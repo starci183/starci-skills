@@ -17,13 +17,5 @@ export function offload(task, payload) {
 /** A plan step run in a worker: same arguments and result as runStep (scripts/supervisor/push-git.mjs). */
 export const stepInWorker = (step, options) => offload('step', { step, options });
 
-/** The Linux parity container run in a worker: same row as runParity (scripts/supervisor/release-linux-parity.mjs). `deps.prepareOnly` runs only the workflow steps the spec leg needs. */
-export const parityInWorker = (repo, deps = {}) => offload('parity', { repo, apps: deps.apps?.(repo) ?? [], specs: deps.specs ?? [], prepareOnly: deps.prepareOnly === true });
-
-/** The parity steps the spec leg prepares with: every workflow step before the first one that runs the declared marker (all steps when none does). */
-export function prepareSelect(marker) {
-  return (step, index, all) => {
-    const stop = all.findIndex((candidate) => candidate.run.includes(marker));
-    return stop < 0 || index < stop;
-  };
-}
+/** The Linux parity container run in a worker: same row as runParity (scripts/supervisor/release-linux-parity.mjs). */
+export const parityInWorker = (repo, deps = {}) => offload('parity', { repo, apps: deps.apps?.(repo) ?? [] });

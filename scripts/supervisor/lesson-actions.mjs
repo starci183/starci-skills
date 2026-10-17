@@ -2,8 +2,7 @@
 // scratch worktree, propose a change to the owner (Telegram). The state, guards and measuring live in
 // scripts/machine/lessons.mjs; these three call the Supervisor's land gate and the owner push, so they sit one tier up.
 //
-//   starci supervisor lesson-actions land --signature <s> --commit <sha>[,<sha>] --lane <name> [--specs <csv>]
-//        [--wrongly-blocked <tests/<name>.spec.mjs>] [--reason <t>] [--wait-ms <ms>] [--json]
+//   starci supervisor lesson-actions land --signature <s> --commit <sha>[,<sha>] --lane <name> [--reason <t>] [--wait-ms <ms>] [--json]
 //   starci supervisor lesson-actions revert --experiment <id> [--apply] [--json]
 //   starci supervisor lesson-actions propose --title <t> --evidence <t> --options <t> --recommendation <t> [--send] [--json]
 import path from 'node:path';
@@ -15,7 +14,6 @@ import { SKILL_ROOT, lanesRoot } from '../machine/home.mjs';
 import { commit as gitCommit } from '../api/git/commit.mjs';
 import { revert as gitRevert } from '../api/git/revert.mjs';
 import { revParseQuery } from '../api/git/rev-parse-query.mjs';
-import { show as gitShow } from '../api/git/show.mjs';
 import { KINDS, commitFiles, guardLand, landedWithin, learningSettings, one, readLearning, write } from '../machine/lessons.mjs';
 import { land } from './land.mjs';
 import { ownerPush } from '../connectors/telegram.mjs';
@@ -24,12 +22,12 @@ import { ownerPush } from '../connectors/telegram.mjs';
  * Guard, land through the gate, record the experiment. `landFn` is land.mjs land (a spec stubs it). Returns
  * {ok, refused?, land?, experiment?}.
  */
-export async function landExperiment({ signature, commits, lane, specs = [], wronglyBlocked = null, reason = null, env = process.env, now = Date.now,
-  waitMs = null, landFn = null, filesOf = commitFiles, readSpec = (rel, sha) => String(gitShow([`${sha}:${rel}`], { cwd: SKILL_ROOT, maxBuffer: 64 * 1024 * 1024 }).stdout ?? '').trim(), settings = learningSettings(), baseline = null }) {
+async function landExperiment({ signature, commits, lane, reason = null, env = process.env, now = Date.now,
+  waitMs = null, landFn = null, filesOf = commitFiles, settings = learningSettings(), baseline = null }) {
   if (!signature || !commits?.length || !lane) throw Object.assign(new Error('land needs --signature, --commit and --lane'), { code: 'land-incomplete' });
   const files = filesOf(commits);
   const state = readLearning({ env });
-  const guard = guardLand({ files, wronglyBlocked, specText: (rel) => commits.map((c) => readSpec(rel, c)).join('\n'), landedToday: landedWithin(state, { now: now() }), cap: settings.dailyAutoLandCap });
+  const guard = guardLand({ files, landedToday: landedWithin(state, { now: now() }), cap: settings.dailyAutoLandCap });
   if (!guard.ok) {
     write(env, KINDS.lesson, { signature, source: 'self', weight: 1, status: 'refused', text: `land refused: ${guard.refusals.map((r) => r.code).join(', ')}`, commits, lane, refusals: guard.refusals }, now());
     return { ok: false, refused: guard.refusals, tier: guard.tier };
@@ -37,11 +35,11 @@ export async function landExperiment({ signature, commits, lane, specs = [], wro
   const doLand = landFn ?? land;
   // --wait-ms: how long to queue for the gate (land.mjs acquireLand), as a lane's land.mjs --wait-ms does. The
   // default allocation.landGate.waitMs gave up behind a queue of lane lands and re-queued at the back (gate-busy).
-  const landed = await doLand({ commits, specs, lane, env, ...(waitMs > 0 ? { waitMs } : {}) });
+  const landed = await doLand({ commits, lane, env, ...(waitMs > 0 ? { waitMs } : {}) });
   if (!landed?.ok) return { ok: false, land: landed };
   const idSource = `${signature}|${commits.join(',')}`;
   const id = `exp-${crypto.createHash('sha1').update(idSource).digest('hex').slice(0, 10)}`;
-  const experiment = write(env, KINDS.experiment, { id, signature, commits, head: landed.head ?? null, lane, tier: guard.tier, files: files.map((f) => f.path), specs,
+  const experiment = write(env, KINDS.experiment, { id, signature, commits, head: landed.head ?? null, lane, tier: guard.tier, files: files.map((f) => f.path),
     reason: one(reason, 500), landedAt: now(), baseline: baseline ?? null }, now());
   return { ok: true, land: landed, experiment };
 }
@@ -51,7 +49,7 @@ export async function landExperiment({ signature, commits, lane, specs = [], wro
  * newest first, one normal commit, the current land gate and the measured result.
  * `apply` false only plans. Seams: landFn, lanes.
  */
-export async function revertExperiment({ id, apply = false, env = process.env, now = Date.now, landFn = null, root = SKILL_ROOT, lanes = null }) {
+async function revertExperiment({ id, apply = false, env = process.env, now = Date.now, landFn = null, root = SKILL_ROOT, lanes = null }) {
   const state = readLearning({ env });
   const e = state.experiments[id];
   if (!e) throw Object.assign(new Error(`no experiment ${id}`), { code: 'experiment-unknown' });
@@ -106,7 +104,7 @@ if (isMain(import.meta.url)) {
   const { argv, verb, value, csv, print } = verbCli();
   try {
     if (verb === 'land') {
-      const r = await landExperiment({ signature: value('signature'), commits: csv(value('commit')), lane: value('lane'), specs: csv(value('specs')), wronglyBlocked: value('wrongly-blocked'), reason: value('reason'), waitMs: Number(value('wait-ms')) || null });
+      const r = await landExperiment({ signature: value('signature'), commits: csv(value('commit')), lane: value('lane'), reason: value('reason'), waitMs: Number(value('wait-ms')) || null });
       let summary;
       if (r.ok) summary = `landed ${r.experiment.id} (${r.experiment.signature}); measuring`;
       else if (r.refused) {

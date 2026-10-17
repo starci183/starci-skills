@@ -3,7 +3,7 @@
 // Host calls go through scripts/api/orca/. Two ways that breaks, both red here:
 //   code   — a .mjs outside scripts/api/orca/ imports the raw runner (ORCA,
 //            orcaRun, orcaCall) from the wrapper lib instead of calling a
-//            wrapper, or (tests/ and packages/ only) spawns orca. A spawn of orca
+//            wrapper, or (e2e/ and packages/ only) spawns orca. A spawn of orca
 //            in the runtime's source roots is RT_EXTERNAL_OWNER's finding (scripts/hfs/runtime-check.mjs).
 //   prose  — agent-facing text tells an agent to run `orca <verb>`, to run a
 //            node path that is not a scripts/api/orca/<verb>.mjs wrapper, or to
@@ -18,7 +18,6 @@ import path from 'node:path';
 import { isMain } from '../lib/is-main.mjs';
 import { walkFiles } from '../lib/walk.mjs';
 import {spawnCalls} from '../lib/spawn-calls.mjs';
-import {releaseTerminalCallRange,releaseTerminalConsumerRanges} from './lib/release-terminal-shape.mjs';
 import {RUNTIME_MANIFEST_FILE,loadSlotManifest,ruleParams} from '../hfs/slots.mjs';
 
 const WRAPPER_DIR='scripts/api/orca';
@@ -31,7 +30,7 @@ const PROSE_ROOTS=['CONTEXT.md','modules/kernel','modules/ops','modules/supervis
   'skills/starci/references/start-workflow.md','skills/starci/references/workflow-chat.md',
   'skills/starci/references/assisted-uat.md','skills/starci/references/release.md','skills/starci/references/host-startup.md','init'];
 const PROSE_EXT=new Set(['.md','.yaml','.yml','.txt']);
-const CODE_ROOTS=['engine','scripts','modules','bin','init','tests','packages'];
+const CODE_ROOTS=['engine','scripts','modules','bin','init','e2e','packages'];
 
 const rel=(root,file)=>path.relative(root,file).replaceAll('\\','/');
 
@@ -62,7 +61,7 @@ const NODE_PATH=/node\s+(\S*orca\S*)/g;
 const LOADS_HOST=/\b(load|loads|loading|read|reads|reading)\b[^.\n]{0,100}modules\/host\/orca/i;
 // (c) agent-launch: every agent launch is orchestration worker-start (modules/kernel/start-workflow.yaml). A terminal the runtime creates itself is the bypass: the terminalCreate wrapper,
 // the calls.yaml `terminal-create` call, a `terminal create` argv or an `orca terminal create` command string. Only
-// code is read, comment lines skipped. Only the adapter's one AST-checked plain release-shell call is admitted.
+// code is read, comment lines skipped.
 const LAUNCH_ROOTS=['engine','scripts','bin','init','modules','packages'];
 const TERMINAL_LAUNCH=[
   [/\bterminalCreate\b/,'the terminalCreate wrapper'],
@@ -81,7 +80,7 @@ const AGENT_CLIS=Object.freeze(['codex','claude','cursor-agent','devin','gemini'
 const AGENT_SPAWN_ROOTS=['scripts','engine','modules','bin'];
 const AGENT_SPAWN_EXT=/\.(?:mjs|cjs|js|ts)$/;
 /** The agent-CLI spawns in one source text: [{line, callee, program}]. Pure. */
-export function agentCliSpawns(text,file='x.mjs'){
+function agentCliSpawns(text,file='x.mjs'){
   return spawnCalls(text,file).calls.flatMap(call=>{
     const program=call.programs.find(p=>AGENT_CLIS.includes(p));
     return program?[{line:call.line,callee:call.callee,program}]:[];
@@ -99,7 +98,7 @@ const COMMENT_LINE=/^\s*(?:\/\/|\/?\*|#)/;
 const IMPORTS_RUNNER=/import\s*\{[^}]*\b(?:ORCA|orcaRun|orcaCall)\b[^}]*\}\s*from\s*['"][^'"]*orca\/lib\.mjs['"]/;
 
 // (a) code: one place builds orca's argv. Who may spawn orca in the runtime's production source is RT_EXTERNAL_OWNER's
-// rule (ruleParams.runtime.sourceRoots of knowledge/hfs/runtime-slots.yaml); the roots it does not read (tests/, packages/,
+// rule (ruleParams.runtime.sourceRoots of knowledge/hfs/runtime-slots.yaml); the roots it does not read (e2e/, packages/,
 // modules/, init/) are read here with the same AST reading. A tree without a runtime manifest is read whole.
 const spawnFileScan = (root, file, layerScan, flag) => {
   const relative = rel(root, file);
@@ -130,10 +129,7 @@ const launchScan=(root,flag)=>{
     for(const file of walk(path.join(root,dir),f=>f.endsWith('.mjs'))){
       if(rel(root,file)===ALLOW_SELF)continue;
       const text=fs.readFileSync(file,'utf8');
-      const admitted=releaseTerminalCallRange(text,rel(root,file));
-      const ranges=admitted?[admitted,...admitted.identifierRanges]:releaseTerminalConsumerRanges(text,rel(root,file));
-      const checked=ranges.sort((a,b)=>b.start-a.start).reduce((value,range)=>value.slice(0,range.start)+' '.repeat(range.end-range.start)+value.slice(range.end),text);
-      checked.split(/\r?\n/).forEach((line,i)=>{
+      text.split(/\r?\n/).forEach((line,i)=>{
         if(COMMENT_LINE.test(line))return;
         const hit=TERMINAL_LAUNCH.find(([re])=>re.test(line));
         if(hit)flag(file,i+1,'agent-launch',`creates a terminal (${hit[1]}) — every agent launch is ${WRAPPER_DIR}/worker-start.mjs`);
@@ -182,7 +178,7 @@ const proseScan=(root,verbs,flag)=>{
 };
 
 /** Every host-boundary violation in `root`. */
-export function findHostBoundaryViolations({root=skillRoot}={}){
+function findHostBoundaryViolations({root=skillRoot}={}){
   const verbs=orcaVerbs(root);
   const found=[];
   const flag=(file,lineNo,rule,detail,code=null)=>{

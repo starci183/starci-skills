@@ -8,20 +8,19 @@
 //       its main moves only with `starci release cut`, which runs the same suites on the exact commit.
 //   --check   everything except the push (clean checkout, full suites, dry-run and hooks-only of the push)
 //
-// The harness never runs a full suite in normal work (config.yaml specs.harness, default false = touching-only:
-// ops, kernels, supervisor lanes, lands and .claude upgrades run only the specs of the code they change; the land
-// gate refuses --specs all). This flow is where the whole suites run, once, before a main leaves the machine:
+// This flow is where the whole suites run, once, before a main leaves the machine:
 //   1. the main checkout must be clean - on branch main, no tracked modification, no staged change. The dirty
 //      paths are reported and NOTHING is stashed, reset or cleaned. (Untracked files are counted, not blocking.)
 //   2. the full suite of that repository, each step to a log file:
-//        .claude          npm test, npm run test:packages, npm run check (the release cut's rows; this flow does not push it)
+//        .claude          npm run test:packages, npm run test:e2e, npm run check (the release cut's rows; this flow does not push it; the runtime has
+//                         no specs of its own, owner ruling no-runtime-specs: the package clean-test and the scaffold e2e are its tests)
 //        app              the app's managed scripts (packages/hfs/templates/app/package-scripts): npm run typecheck,
 //                         npm run lint, npm test (the be unit project only - e2e is manual-only and never run here),
 //                         every npm run build:<side> the app declares (build:be, build:fe), canon-scan
 //                         (scripts/gates/canon-scan.mjs --root <repo>); a managed script the app lacks is `absent`.
 //   3. red: a failure list grouped by spec file (or by file for typecheck/lint/canon), exit 1, and the flow STOPS -
 //      no push, no later repository. The internal release procedure (skills/starci/references/release.md) spawns one fixer per failing group, lands
-//      the fixes (land.mjs --specs touching / ff-main.mjs) and runs the authorized native release flow again. main must not move between
+//      the fixes (starci supervisor land / ff-main.mjs) and runs the authorized native release flow again. main must not move between
 //      the suite and the push: if it did, the run is red (main-moved) and starts over.
 //   4. green: push-mains.mjs pushMains for that repository - a dry run (secret scan), the pre-push hooks alone
 //      (--hooks-only), then the push - and the pushed count. The push is recorded in machine.sqlite `pushes` by
@@ -52,7 +51,7 @@ const MAX_GROUPS = 60;
 /* ------------------------------------------------------------ pure pieces */
 
 /** The state of a main checkout: {branch, onMain, dirty:[porcelain lines], untracked, ahead, head}. Nothing is changed. */
-export function mainState(repo, { run = git } = {}) {
+function mainState(repo, { run = git } = {}) {
   const branch = run(['symbolic-ref', '--short', 'HEAD'], { cwd: repo }).stdout || null;
   const status = run(['status', '--porcelain', '--untracked-files=all'], { cwd: repo });
   const lines = String(status.stdout ?? '').split(/\r?\n/).filter(Boolean);
@@ -69,7 +68,7 @@ const isRuntime = (repo, runtimeRoot = SKILL_ROOT) => samePath(repo, runtimeRoot
 const readPackage = (repo) => readJsonFile(path.join(repo, 'package.json'));
 
 /**
- * The full-suite steps of one checkout. Runtime: npm test + npm run check. App: the managed scripts typecheck, lint,
+ * The full-suite steps of one checkout. Runtime: npm run test:packages, npm run test:e2e, npm run check. App: the managed scripts typecheck, lint,
  * test (the unit project) and every build:<side> the package declares, sorted (each runs only when the package.json
  * declares it - a missing one is an `absent` step, never a pass by silence; no build:<side> at all is one absent
  * `npm run build:<side>`), then canon-scan. e2e is never a step.
@@ -77,7 +76,7 @@ const readPackage = (repo) => readJsonFile(path.join(repo, 'package.json'));
  */
 export function planFor(repo, { runtimeRoot = SKILL_ROOT, pkg = readPackage(repo), skillRoot = SKILL_ROOT } = {}) {
   if (isRuntime(repo, runtimeRoot)) {
-    return { kind: 'runtime', steps: [{ name: 'npm test', cmd: 'npm', args: ['test'] }, { name: 'npm run test:packages', cmd: 'npm', args: ['run', 'test:packages'] }, { name: 'npm run check', cmd: 'npm', args: ['run', 'check'] }] };
+    return { kind: 'runtime', steps: [{ name: 'npm run test:packages', cmd: 'npm', args: ['run', 'test:packages'] }, { name: 'npm run test:e2e', cmd: 'npm', args: ['run', 'test:e2e'] }, { name: 'npm run check', cmd: 'npm', args: ['run', 'check'] }] };
   }
   const scripts = pkg?.scripts ?? {};
   const npmStep = (script, extra = {}) => (scripts[script]
@@ -173,7 +172,7 @@ function consumeEslintLine(line, state, add) {
   return false;
 }
 
-export function failuresOf(name, text, { repo = null } = {}) {
+function failuresOf(name, text, { repo = null } = {}) {
   const groups = new Map();
   const add = (file, item) => {
     const f = rel(file, repo) || '(unparsed)';
@@ -270,7 +269,7 @@ export function runStep(step, { cwd, timeoutMs, tag = 'repo', env = process.env 
  * The flow for one repository: state -> steps -> (unless check) push. Never stashes, resets or cleans.
  * Seams: git, step (runStep), push (pushMains), plan (planFor).
  */
-export function pushGitRepo(repo, { check = false, explicit = false, deps = {} } = {}) {
+function pushGitRepo(repo, { check = false, explicit = false, deps = {} } = {}) {
   const gitRun = deps.git ?? git;
   const stepRun = deps.step ?? runStep;
   const pushRun = deps.push ?? pushMains;
@@ -291,13 +290,13 @@ export function pushGitRepo(repo, { check = false, explicit = false, deps = {} }
 }
 
 /** Which repositories: explicit --repo list, else the runtime plus every bound product repository (push-mains' set). */
-export function selectRepos({ repos = null, deps = {} } = {}) {
+function selectRepos({ repos = null, deps = {} } = {}) {
   if (repos?.length) return { list: repos.map((r) => path.resolve(r)), explicit: true };
   return { list: (deps.defaultRepos ?? defaultPushRepos)(), explicit: false };
 }
 
 /** The whole run: repositories in order, stopping at the first that is not green. */
-export function pushGit({ repos = null, check = false, deps = {} } = {}) {
+function pushGit({ repos = null, check = false, deps = {} } = {}) {
   const { list, explicit } = selectRepos({ repos, deps });
   const results = [];
   for (const repo of list) {
@@ -326,7 +325,7 @@ function describeRepo(r, out) {
   for (const s of r.steps ?? []) describeStep(s, out);
 }
 
-export function describeRun(run) {
+function describeRun(run) {
   const out = [];
   for (const r of run.repos) describeRepo(r, out);
   if (run.notRun?.length) out.push(`not run (stopped at the first red): ${run.notRun.join(', ')}`);
@@ -334,7 +333,7 @@ export function describeRun(run) {
     const check = run.check ? 'CHECK ' : '';
     const pushed = run.check ? '' : ': ' + run.pushed + ' commit(s) pushed';
     out.push('PUSH-GIT ' + check + 'GREEN' + pushed);
-  } else out.push('PUSH-GIT RED: fix the failing groups, land the fixes (starci supervisor land --specs touching), then run starci supervisor push again');
+  } else out.push('PUSH-GIT RED: fix the failing groups, land the fixes (starci supervisor land), then run starci supervisor push again');
   return out.join('\n');
 }
 

@@ -1,8 +1,6 @@
 // runtime-deploy-host.mjs - the host-side seams of `starci runtime deploy`: reading the host tree and its engine, running the new tree's own verbs as children,
 // and journalling the deploy. Each is replaceable in a spec (runtime-deploy.mjs takes them as `deps`).
-import fs from 'node:fs';
 import os from 'node:os';
-import { parseYaml } from '../../engine/yaml.mjs';
 import path from 'node:path';
 import { allocationMs } from '../../engine/config.mjs';
 import { readMachine, withMachine } from '../../engine/db/machine.mjs';
@@ -14,7 +12,7 @@ import { leaderState } from './boot.mjs';
 import { inFlightSteps } from './runtime-deploy-inflight.mjs';
 import { snapshotOf } from './runtime-deploy-verify.mjs';
 import { runLandFullCheck } from '../supervisor/git-land-verify.mjs';
-import { provenFor, runAffectedChild } from './runtime-deploy-affected.mjs';
+import { runRuntimeTests } from '../gates/runtime-tests.mjs';
 
 export const DEPLOY_EVENT = 'runtime-deployed';
 export const DEPLOY_FAILED_EVENT = 'runtime-deploy-failed';
@@ -25,15 +23,12 @@ const CLI = path.join('packages', 'cli', 'bin', 'starci.mjs');
 export const deployNumbers = () => ({ waitMs: allocationMs('deploy.waitMs'), pollMs: allocationMs('deploy.pollMs'), verifyMs: allocationMs('deploy.verifyMs') });
 
 /** Runs `starci <args>` of the host tree as a child (the NEW code after a fast-forward) and parses its JSON: {status, data}. */
-export function runHostVerb(host, args, env) {
+function runHostVerb(host, args, env) {
   const r = runNode([CLI, ...args, '--json'], { cwd: host, env: { ...env, STARCI_RUNTIME: host }, timeout: 1_800_000 });
   let data = null;
   try { data = JSON.parse(String(r.stdout ?? '')); } catch { data = null; }
   return { status: r.error ? 1 : r.status, data, stderr: String(r.stderr ?? r.error?.message ?? '').slice(0, 400) };
 }
-
-/** The budget the source clone's affected run runs in (modules/supervisor/affected-tests.yaml of that tree). */
-const affectedBudget = (dir) => parseYaml(fs.readFileSync(path.join(dir, 'modules', 'supervisor', 'affected-tests.yaml'), 'utf8')).budgetMs;
 
 /** The default seams over the real host. `env` is the verb's environment, `host` the host tree. */
 export function hostSeams({ host, env }) {
@@ -44,11 +39,8 @@ export function hostSeams({ host, env }) {
     inFlight: () => read((machine) => inFlightSteps({ machine, leader: leaderState({ env }) }), []),
     snapshot: () => { const leader = leaderState({ env }); return read((machine) => ({ leader, after: snapshotOf(machine, leader) })); },
     runCheck: (dir) => runLandFullCheck(dir),
-    // The specs the change can break, run in the source clone against the host head as a real child writing a receipt file (runtime-deploy-affected.mjs).
-    runAffected: (dir, base, progress) => runAffectedChild({ dir, base, env, budgetMs: affectedBudget(dir), progress }),
-    provenAffected: (dir, base, tip) => provenFor({ dir, base, tip }),
-    planAffected: (dir, base) => runHostVerb(dir, ['test', 'affected', '--plan', '--base', base], env),
-    affectedBudgetMs: affectedBudget,
+    // The real tests of the source clone against the host head: the package clean-test of the packages the change touches and the scaffold e2e (scripts/gates/runtime-tests.mjs).
+    runTests: (dir, base, progress) => runRuntimeTests({ root: dir, base, env, progress }),
     fetchFrom: (dir) => fetch(['--no-tags', dir, 'HEAD'], { cwd: host }),
     fastForward: (sha) => merge(['--ff-only', sha], { cwd: host }),
     migrate: () => runHostVerb(host, ['runtime', 'artefacts', '--migrate'], env),

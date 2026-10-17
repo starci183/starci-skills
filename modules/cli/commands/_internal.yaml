@@ -1,5 +1,4 @@
 internal:
-  - {path: scripts/api/orca/terminal-create.mjs, why: "Bounded plain release shell preparation, never an agent launcher", usedBy: [scripts/supervisor/release-terminal.mjs]}
   - {path: scripts/reconciler/workflow-up.mjs, why: "Accepted workflow host startup child", usedBy: [scripts/kernel/workflow-startup.mjs]}
   - {path: scripts/agent/quota/index.mjs, why: "Provider quota probe child", usedBy: [scripts/agent/credential-probe.mjs]}
   - {path: scripts/agent/send.mjs, why: "Agent prompt-delivery helper", usedBy: [scripts/agent/lib.mjs]}
@@ -66,8 +65,6 @@ internal:
   - {path: scripts/checks/check-op-judge.mjs, why: "Runtime check-suite member", usedBy: [scripts/checks/check-runtime.mjs]}
   - {path: scripts/checks/check-event-spill.mjs, why: "Runtime check-suite member", usedBy: [scripts/checks/check-runtime.mjs]}
   - {path: scripts/checks/check-root-adhoc.mjs, why: "Runtime check-suite member", usedBy: [scripts/checks/check-runtime.mjs]}
-  - {path: scripts/checks/check-spec-budget.mjs, why: "Runtime check-suite member", usedBy: [scripts/checks/check-runtime.mjs]}
-  - {path: scripts/checks/check-spec-cache-key.mjs, why: "Runtime check-suite member", usedBy: [scripts/checks/check-runtime.mjs]}
   - {path: scripts/checks/check-schema-shared.mjs, why: "Runtime check-suite member", usedBy: [scripts/checks/check-runtime.mjs]}
   - {path: scripts/checks/check-slot-id-shape.mjs, why: "Runtime check-suite member", usedBy: [scripts/checks/check-runtime.mjs]}
   - {path: scripts/checks/check-documented-defaults.mjs, why: "Runtime check-suite member", usedBy: [scripts/checks/check-runtime.mjs]}
@@ -102,7 +99,6 @@ internal:
   - {path: scripts/kernel/transcripts.mjs, why: "Kernel transcript projection helper", usedBy: [scripts/kernel/verbs/report.mjs]}
   - {path: scripts/kernel/typed-logs.mjs, why: "Kernel typed-log helper", usedBy: [scripts/kernel/cli.mjs]}
   - {path: scripts/kernel/usage-record.mjs, why: "Kernel usage-record helper", usedBy: [scripts/kernel/cli.mjs]}
-  - {path: scripts/lib/spec-deps.mjs, why: "Affected-spec dependency resolver", usedBy: [scripts/supervisor/land.mjs]}
   - {path: scripts/machine/close-verify.mjs, why: "Terminal-close verification helper", usedBy: [scripts/kernel/kernel-watchdog.mjs]}
   - {path: scripts/machine/worker-list-all.mjs, why: "Cross-run worker projection", usedBy: [scripts/checks/check-orca-tree.mjs]}
   - {path: scripts/machine/worker-output.mjs, why: "Worker transcript projection", usedBy: [scripts/kernel/transcripts.mjs]}
@@ -120,13 +116,11 @@ internal:
   - {path: scripts/work/validate/check-work-consistency.mjs, why: "Work-validation composition member", usedBy: [scripts/work/validate/work-validate.mjs]}
   - {path: scripts/work/validate/check-work-deep.mjs, why: "Work-validation composition member", usedBy: [scripts/work/validate/work-validate.mjs]}
   - {path: scripts/work/validate/check-work-surfaces.mjs, why: "Work-validation composition member", usedBy: [scripts/work/validate/work-validate.mjs]}
-  - {path: tests/helpers/source-canon-registry.mjs, why: "Scaffold-test registry server", usedBy: [tests/packages-hfs/hfs-scaffold-app.spec.mjs]}
   - {path: packages/hfs/runtime/scripts/hfs/architecture.mjs, why: "Generated runtime copy of the HFS architecture entry", usedBy: [scripts/hfs/sync-runtime.mjs]}
   - {path: scripts/agent/model-scorecard.mjs, why: "Model-scorecard probe run by the debug run verb", usedBy: [scripts/cli/lib/debug-run.mjs]}
   - {path: scripts/reconciler/core-watch.mjs, why: "Core-watch probe run by the debug run verb", usedBy: [scripts/cli/lib/debug-run.mjs]}
   - {path: scripts/gates/release-publish.mjs, why: "Publication owner called by the release publish flow", usedBy: [scripts/supervisor/release-publish-flow.mjs]}
   - {path: scripts/hfs/sync-runtime.mjs, why: "Runtime-copy sync owner called by the release sync-runtime verb", usedBy: [scripts/supervisor/release-sync-runtime.mjs]}
-  - {path: scripts/supervisor/release-affected.mjs, why: "The affected tests row of a release cut under suite ci, run as a plan step", usedBy: [modules/supervisor/release-cut.yaml]}
   - {path: scripts/checks/check-hfs-coverage.mjs, why: "Runtime check-suite member", usedBy: [scripts/checks/check-runtime.mjs]}
   - {path: scripts/checks/check-ruling-cites.mjs, why: "Runtime check-suite member", usedBy: [scripts/checks/check-runtime.mjs]}
   - {path: scripts/hfs/app-wiring.mjs, why: "Lite backend boot proof behind app check --wiring", usedBy: [scripts/hfs/check.mjs]}

@@ -1,14 +1,13 @@
 // release-l4-graph.mjs - the rows of an L4 plan as a schedule graph (release-l4-schedule.mjs runGraph), in the order the release cut runs them (modules/supervisor/release-cut.yaml schedule):
 //   prep         the installs and the test-world build, together
 //   containers   the Linux parity container starts at once and runs beside everything (it works on its own copy of HEAD inside Docker)
-//   root         the root rows one after another (the suite keeps the machine); the spec leg of the parity container follows the suite, its skips decide which spec files it runs
+//   root         the root rows one after another (the package clean-test, the scaffold e2e, the check: they keep the machine)
 //   apps         when the row named by `appsAfter` has ended, every example app's rows start together, each app's own rows in their order
 //   proofs       a Sonar proof starts when its app's rows have ended; the proofs of the apps run together
 // A row already green for this commit (or reused from another one) is `carry`: its recorded result stands in and nothing runs.
 import { appChainLimit, once } from './release-l4-schedule.mjs';
 
 export const LINUX_ROW = 'linux-parity';
-export const SPECS_ROW = 'linux-specs';
 
 const carriedOr = (carry, name, work) => () => carry[name] ?? work();
 
@@ -45,7 +44,7 @@ function appRows({ plan, apps, carry, tasks, trigger, appOf }) {
 }
 
 /**
- * The graph of `plan`: {rows, limits}. `tasks` = {step(step), proof(name), parity(), specs()} do the work; `carry` maps a row name to the result that stands in for running it.
+ * The graph of `plan`: {rows, limits}. `tasks` = {step(step), proof(name), parity()} do the work; `carry` maps a row name to the result that stands in for running it.
  * `deps.hostSample` replaces the host probe that bounds the number of app chains running together.
  */
 export function l4Graph({ plan, apps, settings, tasks, carry = {}, deps = {} }) {
@@ -53,11 +52,7 @@ export function l4Graph({ plan, apps, settings, tasks, carry = {}, deps = {} }) 
   const root = rootRows({ steps: plan.steps, settings, carry, tasks, appOf });
   const rows = [...root.rows, ...appRows({ plan, apps, carry, tasks, trigger: root.trigger, appOf })];
   if (plan.linux && tasks.parity) {
-    const evidence = plan.steps.find((s) => s.evidence);
-    rows.push(
-      { id: LINUX_ROW, pool: 'containers', after: [], run: carriedOr(carry, LINUX_ROW, () => tasks.parity()) },
-      { id: SPECS_ROW, pool: 'containers', after: evidence ? [evidence.name] : [], run: () => (carry[LINUX_ROW] ? null : tasks.specs()) },
-    );
+    rows.push({ id: LINUX_ROW, pool: 'containers', after: [], run: carriedOr(carry, LINUX_ROW, () => tasks.parity()) });
   }
   const { pools } = settings;
   return { rows, limits: { prep: pools.prep, root: pools.root, apps: once(() => appChainLimit({ settings, deps })), proofs: pools.proofs, containers: pools.containers } };

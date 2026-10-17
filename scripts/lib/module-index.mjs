@@ -1,12 +1,12 @@
 // module-index.mjs - the top-level shape of one ES module, read with acorn: its declarations, what each uses, its imports and its exports.
 //
-// The index is what a symbol-level selection (scripts/supervisor/affected-symbols.mjs) needs and nothing more: no scopes, no types. A name used inside
+// The index is what the import graph (scripts/supervisor/module-graph.mjs) needs and nothing more: no scopes, no types. A name used inside
 // a declaration is recorded by its spelling whether or not an inner binding shadows it, so the index over-reports uses and never misses one.
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { boundNames } from './ast-names.mjs';
-import { spawnedEntriesOf } from './spec-deps.mjs';
+import { spawnedEntriesOf } from './relative-imports.mjs';
 
 const SKIPPED_KEYS = new Set(['type', 'start', 'end', 'loc', 'range']);
 
@@ -23,49 +23,14 @@ const children = (node) => Object.keys(node).filter((key) => !SKIPPED_KEYS.has(k
 
 const newUses = () => ({ refs: new Set(), members: new Map(), dynamics: [] });
 
-/** Whether a declaration (or the module level) uses the import `local`: bare, or - when `member` is given - through `local.member` as well. */
-export function usesLocal(uses, local, member = null) {
-  if (uses.refs.has(local)) return true;
-  return member === null ? uses.members.has(local) : Boolean(uses.members.get(local)?.has(member));
-}
 
 // Whether a variable initialiser makes a binding that code can fill in later: no initialiser, `new X(...)`, an empty array or object literal. A
 // declaration that writes such a binding changes what every other declaration reading it sees.
 const holdsState = (init) => !init || init.type === 'NewExpression' || (init.type === 'ArrayExpression' && !init.elements.length) || (init.type === 'ObjectExpression' && !init.properties.length);
 
-const usedNames = (decl) => [...decl.refs, ...decl.members.keys()];
 
-function addUsers(index, reached) {
-  let grew = false;
-  for (const decl of index.decls.values()) {
-    if (!reached.has(decl.name) && [...reached].some((name) => usesLocal(decl, name))) { reached.add(decl.name); grew = true; }
-  }
-  return grew;
-}
 
-function addSharedState(index, reached) {
-  let grew = false;
-  for (const name of reached) {
-    for (const used of usedNames(index.decls.get(name) ?? { refs: [], members: new Map() })) {
-      if (!reached.has(used) && index.decls.get(used)?.state) { reached.add(used); grew = true; }
-    }
-  }
-  return grew;
-}
 
-/**
- * The names of `index` that a change to `names` reaches: `names`, every declaration that uses one of them, and every module-level state binding (a Map, a Set,
- * an empty container, a `let`) that a reached declaration uses - the declarations sharing that state read what the reached one writes - until nothing is added.
- */
-export function usersClosure(index, names) {
-  const reached = new Set(names);
-  let grew = true;
-  while (grew) {
-    const users = addUsers(index, reached);
-    grew = addSharedState(index, reached) || users;
-  }
-  return reached;
-}
 
 /** The exported names that expose one of the local names `locals` (a Set): a declaration or an import binding listed in an export. */
 export const exportsOf = (index, locals) => [...index.exports].filter(([, local]) => locals.has(local)).map(([exported]) => exported);

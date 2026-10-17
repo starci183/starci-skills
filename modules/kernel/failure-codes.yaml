@@ -1155,39 +1155,6 @@ CATALOG_TITLE_DRIFT:
   owner: other-op:work.author
   kind: check-finding
 
-CHANGE_INVALID:
-  title: "Change record malformed"
-  title_vi: "Bản ghi thay đổi không hợp lệ"
-  meaning_vi: "Bản ghi thay đổi (change) của hồ sơ có trường sai: tên lạ, số phiên bản không dương, loại không hợp lệ hoặc thời điểm không đọc được."
-  causes_vi:
-    - "Sai kiểu dữ liệu ở rev, kind hoặc at"
-    - "Có trường không thuộc bản ghi change"
-  nextStep_vi: "Kiểm tra từ chối; op sửa lại bản ghi change cho đúng rồi chạy lại."
-  owner: op-retry
-  kind: check-finding
-
-CHANGE_KIND_MISMATCH:
-  title: "Change kind does not match the edit"
-  title_vi: "Loại thay đổi không khớp nội dung"
-  meaning_vi: "Loại thay đổi mà hồ sơ khai báo khác với loại thay đổi thực tế của lần sửa này."
-  causes_vi:
-    - "Bản đầu tiên không khai là initial"
-    - "Khai sai loại khi sửa nội dung"
-  nextStep_vi: "Kiểm tra từ chối; op khai lại đúng loại thay đổi rồi thử lại."
-  owner: op-retry
-  kind: check-finding
-
-CHANGE_UNRECORDED:
-  title: "Content moved without a revision"
-  title_vi: "Nội dung đổi nhưng không ghi phiên bản"
-  meaning_vi: "Nội dung có giá trị ràng buộc đã thay đổi mà không có phiên bản nào khai báo lần thay đổi đó."
-  causes_vi:
-    - "Sửa nội dung nhưng quên tăng rev"
-    - "Thiếu bản ghi change"
-  nextStep_vi: "Kiểm tra từ chối; op tăng phiên bản và ghi bản ghi change rồi chạy lại."
-  owner: op-retry
-  kind: check-finding
-
 CHECK_MISSING:
   title: "Proof names a check that is not on disk"
   title_vi: "Bằng chứng nhắc tới bộ kiểm không tồn tại"
@@ -2203,17 +2170,6 @@ EVIDENCE_CONTEXT_MISSING:
   owner: op-retry
   kind: check-finding
 
-EVIDENCE_DELETED:
-  title: "Expired evidence was deleted"
-  title_vi: "Bằng chứng hết hạn bị xóa thay vì đánh dấu"
-  meaning_vi: "Bản sửa đã xóa khối bằng chứng cũ; bằng chứng hết hạn chỉ được đánh dấu chứ không được xóa."
-  causes_vi:
-    - "Xóa bằng chứng để làm sạch bản ghi"
-    - "Ghi lại bản ghi từ đầu và làm mất phần cũ"
-  nextStep_vi: "Op sửa bản ghi khôi phục khối bằng chứng và đánh dấu stale kèm lý do."
-  owner: op-retry
-  kind: check-finding
-
 EVIDENCE_DIGEST_MISMATCH:
   title: "Proof file changed since it was hashed"
   title_vi: "Tệp được chứng minh đã đổi so với lúc băm"
@@ -2222,17 +2178,6 @@ EVIDENCE_DIGEST_MISMATCH:
     - "Sửa mã sau khi kiểm chứng"
     - "Bằng chứng cũ chưa được làm mới"
   nextStep_vi: "Chạy lại kiểm chứng trên mã hiện tại để ghi bằng chứng mới, hoặc đánh dấu bằng chứng cũ là stale."
-  owner: op-retry
-  kind: check-finding
-
-EVIDENCE_DIGEST_MISSING:
-  title: "Proof does not say what it covered"
-  title_vi: "Bằng chứng không ghi rõ đã chứng minh cho phiên bản nào"
-  meaning_vi: "Bằng chứng không có mã băm bản ghi nên sau này không thể xét nó có hết hạn hay không."
-  causes_vi:
-    - "Thiếu trường recordDigest"
-    - "Ghi bằng chứng bằng cách viết tay"
-  nextStep_vi: "Người ghi bằng chứng thêm recordDigest của bản ghi lúc chụp bằng chứng rồi ghi lại."
   owner: op-retry
   kind: check-finding
 
@@ -2255,28 +2200,6 @@ EVIDENCE_PATH_MISSING:
     - "Tệp bị xóa hoặc đổi tên"
     - "Sửa cấu trúc thư mục sau khi kiểm chứng"
   nextStep_vi: "Ghi lại bằng chứng trên cấu trúc mã hiện tại."
-  owner: op-retry
-  kind: check-finding
-
-EVIDENCE_STALED_WITHOUT_BREAK:
-  title: "Evidence expired without a breaking change"
-  title_vi: "Bằng chứng bị đánh hết hạn mà chưa có thay đổi phá vỡ"
-  meaning_vi: "Bằng chứng bị đánh dấu hết hạn dù thay đổi chỉ là văn bản hoặc làm rõ, không phá vỡ điều gì."
-  causes_vi:
-    - "Đánh dấu stale quá tay"
-    - "Nhầm sửa câu chữ là thay đổi phá vỡ"
-  nextStep_vi: "Op sửa bản ghi bỏ dấu hết hạn; chỉ thay đổi phá vỡ mới được làm bằng chứng hết hạn."
-  owner: op-retry
-  kind: check-finding
-
-EVIDENCE_STALE_UNMARKED:
-  title: "Breaking change left proof unmarked"
-  title_vi: "Thay đổi phá vỡ nhưng bằng chứng chưa đánh dấu hết hạn"
-  meaning_vi: "Bản sửa làm hỏng điều mà bằng chứng từng chứng minh nhưng bằng chứng vẫn chưa được đánh dấu hết hạn."
-  causes_vi:
-    - "Quên đánh dấu stale khi sửa nội dung quan trọng"
-    - "Chưa chạy lại kiểm chứng"
-  nextStep_vi: "Op sửa bản ghi đánh dấu stale kèm lý do nêu rõ bản sửa và mệnh đề bị mất, hoặc chạy lại kiểm chứng."
   owner: op-retry
   kind: check-finding
 
@@ -4657,16 +4580,6 @@ REV_ACK_OVERDUE:
   surfacedAs: REV_ACK_OVERDUE
   surfacedAt: scripts/reconciler/workflow-plan.mjs
 
-REV_NOT_MONOTONIC:
-  title: "Revision went backwards"
-  title_vi: "Số bản sửa bị giảm"
-  meaning_vi: "Số bản sửa của bản ghi nhỏ hơn trước."
-  causes_vi:
-    - "Đặt tay số thấp"
-  nextStep_vi: "Bộ kiểm tra từ chối; tăng số bản sửa."
-  owner: other-op:work.author
-  kind: check-finding
-
 RIGHTS_GIT_COMMIT:
   title: "Raw git commit write refused"
   title_vi: "Từ chối ghi commit git trực tiếp"
@@ -6238,16 +6151,6 @@ STACKS_UNDECLARED_ENVIRONMENT:
   owner: other-op:workspace.manage
   kind: check-finding
 
-STALE_REASON_UNNAMED:
-  title: "Stale evidence lacks named reason"
-  title_vi: "Bằng chứng cũ chưa nêu lý do"
-  meaning_vi: "Bằng chứng đã hết hạn nhưng không ghi rõ phiên bản nào và điều khoản nào làm nó hết hạn."
-  causes_vi:
-    - "Trường staleReason bị bỏ trống"
-  nextStep_vi: "Bước làm ghi chép cần điền lý do hết hạn (phiên bản và điều khoản) rồi nộp lại."
-  owner: op-retry
-  kind: check-finding
-
 STALL_ESCALATED:
   title: "Stall escalated to the Supervisor"
   title_vi: "Tình trạng đứng yên được chuyển lên Supervisor"
@@ -6572,16 +6475,6 @@ STARCI_WORKFLOW_NOT_FOUND:
   nextStep_vi: "Lệnh bị từ chối; cần kiểm tra mã workflow và dự án."
   owner: op-retry
   kind: input-invalid
-
-STATE_RESTS_ON_STALE_EVIDENCE:
-  title: "Done state rests on expired evidence"
-  title_vi: "Trạng thái xong dựa trên bằng chứng hết hạn"
-  meaning_vi: "Một bản ghi vẫn ghi là xong trong khi bằng chứng của nó đã hết hạn."
-  causes_vi:
-    - "Quên hạ trạng thái khi bằng chứng cũ"
-  nextStep_vi: "Kiểm tra từ chối; bản ghi phải trở về trạng thái chưa làm cho đến khi có bằng chứng mới."
-  owner: op-retry
-  kind: check-finding
 
 STATE_VOCABULARY_UNKNOWN:
   title: "State value not in schema vocabulary"
@@ -7013,39 +6906,6 @@ WAIT_OVERDUE:
   nextStep_vi: "Bộ điều phối ghi vi phạm; Supervisor xem quy trình bị kẹt và mở cổng hoặc gọi chủ sở hữu quyết định."
   owner: supervisor
   kind: blocker
-
-WITHDRAWS_STILL_PRESENT:
-  title: "Withdrawn statement still present"
-  title_vi: "Câu đã rút vẫn còn trong hồ sơ"
-  meaning_vi: "Hồ sơ nói đã rút một câu khẳng định nhưng câu đó vẫn nằm trong danh sách câu khẳng định."
-  causes_vi:
-    - "Quên xóa câu khỏi danh sách statements"
-    - "Ghi nhầm câu cần rút"
-  nextStep_vi: "Bộ kiểm tra thay đổi Work từ chối; op ghi Work xóa câu khỏi statements rồi chạy lại."
-  owner: op-retry
-  kind: check-finding
-
-WITHDRAWS_UNKNOWN_STATEMENT:
-  title: "Withdrawal names unknown statement"
-  title_vi: "Rút một câu mà bản trước không có"
-  meaning_vi: "Hồ sơ rút một câu khẳng định mà phiên bản trước chưa từng có."
-  causes_vi:
-    - "Gõ sai nội dung câu cần rút"
-    - "Câu đã bị đổi chữ ở bản trước"
-  nextStep_vi: "Bộ kiểm tra thay đổi Work từ chối; op ghi Work chép đúng nguyên văn câu của bản trước rồi chạy lại."
-  owner: op-retry
-  kind: check-finding
-
-WITHDRAWS_WITHOUT_BREAKING:
-  title: "Withdrawal not declared breaking"
-  title_vi: "Rút câu nhưng không khai là thay đổi phá vỡ"
-  meaning_vi: "Hồ sơ có rút câu khẳng định nhưng không khai loại thay đổi là phá vỡ tương thích."
-  causes_vi:
-    - "Quên đặt loại thay đổi là breaking"
-    - "Việc rút câu bị nhầm với việc làm rõ câu"
-  nextStep_vi: "Bộ kiểm tra thay đổi Work từ chối; op ghi Work đổi loại thành breaking hoặc bỏ việc rút rồi chạy lại."
-  owner: op-retry
-  kind: check-finding
 
 WORKER_LIST_UNAVAILABLE:
   title: "Orca worker list unavailable"
@@ -7650,13 +7510,12 @@ check-refused:
   owner: supervisor
   kind: settle-reason
 check-relax-unproven:
-  title: "Relaxed check lacks proof"
-  title_vi: "Nới lỏng check nhưng chưa chứng minh"
-  meaning_vi: "Thay đổi sửa bộ kiểm tra nhưng không có spec cho thấy ví dụ đúng mà check đã chặn nhầm."
+  title: "A changed check cannot land autonomously"
+  title_vi: "Check bị sửa không được tự động land"
+  meaning_vi: "Thay đổi sửa bộ kiểm tra (checks, gates, hfs, bộ phán xét work). Runtime không có spec riêng (phán quyết của chủ sở hữu no-runtime-specs), nên một lần land tự động không thể chứng minh check đã chặn nhầm một ví dụ đúng."
   causes_vi:
-    - "Quên kèm --wrongly-blocked với spec liên quan"
-    - "Spec không có chữ wrongly blocked"
-  nextStep_vi: "Đề xuất bị từ chối; thêm spec trong cùng thay đổi chứng minh check chặn nhầm rồi gửi lại."
+    - "Thí nghiệm tự học sửa một file checker"
+  nextStep_vi: "Gửi đề xuất cho chủ sở hữu bằng starci supervisor lesson-actions propose; không nới lỏng check để thành xanh."
   owner: supervisor
   kind: blocker
 check-run-missing:
@@ -15657,28 +15516,6 @@ RT_PORT_RESTATED:
   owner: supervisor
   kind: check-finding
 
-RT_SPEC_OVER_BUDGET:
-  title: "A spec exceeds the land duration budget"
-  title_vi: "Một tệp spec vượt quá ngân sách thời gian của lần land"
-  meaning_vi: "Thời lượng đã ghi của một tệp spec còn tồn tại vượt quá giới hạn chung trong modules/kernel/spec-durations.yaml. Tệp chậm làm kéo dài lần land và phải giảm chi phí thiết lập mà vẫn giữ nguyên từng test, assertion và đường vào production."
-  causes_vi:
-    - "Mỗi test lặp lại việc cài đặt, khởi động tiến trình hoặc dựng fixture nặng"
-    - "Test chờ đồng hồ thật thay vì dùng đồng hồ được tiêm vào"
-  nextStep_vi: "Người giám sát làm theo speed.md: dùng fixture dùng chung trong một tiến trình spec, bỏ cài đặt hoặc khởi động theo từng test, tiêm đồng hồ và không tăng timeout; sau lần land cuối thì làm mới bản ghi thời lượng."
-  owner: supervisor
-  kind: check-finding
-
-RT_SPEC_BUDGET_STALE:
-  title: "A recorded spec duration names a missing file"
-  title_vi: "Một thời lượng spec đã ghi trỏ tới tệp không còn tồn tại"
-  meaning_vi: "Một hàng trong modules/kernel/spec-durations.yaml đặt tên tệp spec không còn tồn tại, nên bản ghi thời lượng của lần land đã cũ và không thể dùng làm ngân sách hiện hành."
-  causes_vi:
-    - "Tệp spec được đổi tên hoặc xóa sau lần làm mới bản ghi gần nhất"
-    - "Bản ghi thời lượng được chép từ một revision khác"
-  nextStep_vi: "Người giám sát làm mới bản ghi từ kết quả land của revision hiện tại để mỗi hàng trỏ tới một tệp spec đang tồn tại."
-  owner: supervisor
-  kind: check-finding
-
 RT_CONFIG_DEFAULT_TWICE:
   title: "A documented default is restated outside its owner"
   title_vi: "Một giá trị mặc định được khai báo lại ngoài tệp chủ"
@@ -16060,16 +15897,6 @@ live-evidence-required:
   nextStep_vi: "Đi qua admission chung để lấy chứng cứ và giữ chỗ trước mọi hiệu ứng khởi động."
   owner: "runtime-core"
   kind: "dispatch-refusal"
-
-observation-unknown:
-  title: "Reservation observation is unknown"
-  title_vi: "Chưa rõ trạng thái chỗ giữ"
-  meaning_vi: "Hòa giải chưa nhận được quan sát tiến trình hoặc chứng cứ kết thúc cho biên nhận này."
-  causes_vi:
-    - "Quan sát bị thiếu hoặc chưa đến."
-  nextStep_vi: "Giữ dung lượng đang chiếm; lấy quan sát có danh tính hoặc chứng cứ kết thúc xác thực."
-  owner: "supervisor"
-  kind: "blocker"
 
 observed-terminal-conflict:
   title: "Observed terminal conflicts with receipt"
@@ -17831,15 +17658,15 @@ RENDER_TOOL_UNAVAILABLE:
   nextStep_vi: "Lệnh giao bị từ chối trước khi tốn một lượt thử, job đứng chờ với lý do host-tool-missing; Supervisor là người giữ máy chủ, cài công cụ nêu trong thông báo rồi job tự sẵn sàng lại ở lần đọc trạng thái sau; không cần op hay chủ dự án."
   owner: supervisor
   kind: dispatch-refusal
-deploy-affected-red:
-  title: "A deploy was refused: the specs the change can break did not all pass on the source commit"
-  title_vi: "Deploy bị từ chối: các spec mà thay đổi có thể làm hỏng không đạt hết trên commit nguồn"
-  meaning_vi: "Sau khi starci runtime check xanh, deploy chạy starci test affected --run --base <đầu cây host> trong clone nguồn và chỉ nhận biên nhận sạch, ok, đúng commit nguồn. Một spec đỏ, thời hạn kết thúc khi còn tệp chưa chạy (thoát 2), biên nhận của commit khác hoặc cây bị đổi trong lúc chạy đều bị từ chối; không có cờ bỏ qua."
+deploy-tests-red:
+  title: "A deploy was refused: the real tests did not all pass on the source commit"
+  title_vi: "Deploy bị từ chối: các bài kiểm thử thật không đạt hết trên commit nguồn"
+  meaning_vi: "Sau khi starci runtime check xanh, deploy chạy các bài kiểm thử thật trong clone nguồn: starci release clean-test --base <đầu cây host> cho mọi package bị thay đổi chạm tới, rồi starci release scaffold-e2e. Một package đỏ hoặc không chạy được, một bài e2e đỏ hoặc bị bỏ qua, hay cây bị đổi trong lúc chạy đều bị từ chối; không có cờ bỏ qua. Runtime không có spec riêng (phán quyết của chủ sở hữu no-runtime-specs)."
   causes_vi:
-    - "Một spec liên quan tới các hàm đã đổi đang đỏ"
-    - "Bộ spec lớn không chạy hết trong thời hạn khai báo của modules/supervisor/affected-tests.yaml"
+    - "Một package bị thay đổi chạm tới không qua được bài kiểm thử của nó sau khi cài sạch"
+    - "Một bài scaffold e2e đỏ, hoặc bị bỏ qua vì thiếu Docker, npm hay registry nguồn"
     - "Clone nguồn đổi HEAD hoặc có tệp mới trong lúc chạy"
-  nextStep_vi: "Sửa spec đỏ đầu tiên trong thông báo, commit, rồi chạy lại starci runtime deploy; với bộ spec quá lớn, chạy starci test affected --run trong clone để thấy tệp nào chưa kịp chạy rồi chạy lại."
+  nextStep_vi: "Sửa package hoặc bài e2e đỏ đầu tiên trong thông báo, commit, rồi chạy lại starci runtime deploy (hoặc starci runtime verify trong clone trước)."
   owner: runtime-core
   kind: verb-refusal
 deploy-ui-install-failed:
@@ -17873,16 +17700,6 @@ RT_HELD_UNSURFACED:
     - "Mã trạng thái chưa có đường báo thì phải ghi surfacedBy open kèm mục đang mở trong sổ ca biên"
   nextStep_vi: "Khai báo surfacedBy, surfacedAs và surfacedAt trong mục của mã (decision-item, sla-clock, incident, digest, notifier, caller hoặc open) và làm cho tệp được trỏ tới thật sự báo cho vai trò giữ mã; nếu chưa làm được thì ghi open và thêm mục open vào modules/reconciler/edge-cases.yaml nêu đúng lý do."
   owner: supervisor
-  kind: check-finding
-SPEC_CACHE_KEY_BLIND:
-  title: "The spec cache key does not move with an input class the affected selector knows"
-  title_vi: "Khóa bộ nhớ đệm spec không đổi khi một loại đầu vào mà bộ chọn affected biết bị thay đổi"
-  meaning_vi: "Self-check spec-cache-key dựng một cây nhỏ cho từng loại đầu vào của một spec (import tĩnh, import động theo chuỗi, require, điểm vào được spawn, tệp dữ liệu nêu bằng đường dẫn hoặc cạnh thư mục của nó, thư mục anh em, thư mục và cây được nêu tên, đầu ra sinh ra của một generator, mỗi gốc dữ liệu, tầng runtime và tầng cây, phiên bản node, preload, lockfile), đổi đúng một tệp của loại đó và đòi khóa phải đổi; một khóa đứng yên cho một thay đổi như vậy sẽ cho tái dùng một kết quả xanh cũ, nên bị từ chối."
-  causes_vi:
-    - "Một loại đầu vào mới được thêm vào bộ chọn affected (một mục generated, một gốc dữ liệu) mà khóa chưa tính"
-    - "Bộ đọc dữ liệu của khóa (spec-cache-reads.mjs) bỏ sót một cách một mô-đun nêu tên một tệp"
-  nextStep_vi: "Thêm loại đầu vào đó vào khóa trong scripts/supervisor/spec-cache-key.mjs hoặc spec-cache-reads.mjs rồi chạy lại starci runtime check --only spec-cache-key; không nới check."
-  owner: runtime-core
   kind: check-finding
 rejudge-not-failed:
   title: "The job is not a failed leg"
@@ -18022,7 +17839,7 @@ kernel-launch-dispatch-mismatch:
 TEST_SPAWN_OUTSIDE_SEAM:
   title: "A test runner is started outside the one launcher that clears the enclosing spec run"
   title_vi: "Một bộ chạy test được khởi động ngoài bộ khởi chạy duy nhất xóa dấu của lần chạy spec bao quanh"
-  meaning_vi: "Một node --test con thừa kế NODE_TEST_CONTEXT tưởng mình là test con của lần chạy bao quanh: nó báo về cha và thoát 0 dù test đỏ, nên một verb chạy spec như tiến trình con (starci test affected, cổng land, release cut) sẽ cho spec đỏ qua khi được gọi từ trong một tiến trình test. Chỉ bộ khởi chạy node của scripts/api/node xóa dấu đó; một tệp ngoài scripts/api mang đối số --test và tự spawn, hoặc một bộ khởi chạy không đi qua forChild, bị từ chối."
+  meaning_vi: "Một node --test con thừa kế NODE_TEST_CONTEXT tưởng mình là test con của lần chạy bao quanh: nó báo về cha và thoát 0 dù test đỏ, nên một verb chạy spec như tiến trình con (starci release clean-test, starci release scaffold-e2e, release cut) sẽ cho spec đỏ qua khi được gọi từ trong một tiến trình test. Chỉ bộ khởi chạy node của scripts/api/node xóa dấu đó; một tệp ngoài scripts/api mang đối số --test và tự spawn, hoặc một bộ khởi chạy không đi qua forChild, bị từ chối."
   causes_vi:
     - "Một tệp mới tự gọi child_process hoặc runProgram với --test thay vì runNode, execNode hoặc spawnNode"
     - "Một bộ khởi chạy trong scripts/api/node/lib.mjs bỏ lời gọi forChild"

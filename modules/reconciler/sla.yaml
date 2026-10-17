@@ -93,7 +93,7 @@ codes:
   LANE_ABANDONED:           {slaMs: 86400000, severity: warn, owner: supervisor, autoAction: 'report, never delete'}
   LANE_CONFLICT_OVERDUE:    {slaMs: 3600000, severity: warn, owner: supervisor, autoAction: 'DI to the Supervisor'}
   LAND_QUEUE_STALL:         {slaMs: 1800000, severity: warn, owner: workers-controller, autoAction: 'unstick the land queue'}
-  LAND_GATE_SLOW:           {slaKey: landGate.specsBaseMs, severity: warn, owner: workers-controller, autoAction: 'none (reported); specsBaseMs + perSpecMs x n rides on the clock'}
+  LAND_GATE_SLOW:           {slaMs: 1800000, severity: warn, owner: workers-controller, autoAction: 'none (reported); the gate checks ride on the clock'}
   LAND_FAILED_UNOWNED:      {slaMs: 3600000, severity: warn, owner: supervisor, autoAction: 'DI to the Supervisor'}
   PUSH_REFUSED_UNOWNED:     {slaMs: 3600000, severity: warn, owner: supervisor, autoAction: 'push-refused DI'}
   LANE_GC_OVERDUE:          {slaKey: housekeeping.gcLaneGraceMs, severity: warn, owner: gc-controller, autoAction: 'GC the merged lane'}

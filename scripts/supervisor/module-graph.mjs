@@ -1,13 +1,13 @@
-// affected-graph.mjs - the module graph a symbol-level selection walks: every `.mjs` module of the repository, indexed, with the links between them.
+// module-graph.mjs - the module graph of the runtime: every `.mjs` module of the repository, indexed, with the links between them (scripts/supervisor/engine-loaded.mjs reads it).
 //
 // A link is one way module `from` reaches module `target`: `import` (a named, default or namespace binding), `reexport`, `dynamic` (a literal import() or
-// require()) and `spawn` (a runtime entry path the module starts as a process, the same strings spec-deps.mjs follows). `owner` is the declaration the
+// require()) and `spawn` (a runtime entry path the module starts as a process, the same strings scripts/lib/relative-imports.mjs follows). `owner` is the declaration the
 // link sits in, or null for a module-level statement. Only relative specifiers resolve inside the repository; a package specifier is no link. A generated
 // module (the CLI catalog) names handler paths as data: the verb rule of land-cli-specs.mjs is the rule for that edge, so it has no dynamic or spawn link.
 import fs from 'node:fs';
 import path from 'node:path';
 import { indexModule } from '../lib/module-index.mjs';
-import { resolveRelative } from '../lib/spec-deps.mjs';
+import { resolveRelative } from '../lib/relative-imports.mjs';
 import { walkFiles } from '../lib/walk.mjs';
 
 const SKIPPED_DIRS = new Set(['node_modules', '.git', '.runtime', 'examples', 'docs']);

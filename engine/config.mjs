@@ -9,7 +9,7 @@ import {validateSonar} from './sonar-config.mjs';
 import {validateRelease,RELEASE_KEYS} from './release-config.mjs';
 import {validateOrca,ORCA_KEYS} from './orca-config.mjs';
 import {validateResources,RESOURCE_KEYS} from './resources-config.mjs';
-import {ENV_NAME,secretEnv,connectorSecret} from './secrets.mjs';
+import { ENV_NAME, connectorSecret } from './secrets.mjs';
 import {byCodeUnit} from './by-code-unit.mjs';
 import {EFFORT_LEVELS,MODELS_KEYS,validateModelsBlock,refuseRemovedKeys,shippedTiers} from './model-config.mjs';
 const knownNames=names=>[...names].sort(byCodeUnit).join(', ');
@@ -162,8 +162,6 @@ function validateConnectors(connectors){
   if(connectors.cloudflare!==undefined)validateCloudflareConnector(connectors.cloudflare);
   if(connectors.telegram!==undefined)validateTelegramConnector(connectors.telegram);
 }
-/** Load connector credentials from the explicitly verified runtime main; never print the returned environment. */
-export function connectorEnv(config,env=process.env,verifiedRuntimeRoot=undefined){return secretEnv(verifiedRuntimeRoot,env);}
 /**
  * The normalized `connectors` block: defaults filled in, the secrets' PRESENCE (booleans, never values),
  * whether each connector is ready to run, and the owner-facing warnings the security posture earns.
@@ -243,8 +241,8 @@ export function uatSettings(config=loadConfig()){
 const GRANT=/^([a-z0-9][a-z0-9.-]*)=(\d+)@([a-z]+(?:\+[a-z]+)*)$/;
 /** One grant string `<pool>=<slots>@<role>+<role>` as {pool, slots, roles}, or null when it is not that shape. */
 /** The closed set of top-level config.yaml blocks: the validator accepts these and refuses every other key. */
-export const CONFIG_BLOCKS=Object.freeze(['language','model','effort','models','allocation','kernel','budgets','supervisor','parallel','delegation','connectors','asks','uat','specs','reconciler','debugLoop','orca','roots','resources','sonar','release','launchTrust','retention']);
-export function parseAllocationGrant(text){
+const CONFIG_BLOCKS=Object.freeze(['language','model','effort','models','allocation','kernel','budgets','supervisor','parallel','delegation','connectors','asks','uat','specs','reconciler','debugLoop','orca','roots','resources','sonar','release','launchTrust','retention']);
+function parseAllocationGrant(text){
   const m=typeof text==='string'?GRANT.exec(text.trim()):null;
   return m?{pool:m[1],slots:Number(m[2]),roles:m[3].split('+')}:null;
 }
@@ -327,7 +325,7 @@ const validateEarlyConfigBlocks=(config)=>{
   if(config?.orca!==undefined){validateOrca(config.orca);} if(config?.roots!==undefined){validateRoots(config.roots);} if(config?.resources!==undefined){validateResources(config.resources);} if(config?.sonar!==undefined){validateSonar(config.sonar);} if(config?.release!==undefined){validateRelease(config.release);}
 };
 const validateConfigBlocks=(config,knownProviders,runtimes,profile)=>{
-  // specs (owner 2026-09-28): {harness?, unit?, e2e?} booleans - each family a boolean; absent = its default (SPEC_DEFAULTS: harness off, unit on, e2e off; specsSettings).
+  // specs (owner 2026-09-28): {unit?, e2e?} booleans - each family a boolean; absent = its default (SPEC_DEFAULTS: unit on, e2e off; specsSettings).
   if(config?.specs!==undefined&&config.specs!==null&&(!plain(config.specs)||Object.keys(config.specs).some(key=>!CONFIG_KEY_TREE.specs.includes(key)||typeof config.specs[key]!=='boolean')))throw new Error(`Invalid config.yaml: specs must be {${SPEC_FAMILIES.map(k=>k+'?: boolean').join(', ')}}, or null.`);
   // reconciler (scripts/reconciler/state.mjs reconcilerConfig): {enabled?: boolean, profile?: operational|observe, controllers?: {<name>: {mode: off|shadow|active}}}, or null.
   if(config?.reconciler!==undefined&&config.reconciler!==null){validateReconcilerBlock(config.reconciler);} if(config?.allocation!==undefined){validateAllocationBlock(config.allocation,runtimes);}
@@ -356,8 +354,8 @@ export function configuredAllocationPolicy(config=loadConfig()){
     :null;
   return {grants,source:allocation?'allocation':'default'};
 }
-/** The variable that confines the owner's `config.yaml` to a directory tree: set, an owner file is read only from under that directory (tests/setup/isolated-temp.mjs points it at a spec's own temp root). */
-export const OWNER_CONFIG_WITHIN_ENV='STARCI_OWNER_CONFIG_WITHIN';
+/** The variable that confines the owner's `config.yaml` to a directory tree: set, an owner file is read only from under that directory (e2e/setup/isolated-temp.mjs points it at a spec's own temp root). */
+const OWNER_CONFIG_WITHIN_ENV='STARCI_OWNER_CONFIG_WITHIN';
 const foldPath=p=>process.platform==='win32'?path.resolve(p).toLowerCase():path.resolve(p);
 /**
  * Whether the owner's `config.yaml` under `root` is visible to this process. Unconfined (the variable unset) every owner file is visible; confined, only the files under the named
@@ -398,31 +396,25 @@ export function inspectOwnerConfig(root=configRoot){
 }
 /**
  * The owner's spec switches (config.yaml root `specs`, owner 2026-09-28; defaults set 2026-09-29, none needs a config block):
- *   harness - .claude's own specs. Default false = touching-only: harness work writes and runs the specs of new or changed code
- *             and the land gate runs only the specs touching the landed files (`land.mjs --specs touching`, its default);
- *             the whole suite never runs in a land - `--specs all` is refused unless this is true. The full suite runs in
- *             the owner-approved /starci release flow (scripts/supervisor/release-cut.mjs), which needs no key. true = `--specs all` may run;
  *   unit    - product unit specs in workflows. Default on: a code-writing op writes/updates the unit specs of the source it
  *             adds or changes and runs only those; the full unit suite is unit.verify's or the approved /starci release flow's. false = the ops'
  *             policy.specsToggle deferral path (scripts/route/spec-deferral.mjs);
  *   e2e     - product e2e in workflows. Default OFF: e2e runs only when the goal or the owner explicitly asks (set true,
  *             or `starci kernel run-deferred-tests`); e2e.verify then runs the FULL e2e suite.
- * An absent, null or unreadable owner file reads as the defaults: harness off, unit on, e2e off.
+ * An absent, null or unreadable owner file reads as the defaults: unit on, e2e off. The runtime itself has no specs (owner ruling no-runtime-specs), so there is no switch for them.
  */
-const SPEC_FAMILIES=Object.freeze(['harness','unit','e2e']);
+const SPEC_FAMILIES=Object.freeze(['unit','e2e']);
 const SEAT_KEYS=Object.freeze(['agent','model','effort']);
 /** The keys each config block accepts directly under it (the validators read these lists; docs/config-format.md and the example are checked against them). Blocks whose keys are open or deeper than this are not listed. */
-export const CONFIG_KEY_TREE=Object.freeze({
+const CONFIG_KEY_TREE=Object.freeze({
   models:MODELS_KEYS,allocation:Object.freeze(['grants']),kernel:SEAT_KEYS,budgets:Object.freeze(['maxOps']),parallel:Object.freeze(['gear']),
   supervisor:Object.freeze(['mode','pollIntervalMs','repos','stallMinutes','kernel','workers','landGate','frozenMinutes']),
   delegation:Object.freeze(['asks','until','excludes','note']),asks:Object.freeze(['autoAcceptRecommended','excludes']),uat:Object.freeze(['maxConcurrent']),
   specs:SPEC_FAMILIES,reconciler:Object.freeze(['enabled','profile','controllers']),debugLoop:Object.freeze(['interval','worktreeLimit']),
   orca:ORCA_KEYS,roots:ROOT_KEYS,resources:RESOURCE_KEYS,release:RELEASE_KEYS,
 });
-export const SPEC_DEFAULTS=Object.freeze({harness:false,unit:true,e2e:false});
+export const SPEC_DEFAULTS=Object.freeze({unit:true,e2e:false});
 export function specsSettings(config){const specs=plain(config?.specs)?config.specs:{};return Object.fromEntries(SPEC_FAMILIES.map(key=>[key,typeof specs[key]==='boolean'?specs[key]:SPEC_DEFAULTS[key]]));}
-/** specs.harness of the owner file under `root` (tolerant read: inspectOwnerConfig): true only when the owner opted in to `--specs all`. */
-export function harnessSpecsEnabled(root=configRoot){return specsSettings(inspectOwnerConfig(root).config).harness;}
 /**
  * config.yaml `debugLoop` (skills/starci, scripts/debug/digest): {interval?, worktreeLimit?}, each optional.
  *   interval       <n>s | <n>m | <n>h — the cadence of the chat /loop that runs `starci debug digest`.

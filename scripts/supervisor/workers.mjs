@@ -56,7 +56,7 @@ const ACTIVE_STATUSES = Object.freeze(['spawning', 'running']);
 const FINAL_STATUSES = Object.freeze(['succeeded', 'failed', 'cancelled']);
 /** sup_attempts.agent is one of these (runtime schema CHECK); any other provider is recorded as null. */
 const MAX_SPAWN_ATTEMPTS = 3;
-export const READINESS_FAILS_PER_HOUR = 2;
+const READINESS_FAILS_PER_HOUR = 2;
 const PROMPT_FILE = path.join(SKILL_ROOT, 'modules', 'supervisor', 'worker-prompt.md');
 const parse = parseJsonOr;
 const csv = (v) => { if (typeof v === 'string') { return v.split(',').map((s) => s.trim()).filter(Boolean); } if (Array.isArray(v)) { return v.map(String); } return []; };
@@ -114,7 +114,7 @@ const SHARED_APPEND_FILES = new Set(['packages/grammar/CHANGELOG.md']);
 const leasable = (files) => files.map(normPath).filter((f) => !SHARED_APPEND_FILES.has(f));
 
 /** Leases other open jobs hold on any of `files`: [{file, jobId}]. */
-export function leaseConflicts(m, files, jobId = null) {
+function leaseConflicts(m, files, jobId = null) {
   const keys = leasable(files);
   if (!keys.length) return [];
   return m.db.prepare(`SELECT path, job_id FROM sup_leases WHERE expires_at>=? AND path IN (${keys.map(() => '?').join(',')})`)
@@ -137,7 +137,7 @@ export function createJob(m, { cluster, title, files = [], incidents = [], specs
 }
 
 // Long-lived leases still expire for dead workers (modules/models/runtimes.yaml allocation.workerJobs.leaseTtlMs).
-export const WORKER_LEASE_TTL_MS = allocationMs('workerJobs.leaseTtlMs');
+const WORKER_LEASE_TTL_MS = allocationMs('workerJobs.leaseTtlMs');
 /** The job's file leases (sup_leases; SHARED_APPEND_FILES stay unleased). {ok} or {ok:false, conflicts}. */
 const takeLeases = (m, job) => m.acquireSupLeases(job.job_id, leasable(job.payload.files), { ttlMs: WORKER_LEASE_TTL_MS });
 export const releaseLeases = (m, jobId) => m.releaseSupLeases(jobId);
@@ -145,9 +145,9 @@ export const releaseLeases = (m, jobId) => m.releaseSupLeases(jobId);
 /* ------------------------------------------------------------ staging */
 
 /** The registry kind of a [Worker] staging checkout (scripts/machine/worktree-registry.mjs ORCA_KINDS). */
-export const STAGING_KIND = 'supervisor-staging';
+const STAGING_KIND = 'supervisor-staging';
 /** The Orca worktree name of a job's staging checkout; Orca derives the branch from it (the receipt is what counts). */
-export const stagingNameOf = (jobId) => `sup-${jobId}`;
+const stagingNameOf = (jobId) => `sup-${jobId}`;
 const branchDeleteMode = (branch, landed) => {
   if (!branch) return null;
   return landed ? 'force' : 'merged';
@@ -238,7 +238,7 @@ function renderWorkerPrompt(job, staging, { template = null, skillRoot = SKILL_R
     .replaceAll('{jobId}', job.job_id).replaceAll('{cluster}', p.cluster).replaceAll('{title}', p.title ?? p.cluster)
     .replaceAll('{incidents}', (p.incidents ?? []).join(', ') || '(none named)')
     .replaceAll('{branch}', staging.branch).replaceAll('{base}', String(staging.base).slice(0, 12)).replaceAll('{staging}', staging.path)
-    .replaceAll('{files}', (p.files ?? []).join(', ')).replaceAll('{specs}', (p.specs ?? []).join(', ') || '(name the spec you add)')
+    .replaceAll('{files}', (p.files ?? []).join(', ')).replaceAll('{specs}', (p.specs ?? []).join(', ') || '(none: the runtime has no specs of its own)')
     .replaceAll('{brief}', String(p.brief ?? '').trim() || '(see the incidents)').replaceAll('{skillRoot}', skillRoot);
 }
 

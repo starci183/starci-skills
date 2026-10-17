@@ -7,9 +7,6 @@ impl:
 flags:
   - {name: job, type: string, summary: Supervisor worker job id to land}
   - {name: commit, type: string, summary: comma-separated commit shas to land}
-  - {name: specs, type: string, summary: "spec files or touching, direct, all, or none"}
-  - {name: reason, type: string, summary: reason required when no spec applies}
-  - {name: full-by-push-git, type: boolean, summary: authorize the full suite from the push flow}
   - {name: lane, type: string, summary: source lane name}
   - {name: notify, type: boolean, summary: file the land outcome in the Supervisor inbox}
   - {name: foreground, type: boolean, summary: "wait for the land in this process; without it the land runs in a detached child that outlives the caller's command window"}
@@ -20,6 +17,6 @@ json: flag
 examples:
   - starci supervisor land --status
   - starci supervisor land --job <job-id>
-  - starci supervisor land --commit <sha> --specs touching --lane <name>
+  - starci supervisor land --commit <sha> --lane <name>
 roles: [coordinator, owner, release]
 editions: [full]

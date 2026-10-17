@@ -9,8 +9,8 @@
 //               a repeat by definition) opens ONE hypothesis: symptom, cause class (gate-defect | brief-gap |
 //               runtime-flow | env | contract-churn), evidence refs
 //   experiment  `land` - the Supervisor's every change goes through here: the authority tier of the changed files
-//               (AUTO lands; PROPOSE is refused - send `propose`), the check guardrail (a changed checker needs a spec
-//               with a correct example the check wrongly blocked), the daily cap on autonomous landings, then the
+//               (AUTO lands; PROPOSE is refused - send `propose`), the check guardrail (a changed checker is proposed, never
+//               landed autonomously: the runtime has no specs), the daily cap on autonomous landings, then the
 //               land gate (land.mjs), then an experiment record with its baseline
 //   measure     every tick (`measureExperiments`): the signature recurring after the land, or a new signature naming
 //               a file the fix changed, or a success-rate drop -> revert due (owed action experiment-revert;
@@ -234,21 +234,17 @@ export function tierOf(files) {
 /**
  * The hard guardrails for an autonomous land. Pure over its inputs; {ok, refusals}.
  *   - tier propose -> refused (send a proposal instead)
- *   - a modified checker (CHECKER: checks, gates, hfs, work judges) needs `wronglyBlocked`: a changed spec under tests/ whose text shows the
- *     correct example the check wrongly blocked ("wrongly blocked" / "wrongly-blocked"); never relax a check to green
+ *   - a modified checker (CHECKER: checks, gates, hfs, work judges) is never landed autonomously: the runtime has no specs of its own (owner ruling
+ *     no-runtime-specs), so no change can prove the check wrongly blocked a correct example; it is proposed to the owner; never relax a check to green
  *   - the daily cap on autonomous landings
  */
-export function guardLand({ files, wronglyBlocked = null, specText = (f) => '', landedToday = 0, cap }) {
+export function guardLand({ files, landedToday = 0, cap }) {
   const refusals = [];
   const t = tierOf(files);
   if (t.tier === 'propose') refusals.push({ code: 'propose-tier', detail: `an IMPORTANT change - propose it to the owner (lesson-actions.mjs propose): ${t.reasons.join('; ')}` });
   const checkers = files.filter((f) => CHECKER.test(norm(f.path)) && f.status !== 'A' && f.status !== 'D');
   if (checkers.length) {
-    const spec = wronglyBlocked ? norm(wronglyBlocked) : null;
-    const inChange = spec && files.some((f) => norm(f.path) === spec && /^tests\/.+\.spec\.mjs$/.test(spec));
-    if (!inChange || !/wrongly[ -]blocked/i.test(specText(spec) ?? '')) {
-      refusals.push({ code: 'check-relax-unproven', detail: `changes checker(s) ${checkers.map((f) => norm(f.path)).join(', ')} without a spec in the change that shows the correct example the check wrongly blocked (--wrongly-blocked <tests/x.spec.mjs>, its text naming "wrongly blocked")` });
-    }
+    refusals.push({ code: 'check-relax-unproven', detail: `changes checker(s) ${checkers.map((f) => norm(f.path)).join(', ')}: the runtime has no specs of its own (owner ruling no-runtime-specs), so an autonomous land cannot prove the check wrongly blocked a correct example; propose it to the owner (lesson-actions.mjs propose)` });
   }
   if (landedToday >= cap) refusals.push({ code: 'daily-cap', detail: `${landedToday} autonomous landing(s) in the last 24 h reach runtimes.yaml supervisorLearning.dailyAutoLandCap ${cap}` });
   return { ok: refusals.length === 0, tier: t.tier, refusals };
@@ -320,7 +316,7 @@ export function learnTick({ items, env = process.env, now = Date.now(), successR
 
 /* ------------------------------------------------------------ lessons: owner feedback, match, export */
 
-export function recordFeedback({ text, signature = null, via = 'chat', refs = [], env = process.env, now = Date.now(), settings = learningSettings() }) {
+function recordFeedback({ text, signature = null, via = 'chat', refs = [], env = process.env, now = Date.now(), settings = learningSettings() }) {
   if (!String(text ?? '').trim()) throw Object.assign(new Error('feedback needs --text'), { code: 'feedback-empty' });
   return write(env, KINDS.lesson, { signature, source: 'owner', via, weight: settings.ownerWeight, status: 'owner-feedback', text: one(text, 1000), refs }, now);
 }
@@ -350,7 +346,7 @@ export function recordLeftover({ klass, count = 1, examples = [], env = process.
 }
 
 /** Lessons relevant to a signature or text, owner first, then by weight and recency. Pure. */
-export function matchLessons(lessons, { signature = null, text = null, limit = 5 } = {}) {
+function matchLessons(lessons, { signature = null, text = null, limit = 5 } = {}) {
   const words = new Set(String(text ?? '').toLowerCase().match(/[a-z0-9][a-z0-9._-]{3,}/g) ?? []);
   const score = (l) => {
     if (signature && l.signature === signature) return 100;
@@ -362,7 +358,7 @@ export function matchLessons(lessons, { signature = null, text = null, limit = 5
 }
 
 /** The versioned lessons file's text from the state (kept, reverted and owner lessons). */
-export function lessonsYaml(state) {
+function lessonsYaml(state) {
   const q = (s) => JSON.stringify(String(s ?? ''));
   const rows = state.lessons.filter((l) => ['kept', 'reverted', 'owner-feedback'].includes(l.status));
   return ['# lessons.yaml - GENERATED by `starci machine lessons export --write` from machine.sqlite sup_learning',

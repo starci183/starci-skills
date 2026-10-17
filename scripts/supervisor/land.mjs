@@ -2,8 +2,8 @@
 // starci supervisor land — the ONE land gate of the live runtime (modules/supervisor/supervise.yaml landGate, docs/supervisor.md).
 // Lands serialize on the land queue; the host lock is held for the publish alone (land-lock.mjs). A change reaches live main only through all of it, or not at all.
 //
-//   starci supervisor land --job <jobId> [--specs <csv>] [--notify] [--json]
-//   starci supervisor land --commit <sha>[,<sha>...] [--specs <csv|touching|direct|all|none>] [--reason <why>] [--full-by-push-git] [--lane <name>] [--notify] [--json]
+//   starci supervisor land --job <jobId> [--notify] [--json]
+//   starci supervisor land --commit <sha>[,<sha>...] [--lane <name>] [--notify] [--json]
 //   starci supervisor land --status [--json]
 // Without --foreground the land runs in a detached child (land-detach.mjs) and the verb answers at once: a caller whose command window is shorter than the gate cannot kill the land.
 //
@@ -26,15 +26,7 @@
 //      sync-runtime --check when the change touches a file a runtime mirror bundles (mirrorDriftCheck, same baseline);
 //      the clean-install proof of every published package the change touches, a file its runtime copy bundles included (packageProofCheck: package-clean-test.mjs --base <base>; red or not run refuses, no baseline);
 //      the FULL `starci runtime check` of the candidate (land-full-check.mjs: packages/cli/bin/starci.mjs runtime check, not only the gate), a step of its own; red refuses, no baseline;
-//      the specs named by the worker/--specs plus the specs that can see the change (node --test,
-//        --test-concurrency allocation.landGate.specConcurrency, timeout specsBaseMs + perSpecMs per spec). Default mode `touching`
-//        (owner rule 2026-09-29, config.yaml `specs.harness` default false = touching-only): the named specs, the specs importing or
-//        spawning a changed file (hub files narrowed to the exports the diff reaches), the specs reading it as data, the tree-wide invariant
-//        specs, and a smoke set of at most SMOKE_LIMIT specs that reach it only through the import graph (land-specs.mjs); a red one refuses.
-//        `--specs direct` is the same without the smoke set. The whole suite is never a land's
-//        job - `--specs all` is refused unless `specs.harness: true` or the push-git flow passes `--full-by-push-git`
-//        (engine/config.mjs harnessSpecsEnabled); `--specs none` needs an explicit `--reason` (recorded as specReason on the
-//        land run); `--specs <csv>` adds named specs;
+//      the runtime carries no specs of its own (owner ruling no-runtime-specs, 2026-10-17): the package proof above and the full check are the land's tests;
 //      current module contracts and citations are checked on the candidate; native gate and package proofs refuse red or unavailable evidence.
 // 3b. git health: a repo whose shared config says core.bare=true fails every work-tree operation ("this operation must be run
 //    in a work tree"); that is refused as `git-unusable` (before the queue and before each scratch), and a cherry-pick that fails
@@ -59,85 +51,33 @@ import { detachedLandLine, startDetachedLand } from './land-detach.mjs';
 import { landQueue, landStatus } from './land-status.mjs';
 export { landQueue, landStatus };
 import { parseYaml } from '../../engine/yaml.mjs';
-import { allocationMs, allocationSettings, harnessSpecsEnabled } from '../../engine/config.mjs';
+import { allocationMs } from '../../engine/config.mjs';
 import { git, normPath } from './workers.mjs';
 import { withMachine, readMachine, writeOrDefer, isMachineBusy } from '../../engine/db/machine.mjs';
-import { safeRemove } from '../api/fs/safe-remove.mjs';
-import { artifactHoldReason } from '../machine/artifact-hold.mjs';
 import { safeRemoveWorktree, createScratchWorktree } from '../machine/worktree-git.mjs';
 import { ci } from '../api/npm/ci.mjs';
 import { markRemoved } from '../machine/worktree-registry.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
 import { withSwcCache } from '../gates/build-env.mjs';
-import { hostThrottle } from '../machine/ram-throttle.mjs';
 import { buildGrammar } from '../gates/grammar-build.mjs';
 import { SKILL_ROOT, lanesRoot, landRoot } from '../machine/home.mjs';
-import { readSpecs } from '../lib/spec-pool.mjs';
-import { specsDirect, changedExports, headRanges, specsInvariant, touchingSelection, SMOKE_LIMIT } from './land-specs.mjs';
 import { fullCheckStep, gateLooseningCheck } from './land-full-check.mjs';
 import { fastForwardLive } from '../machine/live-fast-forward.mjs';
 import { withoutGitLocalEnv } from '../lib/git.mjs'; import { isMain } from '../lib/is-main.mjs'; import { withoutSeatEnv } from '../lib/seat-env.mjs';
-import { tailLines } from '../lib/clip.mjs'; import { underHostLockWaiting } from './land-lock.mjs'; import { selfUpgradeBranchContaining, selfUpgradeIdOf, withSelfUpgradeRef, writeSelfUpgradeRef } from './self-upgrade-ref.mjs'; import { describe, failList, specsRedOnMainOf } from './land-format.mjs'; export { describe };
-import { failKey, landOutcomeOf, recordLand } from './land-record.mjs';
+import { tailLines } from '../lib/clip.mjs'; import { underHostLockWaiting } from './land-lock.mjs'; import { selfUpgradeBranchContaining, selfUpgradeIdOf, withSelfUpgradeRef, writeSelfUpgradeRef } from './self-upgrade-ref.mjs'; import { describe } from './land-format.mjs'; export { describe };
+import { landOutcomeOf, recordLand } from './land-record.mjs';
 import { conflictHint, conflictPreflight, pickConflicts } from './land-conflicts.mjs';
-import { makeTempDir } from '../api/fs/make-temp-dir.mjs';
-export { specsTouching, invariantRootsOf } from './land-specs.mjs'; export { conflictHunks } from './land-conflicts.mjs'; export { conflictPreflight };
-export { specsRedOnMainDecision } from './land-record.mjs';
+export { conflictHunks } from './land-conflicts.mjs'; export { conflictPreflight };
 export const TREE_CHECKS = Object.freeze(['scripts/hfs/sync-runtime.mjs', 'scripts/checks/check-module-yaml.mjs', 'scripts/checks/check-contract-cites.mjs', 'scripts/checks/check-cli-parity.mjs', 'scripts/checks/check-worktree-add.mjs']);
 const MAX_MAIN_RETRIES = 3;
-export const LAND_WAIT_MS = allocationMs('landGate.waitMs');
-/** The spec run's timeout: a base plus a share per spec, so a 70-spec engine change is not cut off under load. */
-export const specConcurrency = () => { const n = Number(allocationSettings()?.landGate?.specConcurrency); if (!Number.isInteger(n) || n < 1) { throw new Error('modules/models/runtimes.yaml allocation.landGate.specConcurrency must be a positive integer'); } return n; };
-export const specTimeoutMs = (count) => allocationMs('landGate.specsBaseMs') + count * allocationMs('landGate.perSpecMs');
-
-/**
- * The land gate's spec run under the RAM-aware throttle (scripts/machine/ram-throttle.mjs, owner ruling 2026-09-28):
- * while the host is `critical` (free RAM under allocation.resources.ramThrottle.landSpecPauseBelowPct, until it is
- * back above landSpecResumeAbovePct) the spec run waits, polling every pollMs up to waitMs; still critical after
- * that, it does not run and the land is refused (a retry lands it once there is room). While `heavy-paused` it runs
- * at half the declared specConcurrency. Returns {ok, concurrency, mode, waitedMs, why}. Seams: probe, sleep, now.
- */
-export function specRunGate({ concurrency = specConcurrency(), waitMs = LAND_WAIT_MS, pollMs = 30_000, probe = () => hostThrottle({}), sleep = sleepSync, now = Date.now } = {}) {
-  const start = now();
-  let t = probe();
-  while (t?.mode === 'critical' && !t.testContext && now() - start < waitMs) { sleep(Math.min(pollMs, Math.max(1, waitMs - (now() - start)))); t = probe(); }
-  const waitedMs = now() - start;
-  if (!t || t.testContext) return { ok: true, concurrency, mode: t?.mode ?? null, waitedMs, why: null };
-  if (t.mode === 'critical') return { ok: false, concurrency: 0, mode: t.mode, waitedMs, why: t.modeWhy };
-  return { ok: true, concurrency: t.mode === 'heavy-paused' ? Math.max(1, Math.floor(concurrency / 2)) : concurrency, mode: t.mode, waitedMs, why: t.modeWhy };
-}
-
-/* ------------------------------------------------------------ pure pieces */
-
-/** --specs keywords: `touching` = the named specs plus every spec naming a changed file (the default); `all` = every spec
- *  (refused unless specs.harness is true or the push-git flow asks); `direct` = the specs that can see the change (hub files narrowed to the exports reached); `none` = no spec (needs an explicit --reason). */
-const SPEC_KEYWORDS = Object.freeze(['touching', 'direct', 'all', 'none']);
-/**
- * The gate's spec plan (owner rule 2026-09-29). The default mode is `touching`: the named specs (--specs csv, a job's) plus
- * every spec touching the change; red refuses. `all` needs `fullAllowed` (config.yaml `specs.harness: true`) or `fullByPushGit`,
- * else the plan is refused (`refused: specs-all-refused`). `none` needs a non-empty `reason` (`specs-none-needs-reason`).
- * Returns {mode: none|touching|all, named, refused?, detail?}.
- */
-export function specPlan({ fullAllowed = false, fullByPushGit = false, asked = [], named = [], reason = null } = {}) {
-  const words = new Set(asked.filter((s) => SPEC_KEYWORDS.includes(s)));
-  const files = [...new Set([...asked.filter((s) => !SPEC_KEYWORDS.includes(s)), ...named])];
-  if (words.has('all') && !(fullAllowed || fullByPushGit)) return { mode: 'touching', named: files, refused: 'specs-all-refused', detail: 'a land never runs the whole suite: config.yaml specs.harness is not true (touching-only); use --specs touching, or /starci release for the full run' };
-  if (words.has('all')) return { mode: 'all', named: files };
-  if (words.has('direct')) return { mode: 'direct', named: files };
-  if (words.has('none')) {
-    if (!String(reason ?? '').trim()) return { mode: 'touching', named: files, refused: 'specs-none-needs-reason', detail: '--specs none needs an explicit --reason "<why no spec touching this change applies>"' };
-    return { mode: 'none', named: [] };
-  }
-  return { mode: 'touching', named: files };
-}
-
+const LAND_WAIT_MS = allocationMs('landGate.waitMs');
 /* ------------------------------------------------------------ scratch */
 
 const outcome = (r) => ({ ok: r.status === 0, status: r.status, stdout: String(r.stdout ?? ''), stderr: String(r.stderr ?? ''), error: r.error?.message ?? null });
 /** `node <args>` in `cwd`, with STARCI_RUNTIME = cwd: the CLI resolves its runtime root from that variable before the per-user record, so every child verifies the tree being landed, not the live checkout. The child is the gate's own work, never the calling seat's tool call: it runs without the seat identity (scripts/lib/seat-env.mjs). */
 const node = (args, { cwd, timeout = 1_200_000, env = process.env } = {}) => outcome(runNode(args, { cwd, timeout, env: { ...withoutSeatEnv(env), STARCI_RUNTIME: cwd }, maxBuffer: 64 * 1024 * 1024 }));
-/** The env the gate's spec run gets: no test-runner channel, no git repository-local variables, no seat identity — a spec's result never depends on which terminal ran the land. */
-export function specRunEnv(parent = process.env) {
+/** The env the gate's test runs get (the package proof): no test-runner channel, no git repository-local variables, no seat identity — a result never depends on which terminal ran the land. */
+function testRunEnv(parent = process.env) {
   const env = withoutSeatEnv(withoutGitLocalEnv(parent));
   delete env.NODE_TEST_CONTEXT;
   return withSwcCache(env);
@@ -166,7 +106,7 @@ export function removeScratch(dir, { root }) {
  * gate read the cherry-pick failure as a conflict. `git -c core.bare=false` does not help a linked worktree; only the
  * config does. The gate never edits the live repo's config: it waits a moment for a transient value, then refuses.
  */
-export function gitHealth({ root = SKILL_ROOT } = {}) {
+function gitHealth({ root = SKILL_ROOT } = {}) {
   const inside = git(['rev-parse', '--is-inside-work-tree'], { cwd: root });
   if (inside.ok && inside.stdout === 'true') return { ok: true };
   const bare = git(['config', '--show-origin', '--get', 'core.bare'], { cwd: root }).stdout;
@@ -177,7 +117,7 @@ const GIT_HEALTH_WAIT_MS = 20_000;
 // The `true` value (and the whitespace before it) at the end of a `git config --show-origin --get core.bare` line.
 const BARE_VALUE = new RegExp([String.raw`\s+`, 'true', '$'].join(''));
 /** gitHealth, retried for a transient value: {ok} or {ok:false, detail, hint, waitedMs}. Seams: check, sleep, now. */
-export function waitGitHealthy({ root = SKILL_ROOT, waitMs = GIT_HEALTH_WAIT_MS, pollMs = 1000, check = gitHealth, sleep = sleepSync, now = Date.now } = {}) {
+function waitGitHealthy({ root = SKILL_ROOT, waitMs = GIT_HEALTH_WAIT_MS, pollMs = 1000, check = gitHealth, sleep = sleepSync, now = Date.now } = {}) {
   const start = now();
   let h = check({ root });
   while (!h.ok && now() - start < waitMs) { sleep(Math.min(pollMs, Math.max(1, waitMs - (now() - start)))); h = check({ root }); }
@@ -208,7 +148,7 @@ function treeCheck(dir, script) {
  * (`<script>: ...`, which carry counts such as "11 dead cite(s) of 5368 checked"). Each of the check-* TREE_CHECKS
  * prints one line per finding naming a file (path or path:line).
  */
-export function findingLines(script, output) {
+function findingLines(script, output) {
   const header = `${path.basename(script, '.mjs')}:`;
   return [...new Set(String(output ?? '').split(/\r?\n/).map((l) => l.trim()).filter((l) => l && !l.startsWith(header)))];
 }
@@ -218,7 +158,7 @@ export function findingLines(script, output) {
  * finding line main lacks (a finding the land removed is fine). A red run printing no finding line falls back to
  * the exact text. {ok, newFindings[]}
  */
-export function baselineVerdict(script, pre, cur) {
+function baselineVerdict(script, pre, cur) {
   if (cur.ok) return { ok: true, newFindings: [] };
   const text = (r) => r?.full ?? r?.output ?? '';
   const found = findingLines(script, text(cur));
@@ -229,94 +169,9 @@ export function baselineVerdict(script, pre, cur) {
   return { ok: newFindings.length === 0, newFindings };
 }
 
-/**
- * The gate's own node --test reporter (written to a temp file per run): one JSON line per failed test, {file, name},
- * `name` the path of names from the file's top-level test down (' > '), so a failure is known by (spec file, test
- * name), never by a count. A todo test failing is not a failure.
- */
-const FAIL_REPORTER = `export default async function* failures(source) {
-  const pending = new Map();
-  const line = (file, f) => JSON.stringify({ file, name: f.path.join(' > ') }) + String.fromCharCode(10);
-  for await (const { type, data } of source) {
-    if (type !== 'test:pass' && type !== 'test:fail') continue;
-    const file = data.file ?? '';
-    const list = pending.get(file) ?? [];
-    const up = list.filter((f) => f.nesting > data.nesting).map((f) => ({ nesting: data.nesting, path: [data.name, ...f.path] }));
-    const next = [...list.filter((f) => f.nesting <= data.nesting), ...(type === 'test:fail' && !data.todo ? [{ nesting: data.nesting, path: [data.name] }] : []), ...up];
-    if (data.nesting === 0) { for (const f of next) yield line(file, f); pending.delete(file); } else pending.set(file, next);
-  }
-  for (const [file, list] of pending) for (const f of list) yield line(file, f);
-}
-`;
-const uniqFailures = (list) => [...new Map(list.map((f) => [failKey(f), f])).values()];
-
-/**
- * Run `files` with node --test in `dir` (the gate's env, the tree's own test preload, `concurrency`): {ok, status,
- * error, stdout, stderr, failures} with failures [{file (repo-relative), name}], or null when the reporter wrote
- * nothing readable (the run crashed before reporting).
- */
-export function runSpecFiles({ dir, files, concurrency, timeout = specTimeoutMs(files.length) }) {
-  const tmpDir = makeTempDir('land-specs-');
-  try {
-    const reporter = path.join(tmpDir, 'failures.mjs');
-    const out = path.join(tmpDir, 'failures.jsonl');
-    fs.writeFileSync(reporter, FAIL_REPORTER);
-    // The tree's own test preloads run first in every spec child (a tree from before them runs without): isolated-registry
-    // isolates the machine registry, runtime-copies regenerates the git-ignored runtime copies the package sources import.
-    const importArgs = ['isolated-registry.mjs', 'runtime-copies.mjs'].map((name) => path.join(dir, 'tests', 'setup', name)).filter((preload) => fs.existsSync(preload)).flatMap((preload) => ['--import', pathToFileURL(preload).href]);
-    const r = node([...importArgs, '--test', `--test-concurrency=${concurrency}`, '--test-reporter=spec', '--test-reporter-destination=stdout',
-      `--test-reporter=${pathToFileURL(reporter).href}`, `--test-reporter-destination=${out}`, ...files], { cwd: dir, timeout, env: specRunEnv() });
-    let failures = null;
-    try {
-      const rel = (f) => normPath(path.isAbsolute(f) ? path.relative(dir, f) : f);
-      failures = uniqFailures(fs.readFileSync(out, 'utf8').split(/\r?\n/).filter(Boolean).map((l) => JSON.parse(l)).map((f) => ({ file: rel(String(f.file)), name: String(f.name) })));
-    } catch { failures = null; }
-    return { ...r, failures };
-  } finally { try { safeRemove(tmpDir, { hold: artifactHoldReason }); } catch { /* temp */ } }
-}
-
-/**
- * Rerun `files` once in a scratch worktree of `root` at `base`: {ok:true, failures, ran} or {ok:false, error} when the
- * base run cannot run (no base tree, no scratch, a crash or timeout, a red run naming no failed test).
- */
-function specBaseRunAt({ root, base, files, concurrency, env = process.env }) {
-  if (!root) return { ok: false, error: 'no base tree to rerun the failing specs at base' };
-  let scratch;
-  try { scratch = makeScratch({ root, base, env }); } catch (e) { return { ok: false, error: `base scratch failed: ${String(e?.message ?? e).slice(0, 300)}` }; }
-  if (!scratch.ok) return { ok: false, error: `base scratch failed: ${String(scratch.error).slice(0, 300)}` };
-  try {
-    const present = files.filter((f) => fs.existsSync(path.join(scratch.dir, f)));
-    if (!present.length) return { ok: true, failures: [], ran: [] };
-    const r = runSpecFiles({ dir: scratch.dir, files: present, concurrency });
-    if (r.error) return { ok: false, error: `base spec run did not finish: ${r.error}` };
-    if (!r.failures) return { ok: false, error: `base spec run wrote no failure report (exit ${r.status}): ${tailLines(r.stdout + r.stderr, 6)}` };
-    if (!r.ok && !r.failures.length) return { ok: false, error: `base spec run exited ${r.status} naming no failed test: ${tailLines(r.stdout + r.stderr, 6)}` };
-    return { ok: true, failures: r.failures, ran: present };
-  } finally { removeScratch(scratch.dir, { root }); }
-}
-
-/**
- * Whether a red spec run passes against its rerun at base: every failure is in a spec the change did not add or modify
- * and main fails that same (file, test name) too. {ok, newFailures, changedSpecFailures, inherited, why}
- */
-export function specBaselineVerdict({ candidate, base, changed = [] }) {
-  if (!candidate) return { ok: false, newFailures: [], changedSpecFailures: [], inherited: [], why: 'the spec run wrote no failure report (it crashed or timed out)' };
-  if (!candidate.length) return { ok: false, newFailures: [], changedSpecFailures: [], inherited: [], why: 'the spec run is red but names no failed test' };
-  const touched = new Set(changed.map(normPath));
-  const changedSpecFailures = candidate.filter((f) => touched.has(f.file));
-  const rest = candidate.filter((f) => !touched.has(f.file));
-  if (rest.length && !base?.ok) return { ok: false, newFailures: [], changedSpecFailures, inherited: [], why: `the rerun at base could not run: ${base?.error ?? 'not run'}` };
-  const known = new Set((base?.failures ?? []).map(failKey));
-  const newFailures = rest.filter((f) => !known.has(failKey(f)));
-  const inherited = rest.filter((f) => known.has(failKey(f)));
-  const ok = !newFailures.length && !changedSpecFailures.length;
-  const why = ok ? null : [changedSpecFailures.length ? `${changedSpecFailures.length} failure(s) in a spec this change added or modified` : null, newFailures.length ? `${newFailures.length} failure(s) main does not have` : null].filter(Boolean).join('; ');
-  return { ok, newFailures, changedSpecFailures, inherited, why };
-}
-
 /** The generator of the published packages' runtime mirrors (packages/hfs/runtime, packages/eslint/{be,fe}/runtime). */
-export const MIRROR_CHECK = 'scripts/hfs/sync-runtime.mjs';
-export const MIRROR_FIX = 'the runtime copies are generated and git-ignored: fix what sync-runtime.mjs mirrors (starci release sync-runtime regenerates them) until its run is clean';
+const MIRROR_CHECK = 'scripts/hfs/sync-runtime.mjs';
+const MIRROR_FIX = 'the runtime copies are generated and git-ignored: fix what sync-runtime.mjs mirrors (starci release sync-runtime regenerates them) until its run is clean';
 
 /** `sync-runtime --check` in `dir`, shaped like a tree check run ({ok, output, full}). */
 export function mirrorRun(dir) {
@@ -330,7 +185,7 @@ export function mirrorRun(dir) {
  * What the candidate's own sync-runtime mirrors, from its exported BUNDLES (never a second list): {bundles[], files[]}
  * runtime-relative, the failure-code catalog included when a bundle carries its slice. null when it cannot be read.
  */
-export function mirroredFiles(dir) {
+function mirroredFiles(dir) {
   const href = pathToFileURL(path.join(dir, MIRROR_CHECK)).href;
   const script = `const m = await import(${JSON.stringify(href)}); const specs = Object.values(m.BUNDLES);
 process.stdout.write(JSON.stringify({ bundles: Object.keys(m.BUNDLES), files: [...new Set([...specs.flatMap((s) => [...s.files]), ...(specs.some((s) => s.catalog) && m.CATALOG ? [m.CATALOG] : [])])] }));`;
@@ -343,7 +198,7 @@ process.stdout.write(JSON.stringify({ bundles: Object.keys(m.BUNDLES), files: [.
  * runs `sync-runtime --check` in the already-synced scratch; any drift still reported refuses with the one fix, drift
  * inherited from main (the baseline entry of the mirror check, same verdict as TREE_CHECKS) is advisory. null when it does not apply.
  */
-export function mirrorDriftCheck({ dir, changed, baseline = null }) {
+function mirrorDriftCheck({ dir, changed, baseline = null }) {
   if (!fs.existsSync(path.join(dir, MIRROR_CHECK))) return null;
   const mirrored = mirroredFiles(dir);
   const files = new Set(mirrored?.files ?? []);
@@ -354,7 +209,7 @@ export function mirrorDriftCheck({ dir, changed, baseline = null }) {
   return { name: 'sync-runtime --check', ok, touches, ...(r.ok ? {} : { output: r.output, ...(ok ? { note: 'red on main too, unchanged by this land' } : { newFindings, hint: MIRROR_FIX }) }) };
 }
 
-export const PACKAGE_PROOF = 'scripts/gates/package-clean-test.mjs';
+const PACKAGE_PROOF = 'scripts/gates/package-clean-test.mjs';
 const PACKAGE_PROOF_TIMEOUT_MS = 3_600_000;
 /**
  * The clean-install proof of every published package the land changes (or whose bundled runtime copy mirrors a changed file): package-clean-test.mjs --base <base> in the scratch
@@ -362,9 +217,9 @@ const PACKAGE_PROOF_TIMEOUT_MS = 3_600_000;
  * or not run (2) refuses; a land that changes no published package passes it without an install. null when the candidate
  * has no such script.
  */
-export function packageProofCheck({ dir, base, runner = node }) {
+function packageProofCheck({ dir, base, runner = node }) {
   if (!fs.existsSync(path.join(dir, PACKAGE_PROOF))) return null;
-  const r = runner([PACKAGE_PROOF, '--base', base], { cwd: dir, timeout: PACKAGE_PROOF_TIMEOUT_MS, env: specRunEnv() });
+  const r = runner([PACKAGE_PROOF, '--base', base], { cwd: dir, timeout: PACKAGE_PROOF_TIMEOUT_MS, env: testRunEnv() });
   return { name: 'package-clean-test', ok: r.ok, output: tailLines(String(r.stdout) + String(r.stderr) + (r.error ? '\n' + String(r.error) : ''), r.ok ? 4 : 60) };
 }
 
@@ -386,81 +241,15 @@ const treeChecks = (dir, baseline) => TREE_CHECKS.flatMap((script) => {
   return [{ name: path.basename(script), ok, ...(r.ok ? {} : { output: r.output, ...(ok ? { note: 'red on main too, unchanged by this land' } : { newFindings }) }) }];
 });
 
-/** The exports a changed .mjs file's diff reaches ({symbols, why}); `symbols` null when the file cannot be narrowed. */
-const symbolsOfChange = ({ dir, base, head, rows }, file) => {
-  const row = rows.find((r) => normPath(r.at(-1)) === file);
-  if (row?.[0] !== 'M' || !/.mjs$/.test(file)) return { symbols: null, why: row?.[0] !== 'M' ? `status ${row?.[0] ?? '?'}` : 'not a .mjs file' };
-  const diff = git(['diff', '-U0', '--no-color', `${base}..${head}`, '--', file], { cwd: dir });
-  const source = git(['show', `${head}:${file}`], { cwd: dir });
-  return diff.ok && source.ok ? changedExports({ source: source.stdout, ranges: headRanges(diff.stdout) }) : { symbols: null, why: 'diff unreadable' };
-};
-
-/** The spec files the gate runs for `specMode` ({allSpecs}) and the hub files `direct` narrowed ({narrowed}). */
-function chooseSpecs({ dir, base, head, rows, changed, specs, specMode }) {
-  const pool = ['touching', 'direct', 'all'].includes(specMode) ? readSpecs(dir) : [];
-  let extra = [], narrowed = [], smoke = [];
-  if (specMode === 'all') extra = pool.map((s) => s.file);
-  else if (specMode === 'touching') { const t = touchingSelection(changed, { specs: pool, root: dir, symbolsOf: (file) => symbolsOfChange({ dir, base, head, rows }, file) }); extra = t.files; narrowed = t.narrowed; smoke = t.smoke; }
-  else if (specMode === 'direct') { const d = specsDirect(changed, { specs: pool, root: dir, symbolsOf: (file) => symbolsOfChange({ dir, base, head, rows }, file) }); extra = [...d.files, ...specsInvariant(changed, { specs: pool })]; narrowed = d.narrowed; }
-  const allSpecs = specMode === 'none' ? [] : [...new Set([...specs.map(normPath), ...extra])].filter((f) => fs.existsSync(path.join(dir, f)));
-  return { allSpecs, narrowed, smoke };
-}
-
-/** The refusal text appended to a red spec run's output. */
-const refusedText = (v) => '\nrefused: ' + String(v.why) + (v.changedSpecFailures.length ? '\n  in a changed spec: ' + String(failList(v.changedSpecFailures)) : '') + (v.newFailures.length ? '\n  new versus main: ' + String(failList(v.newFailures)) : '');
-
-/** The checks of a red spec run: the failing spec files the change did not add or modify run once more at base (red-on-main baseline). A
- *  failure main has too is inherited and reported; any other failure, or a base run that cannot run, refuses. */
-function redSpecChecks(specCheck, r, { base, changed, concurrency, baseTree, env, specBaseRun }) {
-  const candidate = r.error ? null : r.failures;
-  const rerun = [...new Set((candidate ?? []).map((f) => f.file).filter((f) => !changed.includes(f)))];
-  const baseRun = rerun.length ? specBaseRun({ root: baseTree, base, files: rerun, concurrency, env }) : null;
-  const v = specBaselineVerdict({ candidate, base: baseRun, changed });
-  Object.assign(specCheck, { ok: v.ok, newFailures: v.newFailures, changedSpecFailures: v.changedSpecFailures, inherited: v.inherited, ...(baseRun ? { baseRun: { ok: baseRun.ok, files: rerun, ...(baseRun.error ? { error: baseRun.error } : {}) } } : {}) });
-  if (v.ok) specCheck.note = 'red on main too: every failure is inherited from main (see specs red on main)';
-  else specCheck.output = String(specCheck.output) + refusedText(v);
-  const checks = [specCheck];
-  if (v.ok && v.inherited.length) checks.push({ name: `specs red on main (${v.inherited.length})`, ok: true, advisory: true, specsRedOnMain: true, base, inherited: v.inherited,
-    output: `red on main ${String(base).slice(0, 9)} too, not this change's fault - fix main: ${failList(v.inherited)}` });
-  return checks;
-}
-
-/** The checks of one spec run: the run and its red-on-main verdict. */
-function ranSpecChecks({ dir, base, changed, allSpecs, baseTree, env, specBaseRun }, concurrency) {
-  const r = runSpecFiles({ dir, files: allSpecs, concurrency });
-  const specCheck = { name: `specs (${allSpecs.length})`, ok: r.ok, specs: allSpecs, output: tailLines(r.stdout + r.stderr, r.ok ? 6 : 40) };
-  if (r.ok) return [specCheck];
-  return redSpecChecks(specCheck, r, { base, changed, concurrency, baseTree, env, specBaseRun });
-}
-
-/** The spec run of the gate under the RAM throttle: its checks (a paused run, and/or the run itself). */
-function specRunChecks(o) {
-  const { allSpecs, runSpecs, ramGate } = o;
-  const gate = runSpecs && allSpecs.length ? ramGate() : null;
-  const checks = [];
-  if (gate?.ok === false) checks.push({ name: `specs (${allSpecs.length})`, ok: false, specs: allSpecs, output: `spec run paused: host RAM critical after waiting ${Math.round(gate.waitedMs / 1000)}s - ${gate.why}; land again once free RAM is back above allocation.resources.ramThrottle.landSpecResumeAbovePct` });
-  if (runSpecs && allSpecs.length && gate?.ok !== false) checks.push(...ranSpecChecks(o, gate?.concurrency || specConcurrency()));
-  return checks;
-}
-
-const narrowedCheck = (narrowed) => ({ name: 'specs direct: hub files', ok: true, advisory: true, narrowed, output: narrowed.map((n) => String(n.file) + ': ' + String(n.importers) + ' importing specs, kept ' + String(n.kept) + (n.symbols ? ' (exports reached: ' + (n.symbols.join(', ') || 'none') + ')' : ' (' + String(n.why) + ': every importer kept)')).join('; ') });
-
 /** Every required check over the candidate scratch; red or unavailable proof refuses. */
-export function runChecks({ dir, base, head, specs = [], specMode = 'touching', baseline = null, runSpecs = true, baseTree = null, ramGate = specRunGate, env = process.env, specBaseRun = specBaseRunAt }) {
+export function runChecks({ dir, base, head, baseline = null }) {
   const changedOut = git(['diff', '--name-status', `${base}..${head}`], { cwd: dir });
   const rows = changedOut.stdout.split(/\r?\n/).filter(Boolean).map((l) => l.split('\t'));
   const changed = rows.map((r) => normPath(r.at(-1)));
   const present = changed.filter((f) => fs.existsSync(path.join(dir, f)));
   const checks = [...syntaxChecks(dir, present), ...parseChecks(dir, present), ...treeChecks(dir, baseline)];
   for (const step of [mirrorDriftCheck({ dir, changed, baseline }), packageProofCheck({ dir, base }), gateLooseningCheck({ dir, base, head }), fullCheckStep(dir)]) if (step) checks.push(step);
-  const { allSpecs, narrowed, smoke } = chooseSpecs({ dir, base, head, rows, changed, specs, specMode });
-  if (specMode === 'none') checks.push({ name: 'specs skipped', ok: true, advisory: true, output: '--specs none with an explicit --reason: no spec ran (the reason is recorded as specReason on the land run)' });
-  const missing = specs.map(normPath).filter((f) => !fs.existsSync(path.join(dir, f)));
-  if (missing.length) checks.push({ name: 'named specs exist', ok: false, output: `missing: ${missing.join(', ')}` });
-  checks.push(...specRunChecks({ dir, base, changed, allSpecs, runSpecs, baseTree, ramGate, env, specBaseRun }));
-  if (narrowed.length) checks.push(narrowedCheck(narrowed));
-  if (smoke.length) checks.push({ name: 'specs touching: smoke set', ok: true, advisory: true, smoke, output: `${smoke.length} spec(s) reach the change only through imports (at most ${SMOKE_LIMIT} run, spread over spec directories); the rest of that set is the release run's` });
-  return { ok: checks.every((c) => c.ok), checks, changed, rows, specs: allSpecs };
+  return { ok: checks.every((c) => c.ok), checks, changed, rows };
 }
 
 /* ------------------------------------------------------------ the gate */
@@ -471,7 +260,7 @@ export function runChecks({ dir, base, head, specs = [], specMode = 'touching', 
  * how many dependencies package.json names, entries how many node_modules holds (dot entries such as npm's
  * .package-lock.json not counted), null when there is no node_modules.
  */
-export function liveDepsState(root = SKILL_ROOT) {
+function liveDepsState(root = SKILL_ROOT) {
   let declared = 0;
   try { const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')); declared = Object.keys({ ...pkg.dependencies, ...pkg.devDependencies }).length; } catch { /* no manifest: nothing declared */ }
   let entries = null;
@@ -512,7 +301,7 @@ function landedResult({ root, env, deps, result }, { checked, base, head }) {
 
 /** One attempt's work inside its scratch: the pick, the checks, the fast-forward. The result, or null when main moved under it (the gate reruns). */
 function landInScratch(run, scratch, step) {
-  const { commits, specs, specMode, root, env, deps, result, check, liveDeps } = run;
+  const { commits, root, env, deps, result, check, liveDeps } = run;
   const { base } = step;
   const baseline = {};
   if (!deps.runChecks) {
@@ -527,7 +316,7 @@ function landInScratch(run, scratch, step) {
     result.attempts.push({ ...step, reason: 'already-landed' });
     return { ...result, ok: true, alreadyLanded: base, landed: null, base, head: base, checks: [], changed: [] };
   }
-  const checked = check({ dir: scratch.dir, base, head, specs, specMode, baseline, baseTree: root, env });
+  const checked = check({ dir: scratch.dir, base, head, baseline });
   step.head = head;
   step.checks = checked.checks;
   const depsAfter = liveDepsState(root);
@@ -566,18 +355,18 @@ function landAttempt(run, attempt) {
 }
 
 /**
- * Land `commits` (in order) on live main of `root`. `deps.runChecks` replaces the checks in specs. Returns {ok, landed?, base, head?, checks, reason?}. A live runtime without its installed
- * dependencies is refused before any check (reason live-deps-missing): its specs would fail on ERR_MODULE_NOT_FOUND
+ * Land `commits` (in order) on live main of `root`. `deps.runChecks` replaces the checks. Returns {ok, landed?, base, head?, checks, reason?}. A live runtime without its installed
+ * dependencies is refused before any check (reason live-deps-missing): its checks would fail on ERR_MODULE_NOT_FOUND
  * and read as the commit's fault. The same reason refuses a land whose checks ran while the live node_modules lost
  * entries, and result.cleanup.liveDepsLost names a scratch removal after which it had fewer.
  */
-export function landCommits({ commits, specs = [], specMode = 'touching', root = SKILL_ROOT, env = process.env, deps = {} }) {
+function landCommits({ commits, root = SKILL_ROOT, env = process.env, deps = {} }) {
   const check = deps.runChecks ?? runChecks;
   // cleanup is shared by reference with every result below: a scratch this land could not remove shows in it.
   const result = { ok: false, commits, attempts: [], cleanup: { left: [] } };
   const liveDeps = liveDepsState(root);
   if (depsMissing(liveDeps)) return { ...result, reason: 'live-deps-missing', detail: `${path.join(root, 'node_modules')}: ${liveDeps.entries ?? 'no'} entries, package.json declares ${liveDeps.declared}`, hint: depsHint(root) };
-  const run = { commits, specs, specMode, root, env, deps, check, result, liveDeps };
+  const run = { commits, root, env, deps, check, result, liveDeps };
   for (let attempt = 1; attempt <= MAX_MAIN_RETRIES; attempt += 1) {
     const landed = landAttempt(run, attempt);
     if (landed) return landed;
@@ -619,7 +408,7 @@ export function acquireLand({ env = process.env, waitMs = LAND_WAIT_MS, pollMs =
   } catch (error) { process.removeListener('exit', drop); drop(); throw error; }
 }
 
-/** What a land of a job carries: its commits, the specs it names and its source branch, or {refused} (no job, no done report). */
+/** What a land of a job carries: its commits and its source branch, or {refused} (no job, no done report). */
 const jobLandTarget = ({ jobId, commits, root, env }) => {
   const found = readMachine((m) => ({ job: m.supJob(jobId), report: m.supReports({ jobId }).pop()?.report ?? null }), null, { env });
   if (!found?.job) return { refused: { ok: false, reason: 'no-job', detail: jobId } };
@@ -634,7 +423,7 @@ const jobLandTarget = ({ jobId, commits, root, env }) => {
     const range = report.base ? revList(`${report.base}..${report.commit}`) : [report.commit];
     list = range.length ? range : [report.commit];
   }
-  return { commits: list, named: [...new Set([...(report?.specs ?? []), ...(job.payload?.specs ?? [])])], sourceBranch: report?.branch ?? job.payload?.staging?.branch ?? null, supervisorJob: true };
+  return { commits: list, sourceBranch: report?.branch ?? job.payload?.staging?.branch ?? null, supervisorJob: true };
 };
 
 /** Record a land refused before it ran and answer with it. `swallow` keeps a failed record from replacing the answer. */
@@ -673,11 +462,11 @@ const gateBusyResult = (c, lock) => ({ ok: false, commits: c.commits, lane: c.la
   detail: (lock.why === 'db-busy' ? 'machine.sqlite locked; ' : '') + 'waited ' + Math.round((Date.now() - c.startedAt) / 1000) + 's' + (lock.holder ? ' behind ' + String(lock.holder.lane ?? lock.holder.ticketId ?? 'a land') + ' (' + String(lock.holder.commit ?? '').slice(0, 9) + ')' : '') });
 
 /** Write the core record of a landed result; main already moved, so a failed write never turns it into a failed land. */
-const persistLand = (c, result, { ticketId, specMode }) => {
+const persistLand = (c, result, { ticketId }) => {
   const { root, env, lane, commits, jobId, startedAt, deps } = c;
   // A failed record is reported (recordError) and the core record is written again, or queued in the outbox for the next land (recordDeferred).
-  const outcome = landOutcomeOf(result, { ticketId, lane, commits, jobId, specMode, startedAt });
-  try { result.landRun = withMachine((m) => recordLand(m, { result, root, env, ticketId, lane, commits, jobId, specMode, startedAt, outcome, orca: deps.orca }), { env }); }
+  const outcome = landOutcomeOf(result, { ticketId, lane, commits, jobId, startedAt });
+  try { result.landRun = withMachine((m) => recordLand(m, { result, root, env, ticketId, lane, commits, jobId, startedAt, outcome, orca: deps.orca }), { env }); }
   catch (error) {
     result.recordError = String(error?.message ?? error);
     const again = writeOrDefer('recordLandOutcome', [outcome], { env });
@@ -691,40 +480,35 @@ const upgradeIdOf = (c, { sourceBranch, supervisorJob }) => selfUpgradeIdOf({
   lane: c.lane, jobId: supervisorJob ? c.jobId : null });
 
 /** The land itself, inside the gate: the outbox, the checks and the fast-forward, the records. `gate.state` is what the ticket is released as. */
-function landInsideGate(c, { lock, plan, reason, notify, target, gate }) {
+function landInsideGate(c, { lock, notify, target, gate }) {
   const { root, env, commits, jobId, deps } = c;
   // Records an earlier land could not write (machine-db outbox) are applied first, inside the gate.
   let outbox = null;
   try { outbox = withMachine((m) => m.flushOutbox(), { env }); } catch (error) { outbox = { error: String(error?.message ?? error) }; }
-  const landed = { ...landCommits({ commits, specs: plan.named, specMode: plan.mode, root, env, deps }), specMode: plan.mode, ...(plan.mode === 'none' ? { specReason: String(reason).trim() } : {}) };
+  const landed = landCommits({ commits, root, env, deps });
   const result = withSelfUpgradeRef(landed, { root, id: upgradeIdOf(c, target), write: deps.writeSelfUpgradeRef ?? writeSelfUpgradeRef });
   if (outbox && (outbox.flushed || outbox.failed || outbox.error || outbox.busy)) result.outbox = outbox;
   gate.state = result.ok ? 'passed' : 'failed';
-  persistLand(c, result, { ticketId: lock.ticketId, specMode: plan.mode });
-  if (notify || result.grammarRebuild?.ok === false || specsRedOnMainOf(result)) {
+  persistLand(c, result, { ticketId: lock.ticketId });
+  if (notify || result.grammarRebuild?.ok === false) {
     try { withMachine((m) => m.recordSupMessage({ direction: 'in', channel: 'tell', from: 'land-gate', text: describe(result, { jobId }) }), { env }); } catch { /* the land_runs row is the record */ }
   }
   return result;
 }
 
 /** The full gate for one job or commit list, with the queue, the machine records and the optional inbox notice. */
-export async function land({ jobId = null, commits = null, specs = [], reason = null, fullByPushGit = false, lane = null, notify = false, waitMs = LAND_WAIT_MS, root = SKILL_ROOT, env = process.env, deps = {} } = {}) {
-  const asked = specs.map((s) => String(s).trim()).filter(Boolean);
-  let target = { commits, named: [], sourceBranch: null, supervisorJob: false };
+export async function land({ jobId = null, commits = null, lane = null, notify = false, waitMs = LAND_WAIT_MS, root = SKILL_ROOT, env = process.env, deps = {} } = {}) {
+  let target = { commits, sourceBranch: null, supervisorJob: false };
   if (jobId) target = jobLandTarget({ jobId, commits, root, env });
   if (target.refused) return target.refused;
   if (!target.commits?.length) return { ok: false, reason: 'nothing-to-land' };
   const c = { root, env, lane, commits: target.commits, jobId, startedAt: Date.now(), deps };
   const refused = refusalBeforeQueue(c);
   if (refused) return refused;
-  let fullAllowed = false;
-  try { fullAllowed = (deps.specsEnabled ?? harnessSpecsEnabled)(); } catch { /* an unreadable owner file keeps the default: touching-only */ }
-  const plan = specPlan({ fullAllowed, fullByPushGit, asked, named: target.named, reason });
-  if (plan.refused) return { ok: false, commits: c.commits, lane, reason: plan.refused, preflight: true, detail: plan.detail };
   const lock = (deps.acquireLand ?? acquireLand)({ env, waitMs, lane, commits: c.commits });
   if (!lock.ok) return refuseLand(c, gateBusyResult(c, lock));
   const gate = { state: 'cancelled' };
-  try { return landInsideGate(c, { lock, plan, reason, notify, target, gate }); } finally { lock.release(gate.state); }
+  try { return landInsideGate(c, { lock, notify, target, gate }); } finally { lock.release(gate.state); }
 }
 
 if (isMain(import.meta.url)) {
@@ -734,12 +518,12 @@ if (isMain(import.meta.url)) {
   const value = (n) => { const i = argv.indexOf(`--${n}`); return i >= 0 ? argv[i + 1] ?? null : null; };
   const csv = (v) => (v ? v.split(',').map((s) => s.trim()).filter(Boolean) : []);
   if (has('status')) console.log(JSON.stringify(landStatus()));
-  else if (!value('job') && !value('commit')) { console.error('use: starci supervisor land --job <id> | --commit <sha>[,<sha>] [--specs <csv|touching|direct|all|none>] [--reason <why>] [--full-by-push-git] [--lane <name>] [--notify] [--foreground] [--json]'); process.exitCode = 2; }
+  else if (!value('job') && !value('commit')) { console.error('use: starci supervisor land --job <id> | --commit <sha>[,<sha>] [--lane <name>] [--notify] [--foreground] [--json]'); process.exitCode = 2; }
   else if (!has('foreground')) {
     const started = startDetachedLand({ script: fileURLToPath(import.meta.url), argv });
     console.log(has('json') ? JSON.stringify({ ok: true, detached: true, ...started }) : detachedLandLine(started));
   } else {
-    const r = await land({ jobId: value('job'), commits: value('commit') ? csv(value('commit')) : null, specs: csv(value('specs')), reason: value('reason'), fullByPushGit: has('full-by-push-git'), lane: value('lane'),
+    const r = await land({ jobId: value('job'), commits: value('commit') ? csv(value('commit')) : null, lane: value('lane'),
       notify: has('notify'), waitMs: Number(value('wait-ms')) || LAND_WAIT_MS });
     console.log(has('json') ? JSON.stringify(r) : describe(r, { jobId: value('job') }));
     if (!r.ok) process.exitCode = 1;

@@ -11,7 +11,7 @@
 //   app-installs   B3  scripts/gates/release-app-installs.mjs: the published hfs scaffolds an app that installs fresh and runs, none skipped
 //   package-clean  B4  scripts/gates/package-clean-test.mjs: every published package passes its own tests from a clean install
 //   check          C1  `npm run check` of the runtime
-//   specs          C3  the full spec run (the way `npm test` runs it, concurrency 2): 0 failed, 0 cancelled
+//   scaffold-e2e   C3  scripts/gates/scaffold-e2e.mjs: the scaffold e2e, every test ran and passed (the runtime has no specs of its own, owner ruling no-runtime-specs)
 //   checkout       C6  the checkout is on a clean tree and its node_modules are intact
 //   identity       A1,A2,A4  (with --final only) package.json version heads a dated CHANGELOG section with no open markers, on main
 // The land gate is the land wrapper's: it runs before a lane lands, not in this release read. `--only` runs a subset and ends
@@ -24,20 +24,15 @@ import { runNode } from '../api/node/run-node.mjs';
 import { runNpm } from '../api/npm/run-npm.mjs';
 import { porcelainStatus } from '../api/git/porcelain-status.mjs';
 import { revParseQuery } from '../api/git/rev-parse-query.mjs';
-import { safeRemove } from '../api/fs/safe-remove.mjs';
-import { artifactHoldReason } from '../machine/artifact-hold.mjs';
 import { isMain } from '../lib/is-main.mjs';
-import { tapSummary } from '../lib/tap-summary.mjs';
 import { buildPlan } from './release-plan.mjs';
 import { npmRegistry } from './release-registry.mjs';
 import { appInstallsStep, canonPinsStep, checkStep, STEP_STATUS } from './release-proof.mjs';
 import { tailLines } from '../lib/clip.mjs';
-import { makeTempDir } from '../api/fs/make-temp-dir.mjs';
 
 const runtimeRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-export const PROOFS = Object.freeze(['publish-plan', 'canon-pins', 'app-installs', 'package-clean', 'check', 'specs', 'checkout']);
-export const FINAL_PROOFS = Object.freeze(['identity']);
-const SPEC_SETUP = ['tests/setup/low-priority.mjs', 'tests/setup/isolated-temp.mjs', 'tests/setup/isolated-registry.mjs'];
+export const PROOFS = Object.freeze(['publish-plan', 'canon-pins', 'app-installs', 'package-clean', 'check', 'scaffold-e2e', 'checkout']);
+const FINAL_PROOFS = Object.freeze(['identity']);
 const tail = (text, n = 3) => tailLines(text, n, { join: ' | ', max: 500 });
 const result = (id, ok, detail, extra = {}) => ({ id, status: ok ? STEP_STATUS.pass : STEP_STATUS.red, detail, ...extra });
 const unrun = (id, detail) => ({ id, status: STEP_STATUS.toolFailed, detail });
@@ -60,22 +55,14 @@ function packageCleanProof({ root, node }) {
   return result('package-clean', run.status === 0 && Boolean(summary) && summary[2] === '0' && summary[3] === '0', summary ? summary[0] : tail(out));
 }
 
-/** C3: the full spec run; a failing or cancelled test, or a run that printed no summary, is red. */
-function specsProof({ root, node }) {
-  const dir = makeTempDir('release-specs-');
-  const tapFile = path.join(dir, 'specs.tap');
-  try {
-    const args = [...SPEC_SETUP.flatMap((file) => ['--import', `./${file}`]), '--test', '--test-concurrency=2',
-      '--test-reporter=tap', `--test-reporter-destination=${tapFile}`, '--test-reporter=spec', '--test-reporter-destination=stdout', 'tests/**/*.spec.mjs'];
-    const run = node(args, { cwd: root, maxBuffer: 1024 * 1024 * 1024 });
-    if (run.error || run.status === null) return unrun('specs', String(run.error?.message ?? 'the spec run did not start'));
-    const sum = tapSummary(fs.existsSync(tapFile) ? fs.readFileSync(tapFile, 'utf8') : '');
-    const line = `tests=${sum.tests ?? '?'} pass=${sum.pass ?? '?'} fail=${sum.fail ?? '?'} cancelled=${sum.cancelled ?? '?'} skipped=${sum.skipped ?? '?'} todo=${sum.todo ?? '?'}`;
-    const ok = run.status === 0 && sum.tests !== null && sum.fail === 0 && sum.cancelled === 0;
-    return result('specs', ok, ok ? line : `${line}; failing: ${sum.failing.slice(0, 5).join(' | ') || 'none named'}`);
-  } finally {
-    safeRemove(dir, { hold: artifactHoldReason });
-  }
+/** C3: the scaffold e2e; a failed, cancelled or skipped test, or a run that printed no summary, is red. */
+function scaffoldE2eProof({ root, node }) {
+  const run = node([path.join(root, 'scripts', 'gates', 'scaffold-e2e.mjs')], { cwd: root, maxBuffer: 1024 * 1024 * 1024 });
+  const out = `${run.stdout ?? ''}
+${run.stderr ?? ''}`;
+  const summary = /scaffold-e2e: (\d+) of (\d+) passed, (\d+) failed, (\d+) skipped/.exec(out);
+  if (run.error || run.status === null || run.status === 2) return unrun('scaffold-e2e', tail(out));
+  return result('scaffold-e2e', run.status === 0 && Boolean(summary), summary ? summary[0] : tail(out));
 }
 
 /** C6: a clean tracked tree and both node_modules still holding their entries (a removal through a link would empty them). */
@@ -104,7 +91,7 @@ function identityProof({ root, branch = (cwd) => revParseQuery(['--abbrev-ref', 
 }
 
 /** The proofs of `ids` (a subset of PROOFS + FINAL_PROOFS) run in order against `root`; `deps` are the process and npm seams of a spec. */
-export function runProofs({ root = runtimeRoot, ids = PROOFS, deps = {} } = {}) {
+function runProofs({ root = runtimeRoot, ids = PROOFS, deps = {} } = {}) {
   const node = deps.node ?? ((args, opts) => runNode(args, { maxBuffer: 512 * 1024 * 1024, ...opts }));
   const npm = deps.npm ?? ((args, opts) => runNpm(args, { maxBuffer: 512 * 1024 * 1024, ...opts }));
   const registry = deps.registry ?? npmRegistry({ root });
@@ -114,7 +101,7 @@ export function runProofs({ root = runtimeRoot, ids = PROOFS, deps = {} } = {}) 
     'app-installs': () => appInstallsStep({ runtime: root, node }),
     'package-clean': () => packageCleanProof({ root, node }),
     check: () => checkStep({ runtime: root, npm }),
-    specs: () => specsProof({ root, node }),
+    'scaffold-e2e': () => scaffoldE2eProof({ root, node }),
     checkout: () => checkoutProof({ root, git: deps.git }),
     identity: () => identityProof({ root, branch: deps.branch }),
   };

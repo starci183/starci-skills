@@ -9,8 +9,8 @@ purpose: |-
   builds argv from command + flags, refuses a param this file does not declare, requires every
   `required` flag, applies `timeoutMs` and classifies the receipt, so an Orca failure comes back as
   a typed envelope rather than an untyped exception. The wrappers in scripts/api/orca/ — one .mjs
-  file per verb — only name a verb and shape its receipt; tests/repo/provider-orca.spec.mjs refuses a
-  wrapper whose verb this file does not declare.
+  file per verb — only name a verb and shape its receipt; lib.mjs throws on a verb or flag
+  this file does not declare.
 envelope:
   schema: starci/orca-call-result@1
   outcomes: [ok, failed, unknown]
@@ -356,7 +356,7 @@ calls:
       Removes the worktree from Orca and from git. The runtime asks Orca only for a tree that holds no link: its Orca client
       (scripts/machine/worktree-orca.mjs) refuses a tree with a junction or symlink (errorCode worktree-links-present), because Orca
       walks a junction and deletes what it leads to (measured on Orca 1.4.221: a worktree whose node_modules were junctions into a main checkout lost the
-      main's files; tests/api-orca/orca-worktree-rm-live.spec.mjs prints the measurement on every live run). Its one caller is
+      main's files). Its one caller is
       scripts/machine/worktree-orca.mjs removeOrcaWorktree, which removes every link as a link first (check-worktree-add). Orca
       also deletes the checked-out local branch when it can prove the branch merged and keeps it otherwise, so a caller that
       deletes the branch itself first checks it still exists.
@@ -395,8 +395,7 @@ calls:
     replay: none
     note: |-
       Removes a project host setup; a repo-backed setup's id is the repo id that repo add answered, and deleting it removes
-      the repository registration (Orca has no repo rm). Live specs that register a throwaway repository remove it with
-      this call in their teardown (tests/api-orca/orca-worktree-rm-live.spec.mjs).
+      the repository registration (Orca has no repo rm).
     flags: [setup]
     required: [setup]
     receipt: [result]
@@ -439,18 +438,6 @@ calls:
     required: [url, page, worktree]
     receipt: [result]
     note: Rebind only the workflow's persisted input page after helper restart. Never navigate an unrelated owner tab.
-  terminal-create:
-    command: terminal create
-    kind: mutation
-    replay: none
-    flags: [worktree, shell, title]
-    required: [worktree, shell, title]
-    receipt: [result]
-    creates: terminal
-    note: >-
-      Maintenance only: scripts/api/orca/terminal-create.mjs selects this Source's unique registered
-      worktree, shell powershell.exe and the fixed release title. Never command/environment/focus/agent
-      parameters or retry-request. The runner never retries receipt loss; the caller retains unknown custody.
   terminal-list:
     command: terminal list
     kind: read

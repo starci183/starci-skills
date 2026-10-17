@@ -4,7 +4,7 @@
 //   2. the release tag `v<version>` is named, is not on the remote yet, and is either absent or an annotated tag already on HEAD; any other tag is refused;
 //   3. RELEASE_NOTES holds: the tag's CHANGELOG section exists and has no unfinished entries (scripts/hfs/runtime-rules/release-notes.mjs), and the rest of the release
 //      definition that can hold before the suite ran (scripts/guards/release-definition.mjs: the version moved past the remote main's, a dated heading); `--plan` stops here and reports what the cut would run;
-//      the release host provides what L4 needs (scripts/supervisor/release-host.mjs: an Orca terminal, a reachable Orca, a Docker daemon), else the cut refuses `release-host` at once;
+//      the release host provides what L4 needs (scripts/supervisor/release-host.mjs: the lockfile install and a Docker daemon), else the cut refuses `release-host` at once;
 //   4. the L4 row runs once (scripts/supervisor/release-l4.mjs: the example installs, every spec, lint, checks, tsc, images, the Sonar proof and the Linux parity step), as a schedule whose rows run together where they are independent,
 //      each step to a log recorded in the result; a row green for this very commit, or green with an identical input set on an earlier commit (scripts/supervisor/release-reuse.mjs; never the rows the pre-push gate requires), is not run again:
 //      `--rows` re-runs named rows alone on the same commit, `--no-reuse` runs every row;
@@ -35,7 +35,6 @@ import { combine, decisionLines, needsSonar, refusalFor, remember, selectionFor 
 import { scanRange } from './push-mains.mjs';
 import { planOf, preSuiteRefusal } from './release-cut-plan.mjs';
 import { releaseHostMissing, releaseHostWhy } from './release-host.mjs';
-import { prepareReleaseTerminal } from './release-terminal.mjs';
 import { withHostLock as holdHostLock } from '../machine/host-lock.mjs';
 import { writeL4Record } from '../guards/release-record.mjs';
 import { suiteModeOf } from '../guards/release-suite-mode.mjs';
@@ -64,7 +63,7 @@ function pushLiftTarget({ pushUrl, fetchUrl }) {
 }
 
 /** The refs a release push may carry: main and one release tag. Pure: the refusal reason, or null. */
-export function pushRefusal({ refs, branch = 'main' }) {
+function pushRefusal({ refs, branch = 'main' }) {
   const odd = refs.filter((ref) => ref !== branch && !RELEASE_TAG.test(String(ref).replace(/^refs\/tags\//, '')));
   if (odd.length) return `only ${branch} and a release tag v* may be pushed, not ${odd.join(', ')}`;
   if (!refs.includes(branch)) return `a release pushes ${branch} with its tag`;
@@ -109,18 +108,13 @@ function releaseTagState({ tag, branch, remote, cwd, run, out, refuse }) {
 
 /**
  * What is already known to stop the cut before the suite runs, as a refusal or null: the release definition (scripts/guards/release-definition.mjs) is what the pre-push hook enforces, and what the
- * L4 row needs from this host (an Orca terminal, a reachable Orca, a Docker daemon) decides whether the row can pass at all: a cut that would fail an hour in refuses in seconds.
+ * L4 row needs from this host (the lockfile install, a Docker daemon) decides whether the row can pass at all: a cut that would fail an hour in refuses in seconds.
  */
 async function beforeSuiteRefusal({ repo, run, cwd, head, remote, branch, tag, deps, refuse, sonar, plan }) {
   const unmet = await preSuiteRefusal({ repo, run, cwd, head, remote, branch, tag, deps, sonar });
   if (unmet) return refuse(unmet.verdict, unmet.why, { findings: unmet.findings });
-  const hostMissing = (deps.host ?? releaseHostMissing)({ repo, root: cwd });
-  if (!hostMissing.length) return null;
-  if (plan || hostMissing.length !== 1 || hostMissing[0].need !== 'an Orca terminal')
-    return refuse('release-host', releaseHostWhy(hostMissing), { hostMissing });
-  // A real cut may prepare only the missing shell. It still refuses: no suite, tag, push or invented environment.
-  const terminalPreparation = (deps.prepareTerminal ?? prepareReleaseTerminal)({ repo });
-  return refuse('release-host', releaseHostWhy(hostMissing) + '; ' + terminalPreparation.why, { hostMissing, terminalPreparation });
+  const hostMissing = (deps.host ?? releaseHostMissing)({ root: cwd });
+  return hostMissing.length ? refuse('release-host', releaseHostWhy(hostMissing), { hostMissing }) : null;
 }
 
 /** The refusal of a `--rows` the plan or the ledger of this commit cannot serve, or null. */

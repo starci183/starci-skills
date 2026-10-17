@@ -1,7 +1,7 @@
 // engine-loaded.mjs — the files the long-lived engine process loads, derived from the import graph of the entries modules/kernel/revision-scope.yaml
 // declares (`engineEntries`): everything reachable through static and literal dynamic imports. A process the engine only spawns is not loaded by it.
 import { globExpression } from '../lib/glob.mjs';
-import { buildGraph, readModules } from './affected-graph.mjs';
+import { buildGraph, readModules } from './module-graph.mjs';
 
 /** The engine entries that exist in the tree at `root` and the set of files reachable from them: {entries, loaded}. */
 export function engineLoadedSet(root, doc) {

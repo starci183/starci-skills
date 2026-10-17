@@ -21,7 +21,6 @@ import { receiptFor, writeReceipt } from './runtime-deploy-receipt.mjs';
 import { waitForQuiet, stepLine } from './runtime-deploy-inflight.mjs';
 import { verifyRestart } from './runtime-deploy-verify.mjs';
 import { DEPLOY, refusal } from './runtime-deploy-codes.mjs';
-import { affectedJudgement } from './runtime-deploy-affected.mjs';
 import { revParse } from '../api/git/rev-parse.mjs';
 import { symbolicRefQuery } from '../api/git/symbolic-ref-query.mjs';
 
@@ -33,21 +32,14 @@ function hostFacts(host) {
 }
 
 /** Every read the judgement needs: no write. */
-function gather({ from, host, seams, env, plan = false }) {
+function gather({ from, host, seams, env }) {
   const source = resolveSource(from, host);
   const hostState = hostFacts(host);
   if (!source.ok) return { source, host: hostState };
   const range = rangeOf(source, hostState.head);
   const sourceDirty = source.kind === 'clone' && isDirty(source.dir);
   const receipt = receiptFor({ sha: source.sha, tree: source.tree, base: hostState.head, host, env, root: source.dir });
-  const affectedPlan = plan && source.kind === 'clone' && !receipt ? affectedPlanOf(seams, source.dir, hostState.head) : null;
-  return { source, host: hostState, range, sourceDirty, receipt, affectedPlan, lock: seams.lockOwner(), leader: seams.leader(), inFlight: seams.inFlight() };
-}
-
-/** What --plan says of the affected run: the size of the set and the budget it runs in; the run itself is not started. */
-function affectedPlanOf(seams, dir, base) {
-  const planned = seams.planAffected(dir, base);
-  return { files: planned.data?.scope?.length ?? null, budgetMs: seams.affectedBudgetMs(dir), error: planned.status === 0 ? null : planned.stderr || `exit ${planned.status}` };
+  return { source, host: hostState, range, sourceDirty, receipt, lock: seams.lockOwner(), leader: seams.leader(), inFlight: seams.inFlight() };
 }
 
 function lockRefusal(lock) {
@@ -74,10 +66,7 @@ export function judge(facts) {
 /** The steps the verb would take, in order, for the facts. */
 function plannedSteps(facts) {
   const { source, range } = facts;
-  const ap = facts.affectedPlan;
-  const affectedText = ap ? `run starci test affected --run --base ${facts.host.head.slice(0, 12)} in ${source.dir}: ${ap.files ?? 'an unknown number of'} spec file(s), budget ${Math.round((ap.budgetMs ?? 0) / 60_000)} min (exit 0, a clean receipt on the tip)` : null;
-  const thenAffected = affectedText ? ', then ' + affectedText : '';
-  const runCheck = 'run starci runtime check in ' + source.dir + ' (exit 0 required)' + thenAffected + ', and write the receipt';
+  const runCheck = `run starci runtime check in ${source.dir} (exit 0 required), then the real tests against ${facts.host.head.slice(0, 12)} (release clean-test --base and release scaffold-e2e, all green), and write the receipt`;
   const check = facts.receipt ? `check receipt present (${facts.receipt.via})` : runCheck;
   const wait = facts.inFlight.length ? `wait for ${facts.inFlight.length} step(s) in flight: ${facts.inFlight.map(stepLine).join('; ')}` : 'no step in flight';
   return [check, `take the host lock (purpose runtime-deploy)`, wait,
@@ -104,34 +93,28 @@ const refused = (facts, found, extra = {}) => result(1, false, `starci runtime d
 
 const tailOf = (output) => String(output ?? '').trim().split(/\r?\n/).slice(-6).join(' | ');
 
-/** The affected specs of the source against the host head: a receipt already proven for the pair, else a real run. {affected} or {refusal}. */
-async function affectedProof({ facts, seams, progress }) {
+/** The real tests of the source against the host head (scripts/gates/runtime-tests.mjs): {tests} or {refusal}. */
+async function testsProof({ facts, seams, progress }) {
   const { source } = facts;
   const base = facts.host.head;
-  const proven = seams.provenAffected(source.dir, base, source.sha);
-  if (proven) {
-    progress(`affected: accepting the receipt already proven for ${base.slice(0, 12)}..${source.sha.slice(0, 12)} (${proven.passed} of ${proven.total} files passed); not run again`);
-    return { affected: { base: proven.base, tip: proven.tip, ...(proven.root ? { root: proven.root } : {}), passed: proven.passed, total: proven.total } };
-  }
-  const plan = facts.affectedPlan ?? affectedPlanOf(seams, source.dir, base);
-  progress(`affected: running ${plan.files ?? 'an unknown number of'} spec file(s) in ${source.dir} against ${base.slice(0, 12)}, budget ${Math.round((plan.budgetMs ?? 0) / 60_000)} min; progress follows`);
-  const judged = affectedJudgement(await seams.runAffected(source.dir, base, progress), { sha: source.sha, base });
-  return judged.affected ? judged : { refusal: refusal(DEPLOY.affectedRed, `starci test affected --run --base ${base.slice(0, 12)} in ${source.dir}: ${judged.detail}`) };
+  const run = await seams.runTests(source.dir, base, progress);
+  if (!run.ok) return { refusal: refusal(DEPLOY.testsRed, `the tests of ${source.sha.slice(0, 12)} against ${base.slice(0, 12)} in ${source.dir}: ${run.problems.join('; ')}`) };
+  return { tests: { base, tip: source.sha, root: source.dir, packages: run.packages, e2e: run.e2e } };
 }
 
-/** The check, then the specs the change can break, in the clean source: {receipt} exists afterwards, or {refusal}. */
+/** The check, then the real tests, in the clean source: {receipt} exists afterwards, or {refusal}. */
 async function ensureCheck({ facts, seams, env, who, progress }) {
   if (facts.receipt) return { receipt: facts.receipt };
   const { source } = facts;
   progress(`check: running starci runtime check in ${source.dir} (minutes)`);
   const run = seams.runCheck(source.dir);
   if (!run.ok) return { refusal: refusal(DEPLOY.checkRed, `starci runtime check exited non-zero on ${source.sha.slice(0, 12)}: ${tailOf(run.output)}`) };
-  const proof = await affectedProof({ facts, seams, progress });
+  const proof = await testsProof({ facts, seams, progress });
   if (proof.refusal) return proof;
   const after = resolveSource(source.dir, source.dir);
-  if (after.sha !== source.sha || isDirty(source.dir)) return { refusal: refusal(DEPLOY.sourceDirty, 'the check or the specs changed the source tree or its HEAD moved while they ran; the receipt would not bind the commit') };
-  writeReceipt({ sha: source.sha, tree: source.tree, exit: 0, by: who, counts: { pass: run.pass, total: run.total }, affected: proof.affected }, env);
-  return { receipt: { via: 'check-run', affected: proof.affected } };
+  if (after.sha !== source.sha || isDirty(source.dir)) return { refusal: refusal(DEPLOY.sourceDirty, 'the check or the tests changed the source tree or its HEAD moved while they ran; the receipt would not bind the commit') };
+  writeReceipt({ sha: source.sha, tree: source.tree, exit: 0, by: who, counts: { pass: run.pass, total: run.total }, tests: proof.tests }, env);
+  return { receipt: { via: 'check-run', tests: proof.tests } };
 }
 
 function returnAdvice({ host, prev, sha }) {
@@ -201,7 +184,7 @@ function succeeded(run, verified) {
   const { facts, seams, deps } = run;
   const { source, range } = facts;
   const payload = { schema: DEPLOY_SCHEMA, from: facts.host.head, to: source.sha, commits: range.commits, fileCount: range.files.length, areas: areasOf(range.files), who: seams.who(),
-    receipt: facts.receipt?.via ?? 'check-run', affected: facts.receipt?.affected ?? null, artefacts: run.counts, engine: { pid: verified.leader.pid, epoch: verified.leader.epoch, rev: verified.leader.rev },
+    receipt: facts.receipt?.via ?? 'check-run', tests: facts.receipt?.tests ?? null, artefacts: run.counts, engine: { pid: verified.leader.pid, epoch: verified.leader.epoch, rev: verified.leader.rev },
     waitedMs: run.waitedMs, roleActions: (deps.roleActions ?? ((input) => seams.roleActions(input.from, input.to)))({ from: facts.host.head, to: source.sha, files: range.files }) ?? null };
   const event = seams.journal(DEPLOY_EVENT, payload, range.files);
   const text = `starci runtime deploy: ${payload.from.slice(0, 12)} -> ${payload.to.slice(0, 12)} (${range.commits} commit(s), one revision change); engine pid ${payload.engine.pid} on the new revision; artefacts ${JSON.stringify(payload.artefacts)}; event seq ${event?.seq ?? '-'}`;
@@ -224,7 +207,7 @@ export async function runtimeDeploy(ctx, deps = {}) {
   const env = ctx.env ?? process.env;
   const host = path.resolve(deps.root ?? skillRoot);
   const seams = { ...hostSeams({ host, env }), ...deps.seams };
-  const facts = gather({ from, host, seams, env, plan: Boolean(ctx.args.plan) });
+  const facts = gather({ from, host, seams, env });
   const refusals = judge(facts);
   if (ctx.args.plan) return planResult(facts, refusals);
   if (refusals.length) return refused(facts, refusals[0], { refusals });

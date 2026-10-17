@@ -14,7 +14,6 @@ zones:
     why: the command guard and the role rights it enforces
     paths:
       - scripts/guards/**
-      - tests/guards/**
       - modules/kernel/protected-zone.yaml
       - modules/kernel/command-policy.yaml
       - scripts/hfs/runtime-rules/rights-policy.mjs
@@ -36,17 +35,17 @@ zones:
       - scripts/hfs/runtime-rules/git-triggers.mjs
       - examples/*/.github/workflows/**
   - id: test-policy
-    why: spec selection, budgets and the specs.* switches decide how much is tested and when
+    why: the real tests of the runtime (the package clean-test and the scaffold e2e, owner ruling no-runtime-specs) and the specs.* switches decide how much is tested and when
     paths:
-      - scripts/lib/spec-deps.mjs
-      - tests/setup/**
+      - scripts/gates/runtime-tests.mjs
+      - scripts/gates/scaffold-e2e.mjs
+      - e2e/**
       - config.example.yaml
       - config.yaml
   - id: host-lock
     why: the one lock that serialises heavy runs on the host
     paths:
       - scripts/machine/host-lock.mjs
-      - tests/machine/host-lock.spec.mjs
   - id: permissions
     why: the supervisor's own permission, hook and model settings
     paths:

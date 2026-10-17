@@ -1,6 +1,6 @@
 // release-linux-parity.mjs - the Linux step of the L4 row (scripts/supervisor/release-l4.mjs): the CI-equivalent LIGHT jobs, run once in a Linux container on this
 // host BEFORE the push, so the first GitHub run of the release tag is not the first Linux run of these gates. It is NOT a second full suite: the spec suites
-// (the root `npm test`, an example's unit, integration and e2e runs) already ran on the host in the same L4 row and are left out.
+// (the runtime's package clean-test and scaffold e2e, an example's unit, integration and e2e runs) already ran on the host in the same L4 row and are left out.
 // What runs is DERIVED from .github/workflows/*.yml, never listed by hand: every `run` step of every job (installs, the grammar build, the full check set, the clean
 // install of every published package, the scaffold against registry installs, the example records, and per example app codegen, typecheck, starci app lint and the be and fe
 // builds), in workflow order with the working directory and job env the workflow gives it. Left out, each with its reason in the record: spec suites, steps gated on
@@ -9,7 +9,7 @@
 // out) on a READ-ONLY mount, and extracted to a copy inside the container to write in (then a throwaway git repository, since the checks read git). Docker is spoken
 // only through the scripts/api/docker call files, to a container this run names and removes; no port is published and no other container is touched.
 // A red step, or no docker daemon, is a red L4 step: it blocks the cut.
-// Seams (deps): select (a filter over the planned steps: the spec leg of the cut prepares with the steps before the checks), docker ({version, run, rm}), archive (repo, file -> {ok, error}), workflows (repo -> [{file, doc}]), apps (repo -> [names]; runL4 hands over its example apps), logDir, now.
+// Seams (deps): select (a filter over the planned steps), docker ({version, run, rm}), archive (repo, file -> {ok, error}), workflows (repo -> [{file, doc}]), apps (repo -> [names]; runL4 hands over its example apps), logDir, now.
 import fs from 'node:fs';
 import path from 'node:path';
 import { parseYaml } from '../../engine/yaml.mjs';
@@ -26,21 +26,17 @@ import { tempRoot } from '../../engine/temp-root.mjs';
 import { makeTempDir } from '../api/fs/make-temp-dir.mjs';
 
 const STEP_NAME = 'linux-parity';
-/** The label of the spec step the container runs for the tests the host run skipped (read back by release-l4.mjs through the `##STEP` marker). */
-export const LINUX_SPECS_LABEL = 'linux-specs';
-/** The spec setup the root `npm test` runs under (package.json scripts.test): the same isolation for the files the container runs. */
-const SPEC_IMPORTS = ['low-priority', 'isolated-temp', 'isolated-registry', 'runtime-copies'].map((name) => `--import ./tests/setup/${name}.mjs`).join(' ');
 const RUN_TIMEOUT_MS = 90 * 60_000;
 /** Where the container checks HEAD out: a path several levels below the filesystem root, as GitHub's runner checkout is (a spec that judges the runtime's distance from the root sees the same depth). */
 export const WORK_DIR = '/opt/starci-parity/checkout';
-/** The spec suites: the root `npm test` and an example app's npm test / test:<layer> runs. The host ran them in this L4 row. */
+/** The test suites: the root `npm run test:e2e` and an example app's npm test / test:<layer> runs. The host ran them in this L4 row. */
 const SPEC_SUITE = /^npm (?:run )?test(?::[\w:-]+)?(?: -- .*)?$/;
 /** A step that calls a toolchain the GitHub runner image carries and the node image does not (the Go that builds a pinned release): provisioning for a step the container leaves out. */
 const RUNNER_TOOLCHAIN = /^[ \t]*go[ \t]/m;
 const BROWSER = /playwright install|test:a11y|test:browser/;
 
 /** The workflows of `repo` as parsed documents: [{file, doc}] (the root .github/workflows/*.yml, sorted by name). */
-export function readWorkflows(repo) {
+function readWorkflows(repo) {
   const dir = path.join(repo, '.github', 'workflows');
   if (!fs.existsSync(dir)) return [];
   return fs.readdirSync(dir).filter((f) => /\.ya?ml$/.test(f)).sort(byCodeUnit).flatMap((file) => {
@@ -115,7 +111,7 @@ function planJob({ file, id, job, apps, base, seen, state, steps, skipped }) {
  * A job whose matrix is the derived app list runs once per example app; a job gated on workflow_dispatch or on a release tag (the GitHub Release job) is left out whole; a step identical to an earlier one
  * (same directory, command and the env it reads: the repeated root install) runs once.
  */
-export function parityPlan({ workflows, apps }) {
+function parityPlan({ workflows, apps }) {
   const steps = [], skipped = [], seen = new Set(), state = { node: null };
   for (const { file, doc } of workflows) {
     const base = { env: { ...doc.env } };
@@ -127,7 +123,7 @@ export function parityPlan({ workflows, apps }) {
 const quote = (v) => "'" + String(v).replaceAll("'", String.raw`'\''`) + "'";
 
 /** The bash script the container runs: extract HEAD, snapshot it as a git repository, then each step in order, `##STEP`/`##FAILED` markers in the log. Pure. */
-export function parityScript(plan) {
+function parityScript(plan) {
   const lines = [
     '#!/usr/bin/env bash',
     'set -eu',
@@ -143,20 +139,12 @@ export function parityScript(plan) {
     const exports = Object.entries(s.env).map(([k, v]) => `export ${k}=${quote(v)}`).join('\n');
     lines.push(`run_step ${quote(s.name)} ${quote(s.dir)} <<'__STEP_${i}__'`, ...(exports ? [exports] : []), s.run, `__STEP_${i}__`);
   });
-  if (plan.specs?.length) {
-    // The tests the host run could not execute (a shell it lacks, a link privilege it will not grant): their spec files run here, the shells installed INSIDE the container only.
-    const specsName = `${LINUX_SPECS_LABEL}: ${plan.specs.length} spec file(s) the host run skipped tests of`;
-    lines.push(`run_step ${quote(specsName)} . <<'__STEP_SPECS__'`,
-      'apt-get update -qq && apt-get install -y -qq zsh fish > /dev/null',
-      `node ${SPEC_IMPORTS} --test --test-reporter=spec ${plan.specs.map(quote).join(' ')}`,
-      '__STEP_SPECS__');
-  }
   lines.push('echo "##DONE"');
   return `${lines.join('\n')}\n`;
 }
 
 /** The outcome of a container log: {done, failed, steps}. Pure. */
-export function parityOutcome(text) {
+function parityOutcome(text) {
   const steps = [...String(text ?? '').matchAll(/^##STEP (.*)$/gm)].map((m) => m[1]);
   const failed = /^##FAILED (.*)$/m.exec(String(text ?? ''));
   return { done: /^##DONE$/m.test(String(text ?? '')), failed: failed ? failed[1] : null, steps };
@@ -174,7 +162,7 @@ export function runParity(repo, deps = {}) {
   const logDir = (deps.logDir ?? (() => { const dir = path.join(tempRoot(), 'starci-release-l4'); fs.mkdirSync(dir, { recursive: true }); return dir; }))();
   const log = path.join(logDir, `${STEP_NAME}-${t0}.log`);
   const docker = deps.docker ?? { version: dockerVersion, run: dockerRun, rm: containerRm };
-  const plan = { ...parityPlan({ workflows: (deps.workflows ?? readWorkflows)(repo), apps: (deps.apps ?? (() => []))(repo) }), specs: [...(deps.specs ?? [])] };
+  const plan = parityPlan({ workflows: (deps.workflows ?? readWorkflows)(repo), apps: (deps.apps ?? (() => []))(repo) });
   if (deps.select) plan.steps = plan.steps.filter((step, index, all) => deps.select(step, index, all));
   const result = (ok, why, extra = {}) => ({ name: STEP_NAME, ok, log, ms: now() - t0, skips: [], image: plan.image, steps: plan.steps.map((s) => s.name), skipped: plan.skipped, ...(why && { why }), ...extra });
   const refuse = (why) => { fs.writeFileSync(log, `${why}\n`); return result(false, why); };
