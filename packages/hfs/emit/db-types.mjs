@@ -98,22 +98,72 @@ function apiSchemas(root) {
   return (toml?.api?.schemas ?? []).filter((schema) => typeof schema === 'string');
 }
 
-/** The applied column of `migration list --local` is the local database history; the Local column only describes files. Unreadable history cannot authorize an emit. */
-function appliedVersions(text) {
-  const lines = String(text ?? '').split(/\r?\n/);
-  const header = lines.findIndex((line) => /^\s*Local\s*\|\s*Remote\s*\|/i.test(line));
-  if (header < 0) throw new DbTypesError('the local migration history is unreadable; expected the Local | Remote migration list', { file: dbTypesPath });
+/** CLI JSON and table rows use the remote field for the database history even with --local; local only describes files. */
+function historyVersion(value) {
+  if (value == null || value === '') return null;
+  if (typeof value !== 'string' || !/^\d+$/.test(value)) {
+    throw new DbTypesError('the local migration history contains an unreadable row', { file: dbTypesPath });
+  }
+  return value;
+}
+
+/** JSON must explicitly carry a migrations array; an empty array proves an empty database history. */
+function jsonAppliedVersions(text) {
+  let history;
+  try { history = JSON.parse(text); } catch {
+    throw new DbTypesError('the local migration history contains unreadable JSON', { file: dbTypesPath });
+  }
+  if (!Array.isArray(history?.migrations)) {
+    throw new DbTypesError('the local migration history has no migrations array', { file: dbTypesPath });
+  }
   const versions = new Set();
+  for (const row of history.migrations) {
+    if (!row || !Object.hasOwn(row, 'local') || !Object.hasOwn(row, 'remote')) {
+      throw new DbTypesError('the local migration history contains an unreadable row', { file: dbTypesPath });
+    }
+    historyVersion(row.local);
+    const applied = historyVersion(row.remote);
+    if (applied) versions.add(applied);
+  }
+  return versions;
+}
+
+/** Optional outer borders do not add columns; pretty output may wrap each table cell in Markdown backticks. */
+const historyCells = (line, bordered) => {
+  const row = bordered ? line.trim().replace(/^\|/, '').replace(/\|$/, '') : line;
+  return row.split('|').map((cell) => cell.trim().replace(/^`(.*)`$/, '$1'));
+};
+
+/** A recognized header, including a header without rows, proves a table history; malformed rows still refuse. */
+function tableAppliedVersions(lines, header) {
+  const versions = new Set();
+  const bordered = /^\s*\|/.test(lines[header]);
+  const width = historyCells(lines[header], bordered).length;
   for (const line of lines.slice(header + 1)) {
     if (/^[\s|+-]+$/.test(line)) continue;
     if (!line.includes('|')) continue;
-    const cells = line.split('|').map((cell) => cell.trim());
-    if (cells.length !== 3 || cells.slice(0, 2).some((cell) => cell && !/^\d+$/.test(cell))) {
+    const cells = historyCells(line, bordered);
+    if (cells.length !== width) {
       throw new DbTypesError('the local migration history contains an unreadable row', { file: dbTypesPath });
     }
-    if (cells[1]) versions.add(cells[1]);
+    historyVersion(cells[0]);
+    const applied = historyVersion(cells[1]);
+    if (applied) versions.add(applied);
   }
   return versions;
+}
+
+/** Read either CLI stream, stripping terminal colors, and require an explicit JSON history or Local | Remote [| Time] header. */
+function appliedVersions(result) {
+  for (const output of [result.stdout, result.stderr]) {
+    const text = String(output ?? '').replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, '').replaceAll('\u2502', '|').trim();
+    const lines = text.split(/\r?\n/);
+    const json = lines.findIndex((line) => line.trimStart().startsWith('{'));
+    if (json >= 0) return jsonAppliedVersions(lines.slice(json).join('\n'));
+    const header = lines.findIndex((line) => /^\s*\|?\s*Local\s*\|\s*Remote\s*(?:\|\s*Time(?:\s*\(UTC\))?\s*)?\|?\s*$/i.test(line));
+    if (header >= 0) return tableAppliedVersions(lines, header);
+  }
+  throw new DbTypesError('the local migration history is unreadable; expected migrations JSON or the Local | Remote migration list', { file: dbTypesPath });
 }
 
 /** Every applied local version must equal a migration filename stamp, including gaps and extra versions even when the heads match. */
@@ -132,7 +182,7 @@ function requireCurrentDatabase(root, run) {
   if (result?.error || result?.signal || result?.status !== 0) {
     throw new DbTypesError('supabase migration list --local failed; the local migration history must be readable before emitting types', { file: dbTypesPath });
   }
-  const applied = appliedVersions(result.stdout);
+  const applied = appliedVersions(result);
   if (applied.size !== expected.size || [...expected].some((version) => !applied.has(version))) {
     const head = (versions) => [...versions].sort().at(-1) ?? 'none';
     throw new DbTypesError(`the local database is at ${head(applied)}, the migrations folder at ${head(expected)}; run "npm run db:reset" then emit again`, { file: dbTypesPath }, 'HFS_EMIT_DB_TYPES_STALE');
