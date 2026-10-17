@@ -30,6 +30,9 @@ This release supersedes the alpha.19 cut, which was never tagged (its push secre
 ### Removed
 - The alpha.19 one-release bootstrap accepting a legacy 0/0 affected receipt; verification requires the current package and scaffold proof.
 
+### Release
+- Packages to publish: `@starci/hfs` 4.5.0, `@starci/cli` 1.5.0 (new verbs, pins HFS 4.5.0, carries runtime 1.0.0-alpha.20), `@starci/eslint-canon-be` 3.4.2 and `@starci/eslint-canon-fe` 8.4.2 (only their bundled runtime copies changed). The canon pins, the code-pattern bindings and the example package.json pins are bound to them; the example lockfiles resolve them after the publish.
+
 ## [1.0.0-alpha.19] — 2026-10-17
 
 This release supersedes the alpha.18 cut, which was never tagged: it carries everything listed under 1.0.0-alpha.18 below, plus the removal of the runtime's own specs.

@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 8.4.2 - 2026-10-17
+
+- Changed: bundled runtime copies follow runtime 1.0.0-alpha.20, including the canon pins and shared architecture checks.
 
 ## 8.4.1 - 2026-10-17
 
