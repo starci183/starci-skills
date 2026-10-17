@@ -4,9 +4,9 @@ import { projectFixture } from "../be/fixtures/project/tester.mjs"
 import { hooksFolderHoldsHooksOnly } from "./hooks-folder.mjs"
 
 // proves: FE_HOOKS_ARE_HOOKS@lite FE_HOOKS_ARE_HOOKS@full
-const base = "packages/hfs/templates/fe/skeleton/apps/__app__/src/"
-const session = fs.readFileSync(base + "hooks/auth/useSession.ts", "utf8")
-const redux = fs.readFileSync(base + "redux/hooks.ts", "utf8")
+const base = new URL("../../hfs/templates/fe/skeleton/apps/__app__/src/", import.meta.url)
+const session = fs.readFileSync(new URL("hooks/auth/useSession.ts", base), "utf8")
+const redux = fs.readFileSync(new URL("redux/hooks.ts", base), "utf8")
 for (const edition of ["lite", "full"]) {
   test(`R56 ${edition} accepts canonical typed Redux hooks and rejects non-hooks`, t => {
     const filename = "apps/web/src/hooks/auth/useSession.ts"
@@ -14,7 +14,7 @@ for (const edition of ["lite", "full"]) {
       "tsconfig.json": JSON.stringify({ compilerOptions: { moduleResolution: "Bundler", module: "ESNext", baseUrl: ".", paths: { "@/*": ["apps/web/src/*"] } }, include: ["apps/**/*"] }),
       [filename]: session,
       "apps/web/src/redux/hooks.ts": redux,
-      "apps/web/src/redux/index.ts": fs.readFileSync(base + "redux/index.ts", "utf8") + '\nexport { useFake } from "./fake"; export { useAppSelector as useReader } from "./reader";',
+      "apps/web/src/redux/index.ts": fs.readFileSync(new URL("redux/index.ts", base), "utf8") + '\nexport { useFake } from "./fake"; export { useAppSelector as useReader } from "./reader";',
       "apps/web/src/redux/fake.ts": "export const useAppSelector = { withTypes: () => () => 1 }; export const useFake = useAppSelector.withTypes();",
       "apps/web/src/redux/reader.ts": "export const useAppSelector = () => 1;",
     }

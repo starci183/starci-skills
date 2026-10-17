@@ -9,7 +9,7 @@ import { RuleTester } from "eslint"
 import { hfsFromDeclaration } from "./lib/hfs.mjs"
 import { appDeclaration } from "./fixtures/app.mjs"
 import { healthSignals, readyReal, rules } from "./health-ready.mjs"
-import { dockerFindings, NODE_IMAGE } from "../../../scripts/hfs/rules/docker.mjs"
+import { dockerFindings, NODE_IMAGE } from "../../hfs/runtime/scripts/hfs/rules/docker.mjs"
 
 const fixtures = []
 test.after(() => { for (const root of fixtures) fs.rmSync(root, { recursive: true, force: true }) })

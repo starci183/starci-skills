@@ -7,7 +7,7 @@ import { dirname } from 'node:path';
 import test from 'node:test';
 import { RuleTester } from 'eslint';
 import tsParser from '@typescript-eslint/parser';
-import { checkRepo } from '../../../scripts/hfs/check.mjs';
+import { checkRepo } from '../../hfs/runtime/scripts/hfs/check.mjs';
 import { appDeclaration } from './fixtures/app.mjs';
 import { projectFixture } from './fixtures/project/tester.mjs';
 import { at, BE_DECLARATION, TYPED_ROOT } from './fixtures/typed/tester.mjs';

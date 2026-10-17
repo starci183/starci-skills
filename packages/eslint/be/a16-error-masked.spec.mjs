@@ -3,7 +3,13 @@
 import test from 'node:test';
 import { projectFixture } from './fixtures/project/tester.mjs';
 import { rules } from './project-graph.mjs';
-import { errorsFiles } from '../../../tests/helpers/hfs-arch-be-fixture.mjs';
+
+/** platform/errors with an ExceptionFilter and a GraphQL formatError (the package carries its own copy: its tests run without the repository around it). */
+const errorsFiles = {
+  'src/modules/platform/errors/index.ts': "export { AllExceptionsFilter } from './all-exceptions.filter';\nexport { formatError } from './format-error';\n",
+  'src/modules/platform/errors/all-exceptions.filter.ts': 'export class AllExceptionsFilter { catch(): void {} }\n',
+  'src/modules/platform/errors/format-error.ts': 'export const formatError = (error: unknown): unknown => error;\n',
+};
 
 const appModule = (providers, imports) => `import { Module } from '@nestjs/common';
 import { APP_FILTER } from '@nestjs/core';

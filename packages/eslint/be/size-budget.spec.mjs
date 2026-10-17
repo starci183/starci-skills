@@ -1,9 +1,25 @@
-import test from "node:test"
+import test, { after } from "node:test"
+import { mkdtempSync, rmSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+import { runGit } from "./runtime/scripts/api/git/lib.mjs"
 import { RuleTester } from "eslint"
 import tsParser from "@typescript-eslint/parser"
-import { at, fixtureHfs } from "./fixtures/typed/tester.mjs"
+import { BE_DECLARATION } from "./fixtures/typed/tester.mjs"
+import { appDeclaration } from "./fixtures/app.mjs"
+import { hfsFromDeclaration } from "./lib/hfs.mjs"
 import { fileSizeGrowth } from "./size-budget.mjs"
 import { lines, sizeGrowthSharedSpec } from "./fixtures/size-growth.mjs"
+
+// Probe paths of a throwaway git repository with one empty commit: no file of it has a recorded size, so a file over the budget is born over it.
+// (The rule reads the recorded size from git; a package tested from a copy without git history would answer "unavailable".)
+const probeRoot = mkdtempSync(join(tmpdir(), "starci-be-budget-probe-"))
+after(() => rmSync(probeRoot, { recursive: true, force: true }))
+const probeGit = (...args) => runGit(args, { dir: probeRoot, config: { "user.email": "t@example.com", "user.name": "t" } })
+probeGit("init", "-q", "-b", "main")
+probeGit("commit", "-q", "--allow-empty", "-m", "seed")
+const at = (relative) => join(probeRoot, relative)
+const fixtureHfs = () => hfsFromDeclaration(appDeclaration("be", BE_DECLARATION), probeRoot)
 
 const tester = new RuleTester({
     languageOptions: { parser: tsParser, ecmaVersion: 2022, sourceType: "module" },
@@ -12,7 +28,6 @@ const tester = new RuleTester({
 /** The budget is the manifest's (`ruleParams.be.fileLines`); the cases are sized against it. */
 const BUDGET = fixtureHfs().ruleParams.fileLines.soft
 
-// Probe paths no committed fixture file uses: a committed file would have a recorded size and read as grown.
 test("be: a new file over the manifest budget is refused, in a product file and in a spec alike", () => {
     tester.run("file-size-growth", fileSizeGrowth, {
         valid: [
