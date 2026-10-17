@@ -81,6 +81,13 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      # R299 stays the offline app-check gate; actionlint also checks the rendered example workflows in CI.
+      - name: Actionlint rendered example workflows
+        uses: docker://rhysd/actionlint@sha256:887a259a5a534f3c4f36cb02dca341673c6089431057242cdc931e9f133147e9 # 1.7.7
+        with:
+          entrypoint: /bin/sh
+          args: >-
+            -c "exec actionlint -shellcheck= examples/*/.github/workflows/*.yml"
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: ${{ env.NODE_VERSION }}
