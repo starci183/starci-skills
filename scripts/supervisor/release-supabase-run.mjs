@@ -19,6 +19,9 @@ const STEP_TIMEOUT_MS = 5 * 60_000;
 const COMMAND_TIMEOUT_MS = 50 * 60_000;
 const LOCAL_HOSTS = new Set(['127.0.0.1', 'localhost', '[::1]']);
 
+/** Folders `supabase start` creates in the app tree; one the run created stays only when something was written into it. */
+const CLI_LEFTOVERS = Object.freeze([path.join('supabase', 'snippets')]);
+const removeIfEmpty = (folder) => { try { if (fs.readdirSync(folder).length === 0) fs.rmdirSync(folder); } catch { /* absent */ } };
 const say = (line) => process.stderr.write(`supabase-run: ${line}\n`);
 const supabase = (dir, args, timeout) => runNpx(['--no-install', 'supabase', ...args], { cwd: dir, timeout, stdio: ['ignore', 'pipe', 'pipe'] });
 
@@ -57,6 +60,7 @@ async function appBeUrl(dir, db) {
 async function runWithLocalSupabase(appDir, args) {
   const dir = path.resolve(appDir);
   const project = projectOf(dir);
+  const leftovers = CLI_LEFTOVERS.map((rel) => path.join(dir, rel)).filter((folder) => !fs.existsSync(folder));
   try {
     say(`starting the local stack of ${project}`);
     const start = supabase(dir, ['start'], START_TIMEOUT_MS);
@@ -71,6 +75,7 @@ async function runWithLocalSupabase(appDir, args) {
     return run.status ?? 1;
   } finally {
     const stop = supabase(dir, ['stop', '--no-backup'], STEP_TIMEOUT_MS);
+    for (const folder of leftovers) removeIfEmpty(folder);
     say(stop.status === 0 ? `stopped the local stack of ${project}` : `supabase stop exited ${stop.status ?? stop.signal}; stop it by hand: cd ${dir} && npx supabase stop --no-backup`);
   }
 }
