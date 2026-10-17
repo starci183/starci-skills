@@ -36,13 +36,13 @@ const OWNERS = Object.freeze(['op-retry', 'runtime-core', 'supervisor', 'owner']
 const ownerValid = (owner) => OWNERS.includes(owner) || /^other-op:[a-z][a-z0-9.-]*$/.test(String(owner ?? ''));
 const SCAN_DIRS = ['scripts', 'engine', 'modules'];
 // The HFS rule catalog names the code of every rule, including rules whose checker is still owed, so it emits them too.
-const SCAN_FILES = ['knowledge/hfs/rules.yaml'];
+const SCAN_FILES = ['knowledge/hfs/rules.yaml', 'packages/hfs/release/gate.mjs'];
 const SCAN_EXT = /\.(mjs|yaml)$/;
 // The scanner does not read its own catalog checker, the catalog, or the ui/ harness.
 const SKIP_FILES = new Set([CATALOG_FILE, 'scripts/checks/check-failure-codes.mjs']);
 
 /** UPPER_SNAKE literals that are not codes: environment variables, Node/SQLite error names, settings and key names. */
-const NOT_CODE_PREFIX = /^(?:(ORCA|NODE|CODEX|CLAUDE|OPENAI|CLOUDFLARE|TELEGRAM|ANTHROPIC|GITHUB|GIT|DEVIN|LOCALAPPDATA|APPDATA|USERPROFILE|HTTP|SQLITE|ERR)_|SONAR_(?!(?:TUNNEL_NOT_RUNNING|DB_PASSWORD_MISMATCH)$))/;
+const NOT_CODE_PREFIX = /^(?:(ORCA|NODE|CODEX|CLAUDE|OPENAI|CLOUDFLARE|TELEGRAM|ANTHROPIC|GITHUB|GIT|DEVIN|LOCALAPPDATA|APPDATA|USERPROFILE|HTTP|SQLITE|ERR)_|SONAR_(?!(?:TUNNEL_NOT_RUNNING|DB_PASSWORD_MISMATCH|UNREACHABLE)$))/;
 const readNotCodes = (base) => new Set(readAllowlist('not-codes', base).map((entry) => entry.literal));
 
 const skipDir = (name) => name === 'node_modules' || name === '.git' || name === 'dist';

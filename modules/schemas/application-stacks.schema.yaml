@@ -149,6 +149,9 @@ $defs:
       target: {type: number, minimum: 0, maximum: 100}
       components: {enum: [auto]}
       required: {type: boolean}
+      optional:
+        description: Skip an unreachable quality provider with a notice; SonarQube defaults true, SonarCloud and Codecov false.
+        type: boolean
       ecosystems: {type: array, items: {enum: [npm, docker, github-actions]}}
       schedule:
         type: object

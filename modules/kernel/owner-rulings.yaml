@@ -570,6 +570,14 @@ rulings:
     supersedes: []
     enforcedBy: [scripts/supervisor/release-cut.mjs]
 
+  - id: quality-services-optional
+    date: '2026-10-17'
+    source: "the owner in chat to main, relayed to the a20 lead"
+    ruling: >-
+      sonar and codecov each get an `optional` setting in services (default true for self-hosted sonar). When optional and the provider is not reachable, the CI step SKIPS with a clear notice instead of failing. Sonar: probe <host>/api/system/status == UP with a short timeout before the scan and quality-gate steps. Codecov: skip when the upload endpoint or OIDC token is unavailable (fail_ci_if_error false when optional), plus the existing skip-without-lcov. When optional: false, keep it strict. The same applies to the app release gate's --sonar. Render it for the examples and skeletons too.
+    supersedes: []
+    enforcedBy: [packages/hfs/sync/ci-commands.mjs, packages/hfs/release/gate.mjs]
+
 supersedes:
   'ruling:R212/case-2': ['ruling:R212/case-1']
   'ruling:R212/case-4': ['ruling:R212/case-1', 'ruling:R212/case-2']

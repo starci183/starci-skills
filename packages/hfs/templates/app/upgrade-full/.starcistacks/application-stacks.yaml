@@ -43,6 +43,7 @@ ci:
 services:
   sonar:
     provider: sonarqube
+    optional: true
     mode: disabled
     reason: Enable the repository's Sonar service when a host and project token are provisioned.
     qualityGate: starci-quality

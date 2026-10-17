@@ -1,4 +1,4 @@
-// gate.mjs - `starci app release gate`: the honest release gate. It runs the app's own gates on a clean HEAD and ONLY when every one is green it
+// gate.mjs - `starci app release gate`: the honest release gate. It runs the app's own gates on a clean HEAD and when all required gates pass it
 // writes the L4 record <git-common-dir>/starci-release/<HEAD sha>.l4.json (head, tag, per-gate log path and sha256) and creates the annotated tag.
 // The canon pre-push hook lets main and v* tags through only for a HEAD with that tag and that record. Nothing is pushed here (see push.mjs).
 // The gate list comes from the optional `release:` block of .starcistacks/application-stacks.yaml, else from the app's managed package scripts.
@@ -13,6 +13,7 @@ import { failure, refusal } from '../stack/errors.mjs';
 import { latestDefaultBranchCi, requireGreenCi } from './ci-red.mjs';
 
 export const RELEASE_CODE = 'RELEASE_CONFIG_INVALID';
+const SONAR_UNREACHABLE = 'SONAR_UNREACHABLE';
 
 const FIELDS = new Set(['gates', 'tagPrefix', 'defaultBranch', 'tagMatchesVersion']);
 const GATE_FIELDS = new Set(['name', 'command', 'summary', 'env']);
@@ -63,14 +64,15 @@ function auditGate(audit) {
 
 /** A requested local Sonar scan uses only the declared host and token variable; the token never enters argv. */
 function sonarGate(services, env) {
-  const sonar = services?.sonar;
+  const configured = services?.sonar;
+  const sonar = configured?.provider === 'sonarcloud' ? { ...configured, host: 'https://sonarcloud.io' } : configured;
   const tokenName = sonar?.token;
   if (!sonar?.host || !ENV_KEY.test(tokenName) || !env[tokenName]) throw refusal('RELEASE_SONAR_UNAVAILABLE', 'declare an enabled services.sonar host and set its ci.token environment variable');
   const command = ['npx', '--yes', '@sonar/scan@4.3.0', `-Dsonar.host.url=${sonar.host}`];
   const organization = sonar.organization ?? (sonar.organizationVar ? env[sonar.organizationVar] : null);
   if (organization) command.push(`-Dsonar.organization=${organization}`);
   if (!command.every((word) => TOKEN.test(word))) throw refusal('RELEASE_SONAR_UNAVAILABLE', 'Sonar host and organization must be plain command arguments');
-  return { name: 'sonar', command, summary: null, env: { SONAR_TOKEN: env[tokenName] } };
+  return { name: 'sonar', command, summary: null, env: { SONAR_TOKEN: env[tokenName] }, provider: sonar };
 }
 
 function gateProblems(entry, at, seen) {
@@ -209,6 +211,32 @@ export function launch(argv, platform) {
   return [argv[0], argv.slice(1)];
 }
 
+/** Sonar availability is public and bounded; HTTP uses the existing injected fetch seam. */
+async function sonarAvailability(ctx, gate) {
+  const sonar = gate.provider;
+  if (!sonar) return null;
+  let up = false;
+  try {
+    const response = await ctx.fetch(sonar.host.replace(/\/$/u, '') + '/api/system/status', { signal: AbortSignal.timeout(10000) });
+    up = response.ok && (await response.json()).status === 'UP';
+  } catch { up = false; }
+  if (up) return null;
+  const detail = sonar.optional
+    ? `notice: sonar skipped: ${sonar.host} not reachable (services.sonar.optional)`
+    : `${SONAR_UNREACHABLE}: ${sonar.host} did not report UP within ten seconds`;
+  return { skipped: sonar.optional === true, pass: false, detail };
+}
+
+/** Unreachable optional providers remain explicit skipped rows, with a real log and no scan invocation. */
+async function runAvailableGate(ctx, gate, options) {
+  const availability = await sonarAvailability(ctx, gate);
+  if (!availability) return runGate(ctx, gate, options);
+  const log = path.join(options.dir, `${gate.name}.log`);
+  fs.writeFileSync(log, availability.detail + '\n');
+  return { name: gate.name, command: gate.command.join(' '), ...availability, seconds: 0,
+    summary: null, log: path.resolve(log), logSha256: sha256(log), env: Object.keys(gate.env) };
+}
+
 function runGate(ctx, gate, { dir, platform }) {
   const log = path.join(dir, `${gate.name}.log`);
   const started = ctx.now();
@@ -270,7 +298,7 @@ function inspect(ctx, config, options) {
 }
 
 function planLines(config, facts, dir, recordPath) {
-  const out = [`L4 record      ${recordPath}`, `logs           ${dir}`, '', 'gates (all must pass, in this order):'];
+  const out = [`L4 record      ${recordPath}`, `logs           ${dir}`, '', 'gates (required gates must pass, optional provider outages are skipped, in this order):'];
   for (const gate of config.gates) {
     const summary = gate.summary ? ` (summary: ${gate.summary})` : '';
     out.push(`  ${gate.name.padEnd(17)} ${gate.command.join(' ')}${summary}`);
@@ -289,28 +317,31 @@ function assertUnmoved(ctx, head) {
 function writeRecord(ctx, { head, tag, results, recordPath }) {
   const record = {
     schema: 'starci-app-l4-record/1', head, tag, createdAt: new Date(ctx.now()).toISOString(), producedBy: 'starci app release gate',
-    note: 'The full gates ran on a clean HEAD; every entry links the real log and its sha256.',
+    note: 'Required gates passed on a clean HEAD; optional provider skips are explicit and every entry links its log and sha256.',
     gates: results,
   };
   fs.mkdirSync(path.dirname(recordPath), { recursive: true });
   fs.writeFileSync(recordPath, `${JSON.stringify(record, null, 2)}\n`);
 }
 
-function runAll(ctx, config, { dir, platform }) {
-  fs.mkdirSync(dir, { recursive: true });
-  const results = [];
-  for (const gate of config.gates) {
-    const result = runGate(ctx, gate, { dir, platform });
-    results.push(result);
-    if (!result.pass) break;
-  }
-  return results;
+/** Gates run sequentially because each failure prevents subsequent commands and record creation. */
+async function runAll(ctx, config, options) {
+  fs.mkdirSync(options.dir, { recursive: true });
+  return config.gates.reduce(async (pending, gate) => {
+    const results = await pending;
+    if (results.some((result) => !result.pass && !result.skipped)) return results;
+    return [...results, await runAvailableGate(ctx, gate, options)];
+  }, Promise.resolve([]));
 }
 
-const summaryOf = (result) => `${result.pass ? 'PASS' : 'FAIL'} ${result.name} (${result.detail}, ${result.seconds}s) log ${result.log}`;
+function summaryOf(result) {
+  let status = result.pass ? 'PASS' : 'FAIL';
+  if (result.skipped) status = 'SKIPPED';
+  return `${status} ${result.name} (${result.detail}, ${result.seconds}s) log ${result.log}`;
+}
 
 /**
- * `starci app release gate`: dry run prints the preconditions, the gate list, the head and the tag; --execute runs every gate and, only if all are green,
+ * `starci app release gate`: dry run prints the preconditions, the gate list, the head and the tag; --execute runs every gate and, only if required gates pass,
  * writes the L4 record and creates the annotated tag. options: { execute, sonar, source, tagPrefix, platform }.
  */
 export async function releaseGate(ctx, config, options = {}) {
@@ -325,14 +356,14 @@ export async function releaseGate(ctx, config, options = {}) {
   const base = { head: facts.head, tag: facts.chosen.tag, record: recordPath, gates: config.gates.map((gate) => gate.name), ci: { state: ci.state, notices: ciLines } };
   if (facts.red.length > 0) return { ok: false, lines: [...plan, ...facts.red.map((item) => `RED: ${item}`), 'nothing was run.'], data: { ...base, red: facts.red, executed: false } };
   if (options.execute !== true) return { ok: true, lines: [...plan, '', 'dry run: no gate was run, nothing written. preconditions OK.'], data: { ...base, red: [], executed: false } };
-  const results = runAll(ctx, config, { dir, platform: options.platform ?? process.platform });
+  const results = await runAll(ctx, config, { dir, platform: options.platform ?? process.platform });
   const report = results.map(summaryOf);
-  const failed = results.filter((result) => !result.pass);
+  const failed = results.filter((result) => !result.pass && !result.skipped);
   if (failed.length > 0) return { ok: false, lines: [...plan, ...report, `gate(s) red: ${failed.map((item) => item.name).join(', ')}. No L4 record, no tag.`], data: { ...base, executed: true, results } };
   assertUnmoved(ctx, facts.head);
   writeRecord(ctx, { head: facts.head, tag: facts.chosen.tag, results, recordPath });
   const created = facts.chosen.state !== 'on-head';
-  if (created) git(ctx, ['tag', '-a', facts.chosen.tag, '-m', `release ${facts.chosen.tag}: gates green on ${facts.head.slice(0, 12)} (L4 record ${path.basename(recordPath)})`, facts.head]);
+  if (created) git(ctx, ['tag', '-a', facts.chosen.tag, '-m', `release ${facts.chosen.tag}: required gates passed on ${facts.head.slice(0, 12)} (L4 record ${path.basename(recordPath)})`, facts.head]);
   const tagged = created ? `annotated tag ${facts.chosen.tag} created on ${facts.head.slice(0, 10)}` : `annotated tag ${facts.chosen.tag} already on ${facts.head.slice(0, 10)}`;
   return { ok: true, lines: [...plan, ...report, `L4 record written: ${recordPath}`, tagged], data: { ...base, executed: true, results, tagCreated: created } };
 }

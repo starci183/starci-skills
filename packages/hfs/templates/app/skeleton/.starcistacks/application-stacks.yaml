@@ -148,6 +148,7 @@ ci:
 services:
   sonar:
     provider: sonarqube
+    optional: true
     mode: local
     qualityGate: {{sonarGate}}
     host: {local: http://127.0.0.1:9000, public: "https://sonar.{{project}}.example.invalid"}

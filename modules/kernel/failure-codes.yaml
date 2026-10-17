@@ -15754,6 +15754,86 @@ RELEASE_CI_UNKNOWN:
   owner: op-retry
   kind: verb-refusal
 
+RELEASE_CONFIG_INVALID:
+  title: "Release gate configuration is invalid"
+  title_vi: "Cấu hình cổng phát hành không hợp lệ"
+  meaning_vi: "Khối release hoặc cấu hình audit không đáp ứng hợp đồng cổng phát hành."
+  causes_vi:
+    - "Trường lạ, tên cổng trùng hoặc sai dạng, lệnh sai dạng hoặc audit không hợp lệ."
+  nextStep_vi: "Sửa trường được nêu trong application-stacks.yaml rồi chạy lại cổng phát hành."
+  owner: op-retry
+  kind: verb-refusal
+
+RELEASE_GIT_FAILED:
+  title: "A release gate Git command failed"
+  title_vi: "Lệnh Git của cổng phát hành thất bại"
+  meaning_vi: "Git trả mã thoát khác 0 cho lệnh bắt buộc thành công."
+  causes_vi:
+    - "Lệnh Git gặp lỗi trong kho, tham chiếu, quyền truy cập hoặc thao tác tạo thẻ."
+  nextStep_vi: "Sửa nguyên nhân theo lệnh Git và dòng stderr đầu tiên trong thông báo rồi chạy lại."
+  owner: op-retry
+  kind: verb-refusal
+
+RELEASE_GIT_MISSING:
+  title: "The release gate cannot start Git"
+  title_vi: "Cổng phát hành không khởi chạy được Git"
+  meaning_vi: "Công cụ chạy lệnh báo lỗi khi khởi chạy Git trong thư mục ứng dụng."
+  causes_vi:
+    - "Git chưa được cài, không có trong PATH hoặc không thể khởi chạy."
+  nextStep_vi: "Khôi phục Git và quyền truy cập thư mục ứng dụng rồi chạy lại."
+  owner: op-retry
+  kind: verb-refusal
+
+RELEASE_HEAD_MOVED:
+  title: "HEAD changed while release gates ran"
+  title_vi: "HEAD thay đổi khi chạy cổng phát hành"
+  meaning_vi: "HEAD sau các cổng khác commit ban đầu nên không ghi bản ghi L4."
+  causes_vi:
+    - "Một tiến trình hoặc người dùng chuyển HEAD trong lúc các cổng chạy."
+  nextStep_vi: "Ổn định HEAD tại commit cần phát hành rồi chạy lại toàn bộ cổng."
+  owner: op-retry
+  kind: verb-refusal
+
+RELEASE_NO_FREE_TAG:
+  title: "No free release patch tag remains"
+  title_vi: "Không còn thẻ bản vá phát hành trống"
+  meaning_vi: "Không còn thẻ trống từ <prefix><major>.<minor>.0 đến <prefix><major>.<minor>.99."
+  causes_vi:
+    - "Cả 100 tên thẻ trong dải đã tồn tại ở local hoặc remote khi cần chọn thẻ mới."
+  nextStep_vi: "Kiểm tra thẻ đã có và chọn phiên bản major/minor hoặc tiền tố phù hợp; không dời hay xóa thẻ đã phát hành."
+  owner: op-retry
+  kind: verb-refusal
+
+RELEASE_SONAR_UNAVAILABLE:
+  title: "The requested local Sonar scan cannot be configured"
+  title_vi: "Không cấu hình được lượt quét Sonar cục bộ"
+  meaning_vi: "Yêu cầu --sonar thiếu host, biến token hợp lệ có giá trị, hoặc host và organization không dùng được làm đối số lệnh thuần."
+  causes_vi:
+    - "Thiếu host, tên biến token sai hay chưa được đặt, hoặc host hay organization chứa ký tự không được phép."
+  nextStep_vi: "Khai báo dịch vụ Sonar được bật với host và ci.token hợp lệ, đặt biến môi trường được chỉ định và sửa host hay organization rồi chạy lại --sonar."
+  owner: op-retry
+  kind: verb-refusal
+
+RELEASE_TREE_DIRTY:
+  title: "Release gates left changed or untracked files"
+  title_vi: "Các cổng để lại tệp thay đổi hoặc chưa được theo dõi"
+  meaning_vi: "Sau các cổng, cây làm việc có đường dẫn thay đổi hoặc chưa được theo dõi nên không ghi bản ghi L4."
+  causes_vi:
+    - "Một cổng tạo hoặc sửa tệp khiến cây làm việc khác HEAD."
+  nextStep_vi: "Commit thay đổi cần thiết hoặc khai báo bỏ qua tệp sinh ra đúng cách rồi chạy lại toàn bộ cổng trên cây sạch."
+  owner: op-retry
+  kind: verb-refusal
+
+RELEASE_USAGE:
+  title: "A release gate option is invalid"
+  title_vi: "Tùy chọn cổng phát hành không hợp lệ"
+  meaning_vi: "Giá trị --tag-prefix không khớp mẫu tiền tố thẻ được chấp nhận."
+  causes_vi:
+    - "Tiền tố không bắt đầu bằng chữ ASCII, dài quá 20 ký tự hoặc chứa ký tự không hợp lệ."
+  nextStep_vi: "Dùng tiền tố dài từ 1 đến 20 ký tự, bắt đầu bằng chữ ASCII và chỉ chứa chữ ASCII, số, dấu chấm, gạch dưới hoặc gạch nối."
+  owner: op-retry
+  kind: verb-refusal
+
 RELEASE_NOTES:
   title: "Release tag without finished release notes"
   title_vi: "Tag phát hành chưa có ghi chú phát hành hoàn chỉnh"
@@ -19430,3 +19510,13 @@ FE_PUBLIC_BUILD_ARG_MISSING:
   nextStep_vi: "Thêm giá trị mặc định ARG trong Dockerfile hoặc buildArgs.values hay buildArgs.sealed.keys cho ảnh trong mọi môi trường triển khai; chỉ kiểm tra tên, không mở giá trị mã hóa."
   owner: op-retry
   kind: check-finding
+
+SONAR_UNREACHABLE:
+  title: "Sonar provider is unreachable"
+  title_vi: "Khong the ket noi dich vu Sonar"
+  meaning_vi: "Dich vu Sonar khong tra ve trang thai UP trong muoi giay khi cong phat hanh yeu cau kiem tra nghiem ngat."
+  causes_vi:
+    - "May chu khong truy cap duoc, tra ve loi HTTP, hoac chua san sang."
+  nextStep_vi: "Kiem tra host va dich vu Sonar; chi bat services.sonar.optional neu cho phep bo qua khi mat ket noi."
+  owner: op-retry
+  kind: verb-refusal

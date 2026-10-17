@@ -482,6 +482,8 @@ services:
 
 Absent or disabled Sonar normalizes to `null`. Enabled Sonar uses the public host before the local host, the first project key, declared organization and quality gate, and CI wiring. Normalization returns `organization` and `organizationVar` as strings or `null`; `organizationVar` preserves an explicit CI name and otherwise defaults to `SONAR_ORGANIZATION` only for the SonarCloud example form. Its token name defaults to the first legacy CI secret name or `SONAR_TOKEN`; its host variable defaults to `SONAR_HOST_URL`. Missing wiring defaults to `required`; missing quality gate defaults to `starci-quality` (`starci-quality-lite` with the example option).
 
+`services.sonar.optional` defaults to true for self-hosted SonarQube and false for SonarCloud. Optional Sonar probes system status with a ten-second timeout before CI scanning or `starci app release gate --sonar`; an unavailable provider produces a skipped row and notice. `services.codecov.optional` defaults to false; when true, unavailable upload or OIDC authentication produces a notice without failing CI. Set either option to false to keep provider failures strict.
+
 Absent Codecov defaults to enabled, OIDC, no token, target 100, automatic components, required coverage and required CI wiring. Disabled Codecov sets enabled to false. Token auth requires `ci.token`. Absent Dependabot defaults to the ecosystems, weekly schedule, groups, ignore and security settings above; absent audit defaults to high severity, development dependencies omitted, and both release-gate and CI consumers. Dependabot and audit may omit `ci`; all services still require `ownerAction`.
 
 ### r299
