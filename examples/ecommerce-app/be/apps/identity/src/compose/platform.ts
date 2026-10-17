@@ -4,11 +4,13 @@ import { CacheModule } from "@modules/integrations/cache"
 import { IDENTITY_CONNECTION, DatabaseModule } from "@modules/platform/database"
 import { HttpModule } from "@modules/platform/http"
 import { HttpSecurityModule } from "@modules/platform/http-security"
+import { RetryModule } from "@modules/platform/retry"
 import type { IdentityAppOptions } from "../identity.options"
 
 /** Registers identity's edge security, persistence and outbound HTTP capabilities. */
 export function platformModules(options: IdentityAppOptions): Array<DynamicModule> {
     return [
+        RetryModule.register({ isGlobal: true }),
         HttpSecurityModule.register({ isGlobal: true, ...options.httpSecurity }),
         DatabaseModule.register({
             isGlobal: true,

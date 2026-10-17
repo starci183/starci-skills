@@ -1,4 +1,4 @@
-// migrations-sha256: d06a945b1d048e6d88b95509115c4c4edd710ab534e9e388306db54eb08f811f
+// migrations-sha256: 958eea906dcc792a0b5726c844283d12715602f142db3ffa1e52a1ecd8d813d1
 
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[]
 
@@ -24,15 +24,25 @@ export type Database = {
           }
         },"public": {
           Tables: {
-            "bookings": {
+            "announcements_public_read": {
+ Row: { id: string; title: string; body: string; published_at: string }
+ Insert: { id?: string; title: string; body: string; published_at?: string }
+ Update: { id?: string; title?: string; body?: string; published_at?: string }
+ Relationships: []
+},"inbox": {
+ Row: { source: string; event_id: string; claimed_at: string }
+ Insert: { source: string; event_id: string; claimed_at?: string }
+ Update: { source?: string; event_id?: string; claimed_at?: string }
+ Relationships: []
+},"bookings": {
                   Row: {
-                    "created_at": string,"ends_at": string,"id": string,"owner_id": string,"resource_id": string,"starts_at": string,"status": string,"updated_at": string
+                    "created_at": string,"ends_at": string,"id": string,"owner_id": string,"reminder_sent_at": string | null,"resource_id": string,"starts_at": string,"status": string,"updated_at": string
                   }
                   Insert: {
-                    "created_at"?: string,"ends_at": string,"id"?: string,"owner_id": string,"resource_id": string,"starts_at": string,"status"?: string,"updated_at"?: string
+                    "created_at"?: string,"ends_at": string,"id"?: string,"owner_id": string,"reminder_sent_at"?: string | null,"resource_id": string,"starts_at": string,"status"?: string,"updated_at"?: string
                   }
                   Update: {
-                    "created_at"?: string,"ends_at"?: string,"id"?: string,"owner_id"?: string,"resource_id"?: string,"starts_at"?: string,"status"?: string,"updated_at"?: string
+                    "created_at"?: string,"ends_at"?: string,"id"?: string,"owner_id"?: string,"reminder_sent_at"?: string | null,"resource_id"?: string,"starts_at"?: string,"status"?: string,"updated_at"?: string
                   }
                   Relationships: [
                     {
@@ -45,13 +55,13 @@ isOneToOne: false
                   ]
                 },"calendar_inbox": {
                   Row: {
-                    "delivery_id": string,"id": string,"payload": NonNullable<Json>,"processed_at": string | null,"provider": string,"received_at": string
+                    "delivery_id": string,"id": string,"payload": Json,"processed_at": string | null,"provider": string,"received_at": string
                   }
                   Insert: {
-                    "delivery_id": string,"id"?: string,"payload": NonNullable<Json>,"processed_at"?: string | null,"provider": string,"received_at"?: string
+                    "delivery_id": string,"id"?: string,"payload": Json,"processed_at"?: string | null,"provider": string,"received_at"?: string
                   }
                   Update: {
-                    "delivery_id"?: string,"id"?: string,"payload"?: NonNullable<Json>,"processed_at"?: string | null,"provider"?: string,"received_at"?: string
+                    "delivery_id"?: string,"id"?: string,"payload"?: Json,"processed_at"?: string | null,"provider"?: string,"received_at"?: string
                   }
                   Relationships: [
 
@@ -71,13 +81,13 @@ isOneToOne: false
                   ]
                 },"jobs": {
                   Row: {
-                    "claimed_by": string | null,"created_at": string,"current_step": string | null,"error": string | null,"fencing_token": number,"id": string,"job_key": string,"kind": string,"lease_expires_at": string | null,"payload": NonNullable<Json>,"status": string,"updated_at": string
+                    "claimed_by": string | null,"created_at": string,"current_step": string | null,"error": string | null,"fencing_token": number,"id": string,"job_key": string,"kind": string,"lease_expires_at": string | null,"payload": Json,"status": string,"updated_at": string
                   }
                   Insert: {
-                    "claimed_by"?: string | null,"created_at": string,"current_step"?: string | null,"error"?: string | null,"fencing_token": number,"id"?: string,"job_key": string,"kind": string,"lease_expires_at"?: string | null,"payload": NonNullable<Json>,"status": string,"updated_at": string
+                    "claimed_by"?: string | null,"created_at": string,"current_step"?: string | null,"error"?: string | null,"fencing_token": number,"id"?: string,"job_key": string,"kind": string,"lease_expires_at"?: string | null,"payload": Json,"status": string,"updated_at": string
                   }
                   Update: {
-                    "claimed_by"?: string | null,"created_at"?: string,"current_step"?: string | null,"error"?: string | null,"fencing_token"?: number,"id"?: string,"job_key"?: string,"kind"?: string,"lease_expires_at"?: string | null,"payload"?: NonNullable<Json>,"status"?: string,"updated_at"?: string
+                    "claimed_by"?: string | null,"created_at"?: string,"current_step"?: string | null,"error"?: string | null,"fencing_token"?: number,"id"?: string,"job_key"?: string,"kind"?: string,"lease_expires_at"?: string | null,"payload"?: Json,"status"?: string,"updated_at"?: string
                   }
                   Relationships: [
 
@@ -97,13 +107,13 @@ isOneToOne: false
                   ]
                 },"queue": {
                   Row: {
-                    "created_at": string,"id": string,"payload": NonNullable<Json>,"queue": string,"sent_at": string | null
+                    "created_at": string,"id": string,"payload": Json,"queue": string,"sent_at": string | null
                   }
                   Insert: {
-                    "created_at": string,"id"?: string,"payload": NonNullable<Json>,"queue": string,"sent_at"?: string | null
+                    "created_at": string,"id"?: string,"payload": Json,"queue": string,"sent_at"?: string | null
                   }
                   Update: {
-                    "created_at"?: string,"id"?: string,"payload"?: NonNullable<Json>,"queue"?: string,"sent_at"?: string | null
+                    "created_at"?: string,"id"?: string,"payload"?: Json,"queue"?: string,"sent_at"?: string | null
                   }
                   Relationships: [
 
@@ -127,7 +137,7 @@ isOneToOne: false
             [_ in never]: never
           }
           Functions: {
-            [_ in never]: never
+            job_stats: { Args: never; Returns: Json }
           }
           Enums: {
             [_ in never]: never

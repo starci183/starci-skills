@@ -1,7 +1,7 @@
-import { getDataSourceToken } from "@nestjs/typeorm"
 import { Secret } from "@modules/platform/config"
+import { PRIMARY_DATA_SOURCE } from "@modules/platform/database"
 
-/** Compiles the real CLI root with public options and a database infrastructure double. */
+/** Public fixture options and the database double for compiling the real CLI AppModule without network access. */
 export const buildWiringProof = () => ({
     options: {
         connections: [
@@ -13,5 +13,5 @@ export const buildWiringProof = () => ({
             },
         ],
     },
-    overrides: [{ token: getDataSourceToken("primary"), value: { manager: {} } }],
+    overrides: [{ token: PRIMARY_DATA_SOURCE, value: { manager: {} } }],
 })

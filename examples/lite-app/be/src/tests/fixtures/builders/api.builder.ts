@@ -1,9 +1,12 @@
-import { getDataSourceToken } from "@nestjs/typeorm"
 import { Secret } from "@modules/platform/config"
-import { ACCESS_TOKEN_VERIFIER } from "@modules/domain/identity/identity.decorators"
+import { PRIMARY_DATA_SOURCE } from "@modules/platform/database"
+import { ACCESS_TOKEN_VERIFIER } from "@modules/domain/identity"
 import { SUPABASE_ACCESS_TOKEN_VERIFIER, SUPABASE_ADMIN_CLIENT } from "@modules/integrations/supabase"
+import type { QueryBus } from "@nestjs/cqrs"
+import { mock } from "@starci/jest-preset"
+import { GetToolStatusQuery, StatusController } from "@features/api/tool-status"
 
-/** Compiles the real API root with public options and explicit infrastructure doubles. */
+/** Compiles the real API root with public configuration and explicit infrastructure doubles. */
 export const buildWiringProof = () => ({
     options: {
         server: { port: 3000 },
@@ -19,19 +22,21 @@ export const buildWiringProof = () => ({
             schema: "public",
         },
         supabase: { url: "https://fixture.supabase.co", serviceRoleKey: new Secret("fixture-only") },
-        queue: {
-            relayIntervalMs: 1000,
-            relayBatch: 50,
-            concurrency: 5,
-            pollIntervalMs: 1000,
-            visibilityTimeoutMs: 30000,
-        },
-        jobs: { workerId: "fixture", leaseMs: 60000 },
     },
     overrides: [
-        { token: getDataSourceToken("primary"), value: { manager: {} } },
+        { token: PRIMARY_DATA_SOURCE, value: { manager: {} } },
         { token: SUPABASE_ADMIN_CLIENT, value: { auth: {}, storage: {} } },
         { token: SUPABASE_ACCESS_TOKEN_VERIFIER, value: () => ({ ok: false }) },
         { token: ACCESS_TOKEN_VERIFIER, value: () => ({ ok: false }) },
     ],
 })
+
+/** Arranges the status transport collaborator and its expected typed query. */
+export const buildToolStatusProof = () => {
+    const queryBus = mock<QueryBus>()
+    return {
+        queryBus,
+        controller: new StatusController(queryBus),
+        query: (id: string) => new GetToolStatusQuery({ request: { id } }),
+    }
+}

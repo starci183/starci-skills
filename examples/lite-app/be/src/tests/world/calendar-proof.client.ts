@@ -1,3 +1,6 @@
+import type { CalendarReceiptRow, CalendarProcessedRow } from "@modules/domain/calendar-inbox"
+import { QueueInspectionClient } from "@modules/platform/queue"
+import { READ_CALENDAR_RECEIPTS, READ_CALENDAR_PROCESSED } from "@modules/domain/calendar-inbox"
 import { Test } from "@nestjs/testing"
 import { mock } from "@starci/jest-preset"
 import type { FakeClock } from "@starci/jest-preset"
@@ -11,21 +14,8 @@ import { WebhookSignatureService } from "@modules/platform/http-security"
 import type { HttpSecurityOptions } from "@modules/platform/http-security"
 import type { JobClaims } from "@modules/platform/jobs"
 import type { Logger } from "@modules/platform/logging"
-import {
-    PgmqQueueTransportClient,
-    QueueOutboxService,
-    READ_CALENDAR_RECEIPTS,
-    READ_CALENDAR_JOBS,
-    READ_CALENDAR_MESSAGES,
-    READ_CALENDAR_PROCESSED,
-} from "@modules/platform/queue"
-import type {
-    QueueOptions,
-    CalendarReceiptRow,
-    RecordedJobRow,
-    CalendarMessageRow,
-    CalendarProcessedRow,
-} from "@modules/platform/queue"
+import { PgmqQueueTransportClient, QueueOutboxService, READ_CALENDAR_JOBS } from "@modules/platform/queue"
+import type { QueueOptions, RecordedJobRow } from "@modules/platform/queue"
 import { CalendarDeliveryQueue, CALENDAR_DELIVERY_QUEUE } from "@modules/queues/calendar-delivery"
 import { createCalendarBuilder } from "../fixtures/builders/calendar.builder"
 import type { TestDatabases } from "./use-test-world"
@@ -53,7 +43,10 @@ export const createCalendarProof = async (
             db.primary.query<Array<CalendarReceiptRow>>(READ_CALENDAR_RECEIPTS, ["calendar", deliveryId]),
         jobs: (ids: ReadonlyArray<string>) =>
             db.primary.query<Array<RecordedJobRow>>(READ_CALENDAR_JOBS, [CALENDAR_DELIVERY_QUEUE, ids]),
-        messages: (jobId: string) => db.primary.query<Array<CalendarMessageRow>>(READ_CALENDAR_MESSAGES, [jobId]),
+        messages: async (jobId: string) =>
+            (await new QueueInspectionClient().messages(db.primary, CALENDAR_DELIVERY_QUEUE))
+                .filter((row) => row.message.jobId === jobId)
+                .map(({ message }) => ({ message })),
         processed: (receiptId: string) =>
             db.primary.query<Array<CalendarProcessedRow>>(READ_CALENDAR_PROCESSED, [receiptId]),
     }

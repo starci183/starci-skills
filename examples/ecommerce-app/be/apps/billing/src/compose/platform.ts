@@ -14,10 +14,12 @@ import { IdsModule } from "@modules/platform/ids"
 import { I18nModule } from "@modules/platform/i18n"
 import { LoggingModule } from "@modules/platform/logging"
 import { PROBES_ERROR_KINDS, PROBES_MESSAGES } from "@modules/platform/probes"
+import { RetryModule } from "@modules/platform/retry"
 import type { BillingAppOptions } from "../billing.options"
 
 /** The shared runtime, error catalog and edge policy of the billing API. */
 export const platformModules = (options: BillingAppOptions): Array<DynamicModule> => [
+    RetryModule.register({ isGlobal: true }),
     ClockModule.register({ isGlobal: true }),
     IdsModule.register({ isGlobal: true }),
     LoggingModule.register({ isGlobal: true }),

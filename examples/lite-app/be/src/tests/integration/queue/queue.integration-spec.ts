@@ -1,9 +1,9 @@
 import assert from "node:assert/strict"
 import { fakeIds } from "@starci/jest-preset"
 import type { QueueOptions } from "@modules/platform/queue"
-import { useTestWorld, TestWorldError, TestWorldErrorCode } from "../../world"
-import type { TestWorld } from "../../world"
-import { createQueueProof } from "../../world"
+import { useTestWorld, TestWorldError, TestWorldErrorCode } from "../../world/kit"
+import type { TestWorld } from "../../world/kit"
+import { createQueueProof } from "../../world/kit"
 
 const options: QueueOptions = {
     relayIntervalMs: 1,
@@ -95,8 +95,8 @@ const registerSchedulerProof = (proof: () => QueueProof) => {
                 assert(job, "Apply the example's public-surface Supabase migration before integration proofs")
                 expect(job.schedule).toBe("*/15 * * * *")
                 expect(job.command.trim()).toBe(world.modules.tickCommand)
-                const first = await world.modules.builder.registerSchedule(tx, job)
-                const second = await world.modules.builder.registerSchedule(tx, job)
+                const first = await world.modules.builder.registerSchedule(tx)
+                const second = await world.modules.builder.registerSchedule(tx)
                 expect(first).toEqual(second)
                 expect(await world.modules.scheduleIds(tx)).toEqual([{ jobid: job.jobid }])
                 const count = () => world.modules.countTicks(tx)

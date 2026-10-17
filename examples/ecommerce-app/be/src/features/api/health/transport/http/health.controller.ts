@@ -7,6 +7,7 @@ import { ProbesError } from "@modules/platform/probes"
 import type { LivenessReport } from "@modules/platform/probes"
 import { CheckHealthQuery } from "../../application/check-health.query"
 import { CheckLivenessQuery } from "../../application/check-liveness.query"
+import { CheckReadinessQuery } from "../../application/check-readiness.query"
 import { toCheckHealthResponse } from "./check-health.mapper"
 import type { CheckHealthResponse } from "./dto/check-health.response"
 
@@ -26,7 +27,7 @@ export class HealthController {
     @Get("ready")
     @Public({ reason: PublicReason.Health })
     async ready(): Promise<CheckHealthResponse> {
-        const outcome = await this.queryBus.execute(new CheckHealthQuery({ request: {} }))
+        const outcome = await this.queryBus.execute(new CheckReadinessQuery({ request: {} }))
         return toCheckHealthResponse(unwrapOutcome(outcome, ProbesError))
     }
 

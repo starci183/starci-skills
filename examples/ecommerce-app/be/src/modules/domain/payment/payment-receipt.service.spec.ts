@@ -19,7 +19,7 @@ const build = async () => {
     const inbox = fakeInbox()
     const claim = jest.spyOn(inbox, "claim")
     const release = jest.spyOn(inbox, "release")
-    const bus = recordingEventBus()
+    const bus = recordingEventBus<BankTransferReceivedEvent>()
     const moduleRef = await Test.createTestingModule({
         providers: [
             PaymentReceiptService,

@@ -23,3 +23,6 @@ export const PGMQ_ARCHIVE = sql`SELECT private.queue_archive($1, $2::bigint) AS 
 
 /** Makes a failed message visible again after $3 seconds: the backoff of its next attempt ($1 queue, $2 message id). */
 export const PGMQ_SET_VT = sql`SELECT msg_id FROM private.queue_set_vt($1, $2::bigint, $3) LIMIT 1`
+
+/** Deletes one selected delivery through the migration-owned local diagnostic door. */
+export const PGMQ_DELETE = sql`SELECT private.queue_delete($1, $2::bigint) AS deleted`

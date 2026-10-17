@@ -1,5 +1,5 @@
 import { EnvSource } from "@modules/platform/config"
-import { parseHttpSecurityConfig } from "./http-security.config"
+import { parseHttpSecurityConfig } from "@modules/platform/http-security"
 
 describe("HTTP security configuration", () => {
     it("allows local HTTP origins by default in development", () => {

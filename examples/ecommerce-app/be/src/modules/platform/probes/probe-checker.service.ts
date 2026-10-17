@@ -1,9 +1,10 @@
 import { Injectable } from "@nestjs/common"
-import { withinDeadline } from "@modules/platform/http"
 import { InjectLogger } from "@modules/platform/logging"
 import type { Logger } from "@modules/platform/logging"
 import { ok, refused } from "@modules/platform/primitives"
 import type { Outcome } from "@modules/platform/primitives"
+import { InjectTimer } from "@modules/platform/retry"
+import type { Timer } from "@modules/platform/retry"
 import { ProbesErrorCode } from "./errors/probes.error"
 import type { LivenessReport, ProbeReport, ProbeState } from "./probes.contracts"
 import { InjectProbesOptions, InjectProbes } from "./probes.decorators"
@@ -21,6 +22,7 @@ export class ProbeCheckerService {
         @InjectProbesOptions() private readonly options: ProbesOptions,
         @InjectProbes() private readonly probes: ReadonlyArray<Probe>,
         @InjectLogger() private readonly logger: Logger,
+        @InjectTimer() private readonly timer: Timer,
     ) {}
 
     /** Answers from process-local state, even when a required dependency is down. */
@@ -46,12 +48,23 @@ export class ProbeCheckerService {
     }
 
     private async state(probe: Probe): Promise<ProbeState> {
+        let cancel: () => void = () => undefined
         try {
-            await withinDeadline(() => probe.check(), PROBE_TIMEOUT_MS)
+            await Promise.race([
+                probe.check(),
+                new Promise<never>((_resolve, reject) => {
+                    cancel = this.timer.schedule(
+                        () => reject(new Error("Dependency probe timed out")),
+                        PROBE_TIMEOUT_MS,
+                    )
+                }),
+            ])
             return "ok"
         } catch (error) {
             this.logger.error(ProbesLogEvent.ProbeFailed, error, { dependency: probe.name })
             return "unreachable"
+        } finally {
+            cancel()
         }
     }
 }

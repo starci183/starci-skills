@@ -6,13 +6,12 @@ import { FakeClock, fakeIds, mock } from "@starci/jest-preset"
 import { CalendarInboxService } from "@modules/domain/calendar-inbox"
 import { CalendarsService } from "@modules/domain/calendars"
 import { Secret } from "@modules/platform/config"
-import { HttpSecurityErrorCode } from "@modules/platform/http-security"
 import type { HttpSecurityOptions } from "@modules/platform/http-security"
 import type { JobClaims } from "@modules/platform/jobs"
 import type { QueueOptions, RecordedJobRow } from "@modules/platform/queue"
 import { CALENDAR_DELIVERY_QUEUE } from "@modules/queues/calendar-delivery"
-import { useTestWorld } from "../../world"
-import { createCalendarProof } from "../../world"
+import { useTestWorld } from "../../world/kit"
+import { createCalendarProof } from "../../world/kit"
 
 const clock = new FakeClock("2026-10-14T00:00:00.000Z")
 const signingFixture = "integration-calendar-provider-fixture"
@@ -49,7 +48,7 @@ describe("calendar webhook verification collaboration", () => {
 
         await expect(
             door.receive(request, signature(timestamp, Buffer.from("{}")), timestamp, "delivery-1", payload),
-        ).rejects.toMatchObject({ code: HttpSecurityErrorCode.WebhookSignatureInvalid })
+        ).rejects.toMatchObject({ code: "HTTP_SECURITY_WEBHOOK_SIGNATURE_INVALID" })
 
         expect(inbox.acceptCalendarDelivery).not.toHaveBeenCalled()
     })
@@ -61,7 +60,7 @@ describe("calendar webhook verification collaboration", () => {
 
         await expect(
             door.receive(request, signature(timestamp), timestamp, "delivery-1", payload),
-        ).rejects.toMatchObject({ code: HttpSecurityErrorCode.WebhookReplayed })
+        ).rejects.toMatchObject({ code: "HTTP_SECURITY_WEBHOOK_REPLAYED" })
 
         expect(inbox.acceptCalendarDelivery).not.toHaveBeenCalled()
     })

@@ -1,6 +1,8 @@
 import { mock } from "@starci/jest-preset"
 import { LOGGER } from "@modules/platform/logging"
 import type { Logger } from "@modules/platform/logging"
+import { TIMER } from "@modules/platform/retry"
+import type { Timer } from "@modules/platform/retry"
 import { Test } from "@nestjs/testing"
 import { ProbesErrorCode } from "./errors/probes.error"
 import { ProbeCheckerService } from "./probe-checker.service"
@@ -12,15 +14,19 @@ const build = async () => {
     const database = mock<Probe>({ name: "database" })
     const cache = mock<Probe>({ name: "cache" })
     const logger = mock<Logger>()
+    const timer = mock<Timer>()
+    const cancel = jest.fn()
+    timer.schedule.mockReturnValue(cancel)
     const moduleRef = await Test.createTestingModule({
         providers: [
             ProbeCheckerService,
+            { provide: TIMER, useValue: timer },
             { provide: PROBES_OPTIONS, useValue: { service: "order", probes: [] } },
             { provide: PROBES, useValue: [database, cache] },
             { provide: LOGGER, useValue: logger },
         ],
     }).compile()
-    return { checker: moduleRef.get(ProbeCheckerService), database, cache, logger }
+    return { checker: moduleRef.get(ProbeCheckerService), database, cache, logger, timer, cancel }
 }
 
 describe("ProbeCheckerService", () => {
@@ -63,12 +69,14 @@ describe("ProbeCheckerService", () => {
     it("refuses readiness within two seconds when a required dependency never settles", async () => {
         jest.useFakeTimers()
         try {
-            const { checker, database, cache, logger } = await build()
+            const { checker, database, cache, logger, timer, cancel } = await build()
             database.check.mockResolvedValue(undefined)
             cache.check.mockReturnValue(new Promise<void>(() => {}))
             const result = checker.check()
 
             await jest.advanceTimersByTimeAsync(2_000)
+            expect(timer.schedule).toHaveBeenCalledWith(expect.any(Function), 2_000)
+            timer.schedule.mock.calls.at(1)?.[0]()
 
             expect(await result).toBeRefused({
                 code: ProbesErrorCode.DependencyUnavailable,
@@ -79,6 +87,7 @@ describe("ProbeCheckerService", () => {
             })
             expect(await checker.live()).toEqual({ status: "ok", service: "order" })
             expect(jest.getTimerCount()).toBe(0)
+            expect(cancel).toHaveBeenCalledTimes(2)
         } finally {
             jest.useRealTimers()
         }
@@ -87,13 +96,14 @@ describe("ProbeCheckerService", () => {
     it("clears probe deadlines after successful readiness", async () => {
         jest.useFakeTimers()
         try {
-            const { checker, database, cache } = await build()
+            const { checker, database, cache, cancel } = await build()
             database.check.mockResolvedValue(undefined)
             cache.check.mockResolvedValue(undefined)
 
             await checker.check()
 
             expect(jest.getTimerCount()).toBe(0)
+            expect(cancel).toHaveBeenCalledTimes(2)
         } finally {
             jest.useRealTimers()
         }

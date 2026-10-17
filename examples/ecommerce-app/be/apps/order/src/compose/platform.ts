@@ -19,6 +19,7 @@ import { JOBS_ERROR_KINDS, JOBS_MESSAGES } from "@modules/platform/jobs"
 import { LoggingModule } from "@modules/platform/logging"
 import { PROBES_ERROR_KINDS, PROBES_MESSAGES, ProbesModule } from "@modules/platform/probes"
 import { RealtimeModule } from "@modules/platform/realtime"
+import { RetryModule } from "@modules/platform/retry"
 import type { OrderAppOptions } from "../order.options"
 
 /**
@@ -27,6 +28,7 @@ import type { OrderAppOptions } from "../order.options"
  * app-wide. A composition group holds one area's module list and nothing else; `app.module.ts` spreads it.
  */
 export const platformModules = (options: OrderAppOptions): Array<DynamicModule> => [
+    RetryModule.register({ isGlobal: true }),
     ClockModule.register({ isGlobal: true }),
     IdsModule.register({ isGlobal: true }),
     LoggingModule.register({ isGlobal: true }),
