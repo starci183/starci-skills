@@ -34,21 +34,21 @@ restart, a closed chat or a dead agent.
 You hand StarCi a software goal. It plans the work as a chain of small jobs, gives each job to an
 AI agent, checks the result, and hands the finished work back to you.
 
-**Terms.** A *workflow* is one goal and its chain of jobs. An *op* is one short-lived agent that does one job.
-A *gate* is a check the runtime re-runs itself before it accepts an op's result. A *seat* is a long-lived
-agent session. A *lane* is a separate git worktree where one workflow works, so workflows do not collide.
+**Terms.** A _workflow_ is one goal and its chain of jobs. An _op_ is one short-lived agent that does one job.
+A _gate_ is a check the runtime re-runs itself before it accepts an op's result. A _seat_ is a long-lived
+agent session. A _lane_ is a separate git worktree where one workflow works, so workflows do not collide.
 
 **How it works.** Five roles stand on one floor. The floor is the runtime itself: it detects, counts, retries
 within bounds, cleans up and runs the checks. Agents are used only where judgment is needed.
 Reports go up one level at a time, and instructions go down one level at a time.
 
-| Role | Scope | Job |
-| --- | --- | --- |
-| Op | one unit of work | Does one job under its contract and reports with evidence. Never grades itself. |
-| Critic | one product of one op | Grades that product independently, from a different provider than the maker. |
-| Kernel | one workflow | Dispatches ops by the plan, settles their reports by re-running the checks, decides retry or re-plan. |
-| Supervisor | all workflows on the machine | Rules on gates, resolves conflicts between workflows, divides shared resources. |
-| Debug | the owner's chat, for a limited stabilisation period | Audits whether each role did its job and fixes the runtime when one did not. |
+| Role       | Scope                                                | Job                                                                                                   |
+| ---------- | ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| Op         | one unit of work                                     | Does one job under its contract and reports with evidence. Never grades itself.                       |
+| Critic     | one product of one op                                | Grades that product independently, from a different provider than the maker.                          |
+| Kernel     | one workflow                                         | Dispatches ops by the plan, settles their reports by re-running the checks, decides retry or re-plan. |
+| Supervisor | all workflows on the machine                         | Rules on gates, resolves conflicts between workflows, divides shared resources.                       |
+| Debug      | the owner's chat, for a limited stabilisation period | Audits whether each role did its job and fixes the runtime when one did not.                          |
 
 The owner decides what only a person can: intent, credentials, spend and irreversible choices.
 The reporting chain is Op to Kernel to Supervisor to owner. The full contract is `modules/kernel/roles.yaml`.

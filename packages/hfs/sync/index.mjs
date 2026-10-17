@@ -379,7 +379,8 @@ export function renderTargets(hfs, presets, { sonarKey, readTemplate = readBundl
         return { path: where, scope, mode: 'scripts', content, hash: hashOf(content), scripts };
       }
       const markers = target.markdown ? { begin: '<!-- >>> starci app sync (managed block; do not edit) >>> -->', end: '<!-- <<< starci app sync <<< -->' } : { begin: BLOCK_BEGIN, end: BLOCK_END };
-      const managed = target.mode === 'block' ? `${markers.begin}\n${trailingNewline(body)}${markers.end}\n` : body;
+      const spacing = target.markdown ? '\n' : '';
+      const managed = target.mode === 'block' ? `${markers.begin}\n${spacing}${trailingNewline(body)}${spacing}${markers.end}\n` : body;
       return { path: where, scope, mode: target.mode, markdown: target.markdown, markers, content: managed, hash: hashOf(managed) };
     });
   });

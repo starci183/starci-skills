@@ -1,10 +1,14 @@
 #!/usr/bin/env node
 import fs from 'node:fs';
 import path from 'node:path';
+import prettier from 'prettier';
+import prettierConfig from '../../packages/prettier-config/index.cjs';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { isMain } from '../lib/is-main.mjs';
 
 const CODE = 'RT_README_BADGE_MISSING';
+const FORMAT_CODE = 'RT_README_NOT_PRETTIER';
+const READMES = ['README.md', ...['lite-app', 'ecommerce-app', 'shape-slot'].map(name => `examples/${name}/README.md`)];
 const USAGE = 'usage: starci runtime check --only readme-badges [-- --root <runtime tree>]';
 const REQUIRED = [
   { name: 'ci', image: /^https:\/\/github\.com\/[^/]+\/[^/]+\/actions\/workflows\/ci\.yml\/badge\.svg(?:\?|$)/u },
@@ -38,16 +42,27 @@ function readmeBadgeFindings(root = skillRoot) {
     .map(({ name }) => ({ code: CODE, path: 'README.md', message: `Missing ${name} badge line.` }));
 }
 
-/** Judge the selected runtime tree and refuse missing README status badges with the code first. */
-function main(argv) {
+/** Every runtime and example README must be present and pass the canon Markdown formatter after sync. */
+async function readmeFormatFindings(root) {
+  const results = await Promise.all(READMES.map(async file => {
+    const absolute = path.join(root, file);
+    const formatted = fs.existsSync(absolute) && await prettier.check(fs.readFileSync(absolute, 'utf8'), { ...prettierConfig, parser: 'markdown' });
+    return formatted ? [] : [{ code: FORMAT_CODE, path: file, message: 'README is missing or not formatted by prettier; run npm run format.' }];
+  }));
+  return results.flat();
+}
+
+/** Judge the selected runtime tree and refuse missing badges or unformatted READMEs with the code first. */
+async function main(argv) {
   if (argv.length && (argv.length !== 2 || argv[0] !== '--root' || !argv[1])) {
     process.stderr.write(`${USAGE}\n`);
     return 2;
   }
-  const findings = readmeBadgeFindings(argv.length ? path.resolve(argv[1]) : skillRoot);
+  const root = argv.length ? path.resolve(argv[1]) : skillRoot;
+  const findings = [...readmeBadgeFindings(root), ...await readmeFormatFindings(root)];
   for (const finding of findings) process.stdout.write(`${finding.code}: ${finding.path}: ${finding.message}\n`);
-  if (!findings.length) process.stdout.write('readme-badges: required runtime badges present\n');
+  if (!findings.length) process.stdout.write('readme-badges: required runtime badges present; runtime and example READMEs are prettier-clean\n');
   return findings.length ? 1 : 0;
 }
 
-if (isMain(import.meta.url)) process.exitCode = main(process.argv.slice(2));
+if (isMain(import.meta.url)) process.exitCode = await main(process.argv.slice(2));

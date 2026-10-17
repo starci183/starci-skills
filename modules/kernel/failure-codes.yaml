@@ -5258,6 +5258,17 @@ RT_GENERATED_DRIFT:
   owner: supervisor
   kind: check-finding
 
+RT_README_NOT_PRETTIER:
+  title: "Runtime or example README is not formatted by prettier"
+  title_vi: "README runtime hoặc ví dụ chưa đúng định dạng Prettier"
+  meaning_vi: "README runtime hoặc một trong ba ví dụ không vượt qua prettier.check với cấu hình chuẩn Markdown."
+  causes_vi:
+    - "Khối huy hiệu do sync tạo thiếu dòng trống"
+    - "README bị thiếu hoặc nội dung chưa được định dạng"
+  nextStep_vi: "Chạy sync rồi npm run format cho README được nêu trong thông báo và kiểm tra lại readme-badges."
+  owner: runtime-core
+  kind: check-finding
+
 RT_README_BADGE_MISSING:
   title: "Required runtime README badge is missing"
   title_vi: "README runtime thiếu huy hiệu bắt buộc"
