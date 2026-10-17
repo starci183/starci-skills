@@ -4,7 +4,6 @@
 name: images
 
 on:
-{{imageDispatch}}
   push:
     tags: ["v*"]
 

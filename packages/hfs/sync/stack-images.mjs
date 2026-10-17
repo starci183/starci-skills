@@ -51,7 +51,7 @@ function declaredPassEnv(declaration) {
   return [...new Set(names)].sort(byCodeUnit);
 }
 
-/** Release builds select the sole image environment, or production on tags and a protected environment input on dispatch. */
+/** Release builds select the sole image environment, or production when several environments deploy images. */
 function imageEnvironments(declaration) {
   return Object.fromEntries(Object.entries(declaration?.environments ?? {})
     .filter(([name, environment]) => NAME.test(name) && environmentImages(environment).length > 0)
@@ -139,18 +139,8 @@ function releaseImageVariables(environments) {
   const names = Object.keys(environments);
   const selectedApp = names.map(name => `(env.STACK_ENVIRONMENT == '${name}' && contains(fromJSON('${JSON.stringify(environments[name])}'), matrix.name))`).join(' || ') || 'false';
   const multiple = names.length > 1;
-  const environment = multiple ? "${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'production' }}" : names[0] ?? 'production';
-  const dispatch = multiple ? [
-    '  workflow_dispatch:',
-    '    inputs:',
-    '      environment:',
-    '        description: Environment whose public build values the release images use',
-    '        required: true',
-    '        type: environment',
-    '        default: production',
-  ].join('\n') : '  workflow_dispatch: {}';
+  const environment = multiple ? 'production' : names[0] ?? 'production';
   return {
-    imageDispatch: dispatch,
     imageEnvironment: environment,
     imageJobEnvironment: names.length ? `\n    environment: ${environment}` : '',
     imageEnvironmentGuard: multiple ? block([
