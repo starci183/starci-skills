@@ -36,6 +36,8 @@ npm run build:fe
 
 The API reads `PORT`, `HTTP_SECURITY_ALLOWED_ORIGINS`, `PRIMARY_DB_URL`, `PRIMARY_DB_SCHEMA`, `SUPABASE_URL`, and `SUPABASE_SERVICE_ROLE_KEY`. The web app reads `NEXT_PUBLIC_SITE_URL`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and, once the first GraphQL operation exists, `NEXT_PUBLIC_GRAPHQL_URL`. Missing configuration stops the relevant process with a named error; no template supplies credential defaults.
 
+Production browser build values live in `.starcistacks/application-stacks.yaml` under `environments.production.deploy.images.web.buildArgs.values`. Before building deployment images, replace the placeholders with your site's public origin, your Supabase project's public URL, and its public anonymous key. These values reach every browser; keep the service role key in sealed runtime custody.
+
 `npm test` runs the back end's unit specs with per-file coverage. Optional integration specs run with `npm run test:integration` against the local Supabase stack (`npm run db:start`); a lite app has no e2e world.
 
 The public runtime template tracks only sealed member names. Scaffolding creates this app's own age recipient and encrypts generated placeholder values into the declared `.starcistacks/<environment>/secrets/*.enc` members. Keep the matching host age identity in untracked local custody, then use `starci app secret set` to replace each placeholder with an actual value before deployment. Product apps retain sealed member custody. Runtime specs use disposable copies with ephemeral identities and remove them afterwards.

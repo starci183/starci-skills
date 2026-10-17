@@ -106,8 +106,15 @@ environments:
           app: core
         app:
           app: app
+          # Public browser configuration; replace the placeholder origin before deployment.
+          buildArgs:
+            values:
+              NEXT_PUBLIC_SITE_URL: "https://{{project}}.example.invalid"
         landing:
           app: landing
+          buildArgs:
+            values:
+              NEXT_PUBLIC_APP_URL: "https://{{project}}.example.invalid"
       volumes:
         - {{project}}-production-ingress-data
         - {{project}}-production-ingress-config-data

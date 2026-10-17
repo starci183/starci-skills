@@ -37,6 +37,8 @@ requests) and `PRIMARY_DB_URL` at boot; every door is closed until it is marked 
 `npm run cli -- seed run` runs the dev seeds of `.starcistacks/dev/seeds` (run both from the app root). The product app reads
 `NEXT_PUBLIC_SITE_URL` and `NEXT_PUBLIC_GRAPHQL_URL` (the back end it calls through `fe/apps/app/src/modules/api`, read once the first GraphQL operation exists), the landing `NEXT_PUBLIC_APP_URL` (the product app it hands the reader over to). A missing key stops the process with an error that names it.
 
+Production browser build values live in `.starcistacks/application-stacks.yaml` under `environments.production.deploy.images.*.buildArgs.values`. Replace the placeholder origins for the product's `NEXT_PUBLIC_SITE_URL` and the landing's `NEXT_PUBLIC_APP_URL` with your product app's public origin before building deployment images.
+
 ## Work
 
 The product's Work records live in `.starciwork`.

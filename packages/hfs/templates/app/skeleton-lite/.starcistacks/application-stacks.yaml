@@ -147,9 +147,12 @@ environments:
           app: api
         web:
           app: web
+          # Public browser configuration; replace these placeholders before deployment.
           buildArgs:
             values:
               NEXT_PUBLIC_SITE_URL: "https://{{project}}.example.invalid"
+              NEXT_PUBLIC_SUPABASE_URL: "https://supabase.{{project}}.example.invalid"
+              NEXT_PUBLIC_SUPABASE_ANON_KEY: "REPLACE_WITH_PUBLIC_SUPABASE_ANON_KEY"
       volumes:
         - {{project}}-production-ingress-data
         - {{project}}-production-ingress-config-data
