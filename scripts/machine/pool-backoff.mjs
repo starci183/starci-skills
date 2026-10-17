@@ -94,7 +94,7 @@ export const entriesOfRows = (rows) => Object.fromEntries((rows ?? []).map((r) =
 
 
 /** The live backed-off caps of pool_backoff rows: {<pool target>: cap}, rows past until_at skipped. Pure. */
-export function capsOf(rows, { now = Date.now() } = {}) {
+function capsOf(rows, { now = Date.now() } = {}) {
   const out = {};
   for (const r of rows ?? []) {
     const live = Number(r?.until_at) > now;

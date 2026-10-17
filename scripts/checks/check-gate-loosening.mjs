@@ -23,7 +23,7 @@ const COMMIT_LIMIT = 400;
 const finding = (sha, message) => ({ code: CODE, path: `commit ${sha.slice(0, 10)}`, line: 0, message: `commit ${sha.slice(0, 10)} ${message}` });
 
 /** The RT_GATE_LOOSENING findings over the commits since the release commit of the tree at `root`. */
-export function checkGateLoosening(root = skillRoot) {
+function checkGateLoosening(root = skillRoot) {
   const rules = looseningRules(root);
   if (!rules) return [];
   const release = releaseCommit(root);

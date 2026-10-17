@@ -12,7 +12,7 @@ export const WORK_AUTHOR_PREREQUISITE_UNSETTLED = 'WORK_AUTHOR_PREREQUISITE_UNSE
 const AUTHOR_OP = 'work.author';
 
 /** The workflow's legs that must have a succeeded job before work.author runs: its plan ancestors named by workAuthorAfter. */
-export function authorPrerequisiteLegs(goalJson) {
+function authorPrerequisiteLegs(goalJson) {
   const named = readModuleJson('modules', 'goal', 'legality.yaml').workAuthorAfter ?? [];
   const ancestors = new Set(planAncestorsOf(goalJson ?? {}).get(AUTHOR_OP) ?? []);
   return named.filter((leg) => ancestors.has(leg));

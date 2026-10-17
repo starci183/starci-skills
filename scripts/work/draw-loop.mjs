@@ -93,13 +93,13 @@ const loopFileOf = (out) => path.join(out, 'loop.json');
 // The loop is agent data (docs/ledger-db.md): its rounds live in the op's job scratch (op-context.mjs; else an OS-temp
 // folder keyed by the ui record), never in .starciwork. finish puts the whole loop in the blob store as one bundle
 // (engine/db/blob.mjs putBundle) and generation.loop cites it {sha256: <bundle manifest>, round}.
-export const defaultOutOf = (uiDir, base, state, context = opContextOf()) => path.join(
+const defaultOutOf = (uiDir, base, state, context = opContextOf()) => path.join(
   context?.scratchDir ? path.resolve(context.scratchDir) : path.join(tempRoot(), 'starci-draw-loop', sha256(path.resolve(uiDir)).slice(0, 16)),
   LOOP_DIR, `${base}--${state}`);
 /** The manifest file finish writes beside the loop dir (<out>.bundle.json), so starci kernel report --attach carries it too. */
 const bundleFileOf = (out) => `${path.resolve(out)}.bundle.json`;
 
-export function readLoop(out) {
+function readLoop(out) {
   const doc = readJsonFile(loopFileOf(out));
   return doc?.schema === LOOP_SCHEMA ? doc : null;
 }
@@ -119,7 +119,7 @@ export function progressed(r, earlier) {
 }
 
 /** Why the loop stops after its last round, or null. */
-export function stopOf(rounds, settings) {
+function stopOf(rounds, settings) {
   const last = rounds[rounds.length - 1];
   if (!last) return null;
   if (last.allPass && !last.ownerFailed?.length && Number.isFinite(last.beauty) && last.beauty >= Number(settings.beautyMin)) return { reason: STOP.passed, atRound: last.n };
@@ -137,7 +137,7 @@ async function defaultRender({ html, out, viewports, name, fullPage, repo = null
 }
 
 /** Parse --fixture values: "<file>" for every viewport, "<width>=<file>" for one width. */
-export function fixturesByWidth(values) {
+function fixturesByWidth(values) {
   const out = { default: null, byWidth: {} };
   for (const v of list(values)) {
     const m = /^(\d{2,5})=(.+)$/.exec(v);
@@ -250,7 +250,7 @@ export async function runRound(o) {
  * picked or cannot answer is a critique with `error` and no verdict (the round then has no beauty and finish reports
  * DRAW_CRITIC_MISSING, not a low score).
  */
-export async function critiqueRound({ loop, n, roundDir, captures, html, uiDir = null, archetype = null, record = null, shape, settings, drawer = undefined, orca = null }) {
+async function critiqueRound({ loop, n, roundDir, captures, html, uiDir = null, archetype = null, record = null, shape, settings, drawer = undefined, orca = null }) {
   const { rubric, ownerChecks } = rubricFor({ workRoot: uiDir ? workRootOf(uiDir) : null, archetype, record, shape });
   // The owner's notes this shape must address ride as gate checks (draw-feedback.mjs); the loop records which.
   if (ownerChecks.length) loop.ownerChecks = ownerChecks;
@@ -274,7 +274,7 @@ export async function critiqueRound({ loop, n, roundDir, captures, html, uiDir =
  * errored): finish never reports a drawing blocked on a beauty nobody scored. Updates the round's beauty and critic in
  * loop.json. Returns {ran, critique|null, round}. `orca` replaces the Orca client of the critic worker (tests).
  */
-export async function critiqueBest({ out, settings = drawLoopSettings(), drawer = undefined, orca = null }) {
+async function critiqueBest({ out, settings = drawLoopSettings(), drawer = undefined, orca = null }) {
   const loop = readLoop(out);
   if (!loop?.rounds?.length) return { ran: false, critique: null, round: null };
   const best = bestRound(loop.rounds);
@@ -519,7 +519,7 @@ function ownerFeedbackFindings(best) {
  * Finish a stopped loop: pick the best round, install its parts and report the outcome. Returns {outcome: passed|
  * blocked, best, remaining, installed, assets}.
  */
-export function finishLoop({ out, parts = null, prompt = null, repo = null, settings = drawLoopSettings(), force = false }) {
+function finishLoop({ out, parts = null, prompt = null, repo = null, settings = drawLoopSettings(), force = false }) {
   const loop = readLoop(out);
   if (!loop) throw new Error(`${out} holds no draw loop (loop.json)`);
   if (!loop.rounds.length) throw new Error('the loop has no round');

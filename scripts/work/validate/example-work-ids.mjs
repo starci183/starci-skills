@@ -17,7 +17,7 @@ export const expectedId = segments => {
 
 /**
  * The fewest dot-segments after the family prefix each family's JSON schema id pattern admits
- * (modules/schemas/work-*.schema.yaml `id.pattern` `{N,}`; tests/checks/work-place-depth.spec.mjs holds the two
+ * (modules/schemas/work-*.schema.yaml `id.pattern` `{N,}`; the two are kept
  * in step). The place rule derives an id from any depth, so without this a record can sit where its id
  * matches its place yet its own schema refuses the id: impl/index.yaml derives impl.<feature> and
  * impl/<repository>/index.yaml derives impl.<feature>.<repository>, both below

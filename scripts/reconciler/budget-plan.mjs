@@ -11,7 +11,7 @@ const LET_FINISH = { key: 'let-finish', snooze: true, recommended: true, title: 
   verb: 'wait for the running attempt to settle; no command' };
 
 /** The options of one overrun: a running attempt may only be let finish; a settled one has the retries (Kernel commands), re-scope only for a leg that owns more than one path. */
-export function budgetOptions(workflowId, row) {
+function budgetOptions(workflowId, row) {
   if (row.live) return [LET_FINISH];
   const retry = `starci kernel enqueue --workflow ${workflowId} --op ${row.opId} --retry-of ${row.jobId}`;
   const half = row.ownedPaths.slice(0, Math.ceil(row.ownedPaths.length / 2));

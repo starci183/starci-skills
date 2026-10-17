@@ -227,7 +227,7 @@ const opFileFindings = ({ file, dir, root, schema, add }) => {
   checkMissingFindings(id, full, root, add);
 };
 
-export function checkOpManifest({ root = skillRoot, opsDir } = {}) {
+function checkOpManifest({ root = skillRoot, opsDir } = {}) {
   const dir = opsDir ? path.resolve(opsDir) : path.join(root, 'modules', 'ops', 'ops');
   const schemaFile = path.join(root, SCHEMA_FILE);
   const findings = [];
@@ -246,7 +246,7 @@ export function checkOpManifest({ root = skillRoot, opsDir } = {}) {
   return { ok: findings.length === 0, opCount: files.length, findings };
 }
 
-export function opManifestMain(argv = []) {
+function opManifestMain(argv = []) {
   if (argv.includes('--help') || argv.includes('-h')) {
     return { exitCode: 0, text: 'Usage: starci runtime check --only op-manifest -- [--opsDir <dir>] [--json]\n\nEvery modules/ops/ops/<id>.yaml holds the modules/schemas/op.schema.yaml shape, gives each param a default or required: true, keeps each rule in one step, cites params instead of restating numbers, keeps rules out of reads[].purpose, writes one path per entry and cites only checks that exist. Exit 0 is clean.\n' };
   }

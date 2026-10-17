@@ -53,7 +53,7 @@ const pinSourceFindings = (root, name, pin, errors) => {
   if (pkg.version !== pin.version) errors.push(`CANON_PIN_SOURCE ${name}: pinned ${pin.version} but ${pin.source} is ${pkg.version}`);
 };
 
-export function checkCanonPins({ root = skillRoot } = {}) {
+function checkCanonPins({ root = skillRoot } = {}) {
   const errors = [];
   let doc;
   try {
@@ -72,7 +72,7 @@ export function checkCanonPins({ root = skillRoot } = {}) {
 }
 
 /** Every code-pattern profile's canon binding against the canon source this runtime publishes; `pack` lists a package's published files. */
-export function checkCanonBindings({ root = skillRoot, pack = packedFiles } = {}) {
+function checkCanonBindings({ root = skillRoot, pack = packedFiles } = {}) {
   const errors = [];
   // The published file set includes the generated runtime copies (runtime/**): git-ignored, so they are regenerated
   // before the pack list is read - an absent copy would leave it out of the digest.
@@ -98,7 +98,7 @@ export function checkCanonBindings({ root = skillRoot, pack = packedFiles } = {}
 }
 
 /** Judge the root package.json of one app against every pin. */
-export function checkRepoPins({ repo, root = skillRoot }) {
+function checkRepoPins({ repo, root = skillRoot }) {
   const errors = [];
   const doc = loadPins(root);
   const pkg = readJson(path.join(repo, 'package.json'));

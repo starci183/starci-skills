@@ -36,7 +36,7 @@ const scriptGate = (script) => ({
 });
 
 /** The gates derived from the managed package scripts: the app check first, then every script the sync renders that the app has. */
-export function defaultGates(scripts) {
+function defaultGates(scripts) {
   const present = SCRIPT_GATES.filter((script) => typeof scripts?.[script] === 'string');
   return [{ name: 'app-check', command: ['npx', 'starci', 'app', 'check'], summary: null, env: {} }, ...present.map(scriptGate)];
 }
@@ -128,7 +128,7 @@ function nextFree(prefix, version, taken) {
 }
 
 /** The tag this release uses and its state: on-head (reused), free (will be created) or taken (exists on another commit). */
-export function chooseTag(ctx, config, { prefix, remote }) {
+function chooseTag(ctx, config, { prefix, remote }) {
   const onHead = annotatedOnHead(ctx, prefix);
   const taken = takenTags(ctx, prefix, remote);
   const exact = `${prefix}${config.version}`;
@@ -147,7 +147,7 @@ const lineAfter = (text, label) => {
 };
 
 /** The jest summary lines of a log: { suites, failedSuites, tests, failed, passed } or null when jest printed none. */
-export function jestSummary(text) {
+function jestSummary(text) {
   const suites = lineAfter(text, 'Test Suites:');
   const tests = lineAfter(text, 'Tests:');
   if (suites === null || tests === null) return null;
@@ -159,7 +159,7 @@ export function jestSummary(text) {
 }
 
 /** Judges a jest-style gate from its log: green needs suites that all passed, every test passed and no coverage threshold miss. */
-export function judgeJest(text) {
+function judgeJest(text) {
   const summary = jestSummary(text);
   const misses = (text.match(THRESHOLD_MISS) ?? []).length;
   if (!summary) return { pass: false, detail: 'no jest summary in the log', summary: null, misses };

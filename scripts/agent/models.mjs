@@ -74,7 +74,7 @@ export function hostToolsRequired(kind, { opsDir = DEFAULT_OPS_DIR } = {}) {
 }
 
 /** The host tools the agent behind `provider` has, from its card's capabilities.hostTools. */
-export function hostToolsOf(provider, { modelsDir = DEFAULT_MODELS_DIR } = {}) {
+function hostToolsOf(provider, { modelsDir = DEFAULT_MODELS_DIR } = {}) {
   if (!provider || /[\\/]|\.\./.test(String(provider))) return [];
   const tools = readYamlFile(path.join(modelsDir, 'agents', `${provider}.yaml`))?.capabilities?.hostTools;
   return Array.isArray(tools) ? tools.map(String) : [];

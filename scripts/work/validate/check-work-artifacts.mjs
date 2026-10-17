@@ -35,7 +35,7 @@ const relativeToRoot = file => slash(path.relative(root, file));
 // a sops (age) file, by app-relative path: .starcistacks sits at the app root beside be/, fe/ and .starciwork, never under a
 // side. The Work tree only holds the identity/resource record whose custody.sealed points there. The same shape is the
 // schema pattern of custody.sealed in modules/schemas/work-resource.schema.yaml.
-export const SEALED_LOCATION_RE = /^\.starcistacks\/[a-z0-9]+(?:-[a-z0-9]+)*\/secrets\/[a-z0-9]+(?:-[a-z0-9]+)*\.enc$/;
+const SEALED_LOCATION_RE = /^\.starcistacks\/[a-z0-9]+(?:-[a-z0-9]+)*\/secrets\/[a-z0-9]+(?:-[a-z0-9]+)*\.enc$/;
 // A custody path under a side folder (be/.starcistacks/..., fe/.starcistacks/...): the side form, refused by name.
 const SIDE_STACKS_RE = /^(?:be|fe)\/\.starcistacks\//;
 /** Why `sealed` (a custody.sealed text) is not the one location, in words a finding carries; null when it is. */

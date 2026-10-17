@@ -451,7 +451,7 @@ function wakeKernelIn({ db, workflowId, text, pending, activeStaleMs, terminal, 
 /** The line every durable transition wake ends with. */
 export const WAKE_BOUNDS = 'No new scope, path, retry or authority; never duplicate a job or bypass an effect fence.';
 /** A durable transition wake: opener, the transition's own `lines`, WAKE_BOUNDS. */
-export const transitionWakeText = (workflowId, transition, lines) =>
+const transitionWakeText = (workflowId, transition, lines) =>
   [`Durable transition wake for workflow ${workflowId}: ${transition}.`, ...lines, WAKE_BOUNDS].join(' ');
 
 /**

@@ -15,7 +15,7 @@ import { safeRemove } from '../../api/fs/safe-remove.mjs';
 import { makeTempDir } from '../../api/fs/make-temp-dir.mjs';
 import { loadTypescript } from '../../lib/package-at.mjs';
 
-export const CONTRACT_SNAPSHOT_DRIFT = 'HFS_CONTRACT_SNAPSHOT_DRIFT';
+const CONTRACT_SNAPSHOT_DRIFT = 'HFS_CONTRACT_SNAPSHOT_DRIFT';
 const GRAPHQL_TRANSPORT_SLOT = 'be.transport.graphql';
 const SNAPSHOT_OF = { graphql: 'schema.graphql', json: 'openapi.json' };
 const GRAPHQL_PLATFORM = /^src\/modules\/platform\/graphql(?:\/|\.ts$|$)/;

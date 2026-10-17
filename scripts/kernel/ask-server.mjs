@@ -91,7 +91,7 @@ const mirroredPick = (question, pickGroups) =>
 // The owner's "one memorable lane" band, both ends included (engine/config.mjs ASK_PORT_BAND); --band narrows it.
 const [ASK_FIRST, ASK_LAST] = ASK_PORT_BAND;
 // The default --ttl of a served ask (modules/models/runtimes.yaml allocation.serveAsk.ttlMs).
-export const DEFAULT_TTL_MS = allocationMs('serveAsk.ttlMs');
+const DEFAULT_TTL_MS = allocationMs('serveAsk.ttlMs');
 
 // What an ask report is about: the asking job's params.subject (report.from
 // names the job) and the question's refs.
@@ -377,7 +377,7 @@ ${drawReview ? `<label class="opt"><input type="checkbox" name="golden" value="1
 };
 
 /** Wake the Kernel whose parked ask was answered (scripts/kernel/wake-delivery.mjs wakeKernelForTransition). */
-export const wakeAskAnswered = (ledger, { workflowId, dispatchId, receiptPath, answeredBy = OWNER, deps = {} }) => wakeKernelForTransition(ledger, {
+const wakeAskAnswered = (ledger, { workflowId, dispatchId, receiptPath, answeredBy = OWNER, deps = {} }) => wakeKernelForTransition(ledger, {
   workflowId, transition: 'ask-answered', ids: { dispatchId }, deps, lines: [
     answeredBy === AUTO_ACCEPTED_BY
       ? `config.yaml ${AUTO_ACCEPT_CONFIG_KEY} answered the parked ask for dispatch ${dispatchId} with its recommended option (answeredBy ${AUTO_ACCEPTED_BY}; a later owner answer supersedes). Receipt: ${receiptPath}.`

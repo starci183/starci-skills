@@ -19,8 +19,6 @@ import { tempRoot } from '../../engine/temp-root.mjs';import { makeTempDir } fro
  * temporary linked worktree that is removed in a `finally`.
  */
 const VERIFY_PROOF='starci/verify-proof@1';
-/** The proof of a sealed candidate: planned only from a verifier-owned oracle manifest. */
-const CANDIDATE_PROOF='starci/verify-proof@1';
 /** What a proof is worth per operation kind. `fail-before` demands the contrast; `checks-only` accepts the re-run. */
 export const PROOF_POLICY={'backend.implement':'fail-before','interface.implement':'fail-before',default:'checks-only'};
 /** A spec/test file in any of the suites this runtime drives (unit, e2e). */
@@ -36,8 +34,8 @@ const base=file=>normalize(file).split('/').at(-1);
 const short=head=>String(head??'').slice(0,12)||'(unknown)';
 const listOf=value=>(Array.isArray(value)?value:[value]).filter(item=>typeof item==='string'&&item.trim()).map(item=>item.trim());
 
-export const isSpecPath=file=>SPEC_PATTERN.test(normalize(file));
-export const policyFor=kind=>PROOF_POLICY[kind]??PROOF_POLICY.default;
+const isSpecPath=file=>SPEC_PATTERN.test(normalize(file));
+const policyFor=kind=>PROOF_POLICY[kind]??PROOF_POLICY.default;
 
 /** A check `scope` is a path, a directory or a glob (`src/**`, `*.spec.ts`); it covers a spec by prefix or by pattern. */
 function scopeCovers(entry,spec){
@@ -161,91 +159,4 @@ export function proofFinding(result){
   return specs.length>1
     ?`the added specs ${named} also pass at base ${short(result.base?.head)}: they do not prove the change`
     :`the added spec ${named} also passes at base ${short(result.base?.head)}: it does not prove the change`;
-}
-
-/**
- * Build a proof plan exclusively from a pre-sealed, verifier-owned oracle manifest. Tests written in the
- * candidate are supplemental and cannot become the oracle merely because the implementer reported them.
- */
-/**
- * Whether the protected proof is a gate for this operation at all. Proof by contrast is a statement about code:
- * a spec the operation added must fail on the code it started from. A kind that writes no code (a record author,
- * a decision, a drawing, a review) has nothing the proof could contrast, and an operation whose checks name no spec
- * file sealed no oracle to contrast with. Both are answered by the re-run checks, the Work validator and the
- * independent validator - the acceptance every operation already passes - and are recorded as skipped, not judged.
- */
-export function proofApplies(op,{oracleManifest=null,writes=null}={}){
-  const kindWrites=Array.isArray(writes)?writes:[];
-  if(!kindWrites.includes('code'))return {applies:false,reason:`the kind ${op?.kind??'operation'} writes no code: the Work validator and the independent validator are its proof`};
-  const oracles=Array.isArray(oracleManifest?.oracles)?oracleManifest.oracles:[];
-  if(!oracles.length)return {applies:false,reason:'no protected oracle was sealed for this operation (its checks name no spec file): the re-run checks and the independent validator are its proof'};
-  return {applies:true,reason:null};
-}
-
-export function planProtectedProof(op,{oracleManifest,candidateChanges=[],policy=null}={}){
-  const manifest=plainOracleManifest(oracleManifest);
-  const changed=new Set(candidateChanges.map(item=>normalize(typeof item==='string'?item:item?.path)).filter(Boolean));
-  const errors=[];
-  if(!manifest)errors.push('missing or malformed protected oracle manifest');
-  const oracles=listOfOracle(manifest?.oracles).filter(oracle=>{
-    const valid=typeof oracle.id==='string'&&oracle.id&&typeof oracle.command==='string'&&oracle.command&&
-      typeof oracle.sha256==='string'&&/^[a-f0-9]{64}$/.test(oracle.sha256)&&Array.isArray(oracle.assertionIds)&&oracle.assertionIds.length&&
-      typeof oracle.ownerAttemptId==='string'&&oracle.ownerAttemptId&&oracle.ownerAttemptId!==op?.id;
-    if(!valid)errors.push(`malformed or non-independent oracle ${oracle?.id??'(unknown)'}`);
-    if(changed.has(normalize(oracle.path)))errors.push(`candidate changed protected oracle ${oracle.path}`);
-    return valid;
-  });
-  const selected=oracles.filter(oracle=>!Array.isArray(oracle.kinds)||oracle.kinds.includes(op?.kind));
-  if(!selected.length)errors.push(`no protected oracle covers ${op?.kind??'operation'}`);
-  const mode=policy??(op?.proofPolicy==='equivalence'?'equivalence':'fail-before');
-  if(!['fail-before','equivalence'].includes(mode))errors.push(`unsupported proof policy ${mode}`);
-  return {schema:CANDIDATE_PROOF,mode,opId:op?.id??null,kind:op?.kind??null,manifestDigest:manifest?.digest??null,
-    oracles:selected.map(oracle=>({...oracle,path:normalize(oracle.path)})),errors,ready:errors.length===0};
-}
-
-const plainOracleManifest=value=>value&&typeof value==='object'&&!Array.isArray(value)&&value.schema==='starci/oracle-manifest@1'&&
-  typeof value.digest==='string'&&/^[a-f0-9]{64}$/.test(value.digest)?value:null;
-const listOfOracle=value=>Array.isArray(value)?value.filter(item=>item&&typeof item==='object'&&!Array.isArray(item)):[];
-const classifyBase=(result,oracle)=>{
-  if(result.timedOut)return {outcome:'inconclusive',reason:'base oracle timed out'};
-  if(result.unavailable)return {outcome:'unavailable',reason:result.tail||'base oracle unavailable'};
-  if(result.exitCode===0)return {outcome:'fail',reason:'oracle also passes at base'};
-  if(!oracle.expectedBaseFailure)return {outcome:'inconclusive',reason:'base failed without a declared expected failure signature'};
-  try{return new RegExp(oracle.expectedBaseFailure).test(result.tail)?{outcome:'pass'}:
-    {outcome:'inconclusive',reason:'base failed for a different reason than the declared behavior assertion'};}
-  catch{return {outcome:'inconclusive',reason:'oracle expectedBaseFailure is not a valid regular expression'};}
-};
-
-const equivalenceBase=baseResult=>{
-  if(baseResult.exitCode===0)return {outcome:'pass'};
-  return {outcome:baseResult.timedOut?'inconclusive':'unavailable',reason:'equivalence baseline did not run cleanly'};
-};
-
-const oracleResult=(exec,oracle,{mode,baseRoot,candidateRoot,timeoutMs})=>{
-  const baseResult=runOne(exec,oracle.command,{cwd:baseRoot,timeoutMs});
-  const candidateResult=runOne(exec,oracle.command,{cwd:candidateRoot,timeoutMs});
-  const baseVerdict=mode==='equivalence'?equivalenceBase(baseResult):classifyBase(baseResult,oracle);
-  let outcome;
-  if(candidateResult.timedOut)outcome='inconclusive';
-  else if(candidateResult.exitCode!==0)outcome='fail';
-  else outcome=baseVerdict.outcome;
-  const reason=candidateResult.exitCode!==0?'candidate oracle failed':baseVerdict.reason??null;
-  return {oracleId:oracle.id,assertionIds:oracle.assertionIds,base:baseResult,candidate:candidateResult,outcome,reason};
-};
-
-/** Run protected commands against immutable base/candidate roots. Only a discriminating, candidate-green result passes. */
-export function runProtectedProof({plan,baseRoot,candidateRoot,oracleRoot,exec=runCommand,timeoutMs=PROOF_TIMEOUT_MS}={}){
-  if(plan?.schema!==CANDIDATE_PROOF||!plan.ready)return {schema:CANDIDATE_PROOF,verdict:'inconclusive',results:[],errors:plan?.errors??['proof plan is not ready']};
-  if(!baseRoot||!candidateRoot||!oracleRoot)return {schema:CANDIDATE_PROOF,verdict:'unavailable',results:[],errors:['proof roots are unavailable']};
-  const results=plan.oracles.map(oracle=>oracleResult(exec,oracle,{mode:plan.mode,baseRoot,candidateRoot,timeoutMs}));
-  const order=['fail','inconclusive','unavailable'];
-  const verdict=order.find(value=>results.some(result=>result.outcome===value))??'pass';
-  return {schema:CANDIDATE_PROOF,mode:plan.mode,manifestDigest:plan.manifestDigest,verdict,results};
-}
-
-export function protectedProofFinding(result){
-  if(result?.verdict==='pass')return null;
-  const first=(result?.results??[]).find(item=>item.outcome!=='pass');
-  return first?`protected oracle ${first.oracleId} is ${first.outcome}: ${first.reason??'no conclusive proof'}`:
-    `protected proof is ${result?.verdict??'inconclusive'}: ${(result?.errors??[]).join('; ')}`;
 }

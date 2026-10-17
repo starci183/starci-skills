@@ -165,7 +165,7 @@ function housekeepingReason(claim, host) {
 
 /* ------------------------------------------------------------ the controller */
 
-export function createGcController(overrides = {}) {
+function createGcController(overrides = {}) {
   const deps = { ...liveDeps, ...overrides };
   const settings = { ...gcControllerSettings(), ...overrides.settings };
 

@@ -3,7 +3,7 @@
 // The runtime's own guards live in the host state root, never in a tracked path: <starciLocalRoot>/guards
 // (<runtime root>/.runtime/guards, or STARCI_LOCAL_ROOT/guards). STARCI_GUARDS_ROOT relocates THAT directory only - a
 // caller that names another root (a fixture's skill root) keeps <root>/runtime/guards. The node --test preload
-// (tests/setup/isolated-temp.mjs) gives every spec process its own STARCI_GUARDS_ROOT, so two spec files that bind the
+// (e2e/setup/isolated-temp.mjs) gives every spec process its own STARCI_GUARDS_ROOT, so two spec files that bind the
 // same fake Orca handle (fake-terminal-1) never read each other's binding, and no spec writes the live runtime's guards.
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';

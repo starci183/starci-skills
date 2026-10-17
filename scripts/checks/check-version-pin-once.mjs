@@ -40,7 +40,7 @@ const SEMVER = new RegExp([
 const WINDOW = 4;
 
 /** pin name → version for every pin in the canon-pins document. */
-export function pinsOf(pinsDoc) {
+function pinsOf(pinsDoc) {
   const pins = new Map();
   for (const [name, entry] of Object.entries(pinsDoc?.pins ?? {})) {
     if (/^\d+\.\d+\.\d+$/.test(String(entry?.version ?? ''))) pins.set(name, String(entry.version));
@@ -49,7 +49,7 @@ export function pinsOf(pinsDoc) {
 }
 
 /** True when lines[i] is a `version:` leaf nested directly under a binding key (canon/provenance/identity). */
-export function isBindingLeaf(lines, i) {
+function isBindingLeaf(lines, i) {
   const line = lines[i];
   const inline = /^(\s*)([A-Za-z_][\w-]*)\s*:\s*\{[^}]*\bversion\s*:/.exec(line);
   if (inline && BINDING_KEYS.includes(inline[2])) return true; // `canon: {..., version: x}` — the inline binding form
@@ -79,7 +79,7 @@ const restatedPin = (lines, i, ver, nameRe, pins) => {
   return null;
 };
 
-export function versionPinFindings(files, pins) {
+function versionPinFindings(files, pins) {
   const findings = [];
   const names = [...pins.keys()];
   const nameRe = new RegExp(`(?<![w@/-])(?:${names.map(escapeRegExp).join('|')})(?![w-])`, 'g');
@@ -98,7 +98,7 @@ export function versionPinFindings(files, pins) {
 }
 
 /** Run VERSION_PIN_ONCE on the runtime at `root`. */
-export function checkVersionPinOnce(root = skillRoot) {
+function checkVersionPinOnce(root = skillRoot) {
   const tracked = gitOutputOf(lsFiles(['-z'], { dir: root, maxBuffer: 64 * 1024 * 1024 }), 'git ls-files -z').split('\0').filter(Boolean);
   const pins = pinsOf(parseYaml(fs.readFileSync(path.join(root, PINS_FILE), 'utf8')));
   const files = {};

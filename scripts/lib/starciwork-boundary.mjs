@@ -162,5 +162,3 @@ export const STARCIWORK_GITIGNORE = new Proxy([], {
   defineProperty: frozenWrite,
   setPrototypeOf: frozenWrite,
 });
-export const starciworkGitignoreText = ({ edition = 'full' } = {}) => edition === 'lite'
-  ? `${fs.readFileSync(LITE_TEMPLATE, 'utf8').trimEnd()}\n` : `${gitignoreLines().join('\n')}\n`;

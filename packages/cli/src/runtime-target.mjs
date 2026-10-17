@@ -1,7 +1,7 @@
 import path from 'node:path';
 
 /** The code a verb that writes the runtime tree is refused with when it would write a tree other than the CLI's own. */
-export const RUNTIME_TREE_FOREIGN = 'RUNTIME_TREE_TARGET_FOREIGN';
+const RUNTIME_TREE_FOREIGN = 'RUNTIME_TREE_TARGET_FOREIGN';
 
 const sameRoot = (a, b) => (process.platform === 'win32' ? path.resolve(a).toLowerCase() === path.resolve(b).toLowerCase() : path.resolve(a) === path.resolve(b));
 

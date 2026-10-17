@@ -36,7 +36,7 @@ const drawRetriesOf = (s) => {
 };
 
 // The redraw repeats the job the owner's answer concerned; an answer that names no job leaves the write set to the Kernel.
-export const drawRetry = (entry, rows) => {
+const drawRetry = (entry, rows) => {
   const retryOf = entry.redrawOwed.jobId ? ` --retry-of ${entry.redrawOwed.jobId}` : '';
   const row = rows.find((job) => job.job_id === entry.redrawOwed.jobId);
   return withMove({ kind: 'retry', origin: 'draw-redraw', op: DRAW_REVIEW_OP, jobId: entry.redrawOwed.jobId ?? null,
@@ -84,7 +84,7 @@ export const decorPhase = (s) => {
 };
 
 // An ordinal that does not reconcile with the landed seam runs again on its own write set and cut: the move of seam-reconcile-red.
-export const seamMoveOf = (action, rows) => (action.origin === 'seam-reconcile-red'
+const seamMoveOf = (action, rows) => (action.origin === 'seam-reconcile-red'
   ? withMove(action, rerunMoveOf(rows.find((job) => job.job_id === action.jobId), { op: action.op, reason: `cut ${action.cutId} ordinal does not reconcile with the landed seam` }))
   : action);
 

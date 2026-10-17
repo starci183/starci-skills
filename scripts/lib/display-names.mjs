@@ -21,9 +21,9 @@ import { readYamlFile } from './read-yaml.mjs';
 import { normRel, pathsOverlap } from './path-key.mjs';
 import { PRODUCT_NAME_SEGMENT } from './example-refs.mjs';
 
-export const WORKFLOW_NAME_MAX = 48;
+const WORKFLOW_NAME_MAX = 48;
 const DISPLAY_NAME_LIMIT = 80;
-export const JOB_WHAT_MAX = 40;
+const JOB_WHAT_MAX = 40;
 const NAME_SEPARATOR = ' · ';
 
 const LABELS_FILE = new URL('../../modules/ops/_labels.yaml', import.meta.url);
@@ -96,7 +96,7 @@ export const attachedNameOf = (file) => String(file.name ?? path.basename(String
 const BRAND_CASE = { starci: 'StarCi' };
 const REPO_ROLE_SUFFIX = /[-_](backend|be|frontend|fe|api|server|web|app)$/i;
 /** The product's display word(s) from a project or repository name: `shop-be` -> `Shop`. */
-export function productName(raw) {
+function productName(raw) {
   const base = squash(raw).replace(REPO_ROLE_SUFFIX, '');
   if (!base) return '';
   return base.split(/[-_\s]+/).filter(Boolean)
@@ -196,7 +196,7 @@ export function pathLabel(p) {
 }
 
 /** A work-graph node's short label from its id: `login.sign-in` -> `login / sign in`. */
-export function nodeLabel(node) {
+function nodeLabel(node) {
   const id = String(node?.id ?? '');
   const domain = String(node?.domain ?? '');
   const leaf = domain && id.startsWith(`${domain}.`) ? id.slice(domain.length + 1) : id;

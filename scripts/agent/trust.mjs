@@ -303,7 +303,7 @@ const ESCAPED_QUOTE = String.raw`\"`;
 const tomlEscaped = (v) => String(v).replaceAll('\\', '\\\\').replaceAll('"', ESCAPED_QUOTE);
 
 /** The header Codex would write for `key`: a literal for its lowercase form, else a basic string. */
-export function codexHeader(key) {
+function codexHeader(key) {
   const literal = !/['\r\n]/.test(key) && key === key.toLowerCase() && key.includes('\\');
   return literal ? `[projects.'${key}']` : `[projects."${tomlEscaped(key)}"]`;
 }
@@ -439,7 +439,7 @@ export function writeCodexNoModelNudge({ file, hooks }) {
 
 /* ------------------------------------------------------ the command guard */
 
-export const TOOL_GUARD_MATCHER = 'Bash|PowerShell|Edit|Write|MultiEdit|NotebookEdit', TOOL_GUARD_TIMEOUT_S = 30; // the tracked .claude/settings.json registers the same entry
+const TOOL_GUARD_MATCHER = 'Bash|PowerShell|Edit|Write|MultiEdit|NotebookEdit', TOOL_GUARD_TIMEOUT_S = 30; // the tracked .claude/settings.json registers the same entry
 const isGuardHandler = (h) => typeof h?.command === 'string' && (isGuardCommand(h.command) || h.command.includes('command-guard.mjs'));
 const isGuardGroup = (g) => Array.isArray(g?.hooks) && g.hooks.some(isGuardHandler);
 

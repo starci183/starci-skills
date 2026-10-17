@@ -60,7 +60,7 @@ export const ownedBy = (owners, owner) => Boolean(owner) && owners.some((o) => o
 const describe = (owners) => (owners.length ? owners.join(', ') : 'nowhere in runtime production code');
 
 /** The RT_EXTERNAL_OWNER findings of one source file. */
-export function fileExternalFindings({ path: file, text, source, owner, infraOwners }) {
+function fileExternalFindings({ path: file, text, source, owner, infraOwners }) {
   const found = [];
   const ownership = owner ? `this file is ${owner}` : 'this file owns no external system';
   const add = (line, what, owners) => found.push({ code: CODE, level: 'error', path: file, line, message: `${file}:${line} ${what}; only ${describe(owners)} may (${ownership}) - move the call into its scripts/api/<system>/ call file and import that` });

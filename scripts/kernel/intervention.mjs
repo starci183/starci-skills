@@ -4,7 +4,7 @@
 // event to the workflow it targets, so `starci debug digest` counts the interventions of a run.
 import { readEnv } from '../lib/env.mjs';
 
-export const INTERVENTION_EVENT = 'ledger-written-outside-seat';
+const INTERVENTION_EVENT = 'ledger-written-outside-seat';
 const RUNTIME_MARKERS = Object.freeze(['STARCI_ACTOR', 'STARCI_API_CHILD', 'STARCI_CALLER']);
 
 /** {actor: 'person', via} for an admitted identity that is a person, or null for a seat and for a runtime child. */

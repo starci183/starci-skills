@@ -62,7 +62,7 @@ export function ownedPathsIntersect(left,right){
 }
 
 /** The durable resource identity for one normalized concrete owned path. */
-export const ownedPathLeaseKey=value=>`${PATH_LEASE_PREFIX}${normalizeOwnedPath(value)}`;
+const ownedPathLeaseKey=value=>`${PATH_LEASE_PREFIX}${normalizeOwnedPath(value)}`;
 
 /** One capacity-one request per minimal owned prefix. */
 export const ownedPathLeaseRequests=values=>normalizeOwnedPaths(values).map(path=>({resourceKey:ownedPathLeaseKey(path),units:1}));

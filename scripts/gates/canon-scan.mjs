@@ -85,7 +85,7 @@ export function parseCanonScanArgs(argv) {
   return out;
 }
 
-export function loadConformance() {
+function loadConformance() {
   const doc = readModuleJson('modules', 'models', 'canon-conformance.yaml');
   const waves = Array.isArray(doc?.waves) ? doc.waves : [];
   if (!waves.length || waves.some((wave) => !wave?.id || !Array.isArray(wave.roots) || !wave.roots.length)) {
@@ -136,7 +136,7 @@ const homeOf = (unit) => { const segments = unit.split('/'); const src = segment
 
 /** Pack the findings' units into pairwise-disjoint slices, wave by wave and source root by source root. A unit over the file bound
  *  splits one level deeper until it fits or reaches single files. */
-export function planSlices(findings, { conformance, maxFiles, seams = [] }) {
+function planSlices(findings, { conformance, maxFiles, seams = [] }) {
   const byUnit = new Map();
   const place = (list, depth) => {
     const groups = new Map();

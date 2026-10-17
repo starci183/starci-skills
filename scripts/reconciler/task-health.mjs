@@ -8,7 +8,7 @@ import { green, red, warn } from './checklist-items.mjs';
 
 export const RECONCILER_SERVICE = `sched-task:${TASK_DEFINITIONS.reconciler.taskName}`;
 /** The runtime task (a TASK_DEFINITIONS key) behind each service that runs through one. */
-export const SERVICE_TASKS = Object.freeze({ 'harness-ui': 'harness-app', 'harness-tunnel': 'harness-tunnel', [RECONCILER_SERVICE]: 'reconciler' });
+const SERVICE_TASKS = Object.freeze({ 'harness-ui': 'harness-app', 'harness-tunnel': 'harness-tunnel', [RECONCILER_SERVICE]: 'reconciler' });
 const START_POLL_MS = 3000;
 /** The no-quota heal that links the launcher, registers the tasks and starts the services that are down. */
 export const HEAL_SERVICES = 'starci reconciler up --services';

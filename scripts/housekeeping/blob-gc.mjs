@@ -98,7 +98,7 @@ function markArchiveIdentities(db, kind, out) {
 }
 
 /** One DB's marks: {marks: Set, pinned: Set, rows: Map sha -> row, refs: [{table, column, count}], error?}. */
-export function markSource(db, { kind, now = Date.now(), retention = RETENTION } = {}) {
+function markSource(db, { kind, now = Date.now(), retention = RETENTION } = {}) {
   const out = { marks: new Set(), pinned: new Set(), rows: new Map(), archiveIdentities:new Map(), refs: [], error: null };
   if (!hasLedgerTable(db, 'blob_ref_columns')) { out.error = 'no blob_ref_columns table (an old-schema DB): nothing marked from it'; return out; }
   markReferenceColumns(db, { kind, now, retention }, out);
@@ -240,7 +240,7 @@ export async function planBlobGc({ env = process.env, now = Date.now(), retentio
 }
 
 /** A recorded archive is evidence only after exact entry and archive verification. */
-export function verifyBlobArchive(ref,sha,{expectedArchiveSha=null,read=zipVisit}={}){
+function verifyBlobArchive(ref,sha,{expectedArchiveSha=null,read=zipVisit}={}){
   if(!SHA.test(String(sha)))throw new Error('archive verification needs an exact blob sha');
   const at=String(ref??'').lastIndexOf('!');
   if(at<1||String(ref).slice(at+1)!==sha)throw new Error('archive reference does not name the exact blob entry');
@@ -258,7 +258,7 @@ export function verifyBlobArchive(ref,sha,{expectedArchiveSha=null,read=zipVisit
  * blob lifecycle has a writer-consumed deletion fence, destructive apply refuses
  * before acquiring locks, opening writers, pruning rows or publishing archives.
  */
-export async function runBlobGc({apply=false,env=process.env,now=Date.now(),retention=RETENTION,plan=planBlobGc}={}){
+async function runBlobGc({apply=false,env=process.env,now=Date.now(),retention=RETENTION,plan=planBlobGc}={}){
   const observed=await plan({env,now,retention});
   if(!apply)return {...observed,apply:false,ok:!observed.blocked.length};
   return {...observed,apply:true,ok:false,effectState:'none',freedBytes:0,items:[],
@@ -279,7 +279,7 @@ function describe(r) {
   return L.join('\n');
 }
 
-export const blobGcExitCode=r=>(r.ok===false||r.refused||r.blocked?.length||r.items?.some(i=>i.ok===false||['failed','refuse'].includes(i.action)))?1:0;
+const blobGcExitCode=r=>(r.ok===false||r.refused||r.blocked?.length||r.items?.some(i=>i.ok===false||['failed','refuse'].includes(i.action)))?1:0;
 
 if (isMain(import.meta.url)) {
   const argv = process.argv.slice(2);

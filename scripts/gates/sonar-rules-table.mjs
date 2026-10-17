@@ -49,7 +49,7 @@ export const RULES = Object.freeze([
  * shape as RULES. Most are the syntax rules both lint canons publish to every product (scripts/lib/sonar-syntax-rules.mjs); S8786 is the
  * Sonar port that analyses regex backtracking, which the canons do not carry because it needs a dependency.
  */
-export const TS_RULES = Object.freeze([
+const TS_RULES = Object.freeze([
   { sonar: 'S9382', rule: 'starci-canon/no-await-in-loop', type: 'smell' },
   { sonar: 'S7758', rule: 'starci-canon/prefer-code-point', type: 'smell' },
   { sonar: 'S7780', rule: 'starci-canon/prefer-string-raw', type: 'smell' },
@@ -61,20 +61,6 @@ export const TS_RULES = Object.freeze([
   { sonar: 'S8786', rule: 'sonarjs/super-linear-regex', type: 'smell' },
 ]);
 
-/** The Sonar ids this project was flagged for that no local rule can judge, with the reason. */
-export const NOT_COVERED = Object.freeze([
-  { sonar: 'S4790', reason: 'security hotspot: needs the context of the hashed value' },
-  { sonar: 'S2612', reason: 'security hotspot: needs the file-system permission context' },
-  { sonar: 'S4036', reason: 'security hotspot: needs PATH provenance' },
-  { sonar: 'jssecurity:S5144', reason: 'taint analysis (SSRF): needs Sonar\'s inter-procedural data-flow engine' },
-  { sonar: 'jssecurity:S5145', reason: 'taint analysis (log injection): needs the data-flow engine' },
-  { sonar: 'jssecurity:S8689', reason: 'taint analysis (sensitive data in logs): needs the data-flow engine' },
-  { sonar: 'jssecurity:S8703', reason: 'taint analysis (LLM-supplied arguments, SSRF): needs the data-flow engine' },
-  { sonar: 'jssecurity:S8707', reason: 'taint analysis (LLM-supplied arguments, path traversal): needs the data-flow engine' },
-  { sonar: 'S1874', reason: 'a deprecated API of a library (example apps): needs the type checker; the lint canons turn on typescript-eslint no-deprecated, which `starci app lint` runs, not this fast check' },
-  { sonar: 'S6551', reason: 'an object turned into text (example apps): needs the type checker; the lint canons turn on typescript-eslint no-base-to-string, which `starci app lint` runs, not this fast check' },
-  { sonar: 'S7503', reason: 'an async function that never awaits (example apps): Sonar spares one that returns a promise, which only the type checker knows; the lint canons turn on typescript-eslint require-await, which `starci app lint` runs, not this fast check' },
-]);
 
 const PLUGINS = Object.freeze({ sonarjs, unicorn, 'starci-sonar': { rules: ownRules }, 'starci-canon': { rules: SONAR_SYNTAX_RULES } });
 

@@ -9,7 +9,7 @@ import { revParseQuery as revParseQueryCall } from '../api/git/rev-parse-query.m
 import { LAND_NOTE_REF } from '../gates/commit-proof.mjs';
 
 const SKIP = new Set(['.git', 'dist', 'coverage', '.next']);
-export const gitCallResult = (r) => ({ ok: !r?.error && r?.status === 0, stdout: String(r?.stdout ?? '').trim(), stderr: String(r?.stderr ?? r?.error?.message ?? '').trim() });
+const gitCallResult = (r) => ({ ok: !r?.error && r?.status === 0, stdout: String(r?.stdout ?? '').trim(), stderr: String(r?.stderr ?? r?.error?.message ?? '').trim() });
 
 /** Every linked node_modules below root, without ever entering a link or node_modules directory. */
 export function linkedNodeModules(root) {

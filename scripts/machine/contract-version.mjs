@@ -7,7 +7,7 @@ import { asList, byCodeUnit } from '../lib/list.mjs';
 import { headShaOf } from '../lib/git-dir.mjs';
 export { placedWorktreeOf } from './placement-rebound.mjs';
 
-export const CONTRACT_VERSION_SCHEMA = 'starci/contract-version@1';
+const CONTRACT_VERSION_SCHEMA = 'starci/contract-version@1';
 const ABSENT = 'absent';
 const ALWAYS_CITED = ['modules/ops/_common.yaml', 'modules/kernel/verdict-contract.yaml'];
 const CITE_RX = /(?:modules\/schemas|scripts\/(?:checks|gates|hfs|work))\/[A-Za-z0-9._/-]+\.(?:ya?ml|mjs|json)/g;

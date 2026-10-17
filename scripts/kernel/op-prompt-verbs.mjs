@@ -1,7 +1,7 @@
 // op-prompt-verbs.mjs — the "your verbs" block of an [Op] prompt: the exact `starci <group> <verb>` calls the op's contract names, from
 // the CLI catalog (packages/cli/src/catalog.generated.mjs), so a worker never runs --help or re-reads its contract yaml for a flag.
-// The bound is modules/models/runtimes.yaml allocation.opVerbs; a verb the contract names that the catalog lacks is a contract defect
-// (tests/kernel/op-prompt-verbs.spec.mjs), never printed.
+// The bound is modules/models/runtimes.yaml allocation.opVerbs; a verb the contract names that the catalog lacks is a contract defect,
+// never printed.
 import fs from 'node:fs';
 import { cliGroups, cliVerb } from '../machine/cli-verbs.mjs';
 import { allocationSettings } from '../../engine/config.mjs';
@@ -10,7 +10,7 @@ const CALL = /\bstarci ([a-z][a-z0-9-]*) ([a-z][a-z0-9-]*)/g;
 const FLAG = /--([a-z][a-z0-9-]*)/g;
 
 /** The declared bound of the block; refuses when the contract omits it. */
-export function opVerbsBound() {
+function opVerbsBound() {
   const bound = allocationSettings()?.opVerbs;
   for (const key of ['maxVerbs', 'maxChars', 'lineChars']) {
     if (!Number.isInteger(bound?.[key]) || bound[key] <= 0) throw new Error(`modules/models/runtimes.yaml allocation.opVerbs.${key} must declare a positive integer`);
@@ -19,7 +19,7 @@ export function opVerbsBound() {
 }
 
 /** Every `group verb` call the text names in the order it first appears, with the flags written within 300 characters after each call. */
-export function namedCalls(text) {
+function namedCalls(text) {
   const calls = new Map();
   const groups = new Set(cliGroups());
   const hits = [...String(text).matchAll(CALL)].filter((hit) => groups.has(hit[1]));
@@ -32,8 +32,6 @@ export function namedCalls(text) {
   return calls;
 }
 
-/** The `group verb` calls the text names under a catalog group whose verb the catalog lacks: a contract defect, never printed. */
-export const missingVerbs = (text) => [...namedCalls(text).keys()].filter((key) => !catalogVerb(key));
 
 /** The catalog verb row of `group verb`, or null. */
 const catalogVerb = (key) => cliVerb(...key.split(' '));

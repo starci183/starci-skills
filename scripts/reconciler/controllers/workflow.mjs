@@ -61,7 +61,7 @@ const DEFAULT_ROUTES = ['incident-raised', 'incident-resolved', 'ask-serving', '
 const num = (v, d) => positiveNumber(v, d, { orZero: true });
 
 /** modules/reconciler/workflow.yaml + the runtimes.yaml numbers it cites. Never throws (defaults on a bad file). */
-export function workflowSettings({ file = WORKFLOW_FILE, allocation = null, catalog = null } = {}) {
+function workflowSettings({ file = WORKFLOW_FILE, allocation = null, catalog = null } = {}) {
   let doc = {};
   try { doc = parseYaml(fs.readFileSync(file, 'utf8')) ?? {}; } catch { doc = {}; }
   let alloc = allocation;
@@ -333,7 +333,7 @@ export async function reconcileWorkflow(key, ctx, { settings = workflowSettings(
 }
 
 /** Keys for the periodic resync: every running workflow, plus any workflow that still holds an open clock. */
-export async function listWorkflows(ctx) {
+async function listWorkflows(ctx) {
   const keys = new Set();
   const readers = openReaders(ctx);
   try {

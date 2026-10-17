@@ -69,7 +69,7 @@ function ownershipClaims(records,workspaceDoc,workRoot,canon,featureOf){
 
 // ---------- the check ----------
 
-export function checkWorkSurfaces(workRoot, out) {
+function checkWorkSurfaces(workRoot, out) {
   const records = loadRecords(workRoot, walk);
   const workspaceDoc = readWorkspace(workRoot);
   const refuse = (file, code, msg) => out.refuse.push(`${fromRoot(file)}: ${msg} [${code}]`);

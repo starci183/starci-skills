@@ -34,7 +34,7 @@ const housekeepingOf = (allocation) => {
 
 /** The directories holding <project-slug>/ transcript folders: STARCI_CLAUDE_PROJECTS_ROOT (a
  *  path.delimiter list) or <USERPROFILE|HOME>/.claude/projects. */
-export function claudeProjectsRoots(env = process.env) {
+function claudeProjectsRoots(env = process.env) {
   const override = String(env?.STARCI_CLAUDE_PROJECTS_ROOT ?? '').trim();
   if (override) return override.split(path.delimiter).filter(Boolean).map((p) => path.resolve(p));
   const home = env?.USERPROFILE || env?.HOME || os.homedir();
@@ -42,7 +42,7 @@ export function claudeProjectsRoots(env = process.env) {
 }
 
 /** Claude Code's project-slug spelling of a cwd: every non-alphanumeric byte becomes '-'. */
-export const claudeProjectSlug = (cwd) => String(cwd).replace(/[^a-zA-Z0-9]/g, '-');
+const claudeProjectSlug = (cwd) => String(cwd).replace(/[^a-zA-Z0-9]/g, '-');
 
 /** The project directories under `roots`: [{slug, dir, files:[{name, path, stat}]}], links skipped. */
 function transcriptFiles(dir, out) {

@@ -30,7 +30,7 @@ export function callExportFinding(file, source) {
 }
 
 /** The call ids of a calls contract text (the keys of its `calls:` map). */
-export const contractCallIds = (text) => new Set(Object.keys(parseYaml(String(text))?.calls ?? {}));
+const contractCallIds = (text) => new Set(Object.keys(parseYaml(String(text))?.calls ?? {}));
 
 function apiContractsOf(ctx) {
   const contracts = new Map();

@@ -17,14 +17,14 @@ import { REFERENCE_APP_MANIFEST } from '../lib/example-refs.mjs';
 import { byCodeUnit } from '../lib/list.mjs';
 
 const PATTERN_DIRS = Object.freeze(['be', 'fe', 'repo']);
-export const WHY_FILES = Object.freeze([
+const WHY_FILES = Object.freeze([
   { file: 'packages/eslint/fe/lib/why.mjs', kind: 'eslint-fe' },
   { file: 'packages/stylelint/lib/why.mjs', kind: 'stylelint' },
 ]);
 const RULE_NUMBER = (id) => Number(id.slice(1));
 
 /** The catalog lookups the derivations share: owner of a code, owner of an enforcer id, failure codes of a rule. */
-export function catalogIndex(catalog) {
+function catalogIndex(catalog) {
   const byCode = new Map(catalog.rules.flatMap((rule) => rule.failureCodes.map((code) => [code, rule.id])));
   const byEnforcer = new Map(catalog.rules.flatMap((rule) => rule.enforcers.map((enforcer) => [`${enforcer.kind}:${enforcer.id}`, rule.id])));
   const codesOf = new Map(catalog.rules.map((rule) => [rule.id, rule.failureCodes]));
@@ -78,7 +78,7 @@ function verifyPatternBlock(lines, starts, position, index, kinds, unowned) {
  * `text` of a pattern topic with every rule's `hfsRules` completed and `verification.automated` rewritten from the catalog.
  * Returns { text, unowned: [{rule, item}] }: the typed items no catalog rule owns (left out of the list, reported).
  */
-export function derivePatternVerification(text, index, kinds = []) {
+function derivePatternVerification(text, index, kinds = []) {
   const lines = text.split('\n');
   const unowned = [];
   const starts = lines.map((line, i) => (/^ {2}- id: /.test(line) ? i : -1)).filter((i) => i >= 0);
@@ -88,7 +88,7 @@ export function derivePatternVerification(text, index, kinds = []) {
 }
 
 /** `text` of a pattern topic with the `slot` of every `files:` entry set to the slot that owns its path. `classify(path)` -> slot id or null. */
-export function deriveFilesSlots(text, classify) {
+function deriveFilesSlots(text, classify) {
   const lines = text.split('\n');
   const problems = [];
   const filesAt = lines.findIndex((line) => /^files:\s*$/.test(line));
@@ -106,7 +106,7 @@ export function deriveFilesSlots(text, classify) {
 }
 
 /** `text` of a why map with the `code` of each entry set from the catalog; `kind` is the enforcer kind of the plugin. */
-export function deriveWhyCodes(text, index, kind) {
+function deriveWhyCodes(text, index, kind) {
   const lines = text.split('\n');
   const problems = [];
   let current = null;

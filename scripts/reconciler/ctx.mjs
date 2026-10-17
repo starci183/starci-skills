@@ -148,7 +148,7 @@ export async function spawnJson(cmd, args, { env = process.env, cwd = SKILL_ROOT
  * BOTH streams empty: the child ran no status code at all — its entry module read mid-swap during a runtime land —
  * a transient busy the next pass re-reads, not a defect) | 'no-json' (exit 0, stdout carried text but no JSON line). Pure.
  */
-export function statusFailureOf(r, { timeoutMs = null } = {}) {
+function statusFailureOf(r, { timeoutMs = null } = {}) {
   const value = r?.value && typeof r.value === 'object' ? r.value : null;
   if (r?.ok && value) return null;
   const stderr = String(r?.stderr ?? '');

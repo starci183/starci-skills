@@ -24,7 +24,7 @@ const COMPILATION_FAILURE = 'module or proof could not be compiled';
 const WORKER_FAILURE = 'proof worker failed or timed out';
 const SAFE_REASONS = new Set([...DI_FAILURES.values(), COMPILATION_FAILURE]);
 const modulePath = app => `apps/${app}/src/app.module.ts`;
-export const wiringFixturePath = app => `src/tests/fixtures/builders/${app}.builder.ts`;
+const wiringFixturePath = app => `src/tests/fixtures/builders/${app}.builder.ts`;
 
 const refusal = (file, reason) => ({ code: BOOT_PROOF_CODE, level: 'error', path: file,
   message: `${file}: lite boot proof failed (${reason}); compile the real AppModule with explicit fixture options and infrastructure doubles using starci app check --wiring`, reason });
@@ -177,7 +177,7 @@ export function appWiring({ repoRoot, repo = readJson(repoRoot, 'hfs.json'), fil
 }
 
 /** Optional standalone entry; coordinator connects the same seam to app check --wiring. */
-export function appWiringMain(argv, { cwd = invocationDir(), stdout = text => process.stdout.write(text), stderr = text => process.stderr.write(text) } = {}) {
+function appWiringMain(argv, { cwd = invocationDir(), stdout = text => process.stdout.write(text), stderr = text => process.stderr.write(text) } = {}) {
   let directory = cwd, json = false;
   for (let at = 0; at < argv.length; at += 1) {
     if (argv[at] === '--cwd' && argv[at + 1]) directory = path.resolve(cwd, argv[++at]);

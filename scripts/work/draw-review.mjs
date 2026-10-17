@@ -168,7 +168,7 @@ const retiredStates = ({ retired, retiredAssets }) => [...new Set([...retired, .
  * `owed` is true for a complete drawing with current parts and no current owner or declared provisional acceptance.
  * Recipe-rendered records and incomplete drawings owe no review.
  */
-export function drawReviewStatus(uiDir) {
+function drawReviewStatus(uiDir) {
   const drawing = loadDrawing(uiDir);
   const { dir, record } = drawing;
   const split = reviewShapesOf(record);
@@ -235,7 +235,7 @@ function reviewedPartsFromDisk(dir, parts) {
  * drawing); `ownerRequested` marks a drawing the owner asked for, which then reaches the owner. The text names each
  * part's digest prefix, so a redraw asks a new question rather than repeating an answered one.
  */
-export function drawReviewQuestion(uiDir, { lang = ownerLanguage(), ownerRequested = false, jobId = null } = {}) {
+function drawReviewQuestion(uiDir, { lang = ownerLanguage(), ownerRequested = false, jobId = null } = {}) {
   const drawing = loadDrawing(uiDir);
   const { dir, record, repoRoot } = drawing;
   const requested = ownerRequested || Boolean(jobId && drawOwnerRulingInRepo(repoRoot, { jobId, record: record.id }));
@@ -391,7 +391,7 @@ function applyAcceptedDecision({ drawing, record, receipt, receiptAbs, receiptRe
   return { decision: 'accept', written: write, record: record.id, file: slash(drawing.file), owner, learned: learned.added.map((item) => item.id), ...(golden ? { golden } : {}) };
 }
 
-export function applyDrawReview(uiDir, receiptFile, { write = false, now = () => new Date().toISOString() } = {}) {
+function applyDrawReview(uiDir, receiptFile, { write = false, now = () => new Date().toISOString() } = {}) {
   const drawing = loadDrawing(uiDir);
   const { record, repoRoot } = drawing;
   const { receipt, receiptAbs, receiptRel } = readAnswerReceipt(receiptFile, { repoRoot });
@@ -432,7 +432,7 @@ function goldenPromotionOf({ drawing, record, receipt, receiptAbs, review, write
   return { ...r, shapes: [...new Set(parts.map((p) => p.shape).filter(Boolean))], marked };
 }
 
-export function drawReviewMain(argv = []) {
+function drawReviewMain(argv = []) {
   const usage = 'Usage: starci work draw-review <status|question|apply> --ui <ui-record-dir> [--lang en|vi] [--owner-requested] [--job <op-job-id>] [--receipt <answer.json> --write] [--json]\n';
   return reviewMain(argv, {
     targetFlag: '--ui', usage, tag: 'draw-review',

@@ -58,7 +58,7 @@ function loggingLines({ skillRoot, packet, jobLabel, repoLabel }) {
 // every dispatch and sat behind owner gates (inc-826e077777de, inc-95fe7c597bd0). Past OWNED_INLINE_MAX
 // paths or OWNED_INLINE_CHARS characters the list is written one path per line to owned-paths.txt in the
 // job's scratch folder; the prompt names the file, the count and the first few.
-export const OWNED_INLINE_MAX = 60;
+const OWNED_INLINE_MAX = 60;
 const OWNED_INLINE_CHARS = 6000;
 // THE SCRATCH CONTRACT: every job owns one directory outside every repository, under the OS temp directory; op
 // contracts call it STARCI_JOB_SCRATCH. Dispatch creates it fresh (ensureJobScratch), records it as
@@ -76,8 +76,8 @@ export function ensureJobScratch({ repo, workflowId, jobId, fresh = true }) {
 /** The Kernel's own transient working directory for one workflow (background push results, scan output): OS temp,
  * outside every repository; never agent data in .starciwork. */
 export const kernelScratchDirOf = (repo, workflowId, kind) => path.join(tempRoot(), 'starci-kernel-scratch', sha256(`${path.resolve(repo)}\0${workflowId}`).slice(0, 16), kind);
-export const ownedPathsFileOf = (repo, workflowId, jobId, scratchDir = null) => path.join(scratchDir ?? jobScratchDirOf(repo, workflowId, jobId), 'owned-paths.txt');
-export function ownedPathsLine({ paths, repo = null, workflowId = null, jobId = null, scratchDir = null }) {
+const ownedPathsFileOf = (repo, workflowId, jobId, scratchDir = null) => path.join(scratchDir ?? jobScratchDirOf(repo, workflowId, jobId), 'owned-paths.txt');
+function ownedPathsLine({ paths, repo = null, workflowId = null, jobId = null, scratchDir = null }) {
   if (!paths.length) return 'owned_paths: (per brief write-ceiling)';
   const inline = paths.join(', ');
   if (paths.length <= OWNED_INLINE_MAX && inline.length <= OWNED_INLINE_CHARS) return `owned_paths: ${inline}`;

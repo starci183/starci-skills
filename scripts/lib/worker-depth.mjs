@@ -9,7 +9,7 @@
 import { terminalHandleOf } from './worker-accounting.mjs';
 
 /** The runtime's refusal of a launch deeper than orca.maxWorkerDepth (modules/kernel/failure-codes.yaml). */
-export const WORKER_DEPTH_EXCEEDED = 'worker-depth-exceeded';
+const WORKER_DEPTH_EXCEEDED = 'worker-depth-exceeded';
 /** Orca's own refusal of a nested worker-start past its depth setting. */
 const ORCA_DEPTH_ERROR = 'nested_worker_depth_exceeded';
 

@@ -53,7 +53,7 @@ export function proofsOwedUnder(root, op, admitted, judged, { doc = loadScope(ro
 }
 
 /** The small payload of the settle record: both revisions, the proofs owed, and only the files of the judges that moved (at most LISTED each). */
-export function settleRevisionPayload({ op, attempt, owed }) {
+function settleRevisionPayload({ op, attempt, owed }) {
   return { op, attempt, admitted: owed.admitted, judged: owed.judged, known: owed.known, owed: owed.proofs.map((p) => p.proof),
     moved: owed.proofs.filter((p) => p.moved).map((p) => ({ proof: p.proof, count: p.files.length, files: p.files.slice(0, LISTED), admissionAware: p.admissionAware })) };
 }

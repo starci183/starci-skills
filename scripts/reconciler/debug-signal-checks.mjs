@@ -17,7 +17,7 @@ const minutes = (ms) => `${Math.max(1, Math.round(ms / 60_000))} min`;
 // ------------------------------------------------------------------------------------------------ pl-network-loss
 
 /** The provider outage episodes the circuit transitions name: [{provider, from, until, open, failureKind, jobId, step}]. A circuit ends at the end of its cooldown or at the next transition of the provider out of unavailable (a recovery, or a new strike on a circuit that had closed), whichever comes first. */
-export function outageEpisodes(events, now) {
+function outageEpisodes(events, now) {
   const rows = [...events].sort((a, b) => a.seq - b.seq);
   return rows.filter((e) => e.to === 'unavailable').map((e) => {
     const closer = rows.find((x) => x.provider === e.provider && x.seq > e.seq && x.to !== 'unavailable');

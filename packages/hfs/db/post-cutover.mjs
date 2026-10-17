@@ -19,7 +19,7 @@ const MS_PER_HOUR = 3.6e6;
 const DEFAULT_MIN_AGE_HOURS = 48;
 
 /** Makes a DROP signature comparable with pg_proc's regprocedure text. */
-export function normalizeSignature(signature, schema) {
+function normalizeSignature(signature, schema) {
   const lowered = signature.trim().toLowerCase();
   const bare = lowered.startsWith(`${schema}.`) ? lowered.slice(schema.length + 1) : lowered;
   const words = bare
@@ -36,7 +36,7 @@ function droppedSignature(statement) {
 }
 
 /** The signatures a migration drops: every `DROP FUNCTION [IF EXISTS] <signature>;` statement. */
-export function dropSignatures(sql, schema) {
+function dropSignatures(sql, schema) {
   return sql.replace(/--[^\n]*/gu, '').split(';').flatMap((statement) => {
     const signature = droppedSignature(statement.trim());
     return signature === null ? [] : [normalizeSignature(signature, schema)];
@@ -48,7 +48,7 @@ const settingsOf = (post) => ({
 });
 
 /** The read-only pg_proc query of the declared function families (identifiers are validated, so nothing free-form reaches the SQL). */
-export function preflightSql({ schema, prefixes, names }) {
+function preflightSql({ schema, prefixes, names }) {
   const escaped = (prefix) => prefix.replaceAll('_', String.raw`\_`);
   const clauses = [...names.map((name) => `proname = '${name}'`), ...prefixes.map((prefix) => `proname like '${escaped(prefix)}%'`)];
   return `select oid::regprocedure::text as signature from pg_proc where pronamespace = '${schema}'::regnamespace and (${clauses.join(' or ')})`;
@@ -104,7 +104,7 @@ function applyHeld(session, remote) {
  * `starci app db post-cutover`. options: { execute, linked, urlEnv, greenAt, ownerConfirms, query }. Dry run: remote read plus the read-only preflight.
  * --execute: gate open and STARCI_DB_ARMED=1, then `db push --include-all` of exactly the held-back versions.
  */
-export async function postCutoverDatabase(ctx, decl, options = {}) {
+async function postCutoverDatabase(ctx, decl, options = {}) {
   const model = buildModel(ctx.cwd, decl);
   if (model.held.length === 0) return { ok: true, lines: ['no held-back migration in the repository. Nothing to do.'], data: { held: [], done: true, executed: false } };
   if (decl.postCutover === null) throw refusal('DB_POSTCUTOVER_UNDECLARED', 'database.postCutover is not declared: the function preflight needs it (an empty mapping declares no family)');

@@ -52,7 +52,7 @@ export function exportedNames(text, parse = acorn().parse) {
 }
 
 /** The files a package.json names as its public entry (main, module, types, exports, bin), as repo-relative paths. */
-export function publicEntries(packageRel, packageText) {
+function publicEntries(packageRel, packageText) {
   let pkg;
   try { pkg = JSON.parse(packageText); } catch { return []; }
   const dir = path.posix.dirname(packageRel);
@@ -83,7 +83,7 @@ const mentionMap = (files) => {
   return mentions;
 };
 
-export function exportUsedFindings(files) {
+function exportUsedFindings(files) {
   const mentions = mentionMap(files);
   const entries = new Set(files.filter((f) => path.posix.basename(f.rel) === 'package.json').flatMap((f) => publicEntries(f.rel, f.text)));
   const findings = [];
@@ -116,7 +116,7 @@ function readTracked(root = skillRoot) {
 }
 
 /** Run export reachability against the actual current working tree. */
-export const checkExportUsed = (root = skillRoot) => exportUsedFindings(readTracked(root));
+const checkExportUsed = (root = skillRoot) => exportUsedFindings(readTracked(root));
 
 if (isMain(import.meta.url)) {
   const findings = checkExportUsed();

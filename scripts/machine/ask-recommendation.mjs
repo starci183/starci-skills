@@ -36,7 +36,7 @@ const labelOf = (option) => (typeof option === 'string' ? option : option?.label
 const fold = (text) => String(text ?? '').normalize('NFC');
 
 /** The option text marks one option as recommended: its index, or null when zero or several do. */
-export function textRecommendation(options) {
+function textRecommendation(options) {
   const hits = (Array.isArray(options) ? options : [])
     .map((option, index) => (RECOMMENDATION_MARK.test(fold(labelOf(option))) ? index : -1))
     .filter((index) => index >= 0);
@@ -71,7 +71,7 @@ export function askKindOf(question) {
  * The first exclusion class the ask falls in, or null. `secretFields` is serve-ask's field derivation
  * ({files, vars}); `excludes` the policy's list — 'handover' applies whether or not it is listed.
  */
-export function askExclusionOf({ question, opId, secretFields, excludes = [] }) {
+function askExclusionOf({ question, opId, secretFields, excludes = [] }) {
   if (KERNEL_ONLY_OPS.includes(opId)) return 'handover';
   const kind = askKindOf(question);
   const secret = (secretFields?.files?.length ?? 0) + (secretFields?.vars?.length ?? 0) > 0;

@@ -56,12 +56,12 @@ function holdersOn(m,{reclaim}){
 }
 
 /** The live slot holders: [{slot, pid, startedAt, runId}]. Stale locks found on the way are reclaimed. */
-export const slotHolders=({env=process.env,reclaim=true}={})=>reclaim
+const slotHolders=({env=process.env,reclaim=true}={})=>reclaim
   ?withMachine(m=>m.transaction(()=>holdersOn(m,{reclaim:true})),{env})
   :readMachine(m=>holdersOn(m,{reclaim:false}),[],{env});
 
 /** The live queue, oldest first: [{ticket, pid, runId, waitingSince}]. Tickets of dead waiters are dropped. */
-export function slotQueue({env=process.env}={}){
+function slotQueue({env=process.env}={}){
   return withMachine(m=>m.transaction(()=>{
     const out=[];
     for(const row of locksLike(m,TICKET_PREFIX)){

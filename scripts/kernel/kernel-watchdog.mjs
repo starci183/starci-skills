@@ -98,7 +98,7 @@ const classifyKernelScreen = classifyAgentScreen;
 // A wake is typed into the Kernel's input box as one paste. Claude Code folds a paste of about 800 characters or more into a
 // pasted_content block, which the Kernel model reads as untrusted pasted data and refused three times on 2026-10-07; the
 // whole typed wake (this text, the rev line, the seat identity) is bounded by wake-bound.mjs, so it arrives as the user's message.
-export const buildWakePrompt = (workflow, attempt = null, revLine = null) => boundedWake({ workflowId: workflow, attempt, revLine, compose: withWakeIdentity, text: [
+const buildWakePrompt = (workflow, attempt = null, revLine = null) => boundedWake({ workflowId: workflow, attempt, revLine, compose: withWakeIdentity, text: [
   `Watchdog liveness wake for ${workflow}: act on it now.`,
   'Read starci kernel status; answer each menu item with starci kernel decide.',
   'Empty menu: yield the model turn immediately; the runtime wakes this Kernel again.',
@@ -110,7 +110,7 @@ export const wakePromptOf = (workflow, statusValue) =>
   buildWakePrompt(workflow, statusValue?.kernel?.attempt ?? null, revisionWakeLine(statusValue?.revisionNotice, workflow, { root: revRootOf() }));
 
 /** Repair only the Orca tab title: the agent owns the pane title and may change it on every turn. */
-export function repairKernelTabTitle(terminal, name, { list = () => terminalList({ includeVisualLayouts: true }), tabTitles = tabTitlesOf,
+function repairKernelTabTitle(terminal, name, { list = () => terminalList({ includeVisualLayouts: true }), tabTitles = tabTitlesOf,
   rename = (handle, title) => terminalRename({ terminal: handle, title }) } = {}) {
   if (!terminal) return null;
   try {
@@ -151,7 +151,7 @@ export function unansweredStart(started) {
   return { ok: false, step: 'start-workflow', reason: how, error: said ?? `start-workflow ended (exit ${started.status ?? 'none'}) without an answer`, timedOut: Boolean(started.timedOut) };
 }
 
-export function startAnswerOf(started, base = {}) {
+function startAnswerOf(started, base = {}) {
   const live = started.ok && started.value?.replaced === false;
   let action = 'restart-failed';
   if (live) action = 'already-live';
@@ -257,8 +257,8 @@ const replaceUnwritableKernel = ({ phase, terminal, dispatch = null, stale, outp
 // the first of them, the first at least WAKE_FAIL_WINDOW_MS ago, close the terminal and replace the seat.
 const KERNEL_WAKE_FAILED_EVENT = 'kernel-wake-failed';
 const SEAT_WAKE = seatWakeOf();
-export const WAKE_FAIL_REPLACE = SEAT_WAKE.failReplace;
-export const WAKE_FAIL_WINDOW_MS = SEAT_WAKE.failWindowMs;
+const WAKE_FAIL_REPLACE = SEAT_WAKE.failReplace;
+const WAKE_FAIL_WINDOW_MS = SEAT_WAKE.failWindowMs;
 const recordKernelWakeFailed = (terminal, detail) => withKernelLedger((ledger) => ledger.transaction(() => ledger.appendEvent({
   workflowId, entityType: 'kernel', entityId: workflowId, kind: KERNEL_WAKE_FAILED_EVENT, payload: { terminal, ...detail } })));
 const foreignDraft = (draft) => Boolean(draft) && draftOwnership(draft, { texts: [], stagedPattern: DEFAULT_STAGED_PATTERN }).kind === 'foreign';
@@ -289,7 +289,7 @@ const KERNEL_BOOTS = new Set(rotationRule('kernel').bootEvents);
 const KERNEL_WOKEN_EVENT = 'kernel-woken';
 const KERNEL_IDLE_REPLACED_EVENT = 'kernel-replaced-idle';
 const WAKE_IDLE_REPLACE = SEAT_WAKE.idleReplace;
-export const WAKE_IDLE_WINDOW_MS = WAKE_FAIL_WINDOW_MS;
+const WAKE_IDLE_WINDOW_MS = WAKE_FAIL_WINDOW_MS;
 const IDLE_REPLACED_WINDOW_MS = SEAT_WAKE.idleReplacedWindowMs;
 // Kernel-authored job moves: reset the wakes and the idle-replaced streak.
 const KERNEL_MOVES = new Set(['job-enqueued', 'follow-on-enqueued', 'job-dropped', 'kernel-graph-edit', 'lifecycle', 'phase-transition']);

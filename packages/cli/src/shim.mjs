@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync, chmodSync, unlinkSync } from 'node:fs';
+import { mkdirSync, writeFileSync, chmodSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
@@ -54,23 +54,6 @@ export function writeRuntimeShim({ root, home = os.homedir(), cli: launcher = nu
   return { root: runtimeRoot, runtimeJson, shim };
 }
 
-/** Remove only the guarded tool wrappers; a missing wrapper is already unlinked. */
-export function removeToolWrappers({ home = os.homedir() } = {}, deps = {}) {
-  const platform = deps.platform ?? process.platform;
-  const unlink = deps.unlink ?? unlinkSync;
-  const shimDir = path.join(home, '.starci', 'bin');
-  const removed = [];
-  for (const program of TOOL_WRAPPERS) {
-    const wrapper = path.join(shimDir, wrapperName(program, platform));
-    try {
-      unlink(wrapper);
-      removed.push(wrapper);
-    } catch (error) {
-      if (error?.code !== 'ENOENT') throw error;
-    }
-  }
-  return removed;
-}
 
 /**
  * The environment a runtime process runs in: the same as the caller's, without the guarded wrapper directory on PATH.

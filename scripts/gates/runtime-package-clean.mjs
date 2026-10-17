@@ -46,7 +46,7 @@ const typescript = createRequire(import.meta.url)('typescript');
 const resolvesInArchive = (files, target) => [...RESOLVE_EXTENSIONS.map((ext) => `${target}${ext}`), ...RESOLVE_INDEXES.map((index) => path.posix.join(target, index))].some((candidate) => files.has(candidate));
 
 /** The relative module imports of the packed scripts whose target is not in the archive: ["package/a.mjs:12 -> package/b/c.mjs"]. `files` is the tarFiles map. Imports are read by TypeScript's scanner, so one shown inside a string or a comment (scaffold templates emit source text) is not an import. */
-export function unresolvedPackedImports(files) {
+function unresolvedPackedImports(files) {
   const missing = [];
   for (const [file, bytes] of files) {
     if (!/\.(?:mjs|cjs|js)$/.test(file)) continue;

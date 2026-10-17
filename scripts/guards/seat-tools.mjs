@@ -16,7 +16,7 @@ const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..
 const safeName = (s) => String(s).replace(/[^A-Za-z0-9._-]/g, '_');
 
 /** The deny decision for one hook input, or null to pass: {reason} when `toolName` is denied for `handle`. */
-export function seatToolDecision({ handle, toolName, root = skillRoot }) {
+function seatToolDecision({ handle, toolName, root = skillRoot }) {
   if (!handle || !toolName) return null;
   let guard;
   try { guard = JSON.parse(fs.readFileSync(path.join(guardsRoot(root), 'seats', `${safeName(handle)}.json`), 'utf8')); }

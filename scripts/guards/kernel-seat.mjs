@@ -15,14 +15,14 @@ const HINT_TIMEOUT_MS = 45_000;
 
 /** The first two non-option words of a starci call: its group and verb. */
 /** Whether the Kernel seat may run `starci <group> <verb>` with these option names: {allowed, reason?}. */
-export function kernelSeatAllowsVerb(table, group, verb, flags = new Set()) {
+function kernelSeatAllowsVerb(table, group, verb, flags = new Set()) {
   if (!(table?.verbs?.[group] ?? []).includes(verb)) return { allowed: false, reason: `starci ${group} ${verb} is not a verb of the Kernel seat` };
   const blocked = (table['read-flags']?.[verb] ?? []).find((flag) => flags.has(flag));
   return blocked ? { allowed: false, reason: `starci ${group} ${verb} --${blocked} mutates the workflow` } : { allowed: true };
 }
 
 /** The Decide section of the seat's own `starci kernel status` text (its open menu), or '' when the status cannot be read. */
-export function menuHintOf(guard, { env = process.env, root = skillRoot } = {}) {
+function menuHintOf(guard, { env = process.env, root = skillRoot } = {}) {
   if (!guard?.ledgerRepo || !guard?.workflowId) return '';
   try {
     const run = runNode([path.join(root, 'scripts', 'kernel', 'cli.mjs'), 'status', '--repo', guard.ledgerRepo, '--workflow', guard.workflowId],

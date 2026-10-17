@@ -10,7 +10,7 @@ const TEXT_SOURCE = /\.(?:mjs|cjs|js|ts|tsx|ya?ml|md|json)$/;
 const refusedByte = (b) => (b < 0x20 && b !== 0x09 && b !== 0x0a && b !== 0x0d) || b === 0x7f;
 
 /** The RT_CONTROL_CHARACTER finding of one file's bytes (the first offending byte, with how many there are), or null. */
-export function controlCharFinding(file, bytes) {
+function controlCharFinding(file, bytes) {
   let first = -1;
   let count = 0;
   for (let i = 0; i < bytes.length; i += 1) if (refusedByte(bytes[i])) { count += 1; if (first < 0) first = i; }

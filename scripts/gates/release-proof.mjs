@@ -121,7 +121,7 @@ export function checkStep({ runtime = runtimeRoot, npm = defaultNpm } = {}) {
     status, detail: tail(`${run.stdout ?? ''}\n${run.stderr ?? ''}`) };
 }
 
-export function buildReleaseProof({ repo, base, main = null, runtime = runtimeRoot, node = defaultNode, npm = defaultNpm }) {
+function buildReleaseProof({ repo, base, main = null, runtime = runtimeRoot, node = defaultNode, npm = defaultNpm }) {
   const abs = path.resolve(repo);
   const steps = [appInstallsStep({ runtime, node }), canonPinsStep({ repo: abs, runtime, node }), mergeGuardStep({ repo: abs, base, main }), checkStep({ runtime, npm })];
   const ok = steps.every((s) => s.status === STEP_STATUS.pass);

@@ -41,7 +41,7 @@ export const A15_CODES = [
   // codes-end
 ];
 
-export const FINDERS = [
+const FINDERS = [
   // finders-begin
   featureFileFindings,
   lexiconFindings,

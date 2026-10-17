@@ -20,13 +20,13 @@ export const coverageSafePath = (rel) => !/(?:^|\/)(?:node_modules|\.git|\.claud
 export function coverageSources(root) {
   const generated = generatedRootsOf(root);
   const files = new Map();
-  for (const dir of ['knowledge', 'modules/schemas', 'modules/kernel', 'docs', 'scripts', 'packages', 'examples', 'tests']) {
+  for (const dir of ['knowledge', 'modules/schemas', 'modules/kernel', 'docs', 'scripts', 'packages', 'examples', 'e2e']) {
     const absolute = path.join(root, dir);
     if (!fs.existsSync(absolute)) continue;
     for (const file of walkFiles(absolute, { sorted: true, exclude: (_name, full, entry) => {
       const rel = path.relative(root, full).replaceAll('\\', '/');
       return entry.isSymbolicLink() || !coverageSafePath(rel) || generated.some((prefix) => `${rel}/`.startsWith(prefix))
-        || !rel.startsWith('tests/fixtures/') && /(?:^|\/)(?:runtime|dist|coverage|\.runtimes|artifacts)(?:\/|$)/.test(rel);
+        || /(?:^|\/)(?:runtime|dist|coverage|\.runtimes|artifacts)(?:\/|$)/.test(rel);
     } })) {
       const rel = path.relative(root, file).replaceAll('\\', '/');
       const basename = path.posix.basename(rel).replace(/^\./, '');

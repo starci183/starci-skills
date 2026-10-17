@@ -51,7 +51,7 @@ export function fitInto(content, width, height, fit = 'cover') {
 }
 
 /** Where an overlay panel sits on a W x H viewport for a content image of the given aspect. */
-export function panelRect(W, H, content, surface, direction) {
+function panelRect(W, H, content, surface, direction) {
   const aspect = content.width / content.height;
   if (surface === 'drawer') {
     if (direction === 'left' || direction === 'right') {
@@ -69,7 +69,7 @@ export function panelRect(W, H, content, surface, direction) {
 }
 
 /** Pure composition: `content` fitted into `rect` of a copy of `base`, after an optional scrim. */
-export function composeImages({ base, content, rect, fit = 'cover', scrim = null, clear = null }) {
+function composeImages({ base, content, rect, fit = 'cover', scrim = null, clear = null }) {
   const out = { width: base.width, height: base.height, data: Uint8Array.from(base.data) };
   if (scrim) dimImage(out, scrim);
   // A page slot is replaced, never blended with the key colour under it: it is cleared to the theme canvas
@@ -119,7 +119,7 @@ function hostCompositeOf(host, bp, theme, state = null) {
  * Compose one direction for a ui record. Returns {ok, outFile, image, contentAsset, asset} or {ok:false, error}.
  * Nothing is written when `write` is false.
  */
-export function composeDirection(options) {
+function composeDirection(options) {
   try {
     if (isLiteWorkRoot(workRootOf(options.uiDir))) return { ok: true, skipped: true, reason: 'lite .starciwork holds only workspace.yaml and brand/ (plus .gitignore)' };
     return composeOne(options);
@@ -269,7 +269,7 @@ export function recompose(workRoot, uiFile, composite, { uiRecords = null } = {}
   }
 }
 
-export function composeDirectionMain(argv = []) {
+function composeDirectionMain(argv = []) {
   const need = ['--ui', '--content', '--breakpoint', '--theme'];
   if (argv.includes('--help') || need.some((n) => !flag(argv, n))) {
     return { exitCode: argv.includes('--help') ? 0 : 2, text: 'Usage: starci work compose-direction --ui <ui-record-dir> --content <png> --breakpoint <bp> --theme <light|dark> [--state <flow-state>] [--presentation page|overlay] [--host-state <s>] [--fit cover|stretch] [--scrim 0.5] [--tool <t>] [--prompt <path>] [--out <png>] [--json]\n' };

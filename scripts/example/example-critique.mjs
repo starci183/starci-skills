@@ -436,7 +436,7 @@ const SECTIONS = [
 /** The full critique over one `.starciwork` tree: a pure function of what is on disk right now, exactly like
  * example-derive.mjs's `computeDerived`, and built on top of it rather than re-walking the tree twice for the
  * same facts. */
-export function computeCritique(workRoot) {
+function computeCritique(workRoot) {
   const derived = computeDerived(workRoot);
   const {records: rawRecords, evidenceByDir} = readWorkTree(workRoot);
   const repos = resolveRepositories(workRoot);

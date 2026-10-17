@@ -95,7 +95,7 @@ function probeFindings() {
 }
 
 /** The RT_REVISION_SCOPE findings over the tree at `root`. */
-export function checkRevisionScope(root = skillRoot) {
+function checkRevisionScope(root = skillRoot) {
   const doc = loadScope(root);
   const files = trackedFiles(root);
   return [...vocabularyFindings(doc), ...coverageFindings(doc, files), ...engineFindings(root, doc, files), ...bootFindings(root, doc), ...probeFindings()];

@@ -10,7 +10,7 @@ const SCHEMA = 'starci/protected-installations@1';
 const validPort = (value) => Number.isInteger(value) && value > 0 && value <= 65_535;
 
 /** Load and minimally validate the protected-installations contract. */
-export function loadProtectedInstallations({ root = skillRoot, readFile = (file) => fs.readFileSync(file, 'utf8') } = {}) {
+function loadProtectedInstallations({ root = skillRoot, readFile = (file) => fs.readFileSync(file, 'utf8') } = {}) {
   const file = path.join(root, ...PROTECTED_INSTALLATIONS_FILE.split('/'));
   const document = parseYaml(readFile(file));
   if (document?.schema !== SCHEMA) throw new Error(`${PROTECTED_INSTALLATIONS_FILE} must carry schema ${SCHEMA}`);
@@ -49,7 +49,7 @@ export const protectedPortLabel = (value, contract = PROTECTED) => {
   return range ? `${range.first}-${range.last}` : null;
 };
 
-export const isProtectedPort = (value, contract = PROTECTED) => protectedPortLabel(value, contract) !== null;
+const isProtectedPort = (value, contract = PROTECTED) => protectedPortLabel(value, contract) !== null;
 
 /** Protected port numbers mentioned as whole numeric tokens in text, in first-seen order. */
 export function protectedPortsInText(value, contract = PROTECTED) {

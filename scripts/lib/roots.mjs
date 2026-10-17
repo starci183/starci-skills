@@ -17,16 +17,14 @@
 // directory or from the Work directory name outside this module.
 import fs from 'node:fs';
 import path from 'node:path';
-import { skillRoot, runtimeStateDir, starciLocalRoot, starciSourceRoot } from '../../engine/runtime-root.mjs';
+import { skillRoot, starciLocalRoot, starciSourceRoot } from '../../engine/runtime-root.mjs';
 import { tempRoot } from '../../engine/temp-root.mjs';
 
 export { tempRoot, starciLocalRoot, starciSourceRoot };
 
 /** The runtime tree this code runs from. */
-export const runtimeTree = skillRoot;
+const runtimeTree = skillRoot;
 
-/** The state directory of a runtime tree (default: this one). */
-export const runtimeState = (tree = runtimeTree) => runtimeStateDir(tree);
 
 /** The name of the Work records directory inside a product tree. */
 export const WORK_DIR_NAME = '.starciwork';

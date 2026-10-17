@@ -29,7 +29,7 @@ const STEP_TIMEOUT_MS = 15 * 60_000;
 const TAIL_LINES = 60;
 
 /** The installed version a tarball name `<name>-<x.y.z>[-pre].tgz` declares, or null when the name is not an npm pack name. Pure. */
-export function tarballVersion(file) {
+function tarballVersion(file) {
   return /^[\w.-]+?-(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)\.tgz$/.exec(path.basename(file))?.[1] ?? null;
 }
 
@@ -37,7 +37,7 @@ export function tarballVersion(file) {
  * The environment of every sandboxed process: base env with the home variables of every platform pointed into the sandbox.
  * `NPM_CONFIG_*` and `STARCI_*` variables of the outer machine are dropped so a runner or host setting cannot change the proof. Pure.
  */
-export function sandboxEnv({ base, home, platform }) {
+function sandboxEnv({ base, home, platform }) {
   const env = Object.fromEntries(Object.entries(base).filter(([key]) => !/^(?:npm_config_|npm_package_|npm_lifecycle_|STARCI_)/i.test(key)));
   const local = path.join(home, 'AppData', 'Local');
   const roaming = path.join(home, 'AppData', 'Roaming');
@@ -47,7 +47,7 @@ export function sandboxEnv({ base, home, platform }) {
 }
 
 /** What differs between two snapshots (Map path -> `size:mtimeMs`): {added, removed, changed} sorted. Pure. */
-export function diffSnapshots(before, after) {
+function diffSnapshots(before, after) {
   const added = [...after.keys()].filter((key) => !before.has(key)).sort(byCodeUnit);
   const removed = [...before.keys()].filter((key) => !after.has(key)).sort(byCodeUnit);
   const changed = [...after.keys()].filter((key) => before.has(key) && before.get(key) !== after.get(key)).sort(byCodeUnit);
@@ -71,14 +71,14 @@ export function snapshotTree(target, depth = 2, into = new Map()) {
  * The real-home places this install writes if the redirection leaks: the per-user record, launcher dir and runtime dir the install owns, and the npm cache root.
  * Only these exact paths are watched (not the whole .starci, which a live host keeps writing to). Pure.
  */
-export function watchedPaths({ realHome, realLocal, platform }) {
+function watchedPaths({ realHome, realLocal, platform }) {
   const watched = [path.join(realHome, '.starci', 'runtime.json'), path.join(realHome, '.starci', 'bin'), path.join(realHome, '.starci', 'runtime'), path.join(realHome, '.npm')];
   if (platform === 'win32' && realLocal) watched.push(path.join(realLocal, 'npm-cache'));
   return watched;
 }
 
 /** The first PATH entry holding `program` (with a PATHEXT extension on Windows), or null. `exists` is the file probe. Pure over its inputs. */
-export function findOnPath(program, { pathValue, platform, pathext = '.COM;.EXE;.BAT;.CMD', exists: probe = exists }) {
+function findOnPath(program, { pathValue, platform, pathext = '.COM;.EXE;.BAT;.CMD', exists: probe = exists }) {
   const names = platform === 'win32' ? [program, ...pathext.split(';').filter(Boolean).map((ext) => program + ext.toLowerCase())] : [program];
   for (const dir of String(pathValue ?? '').split(platform === 'win32' ? ';' : ':').filter(Boolean)) {
     for (const name of names) if (probe(path.join(dir, name))) return path.join(dir, name);
@@ -87,7 +87,7 @@ export function findOnPath(program, { pathValue, platform, pathext = '.COM;.EXE;
 }
 
 /** The exit code of a finished run: 2 when any step could not run, else 1 when any assertion failed, else 0. Pure. */
-export function exitCodeFor(results) {
+function exitCodeFor(results) {
   if (results.some((result) => result.status === 'error')) return 2;
   return results.some((result) => result.status === 'fail') ? 1 : 0;
 }
@@ -95,7 +95,7 @@ export function exitCodeFor(results) {
 function exists(file) { return fs.existsSync(file); }
 
 /** The managed gitignore entries `text` lacks, matching a line with or without a leading slash. Pure. */
-export function missingIgnores(text, entries = HOST_IGNORES) {
+function missingIgnores(text, entries = HOST_IGNORES) {
   const lines = new Set(text.split(/\r?\n/).map((line) => line.trim()));
   return entries.filter((entry) => !lines.has(entry) && !lines.has(`/${entry}`));
 }
@@ -104,7 +104,7 @@ export function missingIgnores(text, entries = HOST_IGNORES) {
 export function tailOf(text, lines = TAIL_LINES) { return String(text ?? '').replaceAll('\r\n', '\n').split('\n').filter((line) => line.trim()).slice(-lines).join('\n'); }
 
 /** The failure detail of a child step: its exit, the installer's JSON result line when it printed one, then the tail of its stdout, stderr and own report. Pure. */
-export function childDetail({ label, status, stdout = '', stderr = '', report = '' }) {
+function childDetail({ label, status, stdout = '', stderr = '', report = '' }) {
   const result = String(stdout).replaceAll('\r\n', '\n').split('\n').findLast((line) => line.startsWith('initial age setup: '));
   return [`${label} exit ${status}`, ...(result ? [`installer result: ${result}`] : []), `--- output tail (last ${TAIL_LINES} lines of stdout, stderr and report)`, tailOf(`${stdout}\n${stderr}\n${report}`)].join('\n');
 }
@@ -113,7 +113,7 @@ export function childDetail({ label, status, stdout = '', stderr = '', report = 
  * A second spelling of the directory `root` that is not its canonical path, or why none exists: on Windows its 8.3 short name (when the volume generates short
  * names), elsewhere a path through a symlinked parent (the macOS /var -> /private/var shape). The directory must exist. Reads the host (cmd.exe, the filesystem).
  */
-export function nonCanonicalSpelling(root, { platform = process.platform } = {}) {
+function nonCanonicalSpelling(root, { platform = process.platform } = {}) {
   if (platform === 'win32') {
     const run = runProgram('cmd.exe', ['/d', '/s', '/c', `"for %I in ("${root}") do @echo %~sI"`], { windowsVerbatimArguments: true });
     const short = run.status === 0 ? String(run.stdout).trim() : '';
@@ -134,7 +134,7 @@ export function summaryOf({ results, version, platform, node, sandbox }) {
 }
 
 /** The markdown table of a summary for $GITHUB_STEP_SUMMARY. Pure. */
-export function summaryMarkdown(summary) {
+function summaryMarkdown(summary) {
   const rows = summary.results.map((r) => `| ${r.status} | ${r.name} | ${String(r.detail ?? '').replaceAll('|', '/').split(/\r?\n/)[0].slice(0, 200)} |`);
   const fence = '`'.repeat(3);
   const long = summary.results.filter((r) => r.status !== 'pass' && String(r.detail ?? '').includes('\n')).map((r) => `<details open><summary>${r.name}</summary>\n\n${fence}text\n${r.detail.replaceAll(fence, "'''")}\n${fence}\n</details>\n`);
@@ -143,7 +143,7 @@ export function summaryMarkdown(summary) {
 }
 
 /** The `docker run` arguments (after `--rm`) of the Linux sandbox: one named container, the staged directory mounted READ-ONLY at /in, no port, no other mount. Pure. */
-export function dockerArgs({ name, stage, image, tarballName, script, tools = null }) {
+function dockerArgs({ name, stage, image, tarballName, script, tools = null }) {
   // The node image carries node and git but not age-keygen (the apt package is an unsupported 1.1.1): a caller who has a supported Linux build mounts its directory read-only and it leads PATH.
   const mounts = ['--mount', `type=bind,source=${stage},target=/in,readonly`, ...(tools ? ['--mount', `type=bind,source=${tools},target=/tools,readonly`] : [])];
   const command = `${tools ? 'PATH=/tools:$PATH ' : ''}node /in/${script} --tarball /in/${tarballName}`;

@@ -14,8 +14,6 @@ import { posixPath } from './path-key.mjs';
 export const WORKTREES_REL = '.starciwork/worktrees';
 /** Glob patterns an ESLint/tsc-style ignore list takes. */
 export const WORKTREES_IGNORE_GLOBS = Object.freeze([`${WORKTREES_REL}/**`, `**/${WORKTREES_REL}/**`]);
-/** The line .git/info/exclude (or .gitignore) carries. */
-export const WORKTREES_EXCLUDE_LINE = `/${WORKTREES_REL}/`;
 
 const posix = posixPath;
 

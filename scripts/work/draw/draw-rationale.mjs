@@ -173,7 +173,7 @@ function directionIds(workRoot) {
 }
 
 /** Current owner rulings, product feedback notes and actual receipts. */
-export function ownerIds({ record = null, workRoot = null, rulingsFile = OWNER_RULINGS } = {}) {
+function ownerIds({ record = null, workRoot = null, rulingsFile = OWNER_RULINGS } = {}) {
   const ids = new Set();
   for (const r of list(readYamlOr(rulingsFile)?.rulings)) if (r?.id) ids.add(str(r.id).trim());
   const review = record?.ui?.review ?? {};

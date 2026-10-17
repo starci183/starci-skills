@@ -6,7 +6,7 @@ import { withRegistry } from './worktree-registry.mjs';
 import { openLedgerReader } from '../../engine/db/ledger.mjs';
 
 /** The answer for an owner whose ledger exists in the registry but could not be read: not ended, not settled, not unknown. */
-export const LEDGER_UNREADABLE = 'ledger-unreadable';
+const LEDGER_UNREADABLE = 'ledger-unreadable';
 
 /**
  * The default owner lookups, cached for one pass: lookup(ledgerId, jobId) -> job status | null | LEDGER_UNREADABLE, with

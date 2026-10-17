@@ -35,7 +35,7 @@ function ownerWaitIsAskless(db, row) {
 }
 
 /** The op that cures a gap blocker, read from the route table (`on.blocker`, `from: any`, reopening a repair kind), or null. */
-export function gapUpstreamOf(blockerKind, catalog = readModuleJson('modules', 'models', 'kinds.yaml')) {
+function gapUpstreamOf(blockerKind, catalog = readModuleJson('modules', 'models', 'kinds.yaml')) {
   const route = (catalog.routes ?? []).find((item) => item.on?.blocker === blockerKind && item.from === 'any'
     && item.then === 'reopen' && item.to?.kind && item.to.kind !== 'same');
   return route ? catalog.kinds?.[route.to.kind]?.operator ?? route.to.kind : null;

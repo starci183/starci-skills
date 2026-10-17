@@ -43,14 +43,12 @@ const stripComment = (l) => {
 };
 
 /** The boolean flags of the flags file: one per line, `#` comments and blanks ignored. */
-export function readFlagsFile(file) {
+function readFlagsFile(file) {
   let text = '';
   try { text = fs.readFileSync(file, 'utf8'); } catch { return []; }
   return text.split(/\r?\n/).map((l) => stripComment(l).trim().replace(/^--/, '')).filter((l) => SLUG.test(l));
 }
 
-/** The verb names the verb directory declares (file names), without importing them. */
-export const extensionVerbNames = (root) => modulesIn(path.join(root, VERBS_DIR)).map((n) => n.slice(0, -4)).filter((n) => SLUG.test(n));
 
 /**
  * Load every extension under `root` (default: this runtime tree). Returns {verbs: Map<verb, spec>, flags: Set,

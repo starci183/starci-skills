@@ -310,7 +310,7 @@ const renderRuntimeInstallModule = (root) => {
   return `// ${GENERATED}\nexport const RUNTIME_VERSION = ${JSON.stringify(manifest.version)};\n`;
 };
 /** Every output the generator owns: {relpath: text}. */
-export const generateAll = async (root = skillRoot) => {
+const generateAll = async (root = skillRoot) => {
   const cat = loadCatalog(root);
   return {
     'packages/cli/src/catalog.generated.mjs': await renderCatalogModule(cat),

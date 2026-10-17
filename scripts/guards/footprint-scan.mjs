@@ -26,8 +26,8 @@ import { isMain } from '../lib/is-main.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 export const SKILL_ROOT = path.resolve(here, '..', '..');
-export const FOOTPRINT_EVERY_MS = allocationMs('footprint.everyMs');
-export const FOOTPRINT_LOCK_STALE_MS = allocationMs('footprint.lockStaleMs');
+const FOOTPRINT_EVERY_MS = allocationMs('footprint.everyMs');
+const FOOTPRINT_LOCK_STALE_MS = allocationMs('footprint.lockStaleMs');
 const DEFAULT_DEPTH = 4;
 const fold = foldCase;
 /** The repositories root: the directory that holds the source host repository (its .claude is the runtime). */

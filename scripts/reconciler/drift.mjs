@@ -17,7 +17,7 @@ import { RELOAD_HEAD_PATHS, reloadBoundMs } from './reload-bounds.mjs';
 import { SKILL_ROOT } from './state.mjs';
 
 /** Controllers whose effective mode differs from the configured one for longer than graceMs. Pure. modes: {name: {configured, effective, setAt}}. */
-export function modeDrift({ modes, configAt = 0, now = Date.now(), graceMs = allocationMs('reconciler.modeDriftMs') } = {}) {
+function modeDrift({ modes, configAt = 0, now = Date.now(), graceMs = allocationMs('reconciler.modeDriftMs') } = {}) {
   const drifted = [];
   for (const [controller, mode] of Object.entries(modes ?? {})) {
     if (mode.configured === mode.effective) continue;

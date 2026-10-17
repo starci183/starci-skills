@@ -244,7 +244,7 @@ const positiveRev = (value) => {
   const n = typeof value === 'string' && /^\s*\d+\s*$/.test(value) ? Number(value) : value;
   return Number.isInteger(n) && n > 0 ? n : null;
 };
-export function recordRevision(doc) {
+function recordRevision(doc) {
   if (!doc || typeof doc !== 'object' || Array.isArray(doc)) return { rev: null, source: null };
   const top = positiveRev(doc.rev) ?? positiveRev(doc.revision);
   let changes = [];

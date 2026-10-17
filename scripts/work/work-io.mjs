@@ -10,7 +10,7 @@ import { isLiteWorkRoot, workPathAllowed } from '../lib/work-edition.mjs';
 export { slash } from '../lib/path-key.mjs';
 
 /** How many directories below its start a record walk descends (features/<f>/ui/<r> is 3). */
-export const RECORD_DEPTH = 12;
+const RECORD_DEPTH = 12;
 /** Directories a record walk never enters: a record's own files and the kernel's evidence hold no records. */
 const RECORD_SKIP = Object.freeze(['node_modules', 'assets', 'evidence', 'runs', '_derived', 'kernel-evidence', 'kernel-strays', 'kernel-approvals']);
 /** The share of a keyed #FF00FF rectangle that must be key-coloured for it to count as a slot. */

@@ -86,7 +86,7 @@ export function parseSupabaseConfig(text) {
 }
 
 /** Find the nearest app marker upward; hfs.json fixes the root even when its Supabase config is absent. */
-export function findSupabaseAppRoot(cwd, { exists = fs.existsSync } = {}) {
+function findSupabaseAppRoot(cwd, { exists = fs.existsSync } = {}) {
   let directory = path.resolve(cwd ?? process.cwd());
   for (;;) {
     if (exists(path.join(directory, 'hfs.json')) || exists(path.join(directory, SUPABASE_CONFIG))) return directory;

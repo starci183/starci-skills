@@ -29,7 +29,7 @@ function taskTitleOfWorker(row) {
 }
 
 /** Working agents grouped by registered Orca worktree. */
-export function workingByLane(worktrees = [], { worktree = null } = {}) {
+function workingByLane(worktrees = [], { worktree = null } = {}) {
   const wanted = worktree ? pathKey(worktree) : null;
   const lanes = [];
   for (const row of worktrees) {
@@ -53,7 +53,7 @@ const terminalAgent = (terminal) => {
 };
 
 /** Fill the normalized worktree-ps rows from terminal-list when Orca omits their agents array. */
-export async function worktreesWithWorkingAgents(worktrees = [], list = terminalList) {
+async function worktreesWithWorkingAgents(worktrees = [], list = terminalList) {
   const rows = [];
   let failure = null;
   await findInOrder(worktrees, async (row) => {

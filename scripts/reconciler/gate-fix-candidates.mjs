@@ -9,7 +9,7 @@ const CODE = /\b[a-z][a-z0-9]*(?:-[a-z0-9]+){2,}\b/g;
 const cache = new Map(); // `${incidentId} ${rev}` -> [{sha, subject}]
 
 /** The typed codes a gate's cause names: kebab-case words of its workaround record and detail text (op-gate-tool-failed ...), the longest first. Pure. */
-export function causeCodesOf(gate) {
+function causeCodesOf(gate) {
   const text = `${gate.workaround?.attempt ?? ''} ${gate.workaround?.none ?? ''} ${gate.detail ?? ''}`;
   return [...new Set(text.match(CODE) ?? [])].filter((code) => code.length >= 12).sort((a, b) => b.length - a.length).slice(0, MAX_CODES);
 }

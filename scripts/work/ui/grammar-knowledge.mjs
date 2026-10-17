@@ -47,7 +47,7 @@ function defaultPaths(root=skillRoot){
 // The whole census.
 // ---------------------------------------------------------------------------
 
-export async function censusGrammar({packageRoot=defaultPaths().packageRoot}={}){
+async function censusGrammar({packageRoot=defaultPaths().packageRoot}={}){
   const pkg=JSON.parse(read(path.join(packageRoot,'package.json')));
   const {renderers,groups,catalog}=censusRenderers(packageRoot);
   const common=censusCommonTokens(packageRoot,renderers);
@@ -199,7 +199,7 @@ function nestedRange(lines,name,parent){
  * Replace one top-level block (`name:` at column 0 through the line before the next column-0 key) or,
  * with `parent`, one block nested two spaces under a top-level key.
  */
-export function replaceBlock(text,name,replacement,{parent=null}={}){
+function replaceBlock(text,name,replacement,{parent=null}={}){
   const lines=text.split('\n');
   const {start,end}=parent===null?topLevelRange(lines,name):nestedRange(lines,name,parent);
   return [...lines.slice(0,start),...replacement.split('\n'),...lines.slice(end)].join('\n');
@@ -329,7 +329,7 @@ function checkCatalog(findings,grammarRoot,measured){
  * Every drift between the grammar knowledge snapshots and the package source. Line positions, use
  * counts and digests are pointers, not facts, so they are refreshed by `--write` but never reported.
  */
-export async function checkGrammarKnowledge({packageRoot=defaultPaths().packageRoot,grammarRoot=defaultPaths().grammarRoot,census=null}={}){
+async function checkGrammarKnowledge({packageRoot=defaultPaths().packageRoot,grammarRoot=defaultPaths().grammarRoot,census=null}={}){
   const measured=census??await censusGrammar({packageRoot});
   const findings=[];
   checkCommonSnapshot(findings,grammarRoot,measured);
@@ -379,7 +379,7 @@ function withCatalogRendererCount(text,count){
   return [...lines.slice(0,summary+1),block.replace(CATALOG_RENDERER_COUNT,String(count)+' renderers'),...lines.slice(summaryEnd)].join('\n');
 }
 
-export async function writeGrammarKnowledge({packageRoot=defaultPaths().packageRoot,grammarRoot=defaultPaths().grammarRoot}={}){
+async function writeGrammarKnowledge({packageRoot=defaultPaths().packageRoot,grammarRoot=defaultPaths().grammarRoot}={}){
   const census=await censusGrammar({packageRoot});
   const written=[];
   const catalogFile=path.join(grammarRoot,'index.yaml');

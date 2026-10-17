@@ -38,7 +38,7 @@ const START_WAIT_MS = 120_000;
 /* ------------------------------------------------------------ items */
 
 /** -1 | 0 | 1 comparing dotted numeric versions. Pure. */
-export function cmpVersion(a, b) {
+function cmpVersion(a, b) {
   const x = String(a).split('.').map((n) => Number.parseInt(n, 10) || 0), y = String(b).split('.').map((n) => Number.parseInt(n, 10) || 0);
   for (let i = 0; i < Math.max(x.length, y.length); i += 1) if ((x[i] ?? 0) !== (y[i] ?? 0)) return (x[i] ?? 0) < (y[i] ?? 0) ? -1 : 1;
   return 0;
@@ -56,7 +56,7 @@ export function hostPlatformItem(platform = process.platform) {
 }
 
 /** A registered ledger that no product should live in: a temp or test path. Pure. */
-export function isTempLedger(file, { tmp = tempRoot() } = {}) {
+function isTempLedger(file, { tmp = tempRoot() } = {}) {
   const p = String(file ?? '').replaceAll('\\', '/').toLowerCase();
   const t = String(tmp).replaceAll('\\', '/').toLowerCase().replace(/\/$/, '');
   return Boolean(p) && (p.startsWith(`${t}/`) || /\/(?:temp|tmp)\//.test(p) || /prereq|starci-test|\/scratch\//.test(p));
@@ -79,7 +79,7 @@ export function ledgerFindings(ledgers, { exists = (f) => fs.existsSync(f), tmp 
 }
 
 /** quick_check of every registered ledger file that exists: {bad: [{name, result}], checked}. Seams: check, exists. */
-export function ledgerIntegrity(ledgers, { check = (f) => quickCheck(f), exists = (f) => fs.existsSync(f) } = {}) {
+function ledgerIntegrity(ledgers, { check = (f) => quickCheck(f), exists = (f) => fs.existsSync(f) } = {}) {
   const out = { bad: [], checked: 0 };
   for (const l of ledgers ?? []) {
     if (l.state === 'retired' || !l.file || !exists(l.file)) continue;
@@ -106,7 +106,7 @@ function configuredPins(config) {
  * attested from worker-show's effective model, so a pin is unsound only when its agent has no card or its card takes no
  * model flag (start.modelArgument false: Orca's --model is for Claude, Codex and Cursor). Seam: card(agent) -> parsed card | null.
  */
-export function pinProblems(pins, { card = (agent) => { try { return parseYaml(fs.readFileSync(path.join(SKILL_ROOT, 'modules', 'models', 'agents', `${agent}.yaml`), 'utf8')); } catch { return null; } } } = {}) {
+function pinProblems(pins, { card = (agent) => { try { return parseYaml(fs.readFileSync(path.join(SKILL_ROOT, 'modules', 'models', 'agents', `${agent}.yaml`), 'utf8')); } catch { return null; } } } = {}) {
   const out = [];
   for (const pin of pins) {
     const c = card(pin.agent);
@@ -124,7 +124,7 @@ export function pinProblems(pins, { card = (agent) => { try { return parseYaml(f
  * controller entries the profile does not itself run active (an explicit gc/workers/learning setting survives; an explicit
  * shadow/off of job/host/workflow/resource is what the profile replaces; observe keeps none). Returns {text, changed}. Pure.
  */
-export function applyProfileText(text, profile = PROFILE) {
+function applyProfileText(text, profile = PROFILE) {
   if (!Object.hasOwn(PROFILES, profile)) throw new Error(`unknown reconciler profile ${profile}: use ${Object.keys(PROFILES).join(' | ')}`);
   const eol = /\r\n/.test(text) ? '\r\n' : '\n';
   const lines = String(text).split(/\r?\n/);
@@ -312,7 +312,7 @@ function setProfileResult(setProfile) {
  * The host actions. Scope `services` is the no-quota heal (launcher, tasks, UI build, engine, services): it returns before any
  * Orca probe and never reaches a seat launcher. Scope `full` adds the Supervisor seat and, without workflow ingress, the Kernel seats.
  */
-export async function applyHost(opts, deps = {}) {
+async function applyHost(opts, deps = {}) {
   const applied = [];
   const { env = process.env, waitMs, setProfile, noBuild, retire, workflowSeats = true, scope = 'full', platform = process.platform } = opts;
   const unsupported = servicePlatformProblem('harness-ui', platform);
@@ -343,7 +343,7 @@ export async function applyHost(opts, deps = {}) {
   return applied;
 }
 
-export async function ensureHostRuntime({ env = process.env, waitMs = START_WAIT_MS, workflowSeats = false, check = false, platform = process.platform, ...opts } = {}, deps = {}) {
+async function ensureHostRuntime({ env = process.env, waitMs = START_WAIT_MS, workflowSeats = false, check = false, platform = process.platform, ...opts } = {}, deps = {}) {
   // A row only another consumer needs does not gate this start (readiness-consumers.mjs); the Kernel's start never builds the harness UI.
   const consumer = opts.consumer ?? DEFAULT_CONSUMER, gathered = deps.gather ?? gather, read = async (o) => forConsumer(await gathered(o), consumer), apply = deps.applyHost ?? applyHost, wait = deps.sleep ?? sleep, now = deps.now ?? Date.now;
   const services = opts.scope === 'services';

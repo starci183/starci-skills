@@ -67,7 +67,6 @@ export { withWorkflowLock } from './workflow-checkpoint-state.mjs';
 const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const GATE_SCRIPT = path.join(SKILL_ROOT, 'scripts', 'cli', 'gate-run.mjs');
 export const PRESERVED_WORKFLOW_PREFIX = 'preserved';
-export const FINISH_STEPS = Object.freeze(['gate', 'merge-guard', 'review-verify', 'rebase', 'fast-forward', 'push', 'release-pending']);
 export const CHECKPOINT_EVENTS = Object.freeze({ checkpoint: 'workflow-checkpoint', preserved: 'workflow-op-preserved', landed: 'workflow-landed' });
 const RUNTIME_IDENTITY = { 'user.name': 'starci', 'user.email': 'runtime@starci.local' };
 const NO_MODULES = [':(exclude,glob)**/node_modules', ':(exclude,glob)**/node_modules/**'];

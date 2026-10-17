@@ -5,7 +5,7 @@
 //   is this path tracked             isTracked(P) / trackingOf(P); the rule catalog (knowledge/hfs/rules.yaml, modules/schemas/hfs-rules.schema.yaml) loads through loadRuleCatalog / rules().
 // Every check and lint rule of HFS reads knowledge/hfs/slots.yaml through this module; none keeps its own path
 // list. The manifest shape is modules/schemas/hfs-slots.schema.yaml and hfs.json is modules/schemas/hfs-repo.schema.yaml;
-// the installed runtime carries no npm dependency, so this file re-states those shapes instead of loading ajv (tests/hfs/hfs-slots.spec.mjs proves the two agree).
+// the installed runtime carries no npm dependency, so this file re-states those shapes instead of loading ajv.
 //
 // A product is ONE app repository: hfs.json at the app root has kind `app` and declares its two sides, `be` and `fe`, each in
 // the folder of that name. The resolver of the app answers for the whole tree: a root path with the slots of profile `app`,
@@ -41,7 +41,7 @@ export { HfsSlotsError } from './slot-errors.mjs';
 export { loadRuleCatalog };
 export { rules } from './rule-catalog.mjs';
 export { APP_SCOPE };
-export const HFS_MANIFEST_FILE = 'knowledge/hfs/slots.yaml';
+const HFS_MANIFEST_FILE = 'knowledge/hfs/slots.yaml';
 /** The manifest of kind runtime: the standard tree of the StarCi runtime repository (judged by scripts/hfs/runtime-check.mjs). */
 export const RUNTIME_MANIFEST_FILE = 'knowledge/hfs/runtime-slots.yaml';
 export const HFS_DECLARATION_FILE = 'hfs.json';

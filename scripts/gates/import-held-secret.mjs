@@ -23,7 +23,7 @@ import {HELD_MEMBERS} from './sonar-host-secrets.mjs';
 const refuse=(cause,message,extra={})=>({outcome:'refused',code:'held-secret-import-refused',cause,message,...extra});
 
 /** The member's ciphertext at `rev` in the runtime repository, or {error}; without a rev, at the parent of the commit that deleted it. */
-export function readMemberFromHistory({cwd,member,rev=null}){
+function readMemberFromHistory({cwd,member,rev=null}){
   let at=rev;
   if(!at){
     const deleted=log(['--diff-filter=D','-1','--format=%H','--',member],{cwd});
@@ -37,7 +37,7 @@ export function readMemberFromHistory({cwd,member,rev=null}){
 }
 
 /** Decrypt a ciphertext with the owner's identity through the sops call owner (a temp file the tool reads, removed at once); {value} or {error}. */
-export function decryptCiphertext(ciphertext,{env,sops=null,identity=null,timeoutMs=20000}={}){
+function decryptCiphertext(ciphertext,{env,sops=null,identity=null,timeoutMs=20000}={}){
   const file=tempPath(`starci-held-secret-${process.pid}-${Date.now().toString(36)}.enc`);
   try{
     fs.writeFileSync(file,ciphertext,{mode:0o600});
@@ -74,7 +74,7 @@ function appendVariable(file,name,value){
  * Move one held member's value into secret.env. `readMember(member)` returns {ciphertext,rev} or {error}; `decryptMember(ciphertext)`
  * returns {value} or {error}. Returns {outcome:'imported', variable, member, rev, reader} or a refusal; the value appears in neither.
  */
-export function importHeldSecret({member,secretFile,readMember,decryptCipher}){
+function importHeldSecret({member,secretFile,readMember,decryptCipher}){
   const row=HELD_MEMBERS.find(entry=>entry.path===member);
   if(!row)return refuse('unknown-member',`${member} is not a held member; the members are ${HELD_MEMBERS.map(entry=>entry.path).join(', ')}`);
   if(!row.variable)return refuse('retired-member',`${member} is ${row.reader}; nothing is imported`,{member});

@@ -12,7 +12,7 @@ const DEFAULT_SYSTEM_ROOT = ['C:', 'Windows'].join(path.win32.sep);
 const sameText = (a, b) => String(a ?? '').replace(/\s+/g, ' ').trim().toLowerCase() === String(b ?? '').replace(/\s+/g, ' ').trim().toLowerCase();
 
 /** A Task Scheduler result code as the hex Windows documents it (0x41303), or null when none is recorded. */
-export const resultCodeText = (code) => (Number.isFinite(Number(code)) && code != null ? `0x${(Number(code) >>> 0).toString(16)}` : null);
+const resultCodeText = (code) => (Number.isFinite(Number(code)) && code != null ? `0x${(Number(code) >>> 0).toString(16)}` : null);
 
 const fixOf = (name, { shim, task }) => {
   const register = `starci task register ${name} --apply`;
@@ -25,7 +25,7 @@ const fixOf = (name, { shim, task }) => {
  * action, expected, shim, reason, fix}. `problem` is the first of missing, disabled, shim-missing, action-stale, or null.
  * `reason` says why the task cannot work and `fix` is the exact command, both null while it can. Pure over its inputs.
  */
-export function auditTask(name, row, { shim, shimExists, systemRoot }) {
+function auditTask(name, row, { shim, shimExists, systemRoot }) {
   const { taskName } = TASK_DEFINITIONS[name];
   const expected = registeredAction(name, { systemRoot, starci: shim });
   const base = { name, taskName, state: row?.state ?? null, lastResult: row?.lastResult ?? null, action: row?.action ?? null, expected, shim };

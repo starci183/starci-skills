@@ -11,7 +11,7 @@ const CODE = /\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b|\b[a-z][a-z0-9]*(?:-[a-z0-9]+)+\
 const RETRY_BOUND = { ref: 'modules/models/kinds.yaml#routes[id=rejected-report-retries].limit' };
 
 /** 'work' | 'runtime' for a catalogued code whose kind decides the class, else null. */
-export const classOfCode = (code) => CLASS_OF_KIND[failureCodeCatalog()[code]?.kind] ?? null;
+const classOfCode = (code) => CLASS_OF_KIND[failureCodeCatalog()[code]?.kind] ?? null;
 
 /** The catalogued codes a text names, each with its class. */
 const codesIn = (text) => [...new Set(String(text ?? '').match(CODE) ?? [])].map((code) => ({ code, class: classOfCode(code) })).filter((entry) => entry.class);
@@ -33,7 +33,7 @@ export function failureClassOf(db, jobId) {
 }
 
 /** Retries of the unit's lineage still owed by policy row error-work (the rejected-report limit minus the retries already made). */
-export function workRetriesLeft(db, jobId) {
+function workRetriesLeft(db, jobId) {
   const tries = db.prepare('SELECT try_no FROM jobs WHERE job_id=?').get(jobId)?.try_no ?? 1;
   return Math.max(0, boundValue(RETRY_BOUND) - (tries - 1));
 }

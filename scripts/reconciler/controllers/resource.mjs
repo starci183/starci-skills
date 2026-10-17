@@ -40,8 +40,8 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '.
 const NAME = 'resource';
 const WRITER = 'reconciler/resource';
 const WOULD = 'reconciler.would';
-export const HOST_KEY = 'resource:host';
-export const POOLS_KEY = 'resource:pools';
+const HOST_KEY = 'resource:host';
+const POOLS_KEY = 'resource:pools';
 const RATE_LIMITED_EVENT = 'provider-rate-limited';
 const quotaKey = (ledgerId) => `resource:quota:${ledgerId}`;
 export const DEFAULTS = Object.freeze({ resyncMs: 30_000, concurrency: 2, footprintEveryMs: 300_000, quotaProbeEveryMs: 300_000,
@@ -148,7 +148,7 @@ function persistingProviders(pb, next, { now, settings }) {
 
 /* ------------------------------------------------------------ the controller */
 
-export function createResourceController(overrides = {}) {
+function createResourceController(overrides = {}) {
   const deps = { ...liveDeps, ...overrides };
   const env = () => deps.env ?? process.env;
   const writeMachine = (fn) => withSupervisor(fn, { env: env() });

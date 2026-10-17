@@ -35,7 +35,7 @@ export function tokensSinceBoot(db, { subjectType, workflowId = null, bootAt, sk
 }
 
 /** What the Kernel of a workflow has received and spent since its latest boot: {bootAt, wakes, tokens}. Ledger reads only. */
-export function kernelSinceBoot(db, workflowId) {
+function kernelSinceBoot(db, workflowId) {
   const boots = rotationRule('kernel').bootEvents;
   const bootAt = Number(db.prepare(`SELECT MAX(created_at) AS at FROM events WHERE workflow_id=? AND kind IN (${boots.map(() => '?').join(',')})`).get(workflowId, ...boots)?.at ?? 0);
   const wakes = kernelWakeLog(db, workflowId).filter((wake) => wake.at >= bootAt && countsTowardRotation(wake)).length;

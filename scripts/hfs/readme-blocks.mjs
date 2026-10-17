@@ -11,7 +11,7 @@ import { isMain } from '../lib/is-main.mjs';
 import { loadRuleCatalog, loadSlotManifest } from './slots.mjs';
 
 export const README = 'knowledge/hfs/README.md';
-export const BLOCKS = Object.freeze(['app-map', 'be-tree', 'be-tiers', 'fe-tree', 'rules']);
+const BLOCKS = Object.freeze(['app-map', 'be-tree', 'be-tiers', 'fe-tree', 'rules']);
 const open = (name) => `<!-- hfs:generated ${name} -->`;
 const close = (name) => `<!-- hfs:generated-end ${name} -->`;
 const PROFILE_ORDER = ['app', 'be', 'fe', 'repo'];
@@ -61,7 +61,7 @@ function rules(_manifest, catalog) {
 const RENDER = { 'app-map': appMap, 'be-tree': tree('be'), 'be-tiers': beTiers, 'fe-tree': tree('fe'), rules };
 
 /** The rendered text of one block. */
-export const renderBlock = (name, manifest, catalog) => RENDER[name](manifest, catalog);
+const renderBlock = (name, manifest, catalog) => RENDER[name](manifest, catalog);
 
 /** The names of the blocks whose text in `readme` is missing, has no markers or differs from the render. */
 export function staleBlocks(readme, manifest, catalog) {
@@ -74,7 +74,7 @@ export function staleBlocks(readme, manifest, catalog) {
 }
 
 /** `readme` with every block that has markers rewritten to its render. */
-export function writeBlocks(readme, manifest, catalog) {
+function writeBlocks(readme, manifest, catalog) {
   let out = readme;
   for (const name of BLOCKS) {
     const a = out.indexOf(open(name));

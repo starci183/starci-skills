@@ -6,7 +6,7 @@ const POINTER = 'The rest is in starci kernel status.';
 const OPENER_FALLBACK_CHARS = 200;
 
 /** The shared terminal bound for one wake. */
-export const wakeMaxChars = promptFileMaxChars;
+const wakeMaxChars = promptFileMaxChars;
 
 const openerOf = (text) => {
   const end = text.indexOf('. ');

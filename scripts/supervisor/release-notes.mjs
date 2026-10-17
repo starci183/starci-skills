@@ -8,7 +8,7 @@ const USAGE = 'starci release notes --tag <v*> [--repo <dir>] [--out <file>]';
 const RELEASE_TAG = /^v\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
 
 /** True when the version carries a pre-release part (`-alpha.N`, `-beta.N`, `-rc.N`). */
-export function isPrerelease(version) {
+function isPrerelease(version) {
   return /^\d+\.\d+\.\d+-/.test(version);
 }
 

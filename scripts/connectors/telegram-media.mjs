@@ -32,7 +32,7 @@ import { runtimeSecretEnv } from '../gates/runtime-host.mjs';
 import { DEFAULT_API_BASE, botCall, endpoint, telegramSettings } from './telegram.mjs';
 import { botPolite, redact } from './telegram-polite.mjs';
 import { clip } from '../lib/clip.mjs';
-import { readMachine, withMachine } from '../../engine/db/machine.mjs';
+import { withMachine } from '../../engine/db/machine.mjs';
 import { argsOf, connectorLog, ownerConfig } from './lib.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { sleep } from '../lib/sleep.mjs';
@@ -99,11 +99,6 @@ const sendNote = (call, chatId, text) => botCall({ ...call, method: 'sendMessage
 // `media|<workflow>|<job>|<attempt>`) claimed before the upload (delivery 'sending') and settled after it
 // (sent | partial, ref {op, verdict, sent, failed}); a send that delivered nothing gives its claim up.
 const mediaDedupeKey = (workflowId, jobId, attempt) => `media|${workflowId}|${jobId}|${attempt}`;
-/** The dedupe row of one settle ({delivery, sent_at, ref: {...}}), or null. */
-export const mediaSent = (key, env = process.env) => readMachine((m) => {
-  const row = m.db.prepare("SELECT delivery, sent_at, ref FROM notifications WHERE dedupe_key=? AND kind='media'").get(key);
-  return row ? { ...row, ref: parse(row.ref, null) } : null;
-}, null, { env });
 /** Claim `key` for this send: false when a row exists already (sent, or another sender is on it). */
 const claimMedia = (key, { op, verdict, env }) => withMachine((m) => m.insert('notifications', { channel: 'telegram', kind: 'media', text: `${op} ${verdict}`, delivery: 'sending',
   ref: JSON.stringify({ op, verdict }), dedupe_key: key }, { orIgnore: true }).changes > 0, { env });
@@ -138,7 +133,7 @@ const readSettleSafely = (ledgerFile, request, warn) => {
  * `warn`) and an {ok:false} result. Deduped per workflow|job|attempt; a send that delivered nothing
  * releases its claim so a later run can try again. Everything external is injectable.
  */
-export async function sendSettleMedia({ ledgerFile, repo, workflowId, jobId, attempt, op, verdict, dispatchId = null }, {
+async function sendSettleMedia({ ledgerFile, repo, workflowId, jobId, attempt, op, verdict, dispatchId = null }, {
   config = ownerConfig(), env = process.env, root = configRoot, fetchImpl = fetch, apiBase = env.STARCI_TELEGRAM_API_BASE || DEFAULT_API_BASE,
   warn = (line) => process.stderr.write(`${line}\n`), sleepImpl = sleep, now = Date.now(),
 } = {}) {

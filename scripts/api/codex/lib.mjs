@@ -14,7 +14,7 @@ const pathEntries = (env, delimiter) => {
 };
 
 /** The program and leading argv that run the Codex CLI: `codex` itself, or on Windows the script behind its npm shim. */
-export function codexLauncher({ env = process.env, platform = process.platform, exists = fs.existsSync } = {}) {
+function codexLauncher({ env = process.env, platform = process.platform, exists = fs.existsSync } = {}) {
   if (platform !== 'win32') return { command: 'codex', prefix: [] };
   for (const dir of pathEntries(env, ';')) {
     const script = path.join(dir, ...SHIM_SCRIPT);

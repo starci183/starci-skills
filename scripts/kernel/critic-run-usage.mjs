@@ -16,7 +16,7 @@ const RUN_EVENT = 'runtime-critic-run';
 const keyOfRun = (critic) => critic?.dispatchId ?? critic?.taskId ?? null;
 
 /** The runtime Critic runs of a ledger that name a dispatch or a task and have no usage event yet: [{workflowId, jobId, op, dispatchId, taskId, provider, digest}]. */
-export function criticRunsWithoutUsage(db) {
+function criticRunsWithoutUsage(db) {
   const rows = db.prepare('SELECT workflow_id, entity_id, payload_json FROM events WHERE kind=? ORDER BY seq').all(RUN_EVENT);
   const measured = new Set(db.prepare('SELECT json_extract(payload_json,\'$.dispatchId\') AS dispatch FROM events WHERE kind=?').all(CRITIC_USAGE_EVENT).map((row) => row.dispatch));
   return rows.flatMap((row) => {
@@ -31,7 +31,7 @@ export function criticRunsWithoutUsage(db) {
  * The usage event payload of one run, or null while its session is not in the index. `index` is the session index of usage-record.mjs
  * (indexSessions): the entry whose first user message names the dispatch id.
  */
-export function criticUsagePayload(run, index, { extract = extractUsage, prices = loadPrices() } = {}) {
+function criticUsagePayload(run, index, { extract = extractUsage, prices = loadPrices() } = {}) {
   const entry = index.find((e) => e.role === 'op' && (e.dispatchId === run.dispatchId || (run.taskId && e.taskId === run.taskId)));
   if (!entry) return null;
   const got = extract(entry.agent, entry.file);

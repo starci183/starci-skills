@@ -57,7 +57,7 @@ async function runAndRelease(request, { called, env, io, deps }) {
 
 /**
  * Generate the images of `request` (imagegen-request.mjs) and write them with their receipt. `deps` replaces any of
- * admit, begin, live, end, runner, collect (specs); `io` is the admission evidence seam (tests/helpers/fake-admission.mjs).
+ * admit, begin, live, end, runner, collect; `io` is the admission evidence seam.
  */
 export async function runImagegen(request, { env = process.env, now = Date.now, io = null, deps = {} } = {}) {
   const wired = { ...DEFAULT_DEPS, ...deps };

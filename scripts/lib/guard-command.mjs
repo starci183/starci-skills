@@ -7,13 +7,11 @@
 // launcher on POSIX. `starci runtime install` and `runtime link` write both launchers (packages/cli/src/shim.mjs).
 import os from 'node:os';
 
-/** The home a tracked file spells instead of a machine path: the shell that runs the hook expands it. */
-export const PORTABLE_HOME = '$HOME';
 
 const GUARD_COMMAND_END = /starci"? guard command$/;
 
 /** The hook command of `starci guard <verb>`: the quoted launcher path under `home`, then the verb. */
-export const guardHookCommand = (verb, { home = os.homedir() } = {}) => `"${String(home).replaceAll('\\', '/')}/.starci/bin/starci" guard ${verb}`;
+const guardHookCommand = (verb, { home = os.homedir() } = {}) => `"${String(home).replaceAll('\\', '/')}/.starci/bin/starci" guard ${verb}`;
 
 /** The hook command every host registers for the command guard. */
 export const toolGuardCommand = (options = {}) => guardHookCommand('command', options);

@@ -45,7 +45,7 @@ export const SESSION_LEAD_MS = 30 * 60 * 1000;
 const SESSION_GREP_BYTES = 256 * 1024;
 
 /** The project-dir slug an agent CLI derives from a cwd: every non-alphanumeric becomes '-'. */
-export const sessionProjectSlug = (cwd) => String(path.resolve(cwd)).replace(/[^A-Za-z0-9]/g, '-');
+const sessionProjectSlug = (cwd) => String(path.resolve(cwd)).replace(/[^A-Za-z0-9]/g, '-');
 
 /**
  * The session homes the runtime already knows, re-rooted the way
@@ -132,7 +132,7 @@ const codexSessionCandidates = (homes, window) => {
  * window, each flagged `matched` when its head names the job id — the
  * attribution settle archives on and every other session fails.
  */
-export function sessionCandidates({ agent, cwds = [], sinceMs, untilMs = null, homes, jobId }) {
+function sessionCandidates({ agent, cwds = [], sinceMs, untilMs = null, homes, jobId }) {
   if (!agent || !homes || homes.skipped || sinceMs == null) return [];
   let found = agent === 'codex'
     ? codexSessionCandidates(homes, { sinceMs, untilMs })

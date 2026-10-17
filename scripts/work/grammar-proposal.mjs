@@ -31,7 +31,7 @@ import { isDir, isFile } from './work-io.mjs';
 import { altOf } from '../lib/source-phrases.mjs';
 
 export const GRAMMAR_PROPOSAL_FILED = 'grammar-proposal-filed';
-export const GRAMMAR_PROPOSAL_RESOLVED = 'grammar-proposal-resolved';
+const GRAMMAR_PROPOSAL_RESOLVED = 'grammar-proposal-resolved';
 export const PROPOSAL_FILE_NAMES = Object.freeze(['grammar-proposal.yaml', 'grammar-proposal.yml', 'grammar-proposal.md']);
 const PROPOSAL_FIELDS = Object.freeze(['gap', 'anatomy', 'tokens', 'claims', 'render']);
 /** A proposal is never accepted by the runtime: it stays proposed until the owner, through a grammar lane, decides. */

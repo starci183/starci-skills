@@ -43,7 +43,7 @@ const writeTo = (target, text) => {
  * The driver itself is excluded because it represents the complete suite, not
  * one check.
  */
-export function runtimeOnlyChecks(root = skillRoot) {
+function runtimeOnlyChecks(root = skillRoot) {
   const checks = new Map();
   const checksDir = path.join(root, 'scripts', 'checks');
   for (const entry of fs.readdirSync(checksDir, { withFileTypes: true })) {
@@ -61,7 +61,7 @@ export function runtimeOnlyChecks(root = skillRoot) {
 }
 
 /** Run exactly one dynamically discovered check, returning its child exit code. */
-export function runRuntimeOnly(name, args = [], {
+function runRuntimeOnly(name, args = [], {
   root = skillRoot,
   runner = runScript,
   stderr = process.stderr,

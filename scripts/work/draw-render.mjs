@@ -84,9 +84,9 @@ const GENERIC_FAMILIES = Object.freeze(['serif', 'sans-serif', 'monospace', 'cur
 /** Family names that are a system-font alias on one platform only: skipped where absent, never missing. */
 const PLATFORM_ALIASES = Object.freeze(['-apple-system', 'blinkmacsystemfont']);
 
-export class UsageError extends Error {}
+class UsageError extends Error {}
 /** Refuse a pinned or selected runtime dist before its JS or CSS can enter a draw bundle. */
-export function preflightDrawGrammarDist(packageRoot) {
+function preflightDrawGrammarDist(packageRoot) {
   const status = grammarDistStatus(packageRoot);
   if (!status.ok) throw new RedError(grammarDistMessage(status), 'DRAW_GRAMMAR_DIST_STALE');
   return status;
@@ -172,16 +172,16 @@ export function parseViewports(text) {
   return viewports;
 }
 
-export const captureBase = (name, { width, height }, theme) => `${name}--${width}x${height}--${theme}`;
+const captureBase = (name, { width, height }, theme) => `${name}--${width}x${height}--${theme}`;
 
-export const splitFontStack = (stack) => String(stack).split(',').map((f) => f.trim().replace(/^(["'])(.*)\1$/, '$2')).filter(Boolean);
+const splitFontStack = (stack) => String(stack).split(',').map((f) => f.trim().replace(/^(["'])(.*)\1$/, '$2')).filter(Boolean);
 const isGenericFamily = (family) => GENERIC_FAMILIES.includes(family.toLowerCase());
 
 /**
  * Which family each rendered font stack used, and which named families before it did not render.
  * `loaded` are FontFace families with status loaded, `local(family)` answers whether the host has it installed.
  */
-export function resolveFontStacks(stacks, { loaded, local }) {
+function resolveFontStacks(stacks, { loaded, local }) {
   const webfonts = new Set(loaded.map((f) => f.toLowerCase()));
   const used = [], missing = new Set();
   for (const stack of stacks) {
@@ -198,7 +198,7 @@ export function resolveFontStacks(stacks, { loaded, local }) {
 }
 
 /** The failure codes of one measured viewport; empty means green. */
-export function judgeCapture(m) {
+function judgeCapture(m) {
   const failures = [];
   if (m.fonts.missing.length) failures.push('font-missing');
   if (m.layout.horizontalOverflow) failures.push('horizontal-overflow');
@@ -210,7 +210,7 @@ export function judgeCapture(m) {
 }
 
 /** Fixture JSON -> props: every "[Function]" becomes a no-op. */
-export const fixtureProps = (value) => {
+const fixtureProps = (value) => {
   if (value === FUNCTION_FIXTURE) { return '__DRAW_NOOP__'; }
   if (Array.isArray(value)) { return value.map(fixtureProps); }
   if (value && typeof value === 'object') { return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, fixtureProps(v)])); }
@@ -218,7 +218,7 @@ export const fixtureProps = (value) => {
 };
 
 /** Candidate class tokens of a bundle for tailwind's build(): everything between quotes and whitespace. */
-export const classCandidates = (text) => [...new Set(String(text).split(/[\s"'`\\]+/).filter((t) => t.length > 0 && t.length <= 200))];
+const classCandidates = (text) => [...new Set(String(text).split(/[\s"'`\\]+/).filter((t) => t.length > 0 && t.length <= 200))];
 
 function rationalePathOf(value) {
   if (typeof value === 'string') { return value; }
@@ -245,7 +245,7 @@ async function httpImageDigest(src, page) {
  * The sha256 of the bytes each measured <img> shows (file:, data: or http(s): source; null when unreadable), so the
  * palette gate matches the image against the brand's registered artwork masters by content, never by name.
  */
-export async function artworkDigests(images, page = null) {
+async function artworkDigests(images, page = null) {
   const cache = new Map();
   const out = [];
   await eachInOrder(Array.isArray(images) ? images : [], async (a) => {

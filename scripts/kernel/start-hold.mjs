@@ -29,7 +29,7 @@ export function startHoldBudget(read = readModuleJson) {
 }
 
 /** The cause of one failure: its step and its typed reason, else the first line of its error with numbers folded away. Pure. */
-export function startCauseOf({ step, reason, error }) {
+function startCauseOf({ step, reason, error }) {
   const typed = reason ?? `error:${String(error ?? '').split('\n')[0].trim().replace(/\d+/g, '#').slice(0, 120)}`;
   return `${step ?? 'unknown'}|${typed}`;
 }

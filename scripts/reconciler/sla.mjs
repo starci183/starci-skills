@@ -37,8 +37,8 @@ import { positiveNumber } from '../lib/number.mjs';
 const selfFile = fileURLToPath(import.meta.url);
 const skillRoot = path.resolve(path.dirname(selfFile), '..', '..');
 export const SLA_FILE = path.join(skillRoot, 'modules', 'reconciler', 'sla.yaml');
-export const VIOLATED_KIND = 'runtime-invariant-violated';
-export const CLEARED_KIND = 'runtime-invariant-cleared';
+const VIOLATED_KIND = 'runtime-invariant-violated';
+const CLEARED_KIND = 'runtime-invariant-cleared';
 const TYPED_EVENT = 'invariant.violated';
 export const CRITICAL_SUFFIX = '/critical';
 /** A violated episode cleared within this window still gets its runtime-invariant-cleared event (the pass looks no further back). */
@@ -86,7 +86,7 @@ export function codeOf(state, catalog = slaCatalog()) {
 }
 
 /** An entity string -> {type, id, ledger, workflowId}: `workflow:<ledger>:<wf>`, `stuck:<ledger>:<wf>:<kind>:<id>`, `<type>:<rest>`. Pure. */
-export function entityOf(entity, ledgerId = null) {
+function entityOf(entity, ledgerId = null) {
   const parts = String(entity ?? '').split(':');
   const type = parts[0] || 'unknown';
   if (type === 'workflow' && parts.length >= 3) return { type, id: parts.slice(2).join(':'), ledger: parts[1] || ledgerId, workflowId: parts.slice(2).join(':') };

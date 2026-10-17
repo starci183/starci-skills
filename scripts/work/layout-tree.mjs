@@ -487,7 +487,7 @@ export function frontendOf(workRoot) {
  * hfs.json declares them (sides.fe.apps, each at fe/apps/<name>, its App Router directory <root>/src/app or <root>/app) and
  * nothing else names them. `explicit` (--app-dir, repeatable) names directories for a scan outside the declaration.
  */
-export function locateApps(workRoot, explicit = []) {
+function locateApps(workRoot, explicit = []) {
   const located = frontendOf(workRoot);
   const { repoRoot } = located;
   const rootOfAppDir = (d) => { const abs = path.resolve(d); return path.basename(path.dirname(abs)) === 'src' ? path.dirname(path.dirname(abs)) : path.dirname(abs); };
@@ -608,7 +608,7 @@ function updateMergedChange(record, base, entries, notes, at, changed) {
  * changed}. An app the scans no longer name is dropped with a note; what the owner decided per node (chrome,
  * captures, planned nodes) is carried per app.
  */
-export function mergeScan(existing, scans, { at = now() } = {}) {
+function mergeScan(existing, scans, { at = now() } = {}) {
   const notes = [];
   const base = isLayoutTree(existing) ? existing : null;
   const scanList = scans;
@@ -634,7 +634,7 @@ function orderNodes(nodes) {
 }
 
 /** Upsert one capture for a layout node from a PNG (slot measured from the key colour). Mutates `record`. */
-export function addCapture(record, shellDir, { node: id, breakpoint, theme, file, url = null, provenance = null, locale = null, destination = null, routes = [] }) {
+function addCapture(record, shellDir, { node: id, breakpoint, theme, file, url = null, provenance = null, locale = null, destination = null, routes = [] }) {
   if (destination) return addDestinationCapture(record, shellDir, { node: id, destination, routes, breakpoint, theme, file, url, provenance, locale });
   const node = nodeById(record, id);
   if (!node?.layout) throw new Error(`${id}: not a layout node of the tree`);
@@ -809,7 +809,7 @@ function addPlannedNode(record, parts, position, files, design) {
 }
 
 /** Add a planned node (and any missing planned ancestors). Mutates `record`. */
-export function addPlanned(record, { node: id, files = [], design = null }) {
+function addPlanned(record, { node: id, files = [], design = null }) {
   const parts = String(id).split('/').filter(Boolean);
   if (!record.nodes) { record.nodes = []; }
   if (!nodeById(record, '/')) { record.nodes.unshift({ id: '/', parent: null, segment: '/', segmentKind: 'root', url: '/', origin: 'planned' }); }

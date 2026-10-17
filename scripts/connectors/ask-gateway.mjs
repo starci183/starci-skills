@@ -48,7 +48,7 @@ const deny = (res, status, text) => {
  * The resolver the gateway asks: nonce -> {url, credential} or null. Cached briefly so one page's
  * asset requests do not reopen every ledger.
  */
-export function ledgerResolver({ repos, now = Date.now } = {}) {
+function ledgerResolver({ repos, now = Date.now } = {}) {
   let cache = { at: -Infinity, map: new Map() };
   return (nonce) => {
     if (now() - cache.at > RESOLVE_CACHE_MS) {
@@ -64,7 +64,7 @@ export function ledgerResolver({ repos, now = Date.now } = {}) {
  * The gateway request handler. `resolve(nonce)` returns the open ask ({url, credential}) or null;
  * `exposeCredentialAsks()` is read per request so a config change needs no restart.
  */
-export function createGateway({ resolve, exposeCredentialAsks = () => false, language = () => 'en' } = {}) {
+function createGateway({ resolve, exposeCredentialAsks = () => false, language = () => 'en' } = {}) {
   return serve((req, res) => {
     const t = { notFound: 'not found', credential: 'This question asks for credentials, so it is not served over the public link. Answer it on the machine through the localhost link.', upstream: 'The form for this question is not answering right now.' };
     const tr = translator(language());

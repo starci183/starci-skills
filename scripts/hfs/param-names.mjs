@@ -1,6 +1,6 @@
 // param-names.mjs - the one shape of `ruleParams.be.paramNames` of knowledge/hfs/slots.yaml (R85 injected-param-name): a non-empty list of unique
 // entries `{type | typeSuffix, names, nameSuffix?}`. The loader of scripts/hfs/slots.mjs calls it; the schema (modules/schemas/hfs-slots.schema.yaml)
-// states the same shape and tests/hfs/hfs-slots.spec.mjs proves the two agree.
+// states the same shape.
 import { isPlainObject } from '../../engine/plain-object.mjs';
 
 const UPPER = /^[A-Z][A-Za-z0-9]*$/u;

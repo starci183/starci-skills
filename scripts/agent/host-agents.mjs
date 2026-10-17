@@ -27,14 +27,14 @@ export function orcaUserData({ env = process.env, platform = process.platform, h
 }
 
 /** The settings file of Orca's active profile: <userData>/profiles/<activeProfileId>/orca-data.json. */
-export function orcaSettingsFile(opts = {}) {
+function orcaSettingsFile(opts = {}) {
   const data = orcaUserData(opts);
   const profile = readJson(path.join(data, 'orca-profile-index.json'))?.activeProfileId ?? 'local-default';
   return path.join(data, 'profiles', profile, 'orca-data.json');
 }
 
 /** The models the runtime declares for `provider`: the registry `models` entries plus every pool's pins. */
-export function modelsOfProvider(provider) {
+function modelsOfProvider(provider) {
   const found = new Set();
   const registry = readYaml('modules/models/registry.yaml');
   for (const [id, row] of Object.entries(registry?.models ?? {})) if (row?.provider === provider) found.add(id);

@@ -38,7 +38,7 @@ const SERVICE_ROOT = 'be/src';
 const USAGE = 'usage: starci gate unit --root <app> [--out <file>]';
 
 /** op-gate.yaml unitKit: {required[], forbidden[]}. */
-export function unitKitRules(runtime = runtimeRoot) {
+function unitKitRules(runtime = runtimeRoot) {
   const rules = opGateRules(runtime, 'unitKit');
   return { required: rules.required, forbidden: rules.forbidden };
 }
@@ -67,7 +67,7 @@ function inSlot(manifest, id, file) {
 }
 
 /** The spec-required unit role of an app-relative file, or null: its name ends in .<role>.ts under be/src (outside be/src/tests) and, for a role tied to a slot, inside that slot. */
-export function unitRoleOf(rel, roles = unitRolesOf(loadSlotManifest()), manifest = loadSlotManifest()) {
+function unitRoleOf(rel, roles = unitRolesOf(loadSlotManifest()), manifest = loadSlotManifest()) {
   if (!rel.startsWith(`${BE}src/`) || rel.startsWith(`${BE}src/tests/`)) return null;
   return roles.find((role) => rel.endsWith(`.${role.role}.ts`) && (role.slot === undefined || inSlot(manifest, role.slot, rel.slice(BE.length)))) ?? null;
 }
@@ -93,7 +93,7 @@ function judgeServiceSpec(text, serviceText, rules) {
 }
 
 /** The per-subject records from the coverage summary (keys absolute or app-relative) and the specs beside each subject. */
-export function judgeServices(root, coverage, rules = unitKitRules()) {
+function judgeServices(root, coverage, rules = unitKitRules()) {
   const byRel = new Map();
   for (const [file, metrics] of Object.entries(coverage ?? {})) {
     if (file === 'total') continue;
@@ -152,7 +152,7 @@ function runUnit(root, { npm = runNpm } = {}) {
 }
 
 /** Measure the required unit project and its subject coverage; missing or incomplete runs remain non-green. */
-export function buildUnitRun({ root, rules = unitKitRules(), npm = runNpm }) {
+function buildUnitRun({ root, rules = unitKitRules(), npm = runNpm }) {
   const abs = path.resolve(root);
   const { coverage, ...run } = runUnit(abs, { npm });
   const summary = { schema: UNIT_RUN_SCHEMA, at: new Date().toISOString(), root: posixPath(abs), run, services: judgeServices(abs, coverage, rules), findings: [], exit: 2 };

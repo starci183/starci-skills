@@ -71,7 +71,7 @@ const orcaHome = (env, home, platform = process.platform) => {
  * is the base the archived relative path is computed from, `dir` the tree that is
  * walked, `include` an optional predicate on the file's path under `dir`.
  */
-export function sessionSweepRoots(env = process.env) {
+function sessionSweepRoots(env = process.env) {
   const home = env.USERPROFILE || env.HOME || os.homedir();
   const roots = [];
   const seen = new Set();

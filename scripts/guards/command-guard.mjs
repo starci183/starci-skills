@@ -161,7 +161,7 @@ const SUB_CHANGE = {
 };
 
 /** Why `git <sub> <rest>` changes history, a ref or tracked work, or null when it only reads. */
-export function workflowHistoryChange(sub, rest) {
+function workflowHistoryChange(sub, rest) {
   const dd = rest.indexOf('--');
   const before = dd === -1 ? rest : rest.slice(0, dd);
   const options = before.filter((a) => a.startsWith('-'));
@@ -397,7 +397,7 @@ const unguardedHookVerdict = async (call, { env, deps, ctx }) => {
 };
 
 /** The hook's decision for one input: {verdict, guard} to refuse (guard null for an unguarded session), else null. */
-export async function hookDecision(input, { env = process.env, root = skillRoot, deps = null, bindings = null } = {}) {
+async function hookDecision(input, { env = process.env, root = skillRoot, deps = null, bindings = null } = {}) {
   const handle = env.ORCA_TERMINAL_HANDLE;
   const guard = bindings ? bindings.guard : boundGuard(handle, { root, env });
   let seat = null;

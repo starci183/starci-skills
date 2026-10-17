@@ -27,7 +27,7 @@ import { contractDispatchIdOf, jobPayloadOf, operationTerminalHandleOf, verbWork
 
 export const WORKER_QUESTION = 'worker-question';
 const ORCHESTRATION_MESSAGE = 'orchestration-message';
-export const ORCHESTRATION_DELIVERY = 'orchestration-delivery-bridged';
+const ORCHESTRATION_DELIVERY = 'orchestration-delivery-bridged';
 /** One drain acknowledges at most this many Deliveries (50 messages each); the next drain continues. */
 const MAX_DELIVERIES_PER_DRAIN = 40;
 const ANSWERABLE_MESSAGE_TYPES = new Set(['question', 'escalation']);

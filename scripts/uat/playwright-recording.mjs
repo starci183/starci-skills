@@ -82,7 +82,7 @@ export const recordingDirUnder = (root, now = new Date()) => path.join(root, `pl
  * /<job>/ for an op (the job its Orca terminal is bound to, scripts/guards/op-context.mjs), else the shared root. scripts/kernel/job-artifacts.mjs indexJobArtifacts reads the
  * job's folder at settle and indexes its video, trace.zip and screenshots as the job's proof.
  */
-export const RECORDINGS_ROOT_ENV = 'STARCI_UAT_RECORDINGS_ROOT';
+const RECORDINGS_ROOT_ENV = 'STARCI_UAT_RECORDINGS_ROOT';
 const recordingsBaseOf = (env = process.env) => env[RECORDINGS_ROOT_ENV] || path.join(tempRoot(), 'starci-uat-recordings');
 export const recordingsRootOf = (jobId, env = process.env) => path.join(recordingsBaseOf(env), String(jobId).replace(/[^a-z0-9._-]/gi, '_'));
 /** The default record directory of a run: the op's own folder when an op runs it, else the shared root. */

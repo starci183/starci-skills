@@ -59,7 +59,7 @@ function sourceFindings(doc, files) {
 }
 
 /** The findings over the tree at `root` (the tracked runtime sources). */
-export function checkInstalledArtefacts(root = skillRoot) {
+function checkInstalledArtefacts(root = skillRoot) {
   const doc = loadArtefacts(root);
   const tracked = gitOutputOf(lsFiles(['-z'], { dir: root, maxBuffer: 64 * 1024 * 1024 }), 'git ls-files -z').split('\0').filter((rel) => SOURCE.test(rel));
   const files = {};

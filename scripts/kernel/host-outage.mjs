@@ -29,7 +29,7 @@ const envMs = (name, key) => {
   return Number.isFinite(value) && value >= 0 ? value : declared;
 };
 // How long one watchdog tick waits for an unavailable Orca to answer again.
-export const HOST_WAIT_MS = envMs('STARCI_HOST_WAIT_MS', 'hostOutage.waitMs');
+const HOST_WAIT_MS = envMs('STARCI_HOST_WAIT_MS', 'hostOutage.waitMs');
 // A responding Orca that calls the kernel dead is asked again after this long:
 // an Orca app that just restarted re-attaches its panes to the daemon.
 export const DEATH_SETTLE_MS = envMs('STARCI_KERNEL_DEATH_SETTLE_MS', 'hostOutage.deathSettleMs');

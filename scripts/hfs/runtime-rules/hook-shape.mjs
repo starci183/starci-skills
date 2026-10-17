@@ -26,7 +26,7 @@ const PRE_PUSH_MARKERS = ['starci-release', 'refs/backup/', 'v[0-9]', 'RIGHTS_PU
 const finding = (file, message) => ({ code: CODE, level: 'error', path: file, message: `${CODE} ${file}: ${message}` });
 
 /** The RT_HOOK_SHAPE findings of one hook template: `name` is 'pre-commit' or 'pre-push', `text` its content. */
-export function fileHookShapeFindings({ path: file, name, text }) {
+function fileHookShapeFindings({ path: file, name, text }) {
   const body = shellCommandSource(text);
   const found = [];
   const forbidden = name === 'pre-commit' ? PRE_COMMIT_FORBIDDEN : PRE_PUSH_FORBIDDEN;

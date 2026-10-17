@@ -257,7 +257,7 @@ export function canonConformancePolicy(brief = readModuleJson('modules', 'ops', 
  * target), the owner folder it moves from (`home`) and the destinations it may land in - `<src>/<dest>/<Owner>`,
  * the owner being the folder (or file stem) one level below the role's misplaced tier.
  */
-export function relocationOf(finding, relocations) {
+function relocationOf(finding, relocations) {
   const rule = relocations?.[finding?.ruleId];
   if (!rule) return null;
   const moving = String((rule.moves === 'related' ? finding.related : finding.file) ?? '');
@@ -286,7 +286,7 @@ export function relocationOf(finding, relocations) {
  * locations; no other change", enqueued --after every slice of the wave. A wave that moves code gets the wire even
  * without a shared-root file.
  */
-export const REPOINT_BRIEF = 'repoint imports to the new locations; no other change';
+const REPOINT_BRIEF = 'repoint imports to the new locations; no other change';
 /** The findings' relocation grants: a destination no sibling holds is granted, a held one moves to the wave's wire. */
 const grantSlices = ({ slices, findings, relocations, holderOf, wireOf }) => {
   for (const finding of findings) {

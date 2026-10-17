@@ -9,7 +9,7 @@ const runtimeRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '
 
 // Every entry is an existing read-only route. Mutation-capable supervisor and
 // kernel scripts are exposed only with a fixed status argument.
-export const INSPECTORS = Object.freeze({
+const INSPECTORS = Object.freeze({
   'orca-status': { script: 'scripts/api/orca/status.mjs', args: [] },
   'runtime-status': { script: 'scripts/cli/lib/runtime-status.mjs', args: [] },
   'supervisor-status': { script: 'scripts/supervisor/start-supervisor.mjs', args: ['--status'] },

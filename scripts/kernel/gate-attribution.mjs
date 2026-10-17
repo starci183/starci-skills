@@ -60,7 +60,7 @@ const LOG_DEPTH = 200;
 const POSITION = /(?:\(\d+,\d+\)|:\d+(?::\d+)?)$/;
 
 /** A failing file as the gate printed it, repo-relative with forward slashes; null when unusable. */
-export function failingPath(value, repo) {
+function failingPath(value, repo) {
   if (typeof value !== 'string' || !value.trim()) return null;
   let file = value.trim().replaceAll('\\', '/').replace(POSITION, '');
   if (path.isAbsolute(file) && repo) file = path.relative(repo, file).replaceAll('\\', '/');

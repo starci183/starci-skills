@@ -56,7 +56,7 @@ const archetypesOf = (direction) => (direction.archetypes && typeof direction.ar
 const goldenOf = (direction, name) => (Array.isArray(direction.golden) ? direction.golden : []).filter((g) => g?.archetype === name);
 
 /** What the direction holds and which archetypes interface.draw may draw from. */
-export function directionStatus(work) {
+function directionStatus(work) {
   const { direction } = loadDirection(work);
   const archetypes = Object.fromEntries(Object.entries(archetypesOf(direction)).map(([name, a]) => [name, a?.status ?? null]));
   const ready = Object.entries(archetypes).filter(([, status]) => status === 'accepted').map(([name]) => name);
@@ -80,7 +80,7 @@ function reviewedGolden(loaded, name) {
  * The brand-direction-review ask for one archetype: {kind, text, options, refs, assets, review}. It carries no
  * recommended option and carries question.review, so it is never answered automatically.
  */
-export function directionReviewQuestion(work, { archetype, lang = ownerLanguage() } = {}) {
+function directionReviewQuestion(work, { archetype, lang = ownerLanguage() } = {}) {
   const loaded = loadDirection(work);
   const { direction, repoRoot } = loaded;
   if (!DIRECTION_ARCHETYPES.includes(archetype)) throw new Error(`--archetype must be one of ${DIRECTION_ARCHETYPES.join(', ')}`);
@@ -231,7 +231,7 @@ function reviewedGoldenProblems(loaded, review, archetype, phrase) {
   return [...current].filter(([png, sha]) => seen.get(png) !== sha).map(([png]) => `${png} ${phrase}`);
 }
 
-export function applyDirectionReview(work, receiptFile, { write = false } = {}) {
+function applyDirectionReview(work, receiptFile, { write = false } = {}) {
   const loaded = loadDirection(work);
   const { direction, repoRoot, record, file } = loaded;
   const { receipt, receiptRel } = readAnswerReceipt(receiptFile, { repoRoot, schema: OWNER_ANSWER_SCHEMA });

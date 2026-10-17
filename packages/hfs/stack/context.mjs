@@ -1,5 +1,5 @@
 // context.mjs - the seams every stack module runs through: spawning tools, sleeping, the clock and the output.
-// Production uses the real implementations; the specs inject fakes (tests/helpers/stack-fakes.mjs).
+// Production uses the real implementations; a spec injects fakes.
 import { spawnSync } from 'node:child_process';
 import { defaultSops } from '../runtime/scripts/hfs/secret-sops.mjs';
 

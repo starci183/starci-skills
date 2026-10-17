@@ -16,7 +16,7 @@ import { isMain } from '../lib/is-main.mjs';
 
 
 /** Every sha a `land-passed` event (machine.sqlite sup_events) moved main to, oldest first. `m` is a machine handle. */
-export function gateLandedShas(m) {
+function gateLandedShas(m) {
   // land.mjs records every gate run as a land_runs row; a passed run's landed_sha is the main it produced.
   return m.db.prepare("SELECT landed_sha FROM land_runs WHERE result='passed' AND landed_sha IS NOT NULL ORDER BY run_id").all()
     .map((r) => r.landed_sha).filter((s) => typeof s === 'string' && s.trim());

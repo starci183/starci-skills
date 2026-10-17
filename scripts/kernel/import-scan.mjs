@@ -205,7 +205,7 @@ function resolveSpecifier(fromFile, spec, { scopes, exists, isDir }) {
 }
 
 /** The `*` capture of a tsconfig paths pattern against a specifier, '' for an exact pattern, null for no match. */
-export function matchAlias(pattern, spec) {
+function matchAlias(pattern, spec) {
   const star = pattern.indexOf('*');
   if (star < 0) return pattern === spec ? '' : null;
   const pre = pattern.slice(0, star), post = pattern.slice(star + 1);

@@ -9,7 +9,7 @@ import { getBlob } from '../../engine/db/blob.mjs';
 const decode = (bytes, maxBytes) => Buffer.from(bytes).subarray(0, maxBytes).toString('utf8');
 
 /** The hits of one stored text: [{artifact, kind, rule, count}]. Pure; no matched text. */
-export function scanText({ artifact, kind, text }) {
+function scanText({ artifact, kind, text }) {
   return survivingSecrets(text).map(({ rule, count }) => ({ artifact, kind, rule, count }));
 }
 

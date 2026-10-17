@@ -7,7 +7,7 @@ import { openWorkerHandles } from './workers.mjs';
 import { jobTerminalHandles, ledgerJobs, kernelSignalRows, pathUnder, WORKER_HOLDING_STATUSES } from '../machine/terminal-ledger.mjs';
 
 export const SCHEMA = 'starci/orca-tree-check@1';
-export const FINDING_CODES = ['DUPLICATE_KERNEL', 'ORPHAN_TERMINAL', 'STRAY_TERMINAL', 'DEAD_KERNEL', 'TITLE_DRIFT', 'TASK_OUTSIDE_RUN'];
+const FINDING_CODES = ['DUPLICATE_KERNEL', 'ORPHAN_TERMINAL', 'STRAY_TERMINAL', 'DEAD_KERNEL', 'TITLE_DRIFT', 'TASK_OUTSIDE_RUN'];
 
 
 
@@ -84,7 +84,7 @@ function projectLedger(db) {
 }
 
 /** The terminals the open [Worker] jobs own (machine.sqlite sup_jobs; empty when there is no store yet). */
-export const supervisorWorkerHandles = supervisorRead((m) => new Set([...openWorkerHandles(m), ...supervisedSeatHandles(m)]), () => new Set());
+const supervisorWorkerHandles = supervisorRead((m) => new Set([...openWorkerHandles(m), ...supervisedSeatHandles(m)]), () => new Set());
 
 /** Every finding the ledger and the listing disagree on, in code order. */
 // The owner reads the Orca sidebar: every live terminal in a project must be

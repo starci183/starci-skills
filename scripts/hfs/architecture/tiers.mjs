@@ -67,7 +67,7 @@ function finishFrame(state, frame) {
   if (state.low.get(frame.node) === state.index.get(frame.node)) closeComponent(state, frame);
 }
 
-export function stronglyConnected(adjacency) {
+function stronglyConnected(adjacency) {
   const state = { counter: 0, index: new Map(), low: new Map(), onStack: new Set(), stack: [], result: [], work: [] };
   for (const start of adjacency.keys()) {
     if (state.index.has(start)) continue;

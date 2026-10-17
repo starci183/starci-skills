@@ -50,7 +50,7 @@ export const DRAW_ASSET_NOT_TOKEN_RENDERED = 'DRAW_ASSET_NOT_TOKEN_RENDERED';
 export const DRAW_NOT_SHAPES = 'DRAW_NOT_SHAPES';
 export const DRAW_NOT_REDRAWN = 'DRAW_NOT_REDRAWN';
 export { DATA_STATUS_DRAWN };
-export const RENDER_RECORD_SCHEMA = 'starci/draw-render@1';
+const RENDER_RECORD_SCHEMA = 'starci/draw-render@1';
 const IMAGEGEN_ASSERTION = 'imagegen-provenance';
 /** The `retired` reason of a drawing image_gen.imagegen painted before token rendering (work-ui-screen.schema.yaml). */
 const RETIRED_IMAGE_GEN = 'image-gen';

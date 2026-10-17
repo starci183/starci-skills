@@ -69,7 +69,7 @@ export function gateBaseAt(ctx, dir) {
  * record that lost its checkpoint pointer (a tree put back by the custody repair) must not fall back to the merge-base with main: that would put the base of
  * every settled op's gate, and the target of a reset, behind the work those ops committed.
  */
-export function chainCheckpointOf(rec) {
+function chainCheckpointOf(rec) {
   const r = gitLog(['--first-parent', '--format=%H%x09%s', '-n', '256', 'HEAD'], { cwd: rec.path, timeout: 30_000 });
   if (r.status !== 0) return null;
   const prefix = `checkpoint ${rec.workflowId}:`;

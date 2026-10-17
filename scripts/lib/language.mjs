@@ -76,7 +76,7 @@ const I18N_CATALOG_DIR = 'modules/i18n/messages/';
 const OP_MANIFEST_VIETNAMESE_FIELDS = Object.freeze({ fields: Object.freeze(['vi']) });
 const OP_MANIFEST_DIR = 'modules/ops/ops/';
 /** The declared Vietnamese fields of `rel`: its own entry, or the op-manifest text field for a manifest of modules/ops/ops. */
-export const declaredVietnameseFieldsOf = (rel) => DECLARED_VIETNAMESE_FIELDS[rel]
+const declaredVietnameseFieldsOf = (rel) => DECLARED_VIETNAMESE_FIELDS[rel]
   ?? (rel.startsWith(I18N_CATALOG_DIR) && !rel.slice(I18N_CATALOG_DIR.length).includes('/') && /\.ya?ml$/.test(rel) ? I18N_CATALOG_VIETNAMESE_FIELDS : null)
   ?? (rel.startsWith(OP_MANIFEST_DIR) && !rel.slice(OP_MANIFEST_DIR.length).includes('/') && /\.ya?ml$/.test(rel) ? OP_MANIFEST_VIETNAMESE_FIELDS : null);
 

@@ -40,7 +40,7 @@ const SEGMENT = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 const pairsOf = (v) => (Array.isArray(v) ? v.filter((p) => Array.isArray(p) && p.length === 2) : []);
 
 /** The id prefixes of a manifest: naming.prefixes of an app manifest, profiles of a runtime manifest. */
-export function prefixesOf(doc) {
+function prefixesOf(doc) {
   if (Array.isArray(doc?.naming?.prefixes) && doc.naming.prefixes.length) return doc.naming.prefixes.map(String);
   if (Array.isArray(doc?.profiles) && doc.profiles.length) return doc.profiles.map(String);
   return [];
@@ -73,7 +73,7 @@ const slotFinding = (file, slot, { ids, prefixes, families, appKinds }, push) =>
 };
 
 /** The slot-id shape findings of one parsed manifest {file, doc}. */
-export function slotIdFindings({ file, doc }) {
+function slotIdFindings({ file, doc }) {
   const findings = [];
   const push = (path, message) => findings.push({ code: CODE, path, message });
   const slots = Array.isArray(doc?.slots) ? doc.slots : [];
@@ -108,7 +108,7 @@ const profileSuffixFindings = (file, doc, profile, rp, push) => {
 };
 
 /** The suffix-vocabulary findings of one parsed manifest {file, doc}: disjoint lists, refused pairs, live exceptions. */
-export function suffixFindings({ file, doc }) {
+function suffixFindings({ file, doc }) {
   const findings = [];
   const push = (message) => findings.push({ code: CODE, path: file, message });
   for (const [profile, rp] of Object.entries(doc?.ruleParams ?? {})) {
@@ -119,7 +119,7 @@ export function suffixFindings({ file, doc }) {
 }
 
 /** Run SLOT_ID_SHAPE on the manifests under `root`. */
-export function checkSlotIdShape(root = skillRoot) {
+function checkSlotIdShape(root = skillRoot) {
   const findings = [];
   for (const rel of MANIFESTS) {
     const doc = parseYaml(fs.readFileSync(path.join(root, rel), 'utf8'));

@@ -66,7 +66,7 @@ export const workflows = (db, wanted = new Set()) =>
 // Filter in SQL, never after a LIMIT: a cycle that saw more than a page of
 // reports would otherwise drop the oldest of them and skip past their ids
 // forever.
-export const reportsSince = (db, sinceId, wanted = new Set()) =>
+const reportsSince = (db, sinceId, wanted = new Set()) =>
   db.prepare(`SELECT r.report_id,r.workflow_id,a.op_id,a.try_no AS attempt,r.outcome,r.created_at
     FROM reports r JOIN op_attempts a ON a.attempt_id=r.attempt_id WHERE r.report_id > ? ORDER BY r.report_id`)
     .all(sinceId)
@@ -361,7 +361,7 @@ const main = () => {
 };
 
 /** Run async `run` every `intervalMs` after the previous run finished, so two cycles never overlap. Returns stop(). */
-export function runEvery(run, intervalMs) {
+function runEvery(run, intervalMs) {
   let timer = null;
   let stopped = false;
   const next = () => { if (!stopped) timer = setTimeout(() => Promise.resolve().then(run).finally(next), intervalMs); };

@@ -51,9 +51,9 @@ const defaultDeciderOf = (kind) => (SUPERVISOR_KINDS.includes(kind) ? 'superviso
 /** Kinds the Supervisor may claim from a Kernel without an escalation (DESIGN §11.3 rule 1). */
 const CROSS_WORKFLOW_KINDS = Object.freeze(['cross-workflow', 'deadlock']);
 export const LIVE = Object.freeze(['open', 'claimed', 'escalated']);
-export const CLAIM_TTL_MS = 15 * 60_000;
-export const DEFAULT_DUE_MS = Object.freeze({ kernel: 30 * 60_000, supervisor: 60 * 60_000, owner: 24 * 3_600_000 });
-export const RING_MIN_GAP_MS = 2 * 60_000;
+const CLAIM_TTL_MS = 15 * 60_000;
+const DEFAULT_DUE_MS = Object.freeze({ kernel: 30 * 60_000, supervisor: 60 * 60_000, owner: 24 * 3_600_000 });
+const RING_MIN_GAP_MS = 2 * 60_000;
 const RING_TAG = '[decide]';
 const PASS_THROUGH = ['productLedger', 'productWorkflowId', 'code', 'escalatedFrom'];
 
@@ -116,7 +116,7 @@ export function listDecisions(db, { workflowId, all = false, decider = null, now
     .filter((d) => (all || LIVE.includes(d.status)) && (!decider || d.decider === decider)).sort(byUrgency);
 }
 
-export function getDecision(db, id, { now = Date.now() } = {}) {
+function getDecision(db, id, { now = Date.now() } = {}) {
   const r = db.prepare('SELECT * FROM decision_items WHERE di_id=?').get(id);
   return r ? effective(rowToDi(r), now) : null;
 }
@@ -306,7 +306,7 @@ export function escalateDecision(ledger, id, { to = 'supervisor', by = 'unknown'
 /* ------------------------------------------------------------ decisions first (an api guard, not a prompt rule) */
 
 /** A Kernel DI blocks new work once it is this old, open and unclaimed (coordinator 2026-09-28, fe-canon). */
-export const BLOCK_AGE_MS = 2 * 60_000;
+const BLOCK_AGE_MS = 2 * 60_000;
 const DECISIONS_FIRST = 'decisions-first';
 /** The env mark apiRun (kernel-authority.mjs) sets on its children: graph-edit / redesign resolve DIs through them. */
 export const CHILD_ENV = 'STARCI_API_CHILD';
@@ -455,7 +455,7 @@ const RING_SCOPE = 'decision-doorbell';
  * The ring plan for one seat, pure: {ring: false, reason} or {ring: true, text}. `last` is the previous ring
  * {at, text, count} (rung ones only). Never within RING_MIN_GAP_MS, never the same text twice in a row.
  */
-export function planRing({ open, workflowId, last = null, now = Date.now(), minGapMs = RING_MIN_GAP_MS, textOf = doorbellText }) {
+function planRing({ open, workflowId, last = null, now = Date.now(), minGapMs = RING_MIN_GAP_MS, textOf = doorbellText }) {
   if (!open) return { ring: false, reason: 'nothing-open' };
   if (last?.at && now - last.at < minGapMs) return { ring: false, reason: 'rate-limited', nextAt: last.at + minGapMs };
   let text = textOf(open, workflowId);
@@ -604,7 +604,7 @@ const liveSupOrRefuse = (m, id, now) => {
 
 /** Open a Supervisor DI in machine.sqlite (sup_decision_items). Returns {di, created, existing, superseded}. */
 const openSupervisorDecision = (spec, { env = process.env, now = Date.now() } = {}) => withSup((m) => openSupDecisionRow(m, spec, { now }), { env, now });
-export const listSupervisorDecisions = ({ env = process.env, all = false, now = Date.now() } = {}) => withSup((m) => supervisorDecisions(m, { all, now }), { env, now });
+const listSupervisorDecisions = ({ env = process.env, all = false, now = Date.now() } = {}) => withSup((m) => supervisorDecisions(m, { all, now }), { env, now });
 const claimSupervisorDecision = (id, { by, env = process.env, now = Date.now() } = {}) => withSup((m) => {
   if (!String(by ?? '').trim()) throw refuse('--claim needs --by <actor>', 'decision-incomplete');
   return m.transaction(() => {
@@ -666,7 +666,7 @@ export async function ringSupervisor({ env = process.env, wake = null, now = Dat
  * What escalateDue does to one Kernel DI now, pure: null, {step: 'remind'} (past dueAt, first time) or
  * {step: 'supervisor'} (past openedAt + 2 x (dueAt - openedAt), still the Kernel's).
  */
-export function dueStep(di, now = Date.now()) {
+function dueStep(di, now = Date.now()) {
   if (di.decider !== 'kernel' || di.status !== 'open' || di.kind === 'supervisor-ruling' || !Number.isFinite(di.dueAt)) return null;
   const span = Math.max(1, di.dueAt - (di.openedAt ?? di.dueAt));
   if (now >= di.dueAt + span) return { step: 'supervisor' };

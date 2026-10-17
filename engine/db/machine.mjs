@@ -75,11 +75,11 @@ export { LOCAL_ROOT_ENV, starciLocalRoot } from '../runtime-root.mjs';
 /** <local root>/projects: one directory per ledger (decision Q1). */
 export const localProjectsRoot = (env = process.env) => path.join(starciLocalRoot(env), 'projects');
 /** The runtime.sqlite of one ledger (decision Q1): <runtime root>/.runtime/projects/<ledger_id>/runtime.sqlite. */
-export const projectLedgerFile = (ledgerId, env = process.env) => {
+const projectLedgerFile = (ledgerId, env = process.env) => {
   if (!/^[A-Za-z0-9-]{8,64}$/.test(String(ledgerId ?? ''))) throw new Error(`projectLedgerFile needs a ledger id, got ${ledgerId}`);
   return path.join(localProjectsRoot(env), String(ledgerId), 'runtime.sqlite');
 };
-/** The explicit test registry: a machine.sqlite that replaces the host's for this process tree (tests/setup/isolated-registry.mjs). */
+/** The explicit test registry: a machine.sqlite that replaces the host's for this process tree (e2e/setup/isolated-registry.mjs). */
 export const TEST_REGISTRY_ENV = 'STARCI_TEST_MACHINE_FILE';
 const normDir = (file) => pathKey(file, { fold: true });
 const tempDirsOf = (env = process.env) => [...new Set([os.tmpdir(), tempRoot({ env }), env.TEMP, env.TMP].filter(Boolean)
@@ -333,7 +333,7 @@ function ledgerMetaOf(file) {
   } catch { return {}; } finally { try { db?.close(); } catch { /* closed */ } }
 }
 const repoKey = (root) => path.resolve(String(root)).replaceAll('\\', '/').replace(/^[a-z]:/, (d) => d.toUpperCase());
-export const repoKeyOf = repoKey;
+const repoKeyOf = repoKey;
 // The live registry also refuses a repository under the OS temp directory (a repro or test run outside the isolated
 // registry would leave a junk workflow in the harness UI): typed refusal, nothing written.
 const tempRepoRefusal = (m, ledgerId, root) => (m.live && root && isUnderTempDir(String(root), { env: m.env, tempDirs: m.tempDirs })
@@ -1284,7 +1284,7 @@ const API = {
 };
 
 /** Every typed function at module level too: fn(handle, ...args) — blob-gc and callers holding a handle. */
-export { putMachineBlob, meta, checkpoint, registerLedger, resolveLedger, listLedgers, setLedgerState, upsertRepository, forEachLedger, attachLedgers, supEvent, supEvents, newestSupEvent, upsertSupJob, setSupJobStatus, supJob, listSupJobs, acquireSupLeases, releaseSupLeases, supLeases, startSupAttempt, updateSupAttempt, latestSupAttempt, recordSupReport, supReports, consumeSupReport, openSupDecision, setSupDecision, markSupDecisionDelivered, listSupDecisions, ackOwed, upsertLearning, recordSupMessage, supMessages, setSupSignal, supSignal, recordMachineLlmUsage, startProcessRun, heartbeatProcessRun, endProcessRun, openProcessRuns, leaderOf, acquireLeader, renewLeader, releaseLeader, leaderHistory, cursorOf, setCursor, cursors, enqueue, requeue, ensureSchedule, claimSchedule, finishSchedule, schedules, actionIntent, actionRunning, actionFinish, actionOf, actions, controllerModes, setControllerMode, modeChanges, openSlaEpisode, markSlaViolated, markSlaReported, clearSla, openSla, recordViolation, setService, recordProbe, services, serviceEvents, upsertSeat, seatOf, seats, recordDelivery, recordSeatInput, seatTranscriptSnapshot, upsertTerminal, closeTerminal, acquireHostLock, renewHostLock, releaseHostLock, hostLock, claimResource, releaseClaim, throttleState, setThrottle, recordThrottleDecision, releaseThrottleDecision, recordHostSample, hostSamples, setProviderHealth, providerHealth, poolBackoff, setPoolBackoff, clearPoolBackoff, setQuota, quotas, setBudget, budgets, startGcRun, finishGcRun, recordGcItem, gcRuns, upsertLane, laneOf, lanes, enqueueLand, claimLandGate, finishLandTicket, landQueue, recordLandRun, recordLandOutcome, landRuns, recordPush, pushes, flushOutbox, removedWorktree, reserveWorktree, liveWorktrees, worktreeRow, worktreeRepos, dropWorktree, worktreeGcStop, setWorktreeGcStop, gcCursor, setGcCursor, upsertEnvServer, envServer, envServers, upsertUatSlot, uatSlots, releaseUatSlot, connectorOf, upsertAsk, log, logs, recordMetrics };
+export { putMachineBlob, meta, checkpoint, registerLedger, resolveLedger, listLedgers, setLedgerState, upsertRepository, forEachLedger, attachLedgers, supEvent, supEvents, newestSupEvent, upsertSupJob, setSupJobStatus, supJob, listSupJobs, acquireSupLeases, releaseSupLeases, startSupAttempt, updateSupAttempt, latestSupAttempt, recordSupReport, supReports, consumeSupReport, openSupDecision, setSupDecision, markSupDecisionDelivered, listSupDecisions, ackOwed, upsertLearning, recordSupMessage, supMessages, setSupSignal, supSignal, recordMachineLlmUsage, startProcessRun, heartbeatProcessRun, endProcessRun, openProcessRuns, leaderOf, acquireLeader, renewLeader, releaseLeader, cursorOf, setCursor, cursors, enqueue, requeue, ensureSchedule, claimSchedule, finishSchedule, schedules, actionIntent, actionRunning, actionFinish, actionOf, actions, controllerModes, setControllerMode, openSlaEpisode, markSlaViolated, markSlaReported, clearSla, recordViolation, setService, recordProbe, services, upsertSeat, seatOf, seats, recordDelivery, recordSeatInput, seatTranscriptSnapshot, upsertTerminal, closeTerminal, acquireHostLock, renewHostLock, releaseHostLock, hostLock, claimResource, releaseClaim, throttleState, setThrottle, recordThrottleDecision, releaseThrottleDecision, recordHostSample, setProviderHealth, providerHealth, poolBackoff, setPoolBackoff, clearPoolBackoff, setQuota, quotas, setBudget, budgets, startGcRun, finishGcRun, recordGcItem, gcRuns, upsertLane, laneOf, lanes, enqueueLand, claimLandGate, finishLandTicket, landQueue, recordLandRun, recordLandOutcome, landRuns, recordPush, pushes, flushOutbox, removedWorktree, reserveWorktree, liveWorktrees, worktreeRow, worktreeRepos, dropWorktree, worktreeGcStop, setWorktreeGcStop, gcCursor, setGcCursor, upsertEnvServer, envServer, envServers, upsertUatSlot, releaseUatSlot, connectorOf, upsertAsk, log, logs, recordMetrics };
 export { reserveProvider, providerReservations, providerReservationUsage, markProviderReservation, releaseProviderReservation };
 
 /** Best-effort machine log line from anywhere (never throws): opens, appends, closes. */

@@ -23,7 +23,7 @@ export const REGISTRY_FILE = 'modules/schemas/storage-convention.yaml';
 const TEXTUAL = /TEXT|BLOB|JSON|CLOB|CHAR|^$/i;
 
 /** The text columns of one open store: {table: [column]}; the full-text shadow tables and virtual tables are the engine's, not rows. */
-export function textColumnsOf(db) {
+function textColumnsOf(db) {
   const out = {};
   const tables = db.prepare("SELECT name, sql FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '%fts%' ORDER BY name").all();
   for (const table of tables) {
@@ -56,7 +56,7 @@ export function storageFindings({ declared, classes, migrations = [] }, actual) 
 }
 
 /** Run the check on the runtime at `root`: fresh stores in a temp directory, read-only introspection. */
-export function checkStorageConvention(root = skillRoot) {
+function checkStorageConvention(root = skillRoot) {
   const registry = parseYaml(fs.readFileSync(path.join(root, REGISTRY_FILE), 'utf8'));
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-storage-convention-'));
   let ledger = null;

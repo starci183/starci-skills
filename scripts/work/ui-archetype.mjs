@@ -22,7 +22,7 @@
 // owner's receipt ({ready: true, provisional: true}). It never becomes `accepted`, never golden, and the owner's
 // brand-direction-review ask still stands for the handover. Measured 2026-09-27: every product-repo draw of a
 // list/detail surface waited on a proposed archetype the owner had not answered (prerequisite-unmet, awaiting-owner).
-import { DIRECTION_ARCHETYPES, checkDirection, defaultGrammarRoot, readBrandRecord } from './brand/brand.mjs';
+import { checkDirection, defaultGrammarRoot, readBrandRecord } from './brand/brand.mjs';
 import { allocationSettings } from '../../engine/config.mjs';
 import { altOf } from '../lib/source-phrases.mjs';
 
@@ -38,8 +38,6 @@ export function autopilotOn({ workflowId = null, settings = null } = {}) {
   return typeof own === 'boolean' ? own : a.enabled === true;
 }
 
-/** The page archetypes brand.direction settles, plus `layout` (a surface-layout record, which owes none). */
-export const ARCHETYPES = Object.freeze([...DIRECTION_ARCHETYPES, 'layout']);
 /** Archetypes that owe no brand.direction archetype: a layout record draws brand.decide's chrome. */
 export const DIRECTION_EXEMPT = Object.freeze(['layout']);
 

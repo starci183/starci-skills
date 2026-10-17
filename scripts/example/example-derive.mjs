@@ -343,7 +343,7 @@ function deriveFrontier(derivedRecords, records, canon) {
 /** The plain JS structure written to `_derived/index.yaml` - built from `computeDerived`'s output with every
  * collection already in its final deterministic order, so `stringifyYaml` need not (and does not) reorder
  * anything itself. */
-export function buildYamlDocument(derived) {
+function buildYamlDocument(derived) {
   const recordIds = [...derived.records.keys()].sort(byCodeUnit);
   const records = {};
   for (const id of recordIds) {

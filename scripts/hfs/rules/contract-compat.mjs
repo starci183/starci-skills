@@ -14,7 +14,7 @@ import { isPlainObject } from '../../../engine/plain-object.mjs';
 import { found, readJson } from './read.mjs';
 import { byCodeUnit } from '../../lib/list.mjs';
 
-export const CONTRACT_BREAKING = 'BE_CONTRACT_BREAKING';
+const CONTRACT_BREAKING = 'BE_CONTRACT_BREAKING';
 
 const CONTRACTS = /^be\/contracts\/([^/]+)\/events\.pin\.json$/;
 

@@ -26,7 +26,7 @@ import { WORKER_STATES, workerStateOf } from './workflow-in-flight.mjs';
 import { workflowCustody, treeStateOf } from './workflow-custody.mjs';
 
 /** The typed machine cause of an attempt the runtime ends because its placement is lost. */
-export const PLACEMENT_LOST = 'placement-lost';
+const PLACEMENT_LOST = 'placement-lost';
 
 /** Every directory the attempt was admitted with: its attempt row, its contract context, its packet's tree and the gate binding's roots. */
 function admittedPlacementsOf(db, attemptId) {

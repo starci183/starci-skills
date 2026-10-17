@@ -19,7 +19,7 @@ import { readEnv } from '../lib/env.mjs';
 import { safeRemove } from '../api/fs/safe-remove.mjs';
 import { onInterrupt } from '../lib/interrupt-cleanup.mjs';
 
-export const HOST_LOCK_SCHEMA = 'starci/host-lock@1';
+const HOST_LOCK_SCHEMA = 'starci/host-lock@1';
 export const ROLES = Object.freeze(['release', 'coordinator', 'lead', 'worker']);
 const OWNERLESS_STALE_MS = 6 * 60 * 60 * 1000;
 const OWNER_FILE = 'owner';

@@ -27,7 +27,7 @@ const marked = (line) => line.includes(MARKER);
 const commandNameOf = (occurrence) => occurrence.text.trim().split(' ').slice(0, 2).join(' ');
 
 /** The RT_PROSE_COMMAND_UNKNOWN findings over {rel: text}: [{code, path, line, message}]. */
-export function proseCommandFindings(files, table = commandCatalogOf(loadCatalog())) {
+function proseCommandFindings(files, table = commandCatalogOf(loadCatalog())) {
   const findings = [];
   for (const [rel, text] of Object.entries(files)) {
     if (!SURFACE.test(rel) || EXEMPT.test(rel) || isHistoryPath(rel)) continue;
@@ -41,7 +41,7 @@ export function proseCommandFindings(files, table = commandCatalogOf(loadCatalog
 }
 
 /** Run the scan on the working tree at `root`. */
-export const checkProseCommands = (root = skillRoot) => proseCommandFindings(
+const checkProseCommands = (root = skillRoot) => proseCommandFindings(
   workingTreeTexts(root, lsFiles, (rel) => SURFACE.test(rel) && !EXEMPT.test(rel)), commandCatalogOf(loadCatalog(root)));
 
 if (isMain(import.meta.url)) process.exit(printFindings(checkProseCommands(), 'OK: every command an instruction shows is in the CLI catalog.'));

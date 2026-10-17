@@ -97,7 +97,7 @@ const unquote = (raw) => {
   return q ? { value: q[2], quoted: true } : { value: trimTrailing(withoutTrailingComment(v), ',;'), quoted: false };
 };
 /** True when `value` is a literal credential for a key of `kind` (a reference, a stand-in and an empty value are not). */
-export function isLiteralCredential(value, kind, { quoted = false } = {}) {
+function isLiteralCredential(value, kind, { quoted = false } = {}) {
   const v = String(value).trim();
   if (!v || /^(?:~|null|true|false|\[\]|\{\}|\|[+-]?|>[+-]?)$/i.test(v)) return false;
   if (REFERENCE.test(v) || STANDIN.test(v)) return false;
@@ -112,7 +112,7 @@ const PAIR = new RegExp([String.raw`(?<![\w.-])`, `(["']?)`, String.raw`([A-Za-z
 const isAccountsFile = (rel, text) => /(^|\/)accounts\.ya?ml$/i.test(rel) || /schema:\s*work\/disposable-accounts@/.test(text);
 
 /** The secret findings of one text file: [{code, file, line, detail}]. The value itself never appears in a finding. */
-export function scanSecrets(rel, text) {
+function scanSecrets(rel, text) {
   const file = slashed(rel);
   if (ENCRYPTED.test(file)) return []; // encrypted custody is where a secret belongs
   const findings = [];
@@ -170,7 +170,7 @@ const stagedGitEnv = (root) => {
  * `files` are repo-relative or absolute paths (deleted ones are skipped by the caller); `read(rel)` returns a file's text
  * (default: the working tree; the hook passes the index blob). Only .starciwork/ and .starcistacks/ files count.
  */
-export function checkWorkFiles({ repo, files, read = null, strict = true } = {}) {
+function checkWorkFiles({ repo, files, read = null, strict = true } = {}) {
   const root = path.resolve(repo ?? '.');
   const rels = [...new Set((files ?? []).map((f) => (path.isAbsolute(f) ? relTo(root, f) : slashed(f))).filter((f) => f && !f.startsWith('..') && inSecretScope(f)))].sort(byCodeUnit);
   const reader = read ?? ((rel) => { try { return fs.readFileSync(path.join(root, rel), 'utf8'); } catch { return null; } });

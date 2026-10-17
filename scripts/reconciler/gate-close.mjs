@@ -22,7 +22,7 @@ export function closeResolvedGateDis(m, dis, { readLedgers, openGates }) {
  * Resolve on the machine writer `m` the older items of a gate that has a newer one (the runtime re-offers an open runtime-defect gate under each new
  * revision): the Supervisor answers one item per gate, never the same gate twice. Returns the ids closed.
  */
-export function closeSupersededGateDis(m, dis) {
+function closeSupersededGateDis(m, dis) {
   const live = dis.filter((di) => ['open', 'claimed', 'escalated'].includes(di.status) && di.refs?.gateIncident);
   const newest = new Map();
   for (const di of live) {

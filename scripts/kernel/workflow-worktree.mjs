@@ -44,7 +44,7 @@ import { reconcileAttemptPlacements } from './attempt-placement.mjs';
 
 const WORKFLOW_WORKTREE_KIND = 'workflow';
 /** The typed dispatch wait of an op whose side is busy in its workflow worktree (modules/kernel/failure-codes.yaml). */
-export const WORKFLOW_SIDE_BUSY = 'workflow-side-busy';
+const WORKFLOW_SIDE_BUSY = 'workflow-side-busy';
 const SIDES = Object.freeze(['be', 'fe']);
 /** The side of an op that writes only the workflow's Work records (app-relative .starciwork/...). */
 const WORK_SIDE = 'work';
@@ -86,7 +86,7 @@ export function workflowAppRepo(repo, { binding = undefined } = {}) {
  * Register a workflow worktree Orca created (a row keyed by its Orca id, kind workflow, uncapped: the slot is taken by
  * ensureWorkflowWorktree before the creation). {workflowId, orcaWorktreeId, path, branch, checkpoint, repoRoot}
  */
-export function registerWorkflowWorktree(ctx, { workflowId, orcaWorktreeId, path: dir, branch, ledgerId = null, pending = null }) {
+function registerWorkflowWorktree(ctx, { workflowId, orcaWorktreeId, path: dir, branch, ledgerId = null, pending = null }) {
   const { env, git } = ctxOf(ctx);
   const bound = bindOrcaWorktree({ pending, repoRoot: mainRootOf(dir, { git }), kind: WORKFLOW_WORKTREE_KIND, orcaId: orcaWorktreeId, dir, branch: branch ?? null,
     owner: { workflowId, ledgerId }, env, git });

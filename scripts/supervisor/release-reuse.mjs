@@ -17,12 +17,12 @@ const LEDGER_SCHEMA = 'starci/l4-rows@1';
 const SHA = /^[0-9a-f]{40,64}$/;
 
 /** The declared reuse policy of release-cut.yaml. */
-export const reusePolicy = () => readModuleJson('modules', 'supervisor', 'release-cut.yaml').reuse;
+const reusePolicy = () => readModuleJson('modules', 'supervisor', 'release-cut.yaml').reuse;
 
 const underPrefix = (file, prefix) => file === prefix || file.startsWith(prefix.endsWith('/') ? prefix : `${prefix}/`);
 
 /** The class of a row: {kind: 'root'|'whole'|'app'|'always', app?}. A row nothing declares always runs. Pure. */
-export function rowClass(name, { apps = [], policy = reusePolicy() } = {}) {
+function rowClass(name, { apps = [], policy = reusePolicy() } = {}) {
   const declared = Object.entries(policy.classes).find(([, spec]) => (spec.rows ?? []).includes(name));
   if (declared && !policy.always.includes(name)) return { kind: declared[0] };
   const app = apps.find((candidate) => name.startsWith(`${candidate}: `));
@@ -52,14 +52,14 @@ function inputEntries(entries, cls, policy) {
 }
 
 /** The digest of one row at one commit: class, command and the input set's blob ids; null for a class that always runs. Pure. */
-export function rowDigest({ entries, cls, signature, policy = reusePolicy() }) {
+function rowDigest({ entries, cls, signature, policy = reusePolicy() }) {
   if (cls.kind === 'always' || !entries) return null;
   const lines = inputEntries(entries, cls, policy).map((entry) => `${entry.mode} ${entry.sha} ${entry.file}`).sort(byCodeUnit);
   return createHash('sha256').update([policy.digestVersion, cls.kind, cls.app ?? '', JSON.stringify(signature), ...lines].join('\n')).digest('hex');
 }
 
 /** The ledger directory file of `head`. */
-export const ledgerPath = ({ commonDir, head }) => proofFileOf({ commonDir, sha: head, kind: 'rows' });
+const ledgerPath = ({ commonDir, head }) => proofFileOf({ commonDir, sha: head, kind: 'rows' });
 
 /** Write the ledger of a cut: its green rows with their digests. {ok, file} or {ok: false, reason}; never throws. Keeps the newest `keep` ledgers. */
 export function writeLedger({ repo, head, tag, rows, digests, commonDir = null, now = () => new Date(), keep = reusePolicy().keep }) {

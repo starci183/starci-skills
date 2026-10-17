@@ -92,7 +92,6 @@ function vocabularyCodes(base = root) {
   return out;
 }
 
-const relOf = (file) => path.relative(root, file).split(path.sep).join('/');
 const lineOf = (text, index) => text.slice(0, index).split('\n').length;
 
 let typescript = null;
@@ -180,7 +179,7 @@ const fileEmittedCodes = (rel, text, { NOT_CODES, envNames, add }) => {
 };
 
 /** Every emitted code: {code, kind: 'upper'|'kebab', sites: [{file, line}]}. Sorted by code. */
-export function emittedCodes(base = root) {
+function emittedCodes(base = root) {
   const found = new Map();
   const add = (code, kind, file, line) => {
     const e = found.get(code) ?? { code, kind, sites: [] };
@@ -216,7 +215,7 @@ const entryProblems = (entry, ops) => {
 };
 
 /** The catalog problems: {missing[], stale[], malformed[]}. */
-export function catalogProblems(base = root) {
+function catalogProblems(base = root) {
   const catalog = readCatalog(base);
   const emitted = emittedCodes(base);
   const emittedSet = new Set(emitted.map((e) => e.code));

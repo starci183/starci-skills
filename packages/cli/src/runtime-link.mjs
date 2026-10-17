@@ -5,7 +5,7 @@ import process from 'node:process';
 import { pathToFileURL } from 'node:url';
 import { writeRuntimeShim } from './shim.mjs';
 
-export const RUNTIME_ROOT_FILES = Object.freeze([
+const RUNTIME_ROOT_FILES = Object.freeze([
   path.join('scripts', 'cli', 'main.mjs'),
   path.join('packages', 'cli', 'bin', 'starci.mjs'),
 ]);
@@ -28,7 +28,7 @@ const gitHookInstaller = async (root) => {
 };
 
 /** Find the nearest checkout or installed .claude runtime at or above cwd. */
-export function findRuntimeRoot({ cwd = process.cwd(), exists = existsSync } = {}) {
+function findRuntimeRoot({ cwd = process.cwd(), exists = existsSync } = {}) {
   let directory = path.resolve(cwd);
   for (;;) {
     for (const candidate of [directory, path.join(directory, '.claude')]) {

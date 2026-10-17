@@ -109,7 +109,7 @@ function plainText({ kind, critique, document }) {
 }
 
 /** The verb: argv -> {text, exitCode}. */
-export async function decisionCriticMain(argv, io = {}) {
+async function decisionCriticMain(argv, io = {}) {
   const kind = valueAfter(argv, '--kind'), root = valueAfter(argv, '--root'), out = valueAfter(argv, '--out');
   const workRoot = root ? workRootArg(root) : null;
   if (!kind || !workRoot || !out) return { text: `${usage}\n`, exitCode: 2 };

@@ -71,7 +71,7 @@ const ENV_ID = /^environment\.[a-z0-9-]+\.[a-z0-9-]+$/;
 /* ------------------------------------------------------------------------ probing */
 
 /** The first health endpoint an origin answers 2xx on, or null. */
-export async function discoverHealth(origin, { timeoutMs = 5000, candidates = HEALTH_CANDIDATES, skip = [] } = {}) {
+async function discoverHealth(origin, { timeoutMs = 5000, candidates = HEALTH_CANDIDATES, skip = [] } = {}) {
   let found = null;
   await findInOrder(candidates, async (candidate) => {
     const url = new URL(candidate.path, origin).toString();
@@ -108,7 +108,7 @@ const isoOf = (ms) => (ms != null ? new Date(ms).toISOString() : null);
 const recordOf = (row) => (row ? { env: row.env, service: row.service, port: row.port ?? null, url: row.url ?? null, command: commandOf(row.command), cwd: row.cwd ?? null,
   pid: row.pid ?? null, state: row.state, startedAt: isoOf(row.started_at), logSha: row.log_sha ?? null,
   log: serverLogFile(row.server_id) } : null);
-export function readRegistered(envId, service, env = process.env) {
+function readRegistered(envId, service, env = process.env) {
   return readMachine((m) => recordOf(m.envServer(serverIdOf(envId, service))), null, { env });
 }
 /** Write one registry row: {env, service, port, url, command, cwd, pid, state, startedAt?, repo?}. */
@@ -199,7 +199,7 @@ function environmentFile(repo, id) {
 }
 
 /** Environment ids a job's owned uat/e2e/integration record paths reference. */
-export function environmentIdsOfPaths(repo, paths) {
+function environmentIdsOfPaths(repo, paths) {
   if (isLiteWorkRoot(path.join(repo, WORK_DIR_NAME))) return [];
   const ids = new Set();
   for (const raw of paths ?? []) {
@@ -326,7 +326,7 @@ async function checkEnvironment(doc, { restart = false, roots = [], probeTimeout
 }
 
 /** Check every environment a request names. */
-export async function checkEnvironments({ repo, ids = [], paths = [], restart = false, probeTimeoutMs, readyTimeoutMs, env = process.env } = {}) {
+async function checkEnvironments({ repo, ids = [], paths = [], restart = false, probeTimeoutMs, readyTimeoutMs, env = process.env } = {}) {
   const wanted = [...new Set([...ids, ...environmentIdsOfPaths(repo, paths)])];
   const roots = workspaceRoots(repo);
   const environments = [], unresolved = [];
@@ -415,7 +415,7 @@ async function serveMain(args, env, emit) {
   return startServing({ args, repo, url, port, actions, env, emit, claim });
 }
 
-export async function envHealthMain(argv, { write = (s) => process.stdout.write(s), env = process.env } = {}) {
+async function envHealthMain(argv, { write = (s) => process.stdout.write(s), env = process.env } = {}) {
   const args = parseArgs(argv);
   const verb = args._[0];
   const emit = (value, code) => { write(`${JSON.stringify(value, null, args.json ? 0 : 2)}\n`); return code; };

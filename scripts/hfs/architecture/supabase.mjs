@@ -209,7 +209,7 @@ export function checkBackendSupabase(input) {
   };
 }
 
-export function checkJwtPolicy(input) {
+function checkJwtPolicy(input) {
   const kit = machineKit(input);
   const violations = [];
   let verifyCalls = 0;

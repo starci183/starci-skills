@@ -56,7 +56,7 @@ import { currentRuntimeRev } from '../../kernel/runtime-rev.mjs';
 const selfFile = fileURLToPath(import.meta.url);
 const skillRoot = path.resolve(path.dirname(selfFile), '..', '..', '..');
 const JOB_FILE = path.join(skillRoot, 'modules', 'reconciler', 'job.yaml');
-export const SETTLER_SCRIPT = 'scripts/kernel/settle/job-settle-main.mjs';
+const SETTLER_SCRIPT = 'scripts/kernel/settle/job-settle-main.mjs';
 const WORKERS_KEY = 'workers:supervisor';
 const HEALTH_KEY = 'health:all';
 const OPEN = new Set(['queued', 'leased', 'running', 'answering', 'effect_unknown']);
@@ -69,7 +69,7 @@ const SETTLED = SETTLED_JOB_LIST;
 
 const num = (v, d) => positiveNumber(v, d, { orZero: true });
 /** modules/reconciler/job.yaml + the runtimes.yaml numbers it cites. Never throws. */
-export function jobSettings({ file = JOB_FILE, allocation = null } = {}) {
+function jobSettings({ file = JOB_FILE, allocation = null } = {}) {
   let doc = {};
   try { doc = parseYaml(fs.readFileSync(file, 'utf8')) ?? {}; } catch { doc = {}; }
   let alloc = allocation;
@@ -146,7 +146,7 @@ export function jobFacts(db, jobId, { now = Date.now(), settings = jobSettings()
 }
 
 /** Keys of the resync: open op jobs of running workflows, settled ones of the last settledWindowMs, and each running workflow. */
-export function listKeysOf(db, ledgerId, { now = Date.now(), settings = jobSettings(), openClockJobs = [] } = {}) {
+function listKeysOf(db, ledgerId, { now = Date.now(), settings = jobSettings(), openClockJobs = [] } = {}) {
   const live = db.prepare(`SELECT j.job_id, j.workflow_id FROM jobs j JOIN workflows w ON w.workflow_id=j.workflow_id
     WHERE j.kind='op' AND w.archived_at IS NULL AND COALESCE(w.phase,'') <> 'finished' AND j.status IN (${LISTED.map(() => '?').join(',')})`).all(...LISTED);
   const settled = db.prepare(`SELECT job_id, workflow_id FROM jobs WHERE kind='op' AND status IN (${SETTLED.map(() => '?').join(',')}) AND updated_at>?`)
@@ -219,7 +219,7 @@ export function planWorkflow(status, { lastDispatchAt = 0, now = Date.now(), set
 }
 
 /** The settle-nongreen Decision Item (DESIGN §10.3), one per report. Pure. */
-export function settleDecision(f, ledgerId, { now = Date.now(), settings = jobSettings() } = {}) {
+function settleDecision(f, ledgerId, { now = Date.now(), settings = jobSettings() } = {}) {
   const reason = f.handover?.reason ?? (f.report?.outcome !== 'done' ? `outcome-${f.report?.outcome}` : 'needs-kernel');
   return {
     schema: 'starci/decision-item@1', kind: 'settle-nongreen', idempotencyKey: `settle-nongreen:${f.jobId}:${f.report?.dispatchId}`,
@@ -231,7 +231,7 @@ export function settleDecision(f, ledgerId, { now = Date.now(), settings = jobSe
 }
 
 /** The retry-decision Decision Item of a terminal job whose step the runtime could not take: the Kernel's judgment, one per job. Pure. */
-export function retryDecision(f, ledgerId, reason, { now = Date.now(), settings = jobSettings() } = {}) {
+function retryDecision(f, ledgerId, reason, { now = Date.now(), settings = jobSettings() } = {}) {
   return {
     schema: 'starci/decision-item@1', kind: 'retry-decision', idempotencyKey: `retry-decision:${f.jobId}`,
     decider: 'kernel', ledger: ledgerId, workflowId: f.workflowId, entity: { type: 'job', id: f.jobId },
@@ -247,7 +247,7 @@ export function retryDecision(f, ledgerId, reason, { now = Date.now(), settings 
  * worker-show reads the Dispatch's worker state, worker-stop fences it and worker-release (closeWorker) releases
  * the Dispatch, closes the terminal and proves the process tree ended - which also frees its provider reservation.
  * closeLeftover is the finished-job close of scripts/supervisor/workers.mjs closeWorkerTerminal (its own retry budget). */
-export async function workerSweepDeps() {
+async function workerSweepDeps() {
   const [{ workerShow }, { workerStop }, { closeWorker }, closeWorkers] = await Promise.all([
     import('../../api/orca/worker-show.mjs'), import('../../api/orca/worker-stop.mjs'), import('../../machine/worker-close.mjs'),
     import('../../supervisor/workers.mjs')]);
@@ -260,7 +260,7 @@ export async function workerSweepDeps() {
 }
 /** Shadow seams: worker-show stays a real read; worker-stop and worker-release are recorded no-ops answered as if
  * done, so the would-be close is visible in the result. `would` collects them. */
-export function drySweep(deps, would) {
+function drySweep(deps, would) {
   return {
     show: deps.show,
     stop: (dispatch) => { would.push({ act: 'stop', dispatch }); return { ok: true, shadow: true }; },
@@ -269,7 +269,7 @@ export function drySweep(deps, would) {
   };
 }
 /** A machine handle whose transactions record instead of writing (the shadow sweep reads the live rows). */
-export const dryLedger = (m, would) => ({ ...m, transaction: () => { would.push({ act: 'ledger-write' }); } });
+const dryLedger = (m, would) => ({ ...m, transaction: () => { would.push({ act: 'ledger-write' }); } });
 
 /* ------------------------------------------------------------------------------------------------ the controller */
 

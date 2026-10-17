@@ -29,7 +29,7 @@ const refusal = (code, error, menu) => ({ ok: false, code, error, menu });
 const bindCaller = (value, caller) => String(value).replace(CALLER_TOKEN, (match, name) => caller[name]);
 
 /** The argv of a step: `starci <run words> [positional] --flag value ... --json`. */
-export function stepArgv(step, caller) {
+function stepArgv(step, caller) {
   const { _: positional, ...flags } = step.args;
   const words = [...step.run.split(' '), ...(positional ? [positional] : [])];
   const options = Object.entries(flags).flatMap(([key, value]) => (value === true ? [`--${key}`] : [`--${key}`, bindCaller(value, caller)]));
@@ -69,7 +69,7 @@ function renderAnswer({ item, option, done, failed, closed, escalation: owner })
 }
 
 /** Answer one item: validates, records, executes. Returns {out, line} (out.ok false for a refusal). */
-export async function decideItem({ item: itemId, choice, reason, text = '', env = process.env, now = Date.now() }) {
+async function decideItem({ item: itemId, choice, reason, text = '', env = process.env, now = Date.now() }) {
   const why = String(reason ?? '').trim();
   const menu = readSupervisorMenu({ env, now });
   const refuse = ({ code, error }) => ({ out: refusal(code, error, menu), line: [`decide REFUSED (${code}): ${error}`, ...supervisorMenuLines(menu)].join('\n') });

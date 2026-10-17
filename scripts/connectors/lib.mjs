@@ -329,7 +329,7 @@ const parse = parseJson;
  * Every ask whose serve-ask form is still open in one ledger, newest serving per dispatch:
  * not answered, not expired or superseded after it was served, and inside its ttl.
  */
-export function servingAsks(db, { now = Date.now() } = {}) {
+function servingAsks(db, { now = Date.now() } = {}) {
   const rows = db.prepare(`SELECT seq, workflow_id, payload_json, created_at FROM events WHERE kind='ask-serving' ORDER BY seq DESC`).all();
   const seen = new Set(), out = [];
   const closedAfter = db.prepare(`SELECT 1 FROM events WHERE workflow_id=? AND json_extract(payload_json,'$.dispatchId')=?

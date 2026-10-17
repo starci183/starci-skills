@@ -22,7 +22,7 @@ const sameSet = (left, right) => [...new Set(left)].sort().join('\n') === [...ne
 const show = (aliases) => `[${aliases.join(', ')}]`;
 
 /** [{ service, network, aliases }]: every service attached to an `external: true` network of the stack, with the aliases it declares. */
-export function edgeAttachments(bytes) {
+function edgeAttachments(bytes) {
   const model = parseYaml(bytes) ?? {};
   const external = new Map(Object.entries(model.networks ?? {}).filter(([, definition]) => definition?.external === true).map(([key, definition]) => [key, String(definition.name ?? key)]));
   return Object.entries(model.services ?? {}).flatMap(([service, entry]) => Object.entries(networkMap(entry?.networks))

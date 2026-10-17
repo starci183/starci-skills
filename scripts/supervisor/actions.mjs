@@ -22,7 +22,6 @@ import path from 'node:path';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { clipLine } from '../lib/clip.mjs';
 import { hhmm, stampMinute } from '../lib/time.mjs';
-import { OWNER_ONLY } from './owed-text.mjs';
 import { actionRow, supLog } from '../machine/sup-log.mjs';
 import { fullJson } from '../../engine/db/machine.mjs';
 import { newestEvent, readSupervisor, SKILL_ROOT, supervisorEvent, supervisorSettings, withSupervisor } from '../machine/home.mjs';
@@ -38,116 +37,16 @@ export const NOTICE_KIND = 'supervisor-notice';
 export const CLASSES = Object.freeze(parseYaml(fs.readFileSync(path.join(SKILL_ROOT, 'modules', 'supervisor', 'supervise.yaml'), 'utf8')).mission.classes);
 
 const RETRY_PATTERNS = new Set(['retry-loop', 'repeat-check', 'reroute-loop', 'repeat-reject', 'worker-died']);
-// A retry cap a Kernel recorded as an incident (route failed-retries-the-same-op, "fired 3 of 3", attempt caps).
-const RETRY_CAP_TEXT = /failed-retries|retr(?:y|ies) cap|attempt cap|max(?:imum)? (?:retries|attempts)|fired \d+ of \d+ times/i;
-const key = (...parts) => parts.filter((p) => p != null && p !== '').join('|');
 const one = (s, n = 220) => clipLine(s, n);
 
-/** Push refusal class from its text: secret | lint | test | hook | other. Pure. */
-export function pushClass(p) {
-  if (p?.scan?.findings?.length || /secret/i.test(String(p?.refused ?? ''))) return 'secret';
-  const t = `${p?.refused ?? ''} ${p?.error ?? ''} ${p?.hooks ?? ''}`;
-  if (/eslint|lint|prettier|sonar/i.test(t)) return 'lint';
-  if (/\btests?\b|spec|node --test|jest|vitest|assert/i.test(t)) return 'test';
-  if (/hook|pre-push/i.test(t)) return 'hook';
-  return 'other';
-}
 
-/**
- * The owed actions of one tick. Pure over what the tick read: `clusters` (cluster.mjs), `stalls` (stall.mjs findings,
- * every ledger), `flows` (tick flows: workflows with their frontier, deadKernels, orphaned), `pushes` (push-mains).
- * Returns [{key, class, workflowId, repo, subject, evidence, do}]; one item per root cause (an incident a cluster
- * already carries is never listed again as a gate).
- */
-const STUCK_CLASS = { 'owner-gate': 'owner-gate-no-ask', 'peer-wait': 'peer-wait', dependency: 'peer-wait', 'retry-cap': 'retry-cap', 'deferred-settle': 'stalled', 'queued-ready': 'undispatched', throttled: 'stalled' };
 
-function addClusterActions(add, clusters) {
-  for (const c of clusters) {
-    const retry = ((c.items ?? []).length > 0 && c.items.every((i) => RETRY_PATTERNS.has(i.pattern))) || RETRY_CAP_TEXT.test(`${c.id} ${c.summary ?? ''}`);
-    let actionClass = 'runtime-defect';
-    if (retry) actionClass = 'retry-cap';
-    if (c.fixedBy) actionClass = 'fixed-defect';
-    const fixed = c.fixedBy ? `, fixed-by ${c.fixedBy.slice(0, 9)}?` : '';
-    add({ key: key('owed', c.id), class: actionClass, workflowId: c.workflows?.join(',') ?? null,
-      repo: c.items?.[0]?.repo ?? null, subject: c.id, incidents: c.incidents ?? [], fixedBy: c.fixedBy ?? null, size: c.size ?? (c.items ?? []).length,
-      lastAt: Math.max(0, ...(c.items ?? []).map((i) => Number(i.lastFailureAt ?? i.updatedAt ?? i.raisedAt ?? 0))) || null,
-      evidence: one(`${c.size} item(s), oldest ${c.oldestMin}m${fixed}: ${c.summary}`) });
-  }
-}
 
-function addStalledAction(add, finding, frontierOf, workflowId) {
-  if (finding.type !== 'STALLED' || finding.alert === false) return;
-  const frontier = frontierOf.get(workflowId);
-  const ready = frontier?.ready > 0 || finding.actionable === true;
-  add({ key: key(ready ? 'dispatch' : 'stalled', workflowId), class: ready ? 'undispatched' : 'stalled', workflowId, repo: finding.repo, subject: workflowId, evidence: one(finding.line) });
-}
 
-function addStallActions(add, stalls, inCluster, frontierOf) {
-  for (const f of stalls) {
-    const wf = f.workflowId;
-    if (f.incidentId && inCluster.has(f.incidentId)) continue;
-    if (f.type === 'STALE-GATE' || f.type === 'STALE-WAIT') add({ key: key('gate', wf, f.incidentId ?? f.jobId), class: 'stale-gate', workflowId: wf, repo: f.repo, subject: f.incidentId ?? f.jobId, evidence: one(f.line) });
-    else if (f.type === 'STALE-PEER-WAIT') add({ key: key('peer', wf, f.incidentId), class: 'peer-wait', workflowId: wf, repo: f.repo, subject: f.incidentId, peer: f.peer ?? null, evidence: one(f.line) });
-    else if (f.type === 'UNREAD-PEER') add({ key: key('unread', wf, f.peerMessage), class: 'unread-peer', workflowId: wf, repo: f.repo, subject: f.peerMessage, evidence: one(f.line) });
-    else if (f.type === 'GATE' && !f.young && !(f.asks?.length) && !(f.waits?.length) && !OWNER_ONLY.test(f.text ?? ''))
-      add({ key: key('gate', wf, f.incidentId), class: 'owner-gate-no-ask', workflowId: wf, repo: f.repo, subject: f.incidentId, evidence: one(f.line) });
-    else addStalledAction(add, f, frontierOf, wf);
-  }
-}
 
-function addWorkflowActions(add, workflows) {
-  for (const w of workflows) {
-    if (w.error) continue;
-    for (const j of [...(w.deadWorkerJobs ?? []), ...(w.wedgedJobs ?? [])])
-      add({ key: key('worker', w.workflowId, j), class: 'dead-worker', workflowId: w.workflowId, repo: w.repo, subject: j, evidence: `starci kernel status lists ${j} dead or wedged` });
-    if (w.ownerAsks?.length) add({ key: key('ask', w.workflowId), class: 'owner-ask', workflowId: w.workflowId, repo: w.repo, subject: w.ownerAsks.join(','),
-      evidence: `${w.ownerAsks.length} pending non-credential owner ask(s): ${w.ownerAsks.slice(0, 4).join(', ')}` });
-    if (w.kernelRevStale) add({ key: key('rev', w.workflowId), class: 'contract-stale', workflowId: w.workflowId, repo: w.repo, subject: w.kernelRevStale.current ?? null,
-      evidence: one(`kernel read rev ${String(w.kernelRevStale.acked ?? '?').slice(0, 9)}, runtime is ${String(w.kernelRevStale.current ?? '?').slice(0, 9)} (${w.kernelRevStale.fileCount ?? 0} changed file(s))`) });
-  }
-}
 
-function addStuckActions(add, stuck, inCluster, out) {
-  for (const s of stuck) {
-    const cls = STUCK_CLASS[s.kind];
-    if (!cls || s.owner === 'owner' || (s.incidentId && (inCluster.has(s.incidentId) || out.some((x) => x.subject === s.incidentId)))) continue;
-    if (cls === 'undispatched' && out.some((x) => x.key === key('dispatch', s.workflowId))) continue;
-    const cause = s.cause && s.cause !== s.kind ? `/${s.cause}` : '';
-    const detail = s.detail ? `: ${s.detail}` : '';
-    add({ key: key('stuck', s.workflowId, s.kind, s.incidentId ?? s.jobId), class: cls, workflowId: s.workflowId, repo: s.repo ?? null, subject: s.incidentId ?? s.jobId ?? s.workflowId,
-      evidence: one(`${s.severity ?? ''} ${s.kind}${cause} for ${Math.round(Number(s.ageMs ?? 0) / 60_000)}m${detail}`) });
-  }
-}
 
-function addPushActions(add, pushes) {
-  for (const p of pushes) {
-    if (p.pushed || p.skipped || p.deferred || p.wouldPush || (!p.refused && !p.error && p.hooks !== 'red' && p.hooks !== 'failed')) continue;
-    const cls = pushClass(p);
-    const findings = (p.scan?.findings ?? []).map((f) => ' [' + f.file + ':' + (f.line ?? '-') + ' ' + f.pattern + ']').join('');
-    add({ key: key('push', path.basename(p.repo ?? ''), cls), class: 'push-refused', workflowId: null, repo: p.repo, subject: cls,
-      evidence: one(`${cls}: ${p.refused ?? p.error ?? p.hooks}${findings}`) });
-  }
-}
 
-export function owedActions({ clusters = [], stalls = [], flows = {}, pushes = [], stuck = [], revertDue = [], progress = [] } = {}) {
-  const out = [];
-  const add = (item) => { if (!out.some((x) => x.key === item.key)) out.push({ ...item, do: item.do ?? CLASSES[item.class] }); };
-  // Outcome first: stalls past the Kernel's grace, runtime RCA clusters, kernel proposals (the Workflow controller's DIs).
-  for (const item of progress) add(item);
-  const inCluster = new Set(clusters.flatMap((c) => c.incidents ?? []));
-  addClusterActions(add, clusters);
-  const workflows = flows.workflows ?? [];
-  const frontierOf = new Map(workflows.map((w) => [w.workflowId, w]));
-  addStallActions(add, stalls, inCluster, frontierOf);
-  addWorkflowActions(add, workflows);
-  for (const k of flows.deadKernels ?? []) add({ key: key('kernel', k.workflowId), class: 'dead-kernel', workflowId: k.workflowId, repo: k.repo, subject: k.workflowId, evidence: `watchdog read ${k.action} x${k.count}` });
-  for (const o of flows.orphaned ?? []) add({ key: key('orphaned', o.workflowId), class: 'orphaned', workflowId: o.workflowId, repo: o.repo, subject: o.workflowId, evidence: one(o.reason) });
-  addStuckActions(add, stuck, inCluster, out);
-  for (const e of revertDue) add({ key: key('experiment', e.id), class: 'experiment-revert', workflowId: null, repo: null, subject: e.id,
-    evidence: one(`${e.signature}: ${(e.commits ?? []).map((c) => c.slice(0, 9)).join(',')} - ${e.result?.reason ?? 'measured no improvement'}`) });
-  addPushActions(add, pushes);
-  return out;
-}
 
 /** sup_events of `kinds` created after `after` (strictly, or at/after with `inclusive`), oldest first, payload parsed. */
 function eventsSince(m, kinds, after = 0, { inclusive = false } = {}) {
@@ -155,42 +54,9 @@ function eventsSince(m, kinds, after = 0, { inclusive = false } = {}) {
     .all(...kinds, after).map((r) => { let p = null; try { p = fullJson(JSON.parse(r.payload_json ?? 'null')); } catch { p = null; } return { ...r, payload: p ?? {} }; });
 }
 
-/** The newest action time per item key and per workflow notice (since `since`), over the machine handle `m`: {byKey, byWorkflow}. */
-export function actedOf(m, { since = 0 } = {}) {
-  const byKey = {}, byWorkflow = {};
-  const rows = eventsSince(m, [ACTION_KIND, NOTICE_KIND], since, { inclusive: true });
-  for (const r of rows) {
-    const p = r.payload ?? {};
-    if (r.kind === ACTION_KIND && p.item) byKey[p.item] = { at: r.created_at, action: p.action ?? null, reason: p.reason ?? null, ...(Number.isFinite(p.until) ? { until: p.until } : {}) };
-    if (r.kind === NOTICE_KIND && p.delivered) { byWorkflow[p.workflowId ?? r.entity_id] = r.created_at; if (p.item) byKey[p.item] = { at: r.created_at, action: 'notify', reason: null }; }
-  }
-  return { byKey, byWorkflow };
-}
 
-/**
- * The SLA over `items`: {items: [{...item, firstSeenAt, ageMin, actedAt, breach}], seen}. `seen` keeps only the keys
- * seen now (a cleared item starts over). An item counts as acted when an action names it, or a delivered notice went
- * to its workflow, after it was first seen. An action recorded with `until` (a standing ruling that holds the item,
- * e.g. an owner-ordered hold) keeps it out of SLA-BREACH until then; it is still listed, as held. Pure.
- */
-export function withSla(items, { seen = {}, acted = { byKey: {}, byWorkflow: {} }, now = Date.now(), slaMs }) {
-  const next = {};
-  const out = items.map((i) => {
-    const firstSeenAt = seen[i.key] ?? now;
-    next[i.key] = firstSeenAt;
-    const byKey = acted.byKey[i.key]?.at ?? null;
-    const byWf = String(i.workflowId ?? '').split(',').map((wf) => acted.byWorkflow[wf] ?? null).filter(Boolean);
-    const actedAt = [byKey, ...byWf].filter((t) => t != null && t >= firstSeenAt).sort((a, b) => b - a)[0] ?? null;
-    const lastTouch = actedAt ?? firstSeenAt;
-    const until = actedAt != null && acted.byKey[i.key]?.at === actedAt ? acted.byKey[i.key]?.until ?? null : null;
-    const heldUntil = until != null && until > now ? until : null;
-    return { ...i, firstSeenAt, ageMin: Math.round((now - firstSeenAt) / 60_000), actedAt, ...(heldUntil ? { heldUntil } : {}),
-      breach: heldUntil == null && now - lastTouch > slaMs };
-  });
-  return { items: out, seen: next };
-}
 
-export const actionLine = (i) => {
+const actionLine = (i) => {
   let state = 'no action yet';
   if (i.actedAt) {
     state = 'acted ' + hhmm(i.actedAt);

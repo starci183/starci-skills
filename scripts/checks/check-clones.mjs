@@ -99,7 +99,7 @@ const pairFindings = (fa, fb, ai, bi, offset, hits, N) => {
   return findings;
 };
 
-export function cloneFindings(files, { lines: N = CLONE_LINES, tokens: T = CLONE_TOKENS } = {}) {
+function cloneFindings(files, { lines: N = CLONE_LINES, tokens: T = CLONE_TOKENS } = {}) {
   const entries = files.filter((f) => SOURCE.test(f.rel) && !isTest(f.rel)).sort((a, b) => byCodeUnit(a.rel, b.rel)).map((f) => ({ rel: f.rel, ...tokenize(f.rel, f.text) }));
   const buckets = new Map();
   entries.forEach((file, fileIndex) => {

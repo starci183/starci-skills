@@ -6,7 +6,7 @@
 // store opens installs the resolver below, so a reader that selects such a column gets the content whichever shape the row has; a writer stores content with putContent, which
 // keeps a short value inline and puts a long one in the blob store. A value is resolved byte for byte: the blob holds exactly the text the writer was given.
 import { createRequire } from 'node:module';
-import { getBlob, putBlob } from './blob.mjs';
+import { getBlob } from './blob.mjs';
 
 const REF = /^\{"truncated":true,"bytes":(\d+),"sha256":"([0-9a-f]{64})"\}$/;
 
@@ -23,21 +23,12 @@ export function parseRef(value) {
 }
 
 /** The content behind a stored value: a reference is read from the blob store (utf8), anything else is the content itself. */
-export function resolveValue(value) {
+function resolveValue(value) {
   const ref = parseRef(value);
   if (!ref) return value;
   return getBlob(ref.sha).toString('utf8');
 }
 
-/**
- * What to store for `text` in a column bounded to `bound` bytes: the text itself when it fits, else a reference to a blob that holds it whole. `put` is the blob writer (the
- * default is the runtime blob store); a null or non-string value is stored as it is.
- */
-export function putContent(text, { bound, put = (bytes) => putBlob(bytes, { mediaType: 'text/plain' }) } = {}) {
-  if (typeof text !== 'string' || Buffer.byteLength(text, 'utf8') <= bound) return text;
-  const bytes = Buffer.from(text, 'utf8');
-  return refOf(put(bytes).sha, bytes.length);
-}
 
 const resolveRow = (row) => {
   if (row === null || row === undefined || typeof row !== 'object') return row;

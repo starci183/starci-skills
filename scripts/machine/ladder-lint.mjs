@@ -5,10 +5,10 @@ import { ladderRefusal, ladderResult, pathList, scopeFor, unrunnableLevel } from
 import { RUNTIME_ROOT, changedPathsOf, repositoryKind, runStarci } from './ladder-select.mjs';
 
 const SCHEMA = 'starci/lint-run@1';
-export const RUNTIME_LINT_CHECKS = Object.freeze(['doc-language', 'helper-once', 'clones', 'export-used', 'env', 'specs']);
+const RUNTIME_LINT_CHECKS = Object.freeze(['doc-language', 'helper-once', 'clones', 'export-used', 'env', 'specs']);
 
 /** Lint-family self-checks relevant to the changed runtime paths. */
-export function lintChecksForChanges(changed) {
+function lintChecksForChanges(changed) {
   const files = pathList(changed);
   const code = files.some((file) => /\.(?:[cm]?js|ts|tsx)$/i.test(file));
   const prose = files.some((file) => /\.(?:md|ya?ml)$/i.test(file));

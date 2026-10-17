@@ -55,7 +55,7 @@ const NOT_A_CLAIM_BEFORE = new RegExp([
 ].join(''));
 
 /** The owner-claim phrase `text` makes (folded), or null. */
-export function ownerClaimOf(text) {
+function ownerClaimOf(text) {
   const folded = foldText(text);
   for (const re of OWNER_CLAIM_PATTERNS) {
     re.lastIndex = 0;
@@ -86,7 +86,7 @@ const NOT_OWNER_WORK = new RegExp([
 ].join(''));
 
 /** The phrase that marks an owner-gate's text as not owner work, or null. */
-export function notOwnerWorkOf(text) {
+function notOwnerWorkOf(text) {
   const m = NOT_OWNER_WORK.exec(foldText(text));
   return m ? m[0].trim() : null;
 }

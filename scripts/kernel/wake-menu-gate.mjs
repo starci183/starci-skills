@@ -18,7 +18,7 @@ const PROBE_FIELDS = 'frontier.actionable,frontier.reason,menu';
 const PROBE_TIMEOUT_MS = 60_000;
 
 /** What the status fields say: {hold, reason}. Only an explicit `actionable: false` with an empty menu holds a wake. Pure. */
-export function menuVerdict(fields) {
+function menuVerdict(fields) {
   if (fields?.['frontier.actionable'] !== false) return { hold: false, reason: null };
   const menu = fields.menu;
   if (Array.isArray(menu) && menu.length > 0) return { hold: false, reason: null };
@@ -26,7 +26,7 @@ export function menuVerdict(fields) {
 }
 
 /** The read-only status probe of one workflow: {ok, fields} or {ok:false, error}. */
-export function probeMenu({ repo, workflowId, run = runNode, env = process.env }) {
+function probeMenu({ repo, workflowId, run = runNode, env = process.env }) {
   const result = run([CLI, 'status', '--repo', repo, '--workflow', workflowId, '--field', PROBE_FIELDS, '--json'], { timeout: PROBE_TIMEOUT_MS, env: { ...env, STARCI_WAKE_PROBE: '1' } });
   const value = jsonFromStdout(result.stdout);
   if (result.status !== 0 || !value?.fields) return { ok: false, error: String(result.error?.message ?? result.stderr ?? 'status probe failed').slice(0, 200) };
@@ -34,7 +34,7 @@ export function probeMenu({ repo, workflowId, run = runNode, env = process.env }
 }
 
 /** The repository root a ledger file belongs to (<repo>/.starciwork/runtime.sqlite). */
-export const repoOfLedger = (ledger) => (ledger?.file ? path.dirname(path.dirname(ledger.file)) : null);
+const repoOfLedger = (ledger) => (ledger?.file ? path.dirname(path.dirname(ledger.file)) : null);
 
 /**
  * `send()` unless the Kernel's menu is empty. `deps.menuProbe` answers {ok, fields}; the default probe is the real status child, skipped inside a probe

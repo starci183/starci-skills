@@ -18,7 +18,7 @@ const VERB_CONTRACTS = 'modules/cli/commands/kernel/';
  * runtime's, run by the controllers; their contracts are not the seat's to read, and requiring the whole directory made a fresh life read 55 contract files and spend about two million tokens before its first wake.
  */
 const seatVerbContracts = () => ['_group', ...(parseYaml(fs.readFileSync(POLICY_FILE, 'utf8'))?.kernel?.verbs?.kernel ?? [])].map((verb) => `${VERB_CONTRACTS}${verb}.yaml`);
-export const KERNEL_CONTRACT_FILES = Object.freeze([...KERNEL_BOOT_FILES, 'modules/kernel/api.yaml', ...seatVerbContracts(), 'modules/kernel/owner-rulings.yaml']);
+const KERNEL_CONTRACT_FILES = Object.freeze([...KERNEL_BOOT_FILES, 'modules/kernel/api.yaml', ...seatVerbContracts(), 'modules/kernel/owner-rulings.yaml']);
 const OP_PROMPT_FILE = 'scripts/kernel/op-prompt.mjs';
 const KERNEL_READ_SCHEMA = 'starci/kernel-required-read@1';
 const refuse = detail => Object.assign(new Error(detail), { code: 'kernel-read-unverified' });

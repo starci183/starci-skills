@@ -11,7 +11,7 @@ export const ladderOf = () => {
 };
 
 /** Whether `di` (a Supervisor DI) is escalated one more level now: open or escalated, past due + level x step, below the owner level. Pure. */
-export const ladderDue = (di, { now, stepMs, ownerAfter }) => ['open', 'escalated'].includes(di.status) && Number.isFinite(di.dueAt)
+const ladderDue = (di, { now, stepMs, ownerAfter }) => ['open', 'escalated'].includes(di.status) && Number.isFinite(di.dueAt)
   && (di.escalations ?? 0) < ownerAfter && now >= di.dueAt + (di.escalations ?? 0) * stepMs;
 
 /** Escalate every due Supervisor DI one level on the writer `m` (machine.sqlite); returns the escalated ids. */

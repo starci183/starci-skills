@@ -101,7 +101,7 @@ export function brandPalette(brand, { brandDir = null } = {}) {
  * The raster masters the brand registers (brand.artworkSlots): Map(sha256 -> slot id), from each slot's declared
  * sha256 and the bytes of its `master` file (relative to the brand record's directory).
  */
-export function registeredArtwork(brand, brandDir = null) {
+function registeredArtwork(brand, brandDir = null) {
   const out = new Map();
   for (const slot of list(brand?.artworkSlots)) {
     if (!slot || typeof slot !== 'object') continue;
@@ -149,7 +149,7 @@ function artworkRectsOf(record, palette) {
 }
 
 /** A content-image rectangle placed into a composite (compose-direction.mjs fitInto: cover centre-crops, stretch scales), clipped to the placed rect. */
-export function mapIntoComposite(r, content, rect, fit = 'cover') {
+function mapIntoComposite(r, content, rect, fit = 'cover') {
   let sx, sy, ox = 0, oy = 0;
   if (fit === 'stretch') { sx = rect.width / content.width; sy = rect.height / content.height; }
   else {
@@ -167,7 +167,7 @@ export function mapIntoComposite(r, content, rect, fit = 'cover') {
  * the one beside it), or, for a composite (`composite` block of a ui asset, `uiDir` its record directory), from
  * its content part's record mapped through the composite's rect and fit.
  */
-export function artworkExclusions({ file, palette, record = undefined, composite = null, uiDir = null }) {
+function artworkExclusions({ file, palette, record = undefined, composite = null, uiDir = null }) {
   if (!palette?.artwork?.size) return [];
   const own = artworkRectsOf(record === undefined ? renderRecordFor(file) : record, palette);
   if (own.length || !composite?.content?.path || !composite.rect || !uiDir) return own;
@@ -179,7 +179,7 @@ export function artworkExclusions({ file, palette, record = undefined, composite
 }
 
 /** The colour block a draw prompt carries: every chromatic token by role with its hex, and the refusal rule. */
-export function promptPaletteBlock(brand, { name = null } = {}) {
+function promptPaletteBlock(brand, { name = null } = {}) {
   const { entries, primary } = brandPalette(brand);
   const seen = new Set();
   const lines = [];
@@ -198,7 +198,7 @@ export function promptPaletteBlock(brand, { name = null } = {}) {
 }
 
 /** The image as {width, height, data RGBA}; `png.mjs` reads every bit depth and colour type a model returns. */
-export function readImage(file) {
+function readImage(file) {
   return decodePng(fs.readFileSync(file));
 }
 
@@ -239,7 +239,7 @@ function paletteVerdictOf(palette, r, g, b) {
  * which belongs to the palette (the page slot a capture or a drawing keys with #FF00FF), or a list of them (with
  * the boxes of registered brand artwork, artworkExclusions).
  */
-export function measurePalette(image, palette, { exclude = null } = {}) {
+function measurePalette(image, palette, { exclude = null } = {}) {
   const { width, height, data } = image;
   const step = Math.max(1, Math.ceil(Math.sqrt((width * height) / SAMPLE_BUDGET)));
   const cache = new Map();
@@ -394,7 +394,7 @@ const walkFiles = (dir, keep, skip = new Set(['node_modules', 'kernel-evidence',
 };
 
 /** Every image the gate judges under `workRoot`, with what it is and the record that owns it. */
-export async function scanTargets(workRoot) {
+async function scanTargets(workRoot) {
   const targets = [];
   if (isLiteWorkRoot(workRoot)) return targets;
   for (const index of indexFilesUnder(path.join(workRoot, 'features'))) appendRecordTargets(index, targets);

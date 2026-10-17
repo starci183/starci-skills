@@ -193,7 +193,7 @@ const callFindings=(name,call,{calls,publicCommands,forbidden,recoveries},errors
 };
 
 /** Static checks on modules/host/orca/calls.yaml — no Orca process is run. */
-export function validateCallContract(docs){
+function validateCallContract(docs){
   const errors=[];
   if(!docs?.calls)return errors;
   const {calls,api}=docs;

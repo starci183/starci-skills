@@ -20,7 +20,7 @@ import { criticHoldOf } from '../critic-hold.mjs';
 /** The ledger event that records one runtime Critic run. */
 export const RUNTIME_CRITIC_EVENT = 'runtime-critic-run';
 /** The ledger event that records a verdict file an op attached and the settle did not read. */
-export const OP_VERDICT_IGNORED_EVENT = 'runtime-critic-op-verdict-ignored';
+const OP_VERDICT_IGNORED_EVENT = 'runtime-critic-op-verdict-ignored';
 const WORK_ROOT_NAME = '.starciwork';
 const FIELD_MAX = 240;
 const SUMMARY_MAX = 400;

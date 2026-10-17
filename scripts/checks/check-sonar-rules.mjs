@@ -22,7 +22,7 @@ import { gitOutputOf } from '../lib/git.mjs';
 import { analysed, analysedExampleFile, exampleFiles, exampleScopes, readSonarScope, scopeFiles } from '../gates/sonar-rules-scope.mjs';
 import { BASELINE_FILE, BASELINE_SECTION, compareToBaseline, pruneBaseline, readBaseline, writeBaseline } from '../gates/sonar-rules-baseline.mjs';
 
-export const CODE_STALE = 'RT_SONAR_BASELINE_STALE';
+const CODE_STALE = 'RT_SONAR_BASELINE_STALE';
 const FLAGS = Object.freeze(['--json', '--staged', '--init', '--prune', '--root']);
 const HELP = 'usage: check-sonar-rules [--root <dir>] [--staged] [--init | --prune] [--json]';
 
@@ -61,7 +61,7 @@ function planOf(root, scope, staged) {
 }
 
 /** The check at `root`: {ok, findings, listed, stale, checked, skipped?}. `staged` judges only the index. */
-export async function checkSonarRules({ root = skillRoot, staged = false, init = false, prune = false } = {}) {
+async function checkSonarRules({ root = skillRoot, staged = false, init = false, prune = false } = {}) {
   const scope = readSonarScope(root);
   if (!scope) return { ok: true, skipped: 'no sonar-project.properties: not a source checkout', findings: [], listed: 0, stale: 0, checked: 0 };
   const plan = planOf(root, scope, staged);

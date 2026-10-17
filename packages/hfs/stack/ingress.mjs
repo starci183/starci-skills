@@ -44,7 +44,7 @@ const originOf = (url) => {
 // ---- the live and the declared routes -------------------------------------------------------------------------------------------
 
 /** Host keys of a proxy router rule: `a.example` for Host(...), `regexp:<pattern>` for HostRegexp(...). */
-export function hostsOfRule(rule) {
+function hostsOfRule(rule) {
   const out = [];
   for (const [, kind, args] of String(rule).matchAll(MATCHER)) {
     for (const [, value] of args.matchAll(QUOTED)) out.push(kind === 'Host' ? value.toLowerCase() : `regexp:${value}`);
@@ -53,7 +53,7 @@ export function hostsOfRule(rule) {
 }
 
 /** { routes: [{ host, targets }], middlewares: [name] } of one parsed file-provider dynamic document (any shape is tolerated). */
-export function routesOfDocument(doc) {
+function routesOfDocument(doc) {
   const http = asMap(asMap(doc).http);
   const services = asMap(http.services);
   const targetsOf = (name) => {
@@ -491,7 +491,7 @@ const rehearsalVolume = (ingress) => `${ingress.acmeVolume}-rehearsal`;
 const classOf = (code) => Math.floor(code / 100);
 
 /** The static arguments of the ingress service with the ACME http challenge moved to an unused internal entrypoint. */
-export function rehearsalArgs(args) {
+function rehearsalArgs(args) {
   const quiet = args.map((arg) => arg.replace(CHALLENGE_ARG, `$1=${UNUSED_ENTRYPOINT}`));
   return [...quiet, `--entrypoints.${UNUSED_ENTRYPOINT}.address=127.0.0.1:1`];
 }

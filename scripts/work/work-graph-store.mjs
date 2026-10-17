@@ -94,7 +94,7 @@ const combinedColor = (all) => {
  * any other recorded colour is re-derived from every job. A node with children takes its own colour and theirs
  * together: any red is red, any yellow is yellow, all green is green, anything else is gray.
  */
-export function colorsFromJobs(graph, jobs, { recorded = {}, since = 0 } = {}) {
+function colorsFromJobs(graph, jobs, { recorded = {}, since = 0 } = {}) {
   const nodes = list(graph?.nodes);
   const { kids } = upLinks(nodes);
   const covering = coverageOf(graph, jobs);

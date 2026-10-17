@@ -123,7 +123,7 @@ function sealedRunner(ctx, config) {
 }
 
 /** The ssh runner of one invocation (see the top of the file). */
-export function sshRunner(ctx, config, { sshCmd = null } = {}) {
+function sshRunner(ctx, config, { sshCmd = null } = {}) {
   if (sshCmd) return makeRunner(ctx, sshCommandArgv(sshCmd));
   if (config.remote.sealed && ctx.env.STARCI_STACK_SEALED_SSH === '1') return sealedRunner(ctx, config);
   return makeRunner(ctx, ['ssh', ...SSH_OPTIONS, config.remote.host]);
@@ -133,7 +133,7 @@ export function sshRunner(ctx, config, { sshCmd = null } = {}) {
  * The context to open the runner with. On an operator machine (not CI, no --ssh-cmd, the sealed members exist, no explicit
  * STARCI_STACK_SEALED_SSH) the sealed session is selected; otherwise the context is returned unchanged.
  */
-export function withOwnerTransport(ctx, config, { sshCmd = null } = {}) {
+function withOwnerTransport(ctx, config, { sshCmd = null } = {}) {
   const { sealed } = config.remote;
   if (sshCmd || !sealed || ctx.env.GITHUB_ACTIONS === 'true' || ctx.env.STARCI_STACK_SEALED_SSH !== undefined) return ctx;
   const present = [sealed.ops, sealed.sshKey, sealed.knownHosts].every((slug) => fs.existsSync(path.join(config.secretsDir, `${slug}.enc`)));

@@ -43,7 +43,7 @@ function ignoredAmong(cwd, files) {
 }
 
 /** Violations among `files` (repository-relative, '/'-separated): [{ file, code, message }]. `ignored` is a Set of ignored paths. */
-export function hygieneFindings(files, ignored) {
+function hygieneFindings(files, ignored) {
   const findings = [];
   for (const file of files) {
     if (file.startsWith(WORK) && ignored.has(file)) {

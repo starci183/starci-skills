@@ -17,7 +17,7 @@ const greenRecord = (record, head, tag) => record?.head === head && record?.tag 
   && Array.isArray(record.gates) && record.gates.length > 0 && record.gates.every((gate) => gate?.pass === true);
 
 /** The release gate as the hook reads it: the annotated tag on HEAD whose L4 record names head and tag. Returns { tag } or { reason }. */
-export function gateState(ctx, head, prefix) {
+function gateState(ctx, head, prefix) {
   const tags = annotatedOnHead(ctx, prefix);
   if (tags.length === 0) return { reason: `no ANNOTATED tag ${prefix}[0-9]* on HEAD: run starci app release gate --execute first` };
   const file = path.join(releaseDir(ctx), `${head}.l4.json`);

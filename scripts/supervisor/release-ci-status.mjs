@@ -39,7 +39,7 @@ function checkState(state, conclusion) {
 }
 
 /** What GitHub says about `sha`: {ok, runs: [{id, status, conclusion, event, url}], checks: [{name, state}], error?}. Reads through scripts/api/gh; `cwd` is the repository whose remote is asked. */
-export function ciReader({ cwd, workflow, sha, deps = {} }) {
+function ciReader({ cwd, workflow, sha, deps = {} }) {
   const options = { cwd, ...(deps.gh ? { gh: deps.gh } : {}) };
   const runsReply = (deps.workflowRuns ?? workflowRuns)({ workflow, sha }, options);
   const runs = json(runsReply);
@@ -75,7 +75,7 @@ export function writeCiRecord({ repo, head, tag, suite, state, runs = [], checks
 }
 
 /** The CI record of `head`, or null. */
-export function readCiRecord({ repo, head, commonDir = null }) {
+function readCiRecord({ repo, head, commonDir = null }) {
   const dir = commonDir ?? gitCommonDir(repo);
   try { const record = readProofFile(proofFileOf({ commonDir: dir, sha: head, kind: 'ci' })); return record?.schema === CI_SCHEMA && record.head === head ? record : null; } catch { return null; }
 }

@@ -27,7 +27,7 @@ function loopsOfRecord(repo, rel) {
 }
 
 /** The payload of one critic-run event from the best round of a loop, or null when the round names no critic. */
-export function criticRunPayload({ label, loop }, job, opProvider) {
+function criticRunPayload({ label, loop }, job, opProvider) {
   const round = (loop.rounds ?? []).find((r) => r.n === loop.best?.n) ?? (loop.rounds ?? []).at(-1);
   const critic = round?.critic;
   if (!critic) return null;

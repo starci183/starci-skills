@@ -40,8 +40,8 @@ import { assetsOf, list, slash, workRootOf } from '../work-io.mjs';
 import { sha256File } from '../../../engine/digest.mjs';
 import { ownerAcceptanceOf } from '../direction-part.mjs';
 import { DRAW_TOOL, SHAPE_DUPLICATE, assetStateOf } from '../ui/ui-shapes.mjs';
-import { DRAW_DNA_CODES, anatomyFindings, dnaFindings, loadDna, proposalFilesFor, proposalNamesIn } from './draw-dna.mjs';
-import { DRAW_TASTE_CODES, accentBudgetOf, drawLoopSettings, htmlTasteFindings } from './draw-taste.mjs';
+import { anatomyFindings, dnaFindings, loadDna, proposalFilesFor, proposalNamesIn } from './draw-dna.mjs';
+import { accentBudgetOf, drawLoopSettings, htmlTasteFindings } from './draw-taste.mjs';
 import { assetRequestIdsFor } from '../asset-slot.mjs';
 import { DRAW_LOOP_MISSING, loopCoverageFindings, loopFileOfRef } from './draw-loop-coverage.mjs';
 import { DRAW_RATIONALE_MISSING, loadRationale, measuresOf, rationaleFileOf, rationaleFindings, ruleResolver } from './draw-rationale.mjs';
@@ -55,8 +55,6 @@ export const DRAW_BADGE_UNTONED = 'DRAW_BADGE_UNTONED';
 export const DRAW_SCORE_BELOW = 'DRAW_SCORE_BELOW';
 export const DRAW_NOT_OWNER_ACCEPTED = 'DRAW_NOT_OWNER_ACCEPTED';
 export { DRAW_LOOP_MISSING, DRAW_RATIONALE_MISSING };
-export const DRAW_QUALITY_CODES = Object.freeze([SHAPE_DUPLICATE, DRAW_SCOPE_FULL_PAGE, DRAW_ACTION_MISSING, DRAW_COPY_INTERNAL, DRAW_BADGE_UNTONED, DRAW_SCORE_BELOW, DRAW_NOT_OWNER_ACCEPTED,
-  ...DRAW_DNA_CODES, ...DRAW_TASTE_CODES, DRAW_LOOP_MISSING, DRAW_RATIONALE_MISSING]);
 const SCORE_SCHEMA = 'starci/ui-proof-score@1';
 /** The largest share of an image's rows two renders of one XBase may differ in and still be one shape plus a status band. */
 const STATUS_BAND_MAX = 0.3;
@@ -221,7 +219,7 @@ function bestShiftedMatch(ha, hb, top, H, maxShift) {
  * viewport the pushed tail is cut at the bottom) over at least a fifth of the image, the band being at most
  * STATUS_BAND_MAX of the taller image. {band, share, shift} or null.
  */
-export function statusBandOf(a, b) {
+function statusBandOf(a, b) {
   if (!a || !b || a.width !== b.width) return null;
   const ha = rowHashes(a), hb = rowHashes(b);
   const H = Math.max(a.height, b.height), n = Math.min(a.height, b.height);

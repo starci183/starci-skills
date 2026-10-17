@@ -111,7 +111,7 @@ export function hostSettings(raw = parseYaml(fs.readFileSync(HOST_YAML, 'utf8'))
 /* ------------------------------------------------------------ one port source */
 
 /** The public hostname and origin port of ~/.cloudflared/harness.yml: {hostname, originPort} (nulls when unreadable). */
-export function harnessIngress(text) {
+function harnessIngress(text) {
   let doc = null;
   try { doc = parseYaml(String(text ?? '')); } catch { doc = null; }
   const rule = (doc?.ingress ?? []).find((r) => r?.hostname);
@@ -247,7 +247,7 @@ export function serviceRegistry({ settings = hostSettings(), ports = servicePort
 
 /* ------------------------------------------------------------ the state machine (DESIGN 9.7) */
 
-export const DOWN_STATES = new Set(['starting', 'degraded', 'failed', 'backoff', 'quarantined']);
+const DOWN_STATES = new Set(['starting', 'degraded', 'failed', 'backoff', 'quarantined']);
 // The states that run the SERVICE_DOWN clock: one bad pass (`degraded`) is not down.
 export const OUTAGE_STATES = new Set(['starting', 'failed', 'backoff', 'quarantined']);
 
@@ -314,8 +314,6 @@ const serviceStateOf = (state) => {
     default: return 'down';
   }
 };
-// last_probe_json keys of the store itself (never part of a record).
-const STORE_KEYS = ['state', 'restartsFrom', 'removed'];
 
 /**
  * The Host controller's records in machine.sqlite: {get, put, all, remove}. A record is {name, state, since, restarts,
@@ -324,7 +322,7 @@ const STORE_KEYS = ['state', 'restartsFrom', 'removed'];
  * put appends a service_events row on every change of the record's state and one `restart` row per new restart, and a
  * service_probes row per new lastProbe. remove keeps the history: the row turns stale/removed.
  */
-export function machineStore(m) {
+function machineStore(m) {
   const restartsOf = (name, from) => m.db.prepare("SELECT at FROM service_events WHERE name=? AND action='restart' AND at>=? ORDER BY at, seq").all(name, Number(from) || 0).map((r) => Number(r.at));
   const read = (row) => {
     if (!row) return null;
@@ -365,11 +363,6 @@ export function machineStore(m) {
   return { get, put, all, remove };
 }
 
-/** An in-memory store with the same shape (specs). */
-export function memoryStore(initial = []) {
-  const m = new Map(initial.map((r) => [r.name, structuredClone(r)]));
-  return { get: (n) => (m.has(n) ? structuredClone(m.get(n)) : null), put: (r) => { m.set(r.name, structuredClone(r)); return r; }, all: () => [...m.values()].map((r) => structuredClone(r)), remove: (n) => { m.delete(n); } };
-}
 
 let shared = null;
 /** The Host records in machine.sqlite (machineStore over one handle), opened once per process. */
@@ -396,7 +389,7 @@ export async function cleanEnv(env = process.env) {
  * explorer.exe so it takes the desktop shell's environment and never inherits this process's (CLAUDE_CODE_* and
  * the rest). Only processes whose image is the app exe are touched: the terminal daemon keeps running. Pure.
  */
-export function orcaRestartScript({ app, closeWaitMs }) {
+function orcaRestartScript({ app, closeWaitMs }) {
   return [
     `$app = ${psQuote(app)}`,
     '$mine = { @(Get-Process -Name Orca -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $app }) }',
@@ -457,7 +450,7 @@ const TURN_ROW = /esc(?:\s+twice)?\s+to\s+(?:interrupt|cancel)|\b(?:Working|Thin
  * "(12m 30s · ↓ 3k tokens · esc to interrupt)", Codex "Working (1h 02m 13s • esc to interrupt)", Devin
  * "Thinking · 5m 58s (esc twice to interrupt)". The lowest spinner row of the last 40 rows wins. Pure.
  */
-export function turnMinutesOf(screen) {
+function turnMinutesOf(screen) {
   const rows = String(screen ?? '').split(/\r?\n/).slice(-40).reverse();
   for (const row of rows) {
     if (!TURN_ROW.test(row)) continue;
@@ -479,7 +472,7 @@ const SEAT_AGENTS = new Set(['claude', 'codex', 'devin']);
  * This probe reads the terminal; current turn-budget can reuse its agent for an interrupt.
  * The identity proof describes provider evidence, not effect authority or cryptographic attestation.
  */
-export function seatAgentOf(entry, screen = '', fallback = null, identity = terminalIdentityOf(entry, { screen })) {
+function seatAgentOf(entry, screen = '', fallback = null, identity = terminalIdentityOf(entry, { screen })) {
   if (SEAT_AGENTS.has(identity.provider)) return identity.provider;
   // Keep the current probe policy; downstream interrupt eligibility belongs to turn-budget.
   return (fallback ? fallback(entry, 'claude') : null) ?? 'claude';

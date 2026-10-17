@@ -42,12 +42,6 @@ function fileAskReceipt(db, { workflowId, dispatchId, receipt, blob, at = Date.n
   return { receiptPath: blob.fileUri, receiptSha: blob.sha, receiptRef: `blob:${blob.sha}`, artifactId, decisionId };
 }
 
-/** Stage and file one receipt: in the caller's open ledger transaction, else in its own (`ledger.transaction`). */
-export function writeAskReceipt(ledger, { workflowId, dispatchId, receipt, at = Date.now() }) {
-  const blob = stageReceipt(receipt);
-  const file = (db) => fileAskReceipt(db, { workflowId, dispatchId, receipt, blob, at });
-  return ledger.transaction.active() ? file(ledger.db) : ledger.transaction(file);
-}
 
 /** Atomically accept one answer with its receipt, decision and terminal lifecycle event. */
 export function commitAskAnswer(ledger, { workflowId, dispatchId, receipt, at = Date.now(), payload = {}, events = [], blob: staged = null }) {
@@ -76,7 +70,7 @@ export function commitAskAnswer(ledger, { workflowId, dispatchId, receipt, at = 
 }
 
 /** True when `file` is a blob in the store (a receipt's file lives there). */
-export const isBlobFile = (file) => {
+const isBlobFile = (file) => {
   const rel = path.relative(artifactRoot(), path.resolve(file));
   return !!rel && !rel.startsWith('..') && !path.isAbsolute(rel);
 };

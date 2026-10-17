@@ -8,13 +8,13 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 
-export const INSTALL_MARKER = '.starci-install.json';
+const INSTALL_MARKER = '.starci-install.json';
 const MARKER_SCHEMA = 'starci/npm-install-marker@1';
 
 const markerFile = (cwd) => path.join(cwd, 'node_modules', INSTALL_MARKER);
 
 /** The digest of the manifest and lockfile an install is made from, or null when either is missing. */
-export function manifestDigest(cwd, read = fs.readFileSync) {
+function manifestDigest(cwd, read = fs.readFileSync) {
   try {
     const hash = crypto.createHash('sha256');
     for (const name of ['package.json', 'package-lock.json']) hash.update(name).update(read(path.join(cwd, name)));

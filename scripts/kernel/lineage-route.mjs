@@ -37,7 +37,7 @@ import { independentChecksOf } from './verbs/shared/check-evidence.mjs';
 import { agentSwitchOf } from './op-incident-policy.mjs';
 import { rejectionAttemptsOf } from './job-rejections.mjs';
 
-export const EXCLUDE_AFTER = agentSwitchOf().excludeAfter;
+const EXCLUDE_AFTER = agentSwitchOf().excludeAfter;
 const FAILED_NO_REPORT = 'failed-no-report';
 
 const parse = parseJsonOr;
@@ -76,7 +76,7 @@ const outageDuringOf = (db, row, pool) => {
  * Why one lineage attempt failed: {cause, attributable, detail}. `previous` is the attempt it retried (the
  * next older lineage row), used for repeat-red-check.
  */
-export function attemptCauseOf(db, row, previous = null) {
+function attemptCauseOf(db, row, previous = null) {
   const status = settledCauseOf(row);
   if (status) return status;
   const result = resultOf(row);

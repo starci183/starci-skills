@@ -9,7 +9,7 @@ import { fsBindings, fsMemberAccess, lineOf, ts } from './source-ast.mjs';
 export const CODE = 'RT_BASE_IMPURE';
 
 /** The RT_BASE_IMPURE findings of one base-tier source. */
-export function fileBaseFindings({ path: file, source, writeMembers, envSeam }) {
+function fileBaseFindings({ path: file, source, writeMembers, envSeam }) {
   const t = ts();
   const members = new Set(writeMembers);
   const { namespaces, members: functions } = fsBindings(source, (imported) => members.has(imported));

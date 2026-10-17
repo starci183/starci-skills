@@ -1,20 +1,3 @@
-// scripts/reconciler/testing.mjs — spec helpers for controllers (LANES shared contract).
-//
-//   fakeCtx(overrides)   a ctx with no child processes and no ledger writes. Every gated call is recorded:
-//                          ctx.calls.api   [{ledgerId, verb, argv}]        ctx.calls.run  [{cmd, args}]
-//                          ctx.calls.decisions [di]                        ctx.calls.log  [{kind, msg, data}]
-//                          ctx.calls.clock [{entity, state, slaMs, meta}]  ctx.calls.clear [{entity, state}]
-//                        ctx.api / ctx.run / ctx.openDecision answer {ok: true, shadow: true} in shadow (the default
-//                        mode) and `apiResult(call)` / `runResult(call)` / `decisionResult(di)` in active. `status` is a
-//                        map `${ledgerId}:${workflowId}` -> value, or a function. `read(ledgerId, fn)` runs fn over
-//                        `dbs[ledgerId]` (e.g. a DatabaseSync on a fixture ledger). `owns` defaults to mode === 'active'.
-//                        Any other member (read, api, clock, log, ...) passed in `overrides` replaces the default, so a
-//                        spec keeps its own recorders and still gets the whole ctx contract (env, machine, stateDb,
-//                        stateFile, key, epoch, openReader).
-//   tempState()          a machine.sqlite in a fresh temp directory: {dir, file, env, m, db (= m), own(x), close()}; env
-//                        names it (STARCI_TEST_MACHINE_FILE); close() closes every own()ed handle first, then removes
-//                        the directory.
-import assert from 'node:assert/strict';
 import path from 'node:path';
 import { TEST_REGISTRY_ENV, openMachine } from '../../engine/db/machine.mjs';
 import { safeRemove } from '../api/fs/safe-remove.mjs';
@@ -22,14 +5,6 @@ import { artifactHoldReason } from '../machine/artifact-hold.mjs';
 import { tempRoot } from '../../engine/temp-root.mjs';
 import { makeTempDir } from '../api/fs/make-temp-dir.mjs';
 
-/** The shared controller contract, asserted once per controller spec: the module names itself, owns its
- *  concerns, routes its declared event to its duty key, and ships a reconcile function. */
-export function controllerContract(controller, { name, concerns, routeKey, routeEvent = {}, duty }) {
-  assert.equal(controller.name, name);
-  assert.deepEqual(controller.concerns, concerns);
-  assert.equal(typeof controller.reconcile, 'function');
-  assert.equal(controller.routes[routeKey](routeEvent), duty);
-}
 
 export function fakeCtx(overrides = {}) {
   const {

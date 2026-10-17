@@ -26,7 +26,7 @@ function readLegacy(run, ingress) {
 }
 
 /** The stack model (compose spec as JSON, which is valid YAML). */
-export function stackModel(ingress, { args, dynamicTarget, acmeTarget }) {
+function stackModel(ingress, { args, dynamicTarget, acmeTarget }) {
   const ports = [80, 443].map((port) => ({ target: port, published: port, protocol: 'tcp', mode: 'host' }));
   return {
     services: {
@@ -54,7 +54,7 @@ export function stackModel(ingress, { args, dynamicTarget, acmeTarget }) {
 }
 
 /** The guard that no task can start from this model. */
-export function refuseRunning(model) {
+function refuseRunning(model) {
   for (const [name, service] of Object.entries(model.services)) {
     if (service.deploy?.replicas !== 0) throw refusal('STACK_INGRESS_WOULD_START', `the ingress service ${name} would start a task; create deploys it with replicas 0 only`);
   }

@@ -88,7 +88,7 @@ export function slotTopicMap({ base = runtimeRoot } = {}) {
  * longest dotted prefix of the slot the derived map knows (slotTopicMap). A null slot (hfs could not explain the path)
  * owes no named file; its judgment asks for any pattern file instead.
  */
-export function patternsForSlot(slot, doc = loadOpGate(), map = slotTopicMap()) {
+function patternsForSlot(slot, doc = loadOpGate(), map = slotTopicMap()) {
   if (!slot) return [];
   const family = doc.kinds[String(slot).split('.')[0]];
   if (!family) return [];

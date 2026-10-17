@@ -113,7 +113,7 @@ export function scrub(text){
 // ---- configuration ----------------------------------------------------------------------------------------
 
 /** The source host's dev stack - the stack the repository hosting this runtime runs: <host>/.starcistacks/dev. */
-export function sourceHostStackDir(){
+function sourceHostStackDir(){
   return path.join(runtimeHostRoot(),'.starcistacks','dev');
 }
 
@@ -172,7 +172,7 @@ const declaredProjectsOf=sonar=>{
  *   ci and ownerAction, passed through.
  * Returns null when the declaration carries no Sonar service.
  */
-export function readSonarDeclaration(file,repoRoot=path.dirname(path.dirname(path.resolve(file)))){
+function readSonarDeclaration(file,repoRoot=path.dirname(path.dirname(path.resolve(file)))){
   const doc=parseYaml(fs.readFileSync(file,'utf8'));
   const sonar=[doc?.services?.sonar,doc?.quality?.sonar,doc?.services?.quality?.sonar].find(plain);
   if(!sonar)return null;
@@ -264,7 +264,7 @@ const custodyView=entry=>({name:entry.name,present:entry.present,...(entry.via?{
   ...(entry.rejected?{rejected:true}:{}),...(entry.refusal?{refusal:entry.refusal}:{}),...(entry.identityRefusal?{identityRefusal:entry.identityRefusal}:{}),...(entry.reason?{reason:entry.reason}:{})});
 
 /** The custody member a minted project analysis token lives in: runtime/files/sonarqube-KEY-token.key. */
-export const projectTokenRef=key=>`runtime/files/sonarqube-${String(key).replace(/[^A-Za-z0-9_.-]/g,'_')}-token.key`;
+const projectTokenRef=key=>`runtime/files/sonarqube-${String(key).replace(/[^A-Za-z0-9_.-]/g,'_')}-token.key`;
 
 /** The .starcistacks root a custody member resolves into - the tree a stack-secret tool manages. */
 const stackRootOf=file=>{
@@ -684,7 +684,7 @@ export async function evaluateSlice(cfg,tokens,{key,slice,props={},pkg=null,gate
  * sonar-project.properties as given; a bare name (no separator) the directory of that name beside or
  * above `base`, or `base` itself when that is its name. Otherwise the value resolved as a path.
  */
-export function resolveScanCwd(value,base=process.cwd()){
+function resolveScanCwd(value,base=process.cwd()){
   if(!value)return path.resolve(base);
   const isRoot=dir=>fs.existsSync(path.join(dir,'package.json'))||fs.existsSync(path.join(dir,'sonar-project.properties'));
   const direct=path.resolve(base,value);
@@ -699,7 +699,7 @@ export function resolveScanCwd(value,base=process.cwd()){
 }
 
 /** The throwaway project key an isolated slice analysis runs under: stable per repository key and scope. */
-export function isolatedKey(key,scope){
+function isolatedKey(key,scope){
   const hash=createHash('sha1').update(`${key}\n${[...scope].sort(byCodeUnit).join('\n')}`).digest('hex').slice(0,10);
   return `${key}-slice-${hash}`.slice(0,400);
 }
@@ -727,7 +727,7 @@ const testInclusions=(scope,patterns,hasTests,main,isFile)=>{
  * it, so no file is ever indexed as both source and test); a repository with sonar.tests and no test
  * patterns gets the scope globs as its test inclusions.
  */
-export function isolationDefines(cwd,props,scope){
+function isolationDefines(cwd,props,scope){
   const isFile=p=>{try{return fs.statSync(path.join(cwd,p)).isFile();}catch{return false;}};
   const main=scope.map(p=>isFile(p)?p:`${p}/**`);
   const patterns=splitList(props['sonar.test.inclusions']);
@@ -1072,7 +1072,7 @@ const commandConfig=(args,config,env,command)=>{
   return command==='status'||command==='ensure-project'||command==='up'||command==='stop'?sonarAdministrativeConfig(cfg):cfg;
 };
 
-export async function sonarLocalMain(argv=[],{env=process.env,config,put=null}={}){
+async function sonarLocalMain(argv=[],{env=process.env,config,put=null}={}){
   const args=parseArgs(argv);
   if(args.out&&args.blob)return {exitCode:2,text:'sonar-local: --out and --blob are mutually exclusive'};
   if(args.cwd)args.cwd=resolveScanCwd(args.cwd);

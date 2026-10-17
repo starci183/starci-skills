@@ -31,7 +31,7 @@ const TZ = 'Asia/Ho_Chi_Minh';
 
 // A plain-language label for each leg, so the owner never has to decode an op id: the shared op labels
 // (modules/ops/_labels.yaml through scripts/lib/display-names.mjs), the same words the UI and Orca show.
-export const LEG_VI = Object.freeze(Object.fromEntries(Object.entries(opLabelMap()).map(([op, label]) => [op, label.vi ?? op])));
+const LEG_VI = Object.freeze(Object.fromEntries(Object.entries(opLabelMap()).map(([op, label]) => [op, label.vi ?? op])));
 // The label in the report's language (modules/ops/_labels.yaml carries vi and en), the vi one when neither is declared.
 const legLabel = (op, language) => opLabel(op, language);
 const baseName = (wf) => wf.replace(/^wf-/, '').replace(/-mu[a-z0-9]{6,}$/, '');
@@ -68,7 +68,7 @@ const publicBaseOf = (config) => {
  * inc-8cce1cf1b330). Each: {jobId, op, outcome, heldBecause, incident, peer, peerJob, since, doneAt,
  * workerReleased}; `since` is when the hold began (the later of the wait and the consumed report).
  */
-export function settleHoldsOf(db, workflowId, { now = Date.now() } = {}) {
+function settleHoldsOf(db, workflowId, { now = Date.now() } = {}) {
   const waits = db.prepare("SELECT incident_id, op_id, last_progress, updated_at FROM incidents WHERE workflow_id=? AND status='open' ORDER BY updated_at").all(workflowId)
     .map((row) => {
       const kind = /^\[([^\]]+)\]/.exec(row.last_progress ?? '')?.[1] ?? null;
@@ -99,7 +99,7 @@ export function settleHoldsOf(db, workflowId, { now = Date.now() } = {}) {
 }
 
 /** One running workflow's progress, read from its ledger. */
-export function workflowProgress(db, wf, { now = Date.now(), publicBase = null, blocking = null, language = ownerLanguage() } = {}) {
+function workflowProgress(db, wf, { now = Date.now(), publicBase = null, blocking = null, language = ownerLanguage() } = {}) {
   const tr = translator(language);
   const goalRow = db.prepare('SELECT json, markdown FROM goals WHERE workflow_id=? ORDER BY goal_seq DESC LIMIT 1').get(wf.workflow_id);
   const g = parseJson(goalRow?.json, {}) ?? {};
@@ -216,7 +216,7 @@ function etaLine(r, tr) {
 }
 
 /** One readable section for one workflow (HTML). */
-export function workflowSection(r, { now = Date.now(), language = ownerLanguage() } = {}) {
+function workflowSection(r, { now = Date.now(), language = ownerLanguage() } = {}) {
   const tr = translator(language);
   const line = [];
   line.push(tr('<b>▶ {name}</b> — {done}/{total} legs done', { name: escapeHtml(r.name), done: r.done, total: r.total }));

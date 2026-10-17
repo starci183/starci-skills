@@ -19,8 +19,8 @@ import { inspectOwnerConfig, specsSettings } from '../../engine/config.mjs';
 import { attachedNameOf } from '../lib/display-names.mjs';
 import { oneLine } from '../lib/clip.mjs';
 
-export const SONAR_CHECK = 'sonar-gate';
-export const SONAR_INCIDENT_TAG = '[runtime-sonar-unavailable]';
+const SONAR_CHECK = 'sonar-gate';
+const SONAR_INCIDENT_TAG = '[runtime-sonar-unavailable]';
 const SUMMARY_MAX_BYTES = 8 * 1024 * 1024;
 
 
@@ -29,7 +29,7 @@ const SUMMARY_MAX_BYTES = 8 * 1024 * 1024;
  * The newest sonar-local scan summary among a job's files ([{abs, name?}] from collectJobFiles), or null. A file counts
  * only when it parses as JSON with a starci/sonar-local-scan schema, whatever it is called: the name only narrows the read.
  */
-export function readSonarSummary(files) {
+function readSonarSummary(files) {
   let best = null;
   for (const file of files ?? []) {
     if (!file?.abs || !/sonar/i.test(attachedNameOf(file)) && !/sonar/i.test(path.basename(file.abs))) continue;

@@ -34,10 +34,9 @@ topic words and whose sentences overlap at least 30%. Exit 0 clean, 1 lists
 the findings, 2 is a bad argument.`;
 
 const DEFAULT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-export const DOC_OWNER_MISSING = 'RT_DOC_NO_OWNER';
+const DOC_OWNER_MISSING = 'RT_DOC_NO_OWNER';
 const DOC_DIR = 'docs';
 const HEADER = /^(Owner|Task):[ \t]+/;
-const ANY_HEADER = /^(Owner|Task):/m;
 const OWNER_ROOT = /^(?:knowledge|modules)\//;
 /** Words that mark a form, not a topic ("the", "a", ...): they never count toward a shared title. */
 const STOP_WORDS = new Set(['the', 'and', 'for', 'with', 'from', 'how', 'what', 'when', 'your', 'you', 'one', 'are', 'its', 'into', 'that', 'this', 'under', 'over', 'per', 'not', 'nor', 'via', 'out', 'all', 'any']);
@@ -49,7 +48,7 @@ const OVERLAP_RATIO = 0.3;
 const SHARED_TOPIC_WORDS = 2;
 
 /** The tracked Markdown documents of `root`'s docs/ (repository-relative POSIX paths); the filesystem when `root` is no Git work tree. */
-export function docFiles(root = DEFAULT_ROOT) {
+function docFiles(root = DEFAULT_ROOT) {
   const isDoc = (rel) => /^docs\/.+\.md$/.test(rel);
   try {
     return gitOutputOf(lsFiles(['-z', '--', DOC_DIR], { dir: root }), 'git ls-files').split('\0').filter(Boolean)
@@ -177,7 +176,7 @@ const pairFindings = (docs, add) => {
   }
 };
 
-export function docOwnerFindings(root = DEFAULT_ROOT) {
+function docOwnerFindings(root = DEFAULT_ROOT) {
   const findings = [];
   const add = (rel, message, other) => findings.push({ code: DOC_OWNER_MISSING, path: rel, ...(other ? { other } : {}), message });
   const docs = docFiles(root).map((rel) => readDocument(root, rel));
@@ -190,7 +189,7 @@ export function docOwnerFindings(root = DEFAULT_ROOT) {
   return findings;
 }
 
-export function checkDocOwnerMain(argv) {
+function checkDocOwnerMain(argv) {
   const parsed = parseCheckArgs(argv, { name: 'check-doc-owner', help: HELP, root: DEFAULT_ROOT });
   if (parsed.exitCode !== undefined) return parsed;
   const { root, json } = parsed;

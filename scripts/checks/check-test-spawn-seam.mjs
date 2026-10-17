@@ -23,7 +23,7 @@ const SEAM = 'scripts/api/node/lib.mjs';
 const LAUNCHERS = ['nodeSpawn', 'nodeStart', 'nodeExecFile'];
 
 /** The findings over the tracked runtime scripts at `root`. */
-export function checkTestSpawnSeam(root = skillRoot) {
+function checkTestSpawnSeam(root = skillRoot) {
   const tracked = gitOutputOf(lsFiles(['-z'], { dir: root, maxBuffer: 64 * 1024 * 1024 }), 'git ls-files -z').split('\0').filter((rel) => /^scripts\/.*\.mjs$/.test(rel) && !rel.startsWith('scripts/api/'));
   const findings = [];
   for (const rel of tracked) {

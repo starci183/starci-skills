@@ -26,7 +26,7 @@ const npmEntryCandidates = ({ execPath = process.execPath, env = process.env } =
 };
 
 /** Find npm's JavaScript entry so Node can execute it without a command shell. */
-export function resolveNpmEntry({ execPath = process.execPath, env = process.env, exists = existsSync } = {}) {
+function resolveNpmEntry({ execPath = process.execPath, env = process.env, exists = existsSync } = {}) {
   return npmEntryCandidates({ execPath, env }).find((candidate) => exists(candidate)) ?? null;
 }
 

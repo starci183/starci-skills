@@ -8,7 +8,7 @@ import { found } from './read.mjs';
 
 export const HFS_ASSET_OVERSIZE = 'HFS_ASSET_OVERSIZE';
 export const HFS_ASSET_KIND = 'HFS_ASSET_KIND';
-export const DEFAULT_ASSET_BYTES = 512000;
+const DEFAULT_ASSET_BYTES = 512000;
 const BUILD_EXTENSIONS = ['.ttf', '.otf', '.woff', '.woff2', '.eot', '.png', '.svg', '.webp', '.jpg', '.jpeg', '.gif', '.ico', '.avif', '.bmp', '.tif', '.tiff'];
 const MEDIA_EXTENSIONS = new Set(['.mp3', '.mp4', '.wav', '.ogg', '.oga', '.opus', '.flac', '.aac', '.m4a', '.wma', '.aiff', '.aif', '.mid', '.midi', '.mov', '.m4v', '.webm', '.avi', '.mkv', '.mpeg', '.mpg', '.wmv', '.flv', '.3gp']);
 const IMAGE_EXTENSIONS = new Set(BUILD_EXTENSIONS.filter((ext) => !['.ttf', '.otf', '.woff', '.woff2', '.eot'].includes(ext)));

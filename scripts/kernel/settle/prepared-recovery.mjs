@@ -16,7 +16,7 @@ import { revParse } from '../../api/git/rev-parse.mjs';
 import { reset as gitReset } from '../../api/git/reset.mjs';
 
 /** The typed code of a withdrawal. */
-export const PREPARED_WITHDRAWN_CODE = 'prepared-settlement-withdrawn';
+const PREPARED_WITHDRAWN_CODE = 'prepared-settlement-withdrawn';
 /** The event that records a prepared receipt the runtime looked at and kept. */
 export const PREPARED_KEPT = 'workflow-op-preserved-kept';
 

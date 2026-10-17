@@ -14,7 +14,7 @@
 // op-business.decide-660a4d3e9a, waited until-job op-interface.draw-9f387aad28 succeeded, while that
 // draw read `dependency` behind the very business.decide job the gate held, a hold that could never release it.
 
-export const GATE_WAITS_ON_JOB = 'gate-waits-on-job';
+const GATE_WAITS_ON_JOB = 'gate-waits-on-job';
 
 /**
  * Why `row` (a pending job of an earlier leg) does not hold `job` in leg order, or null when it does.

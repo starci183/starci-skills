@@ -57,7 +57,7 @@ const WAKE_TAG = '[Supervisor watchdog]';
 const recentWakes = (m) => m.supEvents({ kind: 'supervisor-wake', limit: 50 }).map((e) => ({ at: e.created_at, payload: e.payload ?? {} }));
 /** How far back unconsumed worker reports are read (modules/models/runtimes.yaml
  * allocation.workerJobs.reportWindowMs). */
-export const WORKER_REPORT_WINDOW_MS = allocationMs('workerJobs.reportWindowMs');
+const WORKER_REPORT_WINDOW_MS = allocationMs('workerJobs.reportWindowMs');
 /** The job ids of worker reports not yet consumed that are not done (diagnosed, blocked, failed), the last WORKER_REPORT_WINDOW_MS. */
 const filedReports = (m, now) => m.db.prepare("SELECT DISTINCT job_id FROM sup_reports WHERE outcome!='done' AND consumed_at IS NULL AND created_at>?")
   .all(now - WORKER_REPORT_WINDOW_MS).map((r) => r.job_id);
@@ -73,19 +73,19 @@ const filedReports = (m, now) => m.db.prepare("SELECT DISTINCT job_id FROM sup_r
  * the wake restarts the seat through the replace path.
  */
 const SUBAGENT_ROW = new RegExp([String.raw`^\s*(?:❯\s*)?`, '[●◯◐◑◒◓]', String.raw`\s+`, String.raw`(?!main\s*$)`, String.raw`[\w.@-]+`, String.raw`\s{2,}`, String.raw`\S.*?`, String.raw`\b\d+m`, String.raw`(?:\s*\d+s)?`, String.raw`\s*·`].join(''), 'mu');
-export const busyScreen = (screen) => SUBAGENT_ROW.test(String(screen ?? ''));
+const busyScreen = (screen) => SUBAGENT_ROW.test(String(screen ?? ''));
 
 /**
  * The signature of a busy frame: the normalized screen text, hashed. A subagent/agent row or a spinner
  * timer whose text has not changed across watchdog reads signs identically; a timer that still ticks
  * signs differently and is still busy.
  */
-export const busySignature = (screen) => sha256(
+const busySignature = (screen) => sha256(
   String(screen ?? '').split(/\r?\n/).map((row) => row.trimEnd()).join('\n').trim()
 ).slice(0, 24);
 
 /** An input row aimed at a subagent ("❯ Message @general-purpose…"): Escape leaves it before a wake. */
-export const SUBAGENT_INPUT = new RegExp(String.raw`^\s*${INPUT_GLYPH_CLASS}[^\n]*@[\w@.-]+`, 'm');
+const SUBAGENT_INPUT = new RegExp(String.raw`^\s*${INPUT_GLYPH_CLASS}[^\n]*@[\w@.-]+`, 'm');
 
 /** Busy screen states a frozen frame rescues; gates/failed/unreadable stay plain busy. */
 const FROZEN_BUSY = new Set(['active', 'unknown', 'wedged', 'subagents-running']);
@@ -111,7 +111,7 @@ const putBusyFrame = (m, terminal, state) => {
  * (no turn progress - config.yaml supervisor.frozenMinutes). `state` is what the next read
  * compares against; `since` keeps the first sighting of a repeating signature.
  */
-export function frozenBusyFrame({ signature, prev = null, now = Date.now(), outputAgeMs = null, frozenMs = DEFAULTS.frozenMinutes * 60_000 }) {
+function frozenBusyFrame({ signature, prev = null, now = Date.now(), outputAgeMs = null, frozenMs = DEFAULTS.frozenMinutes * 60_000 }) {
   const same = prev?.signature === signature;
   const state = { signature, since: same ? prev.since ?? now : now, reads: same ? (prev.reads ?? 1) + 1 : 1 };
   const frozen = same || (Number.isFinite(outputAgeMs) && outputAgeMs >= frozenMs);
@@ -154,7 +154,7 @@ function wakeText({ tags, unread, fresh, remind, openDis, diFresh, diRemind, lan
   return text;
 }
 
-export function planWake({ now = Date.now(), wakes = [], unread = [], reported = [], filed = [], workerDeaths = [], registered = true, decisions = [], revision = null }) {
+function planWake({ now = Date.now(), wakes = [], unread = [], reported = [], filed = [], workerDeaths = [], registered = true, decisions = [], revision = null }) {
   const tags = [];
   const announced = announcedAt(wakes, 'inbox');
   const fresh = unread.filter((m) => !announced.has(m.id)).map((m) => m.id);
@@ -441,7 +441,7 @@ function wakeLiveSeat({ m, deps, env, now, settings, terminal }) {
 }
 
 /** One watchdog pass. `d` = host seams. Returns {ok, action, ...}. */
-export async function watchdogPass({ env = process.env, d = null, now = Date.now } = {}) {
+async function watchdogPass({ env = process.env, d = null, now = Date.now } = {}) {
   if (supervisorMode({ env }) === 'chat') return { ok: true, action: 'chat-mode' };
   const deps = d ?? await hostDeps();
   const settings = supervisorSettings();

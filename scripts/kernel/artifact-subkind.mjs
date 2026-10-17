@@ -41,7 +41,7 @@ const CAPTURE_SEG = /^(?:evidence|screens|captures|live|observed|renders|calibra
 const TOKEN_DIR = /^(?:token-render(?:-.+)?|token-redraw(?:-.+)?|token-draft|token-\d[^/]*)$/i;
 
 /** The generation tool a manifest names, as a subkind: draw-render, asset-gen, or null. */
-export function subkindOfTool(tool) {
+function subkindOfTool(tool) {
   const t = String(tool ?? '').trim().toLowerCase();
   if (!t) return null;
   if (t === 'draw-render') return 'draw-render';
@@ -56,8 +56,6 @@ const readRecord = (dir, name = 'index.yaml') => {
   if (!recordCache.has(key)) { let doc = null; try { const st = fs.statSync(key); doc = st.size < 8 * 1024 * 1024 ? parseYaml(fs.readFileSync(key, 'utf8')) : null; } catch { doc = null; } recordCache.set(key, doc); }
   return recordCache.get(key);
 };
-/** Forget cached ui records (a backfill run or a spec that rewrites them). */
-export const clearManifestCache = () => { recordCache.clear(); recordIndexCache.clear(); drawRecordCache.clear(); };
 
 const MANIFEST_FILES = new Set(['index.yaml', 'draws.yaml', 'manifest.yaml']);
 const NAME_KEYS = ['path', 'image', 'file', 'prompt', 'promptPath'];
@@ -121,7 +119,7 @@ function recordToolIndex(repo, recordDir) {
  * (features/<f>/(ui|impl)[/<surface>]/...): an entry carrying generation.tool or provenance.tool that names the file
  * (recordToolIndex). Null when no manifest of its record names it.
  */
-export function manifestToolOf(repo, rel) {
+function manifestToolOf(repo, rel) {
   if (!repo) return null;
   const file = slash(rel);
   if (!workPathAllowed(path.join(repo, WORK_DIR_NAME), path.resolve(repo, file))) return null;

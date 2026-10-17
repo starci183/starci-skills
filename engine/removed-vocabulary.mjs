@@ -12,8 +12,6 @@ function loaded(){
   return cache.doc;
 }
 
-/** The kinds a removed spelling has. */
-export const removedKinds=()=>loaded().kinds;
 
 /** modules/kernel/removed-vocabulary.yaml: the one list of spellings the runtime refuses, each with its replacement and the release that removed it. */
 export const removedVocabulary=()=>loaded().removed;

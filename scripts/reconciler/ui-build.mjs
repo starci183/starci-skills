@@ -53,7 +53,7 @@ export function manifestNewerThanInstall(root, fsImpl = fs) {
 }
 
 /** The one line a failed UI install is reported by: its cause, and the file and processes holding it when a running process does (the previous install is left in place). */
-export function installFailureLine(install, root, holders = treeHolders) {
+function installFailureLine(install, root, holders = treeHolders) {
   const failure = installFailureOf(install?.stderr);
   const base = `UI dependency install failed: ${String(install?.stderr ?? 'no successful receipt').slice(0, 300)}`;
   if (failure.cause !== 'file-locked') return base;

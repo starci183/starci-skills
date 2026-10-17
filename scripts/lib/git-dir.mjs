@@ -97,7 +97,7 @@ export function headShaOf(root, { headsOnly = false, commonOnly = false } = {}) 
 const words = (line) => [...String(line ?? '').matchAll(/"([^"]*)"|(\S+)/g)].map((m) => m[1] ?? m[2]);
 
 /** The repositories a git command line names by -C, --git-dir or --work-tree (as given, unresolved). */
-export function reposNamed(commandLine) {
+function reposNamed(commandLine) {
   const w = words(commandLine), out = [];
   for (let i = 0; i < w.length; i += 1) {
     if (w[i] === '-C' || w[i] === '--git-dir' || w[i] === '--work-tree') { if (w[i + 1]) { out.push(w[i + 1]); } i += 1; continue; }

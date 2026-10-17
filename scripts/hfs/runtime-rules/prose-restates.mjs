@@ -36,7 +36,7 @@ const isSlotFileName = (name) => {
 };
 
 /** The file names the slots of the app root and the sides declare as literal entries (no placeholder, no glob), as a Set. */
-export function slotFileNames(manifest) {
+function slotFileNames(manifest) {
   const names = new Set();
   for (const slot of manifest.slots) {
     for (const entry of [...braceVariants(slot.path), ...(slot.requires ?? [])]) {

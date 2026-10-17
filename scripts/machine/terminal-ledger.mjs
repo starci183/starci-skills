@@ -9,13 +9,6 @@
 import { parseJson } from '../lib/json.mjs';
 import { normPath as normSpelling } from '../lib/path-key.mjs';
 
-/** Where a job row's terminal lives, in priority order: the worker column, then the payload. */
-export const JOB_HANDLE_FIELDS = Object.freeze([
-  'worker_id',
-  'orca.agentTerminalHandle',
-  'managed.agentTerminalHandle',
-  'hierarchy.runtime.terminalHandle',
-]);
 
 /** The job statuses that still hold a live agent terminal (leased/queued jobs hold none yet). */
 export const WORKER_HOLDING_STATUSES = Object.freeze(['running', 'answering']);

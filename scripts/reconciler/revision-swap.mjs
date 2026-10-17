@@ -25,7 +25,7 @@ export function previousBootRev(machine) {
 }
 
 /** The machine_logs row of one swap: cause 'engine-start' | 'land', both revisions, the actions performed. */
-export function swapRow({ cause, fromRev = null, toRev = null, applied = [], at = undefined }) {
+function swapRow({ cause, fromRev = null, toRev = null, applied = [], at = undefined }) {
   const short = (rev) => (rev ? String(rev).slice(0, 9) : 'unknown');
   const did = applied.map((a) => a.action + ' ' + (a.count ?? 1)).join(', ') || 'nothing';
   return signalRow(SIGNAL.runtimeChange, `runtime revision ${short(fromRev)} to ${short(toRev)} applied (${cause}): ${did}`,

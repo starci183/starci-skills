@@ -54,7 +54,7 @@ const primaryWorktreeOf=(dir)=>{
  * The primary worktree itself, and any standalone checkout, always answer their own: a missing dist on live main
  * stays `missing`.
  */
-export function shippedGrammarPackageRoot(runtimeRoot=skillRoot,deps={}){
+function shippedGrammarPackageRoot(runtimeRoot=skillRoot,deps={}){
   const own=path.join(runtimeRoot,'packages','grammar');
   if((deps.exists??fs.existsSync)(path.join(own,'dist')))return own;
   const primary=(deps.primaryOf??primaryWorktreeOf)(runtimeRoot);
@@ -64,7 +64,7 @@ export function shippedGrammarPackageRoot(runtimeRoot=skillRoot,deps={}){
 export const defaultGrammarPackageRoot=()=>shippedGrammarPackageRoot(skillRoot);
 
 /** Every `--name: value` declaration outside a comment, in document order, whitespace collapsed. */
-export function cssTokenDeclarations(text){
+function cssTokenDeclarations(text){
   const code=String(text).replace(/\/\*[\s\S]*?\*\//g,'');
   return [...code.matchAll(CSS_TOKEN_DECLARATION)].map(m=>({name:m[1],value:m[2].trim().replace(/\s+/g,' ')}));
 }
@@ -108,7 +108,7 @@ function compareCssTokens(packageRoot){
  * `dist/`. Symlinks are resolved first, so `node_modules/@starci/grammar` of a `file:` consumer lands on
  * the linked package directory.
  */
-export function grammarPackageOf(file){
+function grammarPackageOf(file){
   let real;
   try{real=fs.realpathSync(path.resolve(file));}catch{return null;}
   for(let cursor=path.dirname(real);path.dirname(cursor)!==cursor;cursor=path.dirname(cursor)){
@@ -203,12 +203,4 @@ export function grammarDistRefusal(file){
   if(!owner?.inDist)return null;
   const status=grammarDistStatus(owner.root);
   return status.ok?null:{...status,message:grammarDistMessage(status)};
-}
-
-/** Throws the fix message when `packageRoot` is a grammar package whose dist is not fresh. */
-export function assertGrammarDistFresh(packageRoot){
-  if(readJson(path.join(packageRoot,'package.json'))?.name!==GRAMMAR_PACKAGE)return null;
-  const status=grammarDistStatus(packageRoot);
-  if(!status.ok)throw new Error(grammarDistMessage(status));
-  return status;
 }

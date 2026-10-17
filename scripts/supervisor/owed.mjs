@@ -180,7 +180,7 @@ export const citedIncidents = (text, own = null) => [...new Set(String(text ?? '
  * or repeats), 'keywords' (two or more rare file-name/identifier tokens, score >= 4;
  * a token in more than 2% of the commits counts for nothing).
  */
-export function linkFix({ incidentId, kind, text, raisedAt }, commits) {
+function linkFix({ incidentId, kind, text, raisedAt }, commits) {
   const after = commits.filter((c) => c.at > raisedAt);
   const newest = (list) => list.sort((a, b) => b.at - a.at)[0] ?? null;
   const pick = (c, how, extra = {}) => ({ sha: c.sha, at: c.at, subject: clipLine(c.subject, 120), how, ...extra });
@@ -316,7 +316,7 @@ const classifyWorkflow = (env, wf) => {
  * busy peers included (peerBusyProbe over `frontierOf`). Returns
  * [{class, reason, workflowId, repo, incidentId, kind, labels, raisedAt, ageMin, text, summary}].
  */
-export function classifyIncidents(db, { repo = null, ledgers = [], now = Date.now(), wanted = new Set(), graceMs = GATE_GRACE_MS, stallMinutes = stallMinutesOf(),
+function classifyIncidents(db, { repo = null, ledgers = [], now = Date.now(), wanted = new Set(), graceMs = GATE_GRACE_MS, stallMinutes = stallMinutesOf(),
   verdicts = null, frontierOf = apiFrontier } = {}) {
   const find = ledgerLookup({ repo, db, ledgers });
   const dbOf = (wf) => find(wf)?.db ?? null;
@@ -373,7 +373,7 @@ const fixedByTextOf = (fixedBy) => {
  */
 const lastWorseAt = (item) => item.lastFailureAt ?? item.updatedAt ?? item.raisedAt ?? 0;
 /** True while ack still holds item quiet: nothing on its lineage got worse after the ack. */
-export const ackHolds = (item, ack) => Boolean(ack) && lastWorseAt(item) <= ack.at;
+const ackHolds = (item, ack) => Boolean(ack) && lastWorseAt(item) <= ack.at;
 
 /** The sup_owed kind of an item key: 'incident' | 'pattern:<name>' | the key's first part. Pure. */
 const owedKindOf = (key, item) => item?.kind ?? (String(key).startsWith('pattern:') ? String(key).split(':').slice(0, 2).join(':') : String(key).split(':')[0] || 'owed');
@@ -382,7 +382,7 @@ const owedKindOf = (key, item) => item?.kind ?? (String(key).startsWith('pattern
  * Every stored ack (machine.sqlite sup_owed rows in state acked; detail_json is the ack):
  * Map<key, {key, commits, reason, at, by, workflowId, summary}> (empty when machine.sqlite does not exist yet).
  */
-export function readOwedAcks({ env = process.env } = {}) {
+function readOwedAcks({ env = process.env } = {}) {
   return readSupervisor((m) => new Map(m.db.prepare("SELECT owed_id, detail_json, acked_at FROM sup_owed WHERE state='acked' ORDER BY acked_at").all()
     .map((r) => { const v = parse(r.detail_json) ?? {}; return [r.owed_id, { ...v, key: r.owed_id, at: Number(v.at ?? r.acked_at) }]; })), new Map(), { env });
 }
@@ -400,7 +400,7 @@ export function ackOwed({ key, commits, reason, item = null, by = 'cli', now = D
 }
 
 /** Drop the ack of `key` (its sup_owed row closes), with an owed-unacked audit event; true when there was one. */
-export function unackOwed({ key, now = Date.now(), env = process.env }) {
+function unackOwed({ key, now = Date.now(), env = process.env }) {
   return withSupervisor((m) => m.transaction(() => {
     const had = m.db.prepare("UPDATE sup_owed SET state='closed', closed_at=? WHERE owed_id=? AND state='acked'").run(now, key).changes > 0;
     if (had) supervisorEvent(m, { entityType: 'owed-item', entityId: key, kind: 'owed-unacked', payload: { key }, now });

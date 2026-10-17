@@ -53,7 +53,7 @@ import { tarFiles } from '../lib/tar-files.mjs';
 import { BUNDLES, CATALOG } from '../hfs/sync-runtime.mjs';
 import { makeTempDir } from '../api/fs/make-temp-dir.mjs';
 
-export const PROOF_EXIT = Object.freeze({ green: 0, red: 1, unrun: 2 });
+const PROOF_EXIT = Object.freeze({ green: 0, red: 1, unrun: 2 });
 export const PROOF_CODES = Object.freeze({ install: 'PACKAGE_INSTALL_RED', test: 'PACKAGE_TEST_RED', noTest: 'PACKAGE_NO_TEST', unrun: 'PACKAGE_PROOF_UNRUN' });
 const runtimeRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const LOCKFILES = ['package-lock.json', 'npm-shrinkwrap.json'];
@@ -67,7 +67,7 @@ const readJson = (file) => JSON.parse(fs.readFileSync(file, 'utf8'));
 const tail = (text, n = 30) => tailLines(text, n);
 
 /** The published packages: [{name, dir}] with `dir` runtime-relative (posix), from the starci pins that name a source. */
-export function publishSet(root = runtimeRoot) {
+function publishSet(root = runtimeRoot) {
   return Object.entries(loadPins(root)?.pins ?? {})
     .filter(([, pin]) => pin?.group === 'starci' && pin.source)
     .map(([name, pin]) => ({ name, dir: posixPath(path.dirname(pin.source)) }));
@@ -111,7 +111,7 @@ function workspaceRootOf(dir, root) {
  * The install units of `packages` ([{name, dir}], dir relative to `root`): one per standalone package, one per workspace
  * root holding the published members. [{kind: 'standalone'|'workspace', dir, members: [abs], packages: [{name, dir}]}]
  */
-export function installUnits(packages, root = runtimeRoot) {
+function installUnits(packages, root = runtimeRoot) {
   const units = new Map();
   for (const pkg of packages) {
     const abs = path.resolve(root, pkg.dir);
@@ -130,7 +130,7 @@ function mirrorsAny(pkg, files) {
 }
 
 /** The packages of the publish set that `changed` (runtime-relative files) touches: a file inside a package, a file its runtime copy mirrors, or a workspace root's manifest or lockfile. */
-export function packagesChanged(changed, packages, root = runtimeRoot) {
+function packagesChanged(changed, packages, root = runtimeRoot) {
   const files = changed.map((f) => posixPath(path.isAbsolute(f) ? path.relative(root, f) : f));
   return packages.filter((pkg) => {
     if (files.some((f) => f.startsWith(`${pkg.dir}/`)) || mirrorsAny(pkg, files)) return true;
@@ -371,7 +371,7 @@ function proveUnit(unit, { root = runtimeRoot, env = process.env, npm = npmRun, 
 }
 
 /** Prove `packages` ([{name, dir}]); `sources` are the package folders (root-relative) copied beside each one. {exit, results} */
-export function provePackages(packages, { root = runtimeRoot, env = process.env, npm = npmRun, pack = packNpm, log = () => {}, sources = packages.map((p) => p.dir) } = {}) {
+function provePackages(packages, { root = runtimeRoot, env = process.env, npm = npmRun, pack = packNpm, log = () => {}, sources = packages.map((p) => p.dir) } = {}) {
   const results = [];
   for (const unit of installUnits(packages, root)) {
     log(`package-clean-test: installing ${unit.packages.map((p) => p.name).join(', ')} (${unit.kind}) from ${posixPath(path.relative(root, unit.dir)) || '.'}`);

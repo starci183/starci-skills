@@ -28,7 +28,7 @@ import { machineSeatCost, seatCostLines } from './seat-cost.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { reconcilerTaskScript } from '../machine/task-register.mjs';
 
-export const ENGINE_FILE = path.join(SKILL_ROOT, 'scripts', 'reconciler', 'engine.mjs');
+const ENGINE_FILE = path.join(SKILL_ROOT, 'scripts', 'reconciler', 'engine.mjs');
 export { starciShimPath } from '../machine/task-register.mjs';
 /**
  * MB-04: a draining engine (reload handover) or one whose workers:push child still runs is left alone this long past a
@@ -198,7 +198,7 @@ export async function restartEngine({ env = process.env, reason = 'owner-restart
 }
 
 /** Owner stop: stop only the live PID named by the reconciler lock or leader, then settle its machine rows. */
-export function stopEngine({ env = process.env, stop = (pid) => stopTree(pid), alive = pidAlive,
+function stopEngine({ env = process.env, stop = (pid) => stopTree(pid), alive = pidAlive,
   leader = () => leaderState({ env }), lock = () => lockHolder('reconciler', env), record = (fn) => recordBoot(fn, { env }) } = {}) {
   const l = leader();
   const held = lock();

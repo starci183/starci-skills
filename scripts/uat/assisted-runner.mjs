@@ -50,7 +50,7 @@ const launchEnv=prepared=>Object.fromEntries([...SAFE_ENV,...prepared.session.la
 export {launchFor};
 
 const canonicalText=value=>JSON.stringify(value,(_key,node)=>node&&typeof node==='object'&&!Array.isArray(node)?Object.fromEntries(Object.keys(node).sort(byCodeUnit).map(key=>[key,node[key]])):node);
-export const digestValue=value=>sha256(canonicalText(value));
+const digestValue=value=>sha256(canonicalText(value));
 const iso=()=>new Date().toISOString();
 const readYaml=file=>parseYaml(fs.readFileSync(file,'utf8'));
 const same=(a,b)=>path.resolve(a)===path.resolve(b);
@@ -84,7 +84,7 @@ const expandTemplate=(base,template,runId,label)=>{
 };
 const uniqueIds=(items,label)=>need(new Set(items.map(item=>item.id)).size===items.length,`${label} ids must be unique`);
 
-export function computeRequestBindings(request){
+function computeRequestBindings(request){
   const buildDigest=digestValue(request.build);
   const environmentDigest=digestValue(request.environment);
   const flowsDigest=digestValue(request.flows);
@@ -97,7 +97,7 @@ export function computeRequestBindings(request){
 }
 
 const assertDigest=(actual,expected,label)=>need(actual===expected,`${label} digest mismatch: expected ${expected}, got ${actual}`,'assisted-uat-stale');
-export function validateLockedPlaywright(prepared){
+function validateLockedPlaywright(prepared){
   const {session,root}=prepared, command=session.launch.command, joined=command.join(' ').toLowerCase();
   const cwd=resolveCwd(root,session.launch.cwd),first=command[0],firstBase=path.basename(first).toLowerCase().replace(/\.(?:cmd|exe)$/,'');
   const localExecutable=path.isAbsolute(first)&&inside(path.join(cwd,'node_modules'),first)&&/playwright/i.test(first);
@@ -125,7 +125,7 @@ export function validateLockedPlaywright(prepared){
   return {cwd,packageFile,version:installed.version,browserRevision:String(browserRevision??session.playwright.revision)};
 }
 
-export function inspectPreparedRequest({requestPath,receiptPath,allowExistingReceipt=false}={}){
+function inspectPreparedRequest({requestPath,receiptPath,allowExistingReceipt=false}={}){
   need(path.isAbsolute(requestPath??''),'--request must be an explicit absolute path');
   need(path.isAbsolute(receiptPath??''),'--receipt must be an explicit absolute path');
   const requestFile=path.resolve(requestPath),receiptFile=path.resolve(receiptPath);
@@ -391,7 +391,7 @@ const workerMain=async prepared=>{
   try{return await runSession(prepared,state,slot);}finally{slot.release();}
 };
 
-export function startSession({requestPath,receiptPath,skipRunnerCheck=false}={}){
+function startSession({requestPath,receiptPath,skipRunnerCheck=false}={}){
   const prepared=inspectPreparedRequest({requestPath,receiptPath,allowExistingReceipt:true});
   if(fs.existsSync(prepared.receiptFile)){const receipt=readYaml(prepared.receiptFile);validate('receipt',receipt);assertDigest(prepared.requestDigest,receipt.request.sha256,'existing receipt request');return {idempotent:true,runId:prepared.runId,phase:'finished',revision:null,receipt:prepared.receiptFile};}
   const stateFile=stateFileOf(prepared.runDir);
@@ -407,7 +407,7 @@ export function startSession({requestPath,receiptPath,skipRunnerCheck=false}={})
   return publicState(state);
 }
 
-export function signalSession({requestPath,receiptPath,value,actor='user'}={}){
+function signalSession({requestPath,receiptPath,value,actor='user'}={}){
   need(SIGNALS.has(value),'--value must be exactly ok, fail, or cancel');
   const prepared=inspectPreparedRequest({requestPath,receiptPath,allowExistingReceipt:true});
   need(fs.existsSync(stateFileOf(prepared.runDir)),'assisted UAT session has not been started');
@@ -428,7 +428,7 @@ export function signalSession({requestPath,receiptPath,value,actor='user'}={}){
   return {accepted:true,idempotent:false,gateId:signal.gateId,value:signal.value,revision:state.revision};
 }
 
-export async function waitSession({requestPath,receiptPath,after=0}={}){
+async function waitSession({requestPath,receiptPath,after=0}={}){
   const prepared=inspectPreparedRequest({requestPath,receiptPath,allowExistingReceipt:true});
   if(fs.existsSync(prepared.receiptFile))return {runId:prepared.runId,phase:'finished',revision:null,receipt:prepared.receiptFile,event:{type:'finished',receipt:prepared.receiptFile,meaning:'receipt-recorded-not-pass'}};
   need(fs.existsSync(stateFileOf(prepared.runDir)),'assisted UAT session has not been started');

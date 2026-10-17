@@ -21,12 +21,12 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const notAuthored = (name, _full, entry) => name === 'node_modules' || entry.isSymbolicLink();
 
 /** Every *.yaml / *.yml under `dir`, skipping node_modules and links. */
-export function exampleYamlFiles(dir) {
+function exampleYamlFiles(dir) {
   return walkFiles(dir, {sorted: true, exclude: notAuthored, filter: name => name.endsWith('.yaml') || name.endsWith('.yml')});
 }
 
 /** Parse every example YAML under `dir` with the runtime loader; returns the scanned files and the refused ones. */
-export function checkExampleYaml(dir, {base = root} = {}) {
+function checkExampleYaml(dir, {base = root} = {}) {
   const files = exampleYamlFiles(dir);
   const refused = [];
   for (const file of files) {

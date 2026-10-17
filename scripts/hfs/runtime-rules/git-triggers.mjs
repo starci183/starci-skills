@@ -42,7 +42,7 @@ function eventFindings({ event, config, ownBranch, refuse }) {
 }
 
 /** The CI_TRIGGERS_RELEASE_ONLY findings of one workflow text; a text that is not YAML yields none (the other checks name it). A workflow at the root `.github/workflows/` is the runtime's own and may also push on main. */
-export function workflowTriggerFindings({ path: file, text }) {
+function workflowTriggerFindings({ path: file, text }) {
   const doc = parseWorkflow(text);
   if (!doc || typeof doc !== 'object') return [];
   const ownBranch = file.startsWith('.github/workflows/');

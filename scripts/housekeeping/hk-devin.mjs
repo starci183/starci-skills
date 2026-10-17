@@ -48,7 +48,7 @@ const HISTORY_EXT=new Set(['.md','.json','.jsonl','.txt']);
 const DEVIN_PROCESS=/^devin/i;
 
 /** The Devin CLI data root: %APPDATA%/devin on Windows, $XDG_CONFIG_HOME/devin (~/.config) elsewhere. */
-export const devinRoot=(env=process.env)=>{
+const devinRoot=(env=process.env)=>{
   if(env.APPDATA)return path.join(env.APPDATA,'devin');
   return path.join(env.XDG_CONFIG_HOME??path.join(os.homedir(),'.config'),'devin');
 };

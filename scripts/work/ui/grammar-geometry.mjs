@@ -91,7 +91,7 @@ async function checkMode({ argv, repo, family, json, target }) {
   return { exitCode: r.exitCode, text: `${lines.join('\n')}${lines.length ? '\n' : ''}${r.ok ? 'OK' : 'FAIL'}: grammar geometry (${r.family}, ${r.viewport.width}x${r.viewport.height}) - ${r.files.length} file(s), ${r.findings.length} finding(s).\n` };
 }
 
-export async function grammarGeometryMain(argv = []) {
+async function grammarGeometryMain(argv = []) {
   const json = argv.includes('--json');
   const repo = argOf(argv, '--repo');
   const family = argOf(argv, '--family');

@@ -82,7 +82,7 @@ export function parseArgs(argv) {
 
 /** Under autopilot the Supervisor acts without an owner approval and records it provisional. */
 export const autopilotOn = () => { try { return allocationSettings()?.autopilot?.enabled !== false; } catch { return true; } };
-export function approvalOf(args, { autopilot = autopilotOn() } = {}) {
+function approvalOf(args, { autopilot = autopilotOn() } = {}) {
   if (autopilot) return { approvedBy: 'supervisor-autopilot', provisional: true };
   if (args['owner-ok']) return { approvedBy: 'owner', provisional: false };
   return fail('autopilot is off (runtimes.yaml allocation.autopilot.enabled false): a bridging action needs the owner\'s ok first; re-run with --owner-ok once the owner said ok', 'autopilot-off');
@@ -178,7 +178,7 @@ const revisionState = (applied) => {
   return 'refused';
 };
 /** The command line the Supervisor would run for a clear-cut finding. */
-export function commandFor(repo, f) {
+function commandFor(repo, f) {
   const p = f.proposal ?? {};
   const base = `starci supervisor bridge ${p.action} --repo ${repo}`;
   if (p.action === 'bridge') return base + (p.blocker ? ` --blocker ${p.blocker}` : '') + ` --dependents ${list(p.dependents).join(',')} --foundation ${p.foundation ?? '<name>'} --goal ${q(p.goalDraft ?? '<goal>')} --reason ${q(f.summary)} --finding ${q(f.key)} --start`;

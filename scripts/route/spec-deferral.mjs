@@ -40,7 +40,7 @@ const TESTS_DEFERRED_EVENT = 'tests-deferred';
 const TESTS_REQUEUED_EVENT = 'tests-requeued';
 const DEFERRED_VERDICT = 'deferred';
 /** The reason a deferral carries: the owner key that caused it. */
-export const deferReasonOf = (kind) => (SPECS_CLASSES.includes(kind) ? `specs.${kind}=false` : `${kind} verification runs only on an explicit ask or before release, and this goal did not ask for it`);
+const deferReasonOf = (kind) => (SPECS_CLASSES.includes(kind) ? `specs.${kind}=false` : `${kind} verification runs only on an explicit ask or before release, and this goal did not ask for it`);
 
 // A test path is e2e when a segment or name part says so (test/e2e/**, *.e2e-spec.ts, playwright/**).
 const E2E_PATH = /(?:^|[\\/._-])e2e(?:[\\/._-]|$)|playwright/i;
@@ -65,7 +65,7 @@ function opSpecsToggle({ skillRoot, op }) {
 
 const askCache = new Map();
 /** The kind an op runs only on an explicit ask for (`policy.explicitAsk` of its brief, e.g. 'integration'), else null. */
-export function opExplicitAskKind({ skillRoot, op }) {
+function opExplicitAskKind({ skillRoot, op }) {
   if (!op) return null;
   const file = path.join(skillRoot, 'modules', 'ops', 'ops', `${op}.yaml`);
   let stamp;

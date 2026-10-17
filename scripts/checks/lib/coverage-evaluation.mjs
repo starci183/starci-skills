@@ -3,7 +3,7 @@ import { astChildren, nodeName, resolvedExpression } from './coverage-ast.mjs';
 
 export const UNKNOWN = Symbol('unknown authored expression');
 const callable = (node) => ['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression'].includes(node?.type);
-export const testHelper = (index) => index.file.startsWith('tests/') || index.file.endsWith('.spec.mjs');
+export const testHelper = (index) => index.file.startsWith('e2e/') || index.file.endsWith('.spec.mjs');
 export const localScope = (index) => ({ ...index, locals: new Map(index.locals ?? []) });
 const valueExpression = (index, value) => ({ index, node: { type: 'Literal', value } });
 

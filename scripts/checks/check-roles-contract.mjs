@@ -86,7 +86,7 @@ function tableFindings(root, doc) {
 }
 
 /** The RT_ROLES_CONTRACT_DRIFT findings over the tree at `root`. */
-export function checkRolesContract(root = skillRoot) {
+function checkRolesContract(root = skillRoot) {
   const doc = rolesContract(root);
   const surfaces = doc.roles.flatMap((role) => role.surfaces.flatMap((surface) => surfaceFindings(root, role, surface, doc)));
   const standard = standingMessages(roleStandings(doc, root)).map((message) => finding(ROLES_FILE, 0, message));
@@ -94,7 +94,7 @@ export function checkRolesContract(root = skillRoot) {
 }
 
 /** Regenerates every block surface and the roles table of the tree at `root`; returns how many role blocks it wrote. */
-export function writeRoleBlocks(root = skillRoot) {
+function writeRoleBlocks(root = skillRoot) {
   const doc = rolesContract(root);
   const pairs = doc.roles.flatMap((role) => role.surfaces.filter((s) => s.mode === 'block').map((s) => [role.id, s.file]));
   for (const [id, file] of pairs) {
@@ -107,7 +107,7 @@ export function writeRoleBlocks(root = skillRoot) {
 }
 
 /** The role x requirement table of the tree at `root`, as the check prints it. */
-export function standardTable(root = skillRoot) {
+function standardTable(root = skillRoot) {
   const doc = rolesContract(root);
   return renderStandingTable(doc, roleStandings(doc, root));
 }

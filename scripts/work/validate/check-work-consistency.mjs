@@ -78,7 +78,7 @@ const stateEnumCache = new Map();
  * `$defs.state.enum` - the authority the layout already publishes, read rather than restated here so the two
  * cannot drift. `null` when the family has no per-family schema file or declares no enum: no claim is made
  * about a vocabulary this file cannot read. */
-export function declaredStateValues(schema) {
+function declaredStateValues(schema) {
   if (stateEnumCache.has(schema)) return stateEnumCache.get(schema);
   const file = schemaFileFor(schema);
   let allowed = null;
@@ -226,8 +226,7 @@ function checkConsistencyTree(workRoot, records, sink) {
 }
 
 /** One-call form for a caller that has not already loaded the tree: build the record map, run every same-tree
- * check, and hand back the filled `{refuse, suspect, info}` sink. Used by this file's CLI and by
- * tests/checks/work-consistency.spec.mjs, which points it at a throwaway tree. */
+ * check, and hand back the filled `{refuse, suspect, info}` sink. Used by this file's CLI. */
 export function checkWorkConsistencyTree(workRoot) {
   const sink = {refuse: [], suspect: [], info: []};
   checkConsistencyTree(workRoot, loadRecords(workRoot, walk), sink);
@@ -253,7 +252,7 @@ export function checkWorkConsistencyTree(workRoot) {
  * rather than wrong. Schemas with no records at all in the other tree are skipped - a whole family missing is
  * a scope fact, not drift.
  */
-export function checkTreeParity(perTree, sink) {
+function checkTreeParity(perTree, sink) {
   if (perTree.length < 2) {
     sink.info.push('(single tree): parity skipped, comparing conventions needs both example trees [PARITY_SKIPPED]');
     return;

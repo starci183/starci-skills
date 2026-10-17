@@ -279,7 +279,7 @@ function geometryLines(b) {
 }
 
 /** The brief as text. */
-export function briefText(b) {
+function briefText(b) {
   const lines = briefHeadLines(b);
   for (const layer of LAYERS) {
     lines.push('', `== ${layer.toUpperCase()} ==`);
@@ -641,7 +641,7 @@ async function scoreCommand(brief, argv, { repo, html, json }) {
   return { exitCode: s.ok ? 0 : 1, text: json ? `${JSON.stringify(s, null, 2)}\n` : scoreText(s) };
 }
 
-export async function uiProofBriefMain(argv = []) {
+async function uiProofBriefMain(argv = []) {
   if (argv.includes('--help') || argv.includes('-h')) return { exitCode: 0, text: USAGE };
   const json = argv.includes('--json');
   const surface = argOf(argv, '--surface');

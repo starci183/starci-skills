@@ -40,7 +40,7 @@ function packageRequest(rawValue) {
 }
 
 /** Resolve requested packages without registry lookups. */
-export function resolveInstallPackages(requested, pins) {
+function resolveInstallPackages(requested, pins) {
   const resolved = [];
   for (const value of requested ?? []) {
     const parsed = packageRequest(value);

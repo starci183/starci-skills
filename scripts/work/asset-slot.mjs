@@ -36,8 +36,8 @@ import { isDir, isFile, slash } from './work-io.mjs';
 export { ASSET_SLOT_ATTR };
 const ASSET_SHA_ATTR = 'data-asset-sha256';
 const ASSET_REQUEST_FILE = 'asset-request.md';
-export const ASSET_SLOT_OWED = 'asset-slot-owed';
-export const ASSET_SLOT_FILLED = 'asset-slot-filled';
+const ASSET_SLOT_OWED = 'asset-slot-owed';
+const ASSET_SLOT_FILLED = 'asset-slot-filled';
 const ASSET_PROMPT_ATTR = 'data-asset-prompt';
 export const ASSET_OP = 'interface.asset';
 export const ASSET_SLOT_UNFILLED = 'ASSET_SLOT_UNFILLED';
@@ -76,7 +76,7 @@ const SLUG = /^[a-z0-9][a-z0-9._-]*$/i;
 const HEADING_PATTERN = new RegExp(['^#{1,6}', String.raw`\s+`, '(.*)$'].join(''));
 const SLOT_LINE_PATTERN = new RegExp([String.raw`^\s*`, '[-*]?', String.raw`\s*(?:slot|id)\s*:\s*`, '`?', String.raw`([\w.-]+)`, '`?', String.raw`\s*$`].join(''), 'i');
 /** The slot requests of asset-request.md files: [{id, file, brief}] - a heading per slot, or `slot: <id>` lines. */
-export function readAssetRequests(files) {
+function readAssetRequests(files) {
   const out = [];
   for (const file of files ?? []) readFileRequests(file, out);
   return out;
@@ -153,7 +153,7 @@ function brandMasterShas(workRoot) {
  * The slots of one render source: [{id, tag, component, src, sha256, file, master, prompt, filled}]; `htmlFile`
  * resolves the src and the prompt, `masters` is the Set of brand master sha256s a filled slot must not equal.
  */
-export function slotsOfHtml(html, { htmlFile = null, masters = new Set() } = {}) {
+function slotsOfHtml(html, { htmlFile = null, masters = new Set() } = {}) {
   const out = [];
   for (const el of walkElements(parseHtml(html))) {
     const slot = slotOfElement(el, htmlFile, masters);

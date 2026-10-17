@@ -6,6 +6,7 @@ import { lintEnforcersForCode, registeredLintRules } from './coverage-routing.mj
 import { bindPattern, evaluate, invocation, localScope, scopedWalk, UNKNOWN } from './coverage-evaluation.mjs';
 import { resultReach, returnedExpressions } from './coverage-results.mjs';
 import { collectorExpressions, collectorFacadeInvocation } from './coverage-collectors.mjs';
+import { hasRulingReference } from './coverage-cites.mjs';
 
 const NEGATIVE = /\b(?:invalid|violat\w*|refus\w*|reject\w*|deni\w*|fail\w*|negative|forbid\w*|missing)\b/i;
 const POSITIVE = /\b(?:valid|pass\w*|accept\w*|conform\w*|positive|clean)\b/i;
@@ -372,7 +373,9 @@ function lintProven(context, proofs, entry) {
 export function coverageProofFindings(context, rule, code, edition) {
   const proofs = sourceEvidence(context, rule, code, edition);
   if (!proofs.length) return [];
-  const missing = activeSourceEnforcers(context, rule, code, edition).filter((entry) => !sourceProven(context, proofs, entry));
+  // A rule whose specNa cites owner:no-runtime-specs keeps the proof obligation of its package (lint) enforcers only: its runtime-code enforcers have no spec.
+  const waived = typeof rule.specNa === 'string' && hasRulingReference(rule.specNa, context);
+  const missing = waived ? [] : activeSourceEnforcers(context, rule, code, edition).filter((entry) => !sourceProven(context, proofs, entry));
   missing.push(...lintEnforcersForCode(context, rule, code, edition).filter((entry) => !lintProven(context, proofs, entry)));
   const meaningful = proofs.some((proof) => proof.tests.some((test) => test.roles.size || test.runs.some((run) => run.complete)));
   if (!missing.length && meaningful) return [];

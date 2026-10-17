@@ -51,7 +51,7 @@ const paxPath = (body) => body.toString('utf8').split('\n').map((record) => /^\d
  * Walks a tar file by header: calls visit({ name, type, size, read }) for every entry (`read()` returns the content, called only for files worth
  * reading). Handles ustar prefixes, GNU long names (L) and PAX paths (x). Content is never loaded unless the visitor asks for it.
  */
-export function walkTar(file, visit) {
+function walkTar(file, visit) {
   const fd = fs.openSync(file, 'r');
   try {
     const header = Buffer.alloc(BLOCK);

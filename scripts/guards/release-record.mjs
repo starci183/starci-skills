@@ -26,7 +26,7 @@ export function gitCommonDir(repo, { run = revParseQuery } = {}) {
 }
 
 /** The record file of `head` under `commonDir`. */
-export const l4RecordPath = ({ commonDir, head }) => proofFileOf({ commonDir, sha: head, kind: 'l4' });
+const l4RecordPath = ({ commonDir, head }) => proofFileOf({ commonDir, sha: head, kind: 'l4' });
 
 /**
  * Write the L4 record of `head` for release tag `tag`. {ok, file} or {ok:false, reason}: a head that is not a full sha, a tag

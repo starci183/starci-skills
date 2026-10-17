@@ -31,7 +31,7 @@ export const DRAW_NESTED_VARIANT = 'DRAW_NESTED_VARIANT';
 export const DRAW_MEASURE_UNCAPPED = 'DRAW_MEASURE_UNCAPPED';
 
 /** W-3xl of the Width scale (measure.yaml guidance width-scale): no form region renders wider. */
-export const FORM_MEASURE_CAP_PX = 768;
+const FORM_MEASURE_CAP_PX = 768;
 
 /** Grammar form controls whose HeroUI v3 anatomy has the layer variant (primary | secondary). */
 const VARIANT_CONTROLS = Object.freeze(['Input', 'Textarea', 'Select', 'ComboBox', 'SearchField', 'NumberField', 'DateField', 'TimeField',
@@ -57,7 +57,7 @@ function isSurface({ component, attrs, classes }) {
 }
 
 /** The layer variant a control root renders: data-grammar-variant, else the first vendor variant class in it. */
-export function variantOfControl(root) {
+function variantOfControl(root) {
   const own = root.attrs?.['data-grammar-variant'];
   if (own === 'primary' || own === 'secondary') return own;
   for (const el of [root, ...walkElements(root)]) {
@@ -121,10 +121,6 @@ export function measureFindings(layer, { label = 'the capture', cap = FORM_MEASU
     detail: `${label}: the form region ${f.desc ?? ''} (${(f.fields ?? []).slice(0, 4).join(', ') || 'fields'} and a primary submit) renders ${Math.round(Number(f.width))}px wide at ${layer.viewport?.width ?? '?'}px, past the ${cap}px (W-3xl) form cap - a drawn XBase owns its measure: SurfaceCard measure="form"/"formCompact", else w-full max-w-md mx-auto (MEASURE-4 case-3/case-4; MEASURE-1 is the page width, not the form's)`.replace(/\s+/g, ' ') }));
 }
 
-/** Every layer finding of one capture: the static DOM variant check plus the measured form width. */
-export function layerFindings({ html, layer = null, label = 'the render' }) {
-  return [...nestedVariantFindings(html, { label }), ...measureFindings(layer, { label })];
-}
 
 /**
  * Runs IN THE PAGE (draw-render passes it to page.evaluate): every form region's rendered width. A form region is the

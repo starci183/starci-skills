@@ -13,7 +13,7 @@ const BIRTH_SLACK_MS = 2000;
 const recordedObjects = (record) => [record?.processIdentity ?? record?.processCapture?.identity, record?.childIdentity].filter(Boolean);
 
 /** Whether no process of `table` is the recorded object (same pid born at the recorded instant). A birth that cannot be read proves nothing. Pure. */
-export function objectGone(identity, table) {
+function objectGone(identity, table) {
   const born = bornAt(identity);
   if (born === null || !Array.isArray(table)) return false;
   return !table.some((row) => row.pid === identity.pid && Number.isFinite(row.created) && Math.abs(row.created - born) <= BIRTH_SLACK_MS);

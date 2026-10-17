@@ -56,7 +56,7 @@ function sourceFindings(file, text) {
 }
 
 /** The RT_ABSOLUTE_PATH findings of one file's text (the file kind is read from its extension). */
-export function absolutePathFindings(file, text) {
+function absolutePathFindings(file, text) {
   if (SKIPPED.test(file)) return [];
   if (!SOURCE.test(file) && !LINE_TEXT.test(file)) return [];
   if (SOURCE.test(file)) return sourceFindings(file, text);

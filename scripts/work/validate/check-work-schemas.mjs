@@ -28,7 +28,7 @@ const SKIPPED_ROOTS = new Set(['kernel-evidence', 'kernel-strays', 'kernel-appro
 let cached = null;
 
 /** Every catalogued work-tree schema compiled once per process, keyed by its `schema` const. */
-export function loadWorkSchemaValidators(root = runtimeRoot) {
+function loadWorkSchemaValidators(root = runtimeRoot) {
   if (cached?.root === root) return cached;
   let Ajv2020;
   try {

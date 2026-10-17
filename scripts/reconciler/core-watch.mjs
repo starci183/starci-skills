@@ -152,7 +152,7 @@ async function serviceFacts(o) {
  * The fact of one `services --list` row: null while healthy (a seat: live) or while config.yaml connectors turn the
  * connector off (connectorWanted: not required, so never an outage), else its state with the probe error and fail streak.
  */
-export function serviceRowFact(facts, row, { config = null } = {}) {
+function serviceRowFact(facts, row, { config = null } = {}) {
   if (row.name.startsWith('ledger:') || row.name.startsWith('sched-task:')) return;
   const notRequired = !connectorWanted(row.name, config);
   const okState = notRequired || (row.name.startsWith('seat:') ? row.state === 'live' : row.state === 'healthy');
@@ -369,7 +369,7 @@ async function collect(o) {
 }
 
 /** The watch options from argv (defaults when absent). */
-export function watchOptions(argv = []) {
+function watchOptions(argv = []) {
   const val = (name, d) => { const i = argv.indexOf(name); return i >= 0 && argv[i + 1] != null ? Number(argv[i + 1]) : d; };
   return { timeoutMs: val('--child-timeout', 90) * 1000, tokenWindowMs: val('--token-window', 10) * 60_000, tokenSpike: val('--token-spike', 3_000_000) };
 }

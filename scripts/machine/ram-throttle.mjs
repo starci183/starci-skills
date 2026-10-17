@@ -64,7 +64,7 @@ export { MODES } from './ram-mode.mjs';
 import { isoOr } from '../lib/time.mjs';
 
 /** The Resource controller's writer tag (scripts/reconciler/controllers/resource.mjs) and how long its mode stays usable. */
-export const RECONCILER_WRITER = 'reconciler/resource';
+const RECONCILER_WRITER = 'reconciler/resource';
 const RECONCILER_MODE_FRESH_MS = 120_000;
 
 export const DISPATCH_THROTTLED = 'dispatch-throttled';
@@ -110,7 +110,7 @@ const priorMbOf = (op, table) => (table.kinds[op] ?? table.default).mb;
  * agents' RAM (minus kernels x kernelMb) is shared across the running ops in proportion to their priors.
  * Returns {<kind>: [mbPerOp, ...]}.
  */
-export function footprintObservations(samples, table, { kernelMb = DEFAULTS.kernelMb } = {}) {
+function footprintObservations(samples, table, { kernelMb = DEFAULTS.kernelMb } = {}) {
   const obs = {};
   for (const s of samples ?? []) {
     const running = Object.entries(s?.running ?? {}).filter(([, n]) => num(n) > 0);
@@ -174,7 +174,7 @@ export const weightOf = (wf, priorities) => priorities?.[wf]?.weight ?? 1;
  * queued, pending}]}. `ops`: the worker census [{op, workflowId, status}] (queued rows included). A workflow's
  * pending claim is min(reserve || queued + running, queued + running) - running, its queued kinds' estimates sized.
  */
-export function priorityClaim(wf, ops, priorities, estimates) {
+function priorityClaim(wf, ops, priorities, estimates) {
   const w = weightOf(wf, priorities);
   const above = [];
   let slots = 0, mb = 0;

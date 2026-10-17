@@ -51,7 +51,7 @@ const stuckSummaryLine = (s) => {
 };
 
 /** The legs line of the full status text: every leg with its colour and the one tag of who judges it. */
-export const legsLine = (s) => {
+const legsLine = (s) => {
   const legs = s.graph.legs.map((leg) => {
     const deferred = leg.deferred ? '(deferred)' : '';
     return `${leg.op}(${leg.label}):${leg.color}${deferred}[judge:${judgeTagOf(leg.op, s.internals.skillRoot)}]`;

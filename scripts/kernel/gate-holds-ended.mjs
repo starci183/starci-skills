@@ -15,8 +15,8 @@ import { currentRuntimeRev } from './runtime-rev.mjs';
 import { kernelHandoverOf, reportedJobs } from '../machine/reported-jobs.mjs';
 
 /** The resolved reason an incident row takes, and the event that says the holds settled. */
-export const HOLDS_SETTLED_REASON = 'fixed';
-export const HOLDS_SETTLED_EVENT = 'gate-holds-settled';
+const HOLDS_SETTLED_REASON = 'fixed';
+const HOLDS_SETTLED_EVENT = 'gate-holds-settled';
 export const GATE_REJUDGED_EVENT = 'gate-rejudged';
 
 const marks = (list) => list.map(() => '?').join(',');

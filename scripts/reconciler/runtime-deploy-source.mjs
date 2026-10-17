@@ -13,7 +13,7 @@ import { symbolicRefQuery } from '../api/git/symbolic-ref-query.mjs';
 const text = (r) => (r.status === 0 ? String(r.stdout ?? '').trim() : null);
 
 /** Where a file belongs: scripts/<sub>, modules/<sub> and knowledge/<sub> by their second segment, everything else by its first. */
-export function areaOf(file) {
+function areaOf(file) {
   const parts = String(file).split('/');
   return parts.length > 2 && ['scripts', 'modules', 'knowledge'].includes(parts[0]) ? `${parts[0]}/${parts[1]}` : parts[0];
 }

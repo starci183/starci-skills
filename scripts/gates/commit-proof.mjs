@@ -13,7 +13,7 @@ const SHORT = 12;
 export const LAND_NOTE_REF = 'land';
 
 /** The directory shared by release proofs of every worktree of a repository. */
-export const proofDirOf = (commonDir) => path.join(commonDir, 'starci-release');
+const proofDirOf = (commonDir) => path.join(commonDir, 'starci-release');
 
 /** The location of an affected, verify, deploy/check or release receipt; existing references keep their established paths. */
 export function proofFileOf({ kind, sha, base, root, env, commonDir }) {

@@ -33,7 +33,7 @@ function liveOverBudget(db, workflowId, budget) {
  * The attempts of a workflow whose measured tokens exceed `budget`: [{attemptId, jobId, opId, agent, tokens, budget, jobStatus, ownedPaths, live}].
  * A settled attempt is measured by its usage rows; a running one by the live pass's reading (live: true).
  */
-export function attemptsOverBudget(db, workflowId, { budget = attemptBudget().perAttempt } = {}) {
+function attemptsOverBudget(db, workflowId, { budget = attemptBudget().perAttempt } = {}) {
   const settled = db.prepare(`SELECT a.attempt_id AS attemptId, a.job_id AS jobId, a.op_id AS opId, a.agent AS agent, j.status AS jobStatus, j.payload_json AS payload, ${TOKENS} AS tokens
     FROM op_attempts a JOIN llm_usage u ON u.attempt_id=a.attempt_id AND u.subject_type='attempt' JOIN jobs j ON j.job_id=a.job_id
     WHERE a.workflow_id=? GROUP BY a.attempt_id HAVING ${TOKENS} > ? ORDER BY a.attempt_id`).all(workflowId, budget).map(withPaths(budget, false));

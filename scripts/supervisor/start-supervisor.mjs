@@ -58,7 +58,7 @@ const DOCTRINE_FILE = path.join(SKILL_ROOT, 'modules', 'supervisor', 'supervise.
 const indent = (text, pad = '  ') => String(text ?? '').trim().split(/\r?\n/).map((l) => `${pad}${l}`).join('\n');
 
 /** The doctrine block the prompt carries, read from supervise.yaml kernelSeat + guardrails (ids and rules). */
-export function doctrineOf(doc) {
+function doctrineOf(doc) {
   const seat = doc?.kernelSeat ?? {};
   const lines = [];
   if (seat.role) lines.push(`Role:\n${indent(seat.role)}`);
@@ -173,7 +173,7 @@ function shownWorkerHealth(shown, terminal, dispatch) {
  * as the seat (every seat is a worker-start worker). `screenOf(handle)` reads a frame (null = unreadable: kept).
  * Returns {close: [entry], keep: [entry]}.
  */
-export function planSupervisorDedupe({ marked, seatTerminal = null, screenOf, exitedRow }) {
+function planSupervisorDedupe({ marked, seatTerminal = null, screenOf, exitedRow }) {
   const plan = { close: [], keep: [] };
   for (const t of marked) {
     if (t.handle === seatTerminal) { plan.keep.push({ ...t, reason: 'seat' }); continue; }
@@ -200,7 +200,7 @@ function closeDuplicates(entries, deps, listing) {
 /* ------------------------------------------------------------ the launch */
 
 /** Why no [Supervisor] kernel starts in chat mode (config.yaml supervisor.mode). */
-export const CHAT_MODE_REASON = "config.yaml supervisor.mode is chat: the owner's desktop chat is the Supervisor; no [Supervisor] kernel is started (set supervisor.mode: kernel to run one)";
+const CHAT_MODE_REASON = "config.yaml supervisor.mode is chat: the owner's desktop chat is the Supervisor; no [Supervisor] kernel is started (set supervisor.mode: kernel to run one)";
 
 const START_LOCK = 'supervisor-start';
 /**
@@ -357,7 +357,7 @@ async function spawnSeat({ m, d, seat, health, listing, recorded, dedupe, group,
  * enabled). Every host seam is in `deps`. Returns a result object; `exit` is the
  * process exit code it maps to.
  */
-export async function launchSupervisor({ mode = 'start', reason = null, plan: planOnly = false, rotate = false,
+async function launchSupervisor({ mode = 'start', reason = null, plan: planOnly = false, rotate = false,
   env = process.env, deps = null, settings = supervisorSettings(), template = null, doc = null, now = Date.now,
   profile = SUPERVISOR_SEAT } = {}) {
   const refusal = chatModeRefusal({ env, planOnly, mode });
@@ -389,7 +389,7 @@ export async function launchSupervisor({ mode = 'start', reason = null, plan: pl
 }
 
 /** Disable the seat, fence and release its worker (worker-stop + worker-release). The watchdog then leaves it down. */
-export async function stopSupervisor({ env = process.env, deps = null, now = Date.now, profile = SUPERVISOR_SEAT } = {}) {
+async function stopSupervisor({ env = process.env, deps = null, now = Date.now, profile = SUPERVISOR_SEAT } = {}) {
   const d = deps ?? await orcaDeps();
   const m = openMachine({ env });
   try {
@@ -439,7 +439,7 @@ const describe = (r) => {
 };
 
 /** The flags this script takes for the runtime's own callers (the watchdog, the owner's restart) and the CLI refuses with a pointer: modules/cli/commands/supervisor/start.yaml internalFlags. */
-export const INTERNAL_FLAGS = Object.freeze(['replace', 'rotate', 'restart']);
+const INTERNAL_FLAGS = Object.freeze(['replace', 'rotate', 'restart']);
 
 async function main() {
   const argv = process.argv.slice(2);

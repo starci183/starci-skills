@@ -2,7 +2,7 @@
 import { quotaTimestamp as timestamp, quotaPolicyValid, quotaMaxAgeMs, inspectQuotaEvidence } from '../../lib/quota-evidence.mjs';
 const observedOrParent = (value, parent) => value == null ? parent : timestamp(value) ?? value;
 /** All percentage windows supplied by one provider/account response, including short windows. */
-export function quotaWindows(entry, observedAt) {
+function quotaWindows(entry, observedAt) {
   const windows = [];
   const visit = (value, id) => {
     if (!value || typeof value !== 'object') return;

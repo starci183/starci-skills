@@ -40,7 +40,7 @@ export const languageOf = (p) => LANGUAGE[path.extname(String(p)).toLowerCase()]
 const isImagePath = (p) => IMAGE_EXT.has(path.extname(String(p)).toLowerCase());
 
 /** A git-quoted path ("a/\303\251.ts") as its UTF-8 string; an unquoted one as it is. */
-export function unquoteGitPath(value) {
+function unquoteGitPath(value) {
   const v = String(value);
   if (!v.startsWith('"') || !v.endsWith('"')) return v;
   const bytes = [];
@@ -57,7 +57,7 @@ export function unquoteGitPath(value) {
 }
 const stripSide = (p) => { const u = unquoteGitPath(p.trim()); return u === '/dev/null' ? null : u.replace(/^[ab]\//, ''); };
 /** The two paths of `diff --git a/X b/Y`, splitting where both halves agree when a name holds " b/". */
-export function pathsOfDiffLine(line) {
+function pathsOfDiffLine(line) {
   const rest = line.slice('diff --git '.length);
   if (rest.startsWith('"')) {
     const m = /^("(?:[^"\\]|\\.)*")\s+(?!\s)(.*)$/.exec(rest);
@@ -73,7 +73,7 @@ export function pathsOfDiffLine(line) {
 const B85 = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz!#$%&()*+-;<=>?@^_`{|}~';
 const B85_INDEX = new Map([...B85].map((c, i) => [c, i]));
 /** One `GIT binary patch` data line decoded: its first char gives the byte count, the rest is base85. */
-export function decodeBase85Line(line) {
+function decodeBase85Line(line) {
   const c = line[0];
   let len = -1;
   if (c >= 'A' && c <= 'Z') len = c.codePointAt(0) - 64; else if (c >= 'a' && c <= 'z') len = c.codePointAt(0) - 96 + 26;
@@ -250,12 +250,6 @@ function patchParser({ caps = diffCaps(), onLiteral = null } = {}) {
  *  alone — patchParser.line strips a trailing '\r' itself. */
 const forEachLine = (file, onLine, chunkBytes = 8 * 1024 * 1024) => forEachFileLine(file, onLine, { chunkBytes, eol: '\n' });
 
-/** Parse patch text (a string) - what the specs and small callers use. */
-export function parsePatchText(text, options = {}) {
-  const parser = patchParser(options);
-  for (const l of String(text).split('\n')) parser.line(l);
-  return parser.finish();
-}
 
 export const patchJsonFileOf = (patchFile) => `${patchFile}.json`;
 export const patchAssetsDirOf = (patchFile) => `${patchFile}.assets`;

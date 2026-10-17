@@ -89,7 +89,7 @@ const appendSchemaObjectErrors = (out, node, s, where, run) => {
   }
 };
 /** The subset of JSON Schema the declaration schema uses: type, const, enum, pattern, minLength, required, properties, additionalProperties, items, minProperties, $ref, anyOf. */
-export function schemaErrors(value, shape, at = '$', root = declarationSchema()) {
+function schemaErrors(value, shape, at = '$', root = declarationSchema()) {
   const resolve = (ref) => ref.slice(2).split('/').reduce((node, key) => node?.[key], root);
   const typeOk = (node, s) => ({ object: plain, array: Array.isArray, integer: Number.isInteger }[s.type] ?? ((n) => (s.type ? typeof n === s.type : true)))(node);
   const run = (node, s, where) => {
@@ -473,7 +473,7 @@ export function ownerAskConflict({ repo, question } = {}) {
 }
 // ---- CLI ------------------------------------------------------------------------------------------------
 const USAGE = 'Usage: starci gate starcistacks <repo-root> [--new] [--json]\n\nHolds a repository\'s stack declaration services block (sonar, container-registry, analytics, error-tracking) and its custody layout to modules/schemas/application-stacks.schema.yaml and stacks-layout.yaml. Exit 0 clean (suspects allowed), 1 refused, 2 usage.\n';
-export async function checkStarciStacksMain(argv = []) {
+async function checkStarciStacksMain(argv = []) {
   const rest = argv;
   const args = rest.filter((arg) => !['--json', '--new'].includes(arg));
   if (args.includes('--help') || args.includes('-h')) return { exitCode: 0, text: USAGE };

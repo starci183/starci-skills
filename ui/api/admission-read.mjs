@@ -24,7 +24,7 @@ function quotaOf(value) {
 }
 
 /** Supports the recorded camel-case contract receipt and the additive machine SQL row. */
-export function admissionReservation(value) {
+function admissionReservation(value) {
   const row = object(value);
   if (!row) return null;
   const quota = row.quota ?? parse(row.quota_json);

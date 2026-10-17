@@ -110,7 +110,7 @@ const staleFindings = (stamps, moduleLocal, errors) => {
   return unused;
 };
 
-export function checkSchemaCatalog({ root = skillRoot } = {}) {
+function checkSchemaCatalog({ root = skillRoot } = {}) {
   const modulesDir = root === skillRoot ? MODULES_DIR : path.join(root, 'modules');
   const catalogFile = root === skillRoot ? CATALOG_FILE : path.join(root, 'modules', 'schemas', 'index.yaml');
   const errors = [];

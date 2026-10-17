@@ -32,7 +32,7 @@ function environmentImages(environment) {
  * The images of a parsed declaration, [{ service, app, buildArgs }] sorted by service: the union over its environments (the first
  * environment that names a service decides its app; a later one only adds build arguments). A declaration with no deploy block has none.
  */
-export function declaredStackImages(declaration) {
+function declaredStackImages(declaration) {
   const byService = new Map();
   for (const environment of Object.values(record(declaration?.environments) ? declaration.environments : {})) {
     for (const image of environmentImages(environment)) {
@@ -44,7 +44,7 @@ export function declaredStackImages(declaration) {
 }
 
 /** The host variables (names only) the declared environments interpolate into `docker stack config`: the union of `deploy.passEnv`. */
-export function declaredPassEnv(declaration) {
+function declaredPassEnv(declaration) {
   const names = Object.values(record(declaration?.environments) ? declaration.environments : {})
     .flatMap(environment => (Array.isArray(environment?.deploy?.passEnv) ? environment.deploy.passEnv : []))
     .filter(name => typeof name === 'string' && KEY.test(name));

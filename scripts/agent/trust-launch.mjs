@@ -13,7 +13,7 @@ import {
 
 const TRUST_AGENTS = new Set(['claude', 'codex', 'devin']);
 // The Critic's own worktree also hooks the read tools: its guard confines them to its directory (scripts/guards/critic-reach.mjs).
-export const CRITIC_TOOL_GUARD_MATCHER = `${TOOL_GUARD_MATCHER}|Read|Grep|Glob`;
+const CRITIC_TOOL_GUARD_MATCHER = `${TOOL_GUARD_MATCHER}|Read|Grep|Glob`;
 
 /**
  * Pre-trust `cwd` for `agent` before launch. Never throws; a failure is

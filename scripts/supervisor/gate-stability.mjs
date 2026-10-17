@@ -69,7 +69,7 @@ async function findingsForLeg(repo, leg, fns) {
   return { findings, errors };
 }
 
-export async function gateSide({ tree = SELF_ROOT, family, ledgers = registeredLedgers(), gates = null }) {
+async function gateSide({ tree = SELF_ROOT, family, ledgers = registeredLedgers(), gates = null }) {
   const spec = gates;
   if (!Array.isArray(spec) || !spec.length || spec.some((g) => !g?.module || !g?.export)) throw new Error('an explicit nonempty current --gate module#export set is required');
   const fns = await loadGateFns(tree, spec);
@@ -87,7 +87,7 @@ export async function gateSide({ tree = SELF_ROOT, family, ledgers = registeredL
 const keyOf = (f) => `${f.code}|${f.path ?? ''}`;
 
 /** Compare two sides: {family, legs, flips, newFindings, perLeg:[{workflowId, jobId, baseFindings, headFindings, flipped, newFindings[]}]}. */
-export function compareSides(base, head) {
+function compareSides(base, head) {
   const byLeg = new Map(base.legs.map((leg) => [`${leg.ledger}\0${leg.jobId}`, leg]));
   const perLeg = head.legs.map((leg) => {
     const before = byLeg.get(`${leg.ledger}\0${leg.jobId}`) ?? { findings: [], errors: ['no base side'] };
@@ -117,7 +117,7 @@ function runSide({ runner = SELF_ROOT, tree, family, ledgers = null, gates = nul
  * Both sides and the comparison; `runner` is the tree whose copy of this script runs both. Both sides run the gates
  * explicitly selected current gates (a module the base tree lacks is unavailable, never a flip).
  */
-export function gateStability({ runner = SELF_ROOT, base, head, family, ledgers = null, gates = null, env = process.env }) {
+function gateStability({ runner = SELF_ROOT, base, head, family, ledgers = null, gates = null, env = process.env }) {
   if (!Array.isArray(gates) || !gates.length || gates.some((g) => !g?.module || !g?.export)) return { family, error: 'an explicit nonempty current --gate module#export set is required' };
   const b = runSide({ runner, tree: base, family, ledgers, gates, env });
   const h = runSide({ runner, tree: head, family, ledgers, gates, env });

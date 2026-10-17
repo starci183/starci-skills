@@ -55,7 +55,7 @@ export function terminalTree(handle, { table, envRows }) {
 
 /** Members with the same known pid and creation time. Missing creation never acts as a wildcard. Pure. */
 const createdKnown = value => Number.isSafeInteger(value) && value > 0;
-export const survivorsOf = (members, table) => members.filter((m) => createdKnown(m.created)
+const survivorsOf = (members, table) => members.filter((m) => createdKnown(m.created)
   && (table ?? []).some((p) => p.pid === m.pid && createdKnown(p.created) && m.created === p.created));
 
 const members = (list) => list.map((m) => ({ pid: m.pid, name: m.name ?? null, created: m.created, identity: m.identity ?? null }));

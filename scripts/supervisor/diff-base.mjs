@@ -1,4 +1,4 @@
-// diff-base.mjs - the base `starci test affected` and `starci runtime verify` diff against, and why it was chosen.
+// diff-base.mjs - the base `starci runtime verify` diffs against, and why it was chosen.
 // A local `main` is only a branch name: in a shared repository it can sit far behind origin/main and behind the newest release tag (nothing moves it
 // between releases), and a base that old makes the affected set several times larger than the change. So with no named ref the base is the merge-base of
 // HEAD with the NEWEST of local main, origin/main and the latest release tag reachable from HEAD: a candidate whose merge-base contains the merge-base of
@@ -11,7 +11,7 @@ const SHORT = 9;
 const short = (sha) => String(sha).slice(0, SHORT);
 
 /** The newest release tag (v*) reachable from HEAD, by tag date, or null when there is none. */
-export function latestReleaseTag(root) {
+function latestReleaseTag(root) {
   const listed = gitTag(['--list', 'v[0-9]*', '--merged', 'HEAD', '--sort=-creatordate'], { cwd: root, timeout: 60_000 });
   return listed.status === 0 ? String(listed.stdout ?? '').split(/\r?\n/).map((line) => line.trim()).find(Boolean) ?? null : null;
 }

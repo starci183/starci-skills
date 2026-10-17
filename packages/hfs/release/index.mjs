@@ -22,7 +22,7 @@ export function contextOf(io = {}) {
 }
 
 /** Splits argv into { flags, positional }; an unknown flag or a flag without its value is a refusal. */
-export function parseVerbFlags(argv, spec, code = 'RELEASE_USAGE') {
+function parseVerbFlags(argv, spec, code = 'RELEASE_USAGE') {
   const flags = {};
   const positional = [];
   for (let index = 0; index < argv.length; index += 1) {
@@ -53,7 +53,7 @@ function readPackage(root) {
 }
 
 /** The normalised `release:` block (tolerant of absence) with the package version: { root, version, gates, tagPrefix, defaultBranch, tagMatchesVersion }. */
-export function loadReleaseConfig(root) {
+function loadReleaseConfig(root) {
   const pkg = readPackage(root);
   if (typeof pkg.version !== 'string' || !VERSION.test(pkg.version)) throw refusal(RELEASE_CODE, 'package.json needs a version like 1.2.3 (the release tag derives from it)');
   const { config, problems } = normalizeRelease(readDeclaration(root).release, pkg.scripts);

@@ -11,8 +11,8 @@ export const isSpecRun = (env = process.env) => Boolean(env.NODE_TEST_CONTEXT);
 
 /**
  * The environment for a child that is itself a test runner: `env` without the mark of an enclosing spec run. A `node --test` that inherits NODE_TEST_CONTEXT believes it is a
- * subtest of that run: it reports to its parent and exits 0 whatever its tests did, so a verb that runs specs as a child (starci test affected, the land gate, the release cut, the
- * suite) would pass red specs from inside a test process. The runner marks the spec files it starts itself, so isSpecRun stays true inside them.
+ * subtest of that run: it reports to its parent and exits 0 whatever its tests did, so a verb that runs specs as a child (the package clean-test, the scaffold e2e, the release cut)
+ * would pass red specs from inside a test process. The runner marks the spec files it starts itself, so isSpecRun stays true inside them.
  */
 export function withoutTestRunner(env = process.env) {
   const { NODE_TEST_CONTEXT: _enclosing, ...rest } = env;

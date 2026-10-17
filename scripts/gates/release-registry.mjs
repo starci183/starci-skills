@@ -31,7 +31,7 @@ const fileDiff = (registryFiles, localFiles, file) => {
  * (only line endings differ), `dist <n>` (only dist/ files differ: stale build output a publish rebuilds) or
  * `drift <n>: <first files>` (anything else differs, appears or is missing).
  */
-export function classifyContent(registryFiles, localFiles) {
+function classifyContent(registryFiles, localFiles) {
   let crlf = 0;
   const dist = [];
   const drift = [];

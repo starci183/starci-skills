@@ -17,7 +17,7 @@ import { byCodeUnit } from '../lib/list.mjs';
 import { trimTrailingSlashes } from './trailing-slashes.mjs';
 
 /** The component that holds the shared infrastructure: the platform tier and every capability more than one service app composes. */
-export const PLATFORM_COMPONENT = 'platform';
+const PLATFORM_COMPONENT = 'platform';
 const SERVICE_APP_KINDS = new Set(['api', 'worker']);
 /** `text` with every `<placeholder>` (a `<`, at least one character, the next `>`) replaced by `*`; a `<` with no closing `>` stays. */
 export const star = (text) => {

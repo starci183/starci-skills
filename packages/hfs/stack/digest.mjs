@@ -1,6 +1,6 @@
 // digest.mjs - image reference and release identifier guards (the all-zero placeholder digest is never a real image).
 /** A registry image reference pinned by a real sha256 digest; the all-zero placeholder digest is refused. */
-export const DIGEST_REF = /^[a-z0-9./_-]+(?::[A-Za-z0-9._-]+)?@sha256:(?!0{64}$)[0-9a-f]{64}$/u;
+const DIGEST_REF = /^[a-z0-9./_-]+(?::[A-Za-z0-9._-]+)?@sha256:(?!0{64}$)[0-9a-f]{64}$/u;
 
 /** A release identifier: the first 16 hex characters of the release digest. */
 export const RELEASE_ID = /^[0-9a-f]{16}$/u;

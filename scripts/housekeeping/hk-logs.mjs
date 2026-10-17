@@ -35,16 +35,16 @@ import { artifactHoldOf } from '../machine/artifact-hold.mjs';
 import { realpathOr } from '../lib/fs-kind.mjs';
 
 /** Spec-agreed window and cap. logMaxAgeMs: runtimes.yaml allocation.housekeeping.logMaxAgeMs (14d). */
-export const DEFAULT_LOG_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000;
+const DEFAULT_LOG_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000;
 /** The codebase's declared log cap; housekeeping.logCapBytes overrides. */
-export const LOG_CAP_BYTES = 5 * 1024 * 1024;
+const LOG_CAP_BYTES = 5 * 1024 * 1024;
 const DEFAULT_LOG_CAP_BYTES = LOG_CAP_BYTES;
 
 /**
  * Make the log's directory; a log past `cap` bytes moves to `<log>.1`, replacing the previous one. The one text-log cap
  * convention: the writers that own a text log call it.
  */
-export function rotateLog(log, { cap = LOG_CAP_BYTES } = {}) {
+function rotateLog(log, { cap = LOG_CAP_BYTES } = {}) {
   fs.mkdirSync(path.dirname(log), { recursive: true });
   try { if (fs.statSync(log).size > cap) fs.renameSync(log, `${log}.1`); } catch { /* no log yet */ }
   return log;

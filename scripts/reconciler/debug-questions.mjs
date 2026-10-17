@@ -142,7 +142,7 @@ function wakeActed(d, snapshot, n) {
 const cleanFinished = (history) => (history ?? []).filter((h) => h.interventions === 0 && h.runtimeDefects === 0 && h.startFailures === 0);
 
 /** The number of consecutive most recent finished workflows that ran clean. */
-export function cleanRun(history) {
+function cleanRun(history) {
   let run = 0;
   for (const h of [...(history ?? [])].reverse()) {
     if (h.interventions + h.runtimeDefects + h.startFailures > 0) break;

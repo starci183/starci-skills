@@ -63,8 +63,8 @@ export function parseLintArgs(argv) {
 }
 
 /** The typed ESLint run reads nothing above the app root: its TypeScript `sys` is bound by this preload (3.3, bound-sys.cjs). */
-export const BOUND_ENV = 'STARCI_LINT_BOUND';
-export const linterBoundArgs = () => ['--require', fileURLToPath(new URL('./bound-sys.cjs', import.meta.url))];
+const BOUND_ENV = 'STARCI_LINT_BOUND';
+const linterBoundArgs = () => ['--require', fileURLToPath(new URL('./bound-sys.cjs', import.meta.url))];
 
 /** The child `node` ran with `args` from `cwd`: its exit status, signal, spawn error and the text of both streams, once it closes. */
 function runNode(args, options) {

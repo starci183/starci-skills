@@ -79,7 +79,7 @@ export const resourceThresholds = (settings = null, config = undefined) =>
   hostFloors((settings ?? allocationSettings())?.resources, (config === undefined ? loadConfig() : config)?.resources ?? null);
 
 /** The drive (or mount root) a path resolves on, spelled 'C:' on Windows, '/' on POSIX. */
-export const driveOf = (p) => {
+const driveOf = (p) => {
   const root = path.parse(path.resolve(String(p))).root;
   let withoutTrailingSeparators = root;
   while (withoutTrailingSeparators.endsWith('/') || withoutTrailingSeparators.endsWith('\\')) withoutTrailingSeparators = withoutTrailingSeparators.slice(0, -1);
@@ -132,7 +132,7 @@ const statfsNearest = (statfs, target) => {
  * {totalRamBytes, freeRamBytes} (memoryProbe). A drive whose statfs fails keeps its entry with `error`
  * and counts as unmeasured — the guard judges only drives it actually read.
  */
-export function probeHostResources({ env = process.env, repo = null, settings = null, config = undefined, statfs = (p) => fs.statfsSync(p), meminfo = () => memoryProbe() } = {}) {
+function probeHostResources({ env = process.env, repo = null, settings = null, config = undefined, statfs = (p) => fs.statfsSync(p), meminfo = () => memoryProbe() } = {}) {
   const thresholds = resourceThresholds(settings, config);
   const tempDir = tempRoot({ env, config });
   const wanted = [{ role: 'temp', drive: driveOf(tempDir), path: tempDir }];
@@ -159,7 +159,7 @@ export function probeHostResources({ env = process.env, repo = null, settings = 
  * The probe shape over override-supplied measurements (the STARCI_HOST_RESOURCES_JSON seam): the JSON
  * names drives and RAM numbers, this function computes the verdicts against the real thresholds.
  */
-export function hostResourcesFromOverride(raw, { settings = null, config = undefined } = {}) {
+function hostResourcesFromOverride(raw, { settings = null, config = undefined } = {}) {
   const thresholds = resourceThresholds(settings, config);
   const d = raw && typeof raw === 'object' ? raw : {};
   const list = Array.isArray(d.drives) && d.drives.length

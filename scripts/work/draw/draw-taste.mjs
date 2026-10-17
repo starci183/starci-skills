@@ -29,7 +29,6 @@ import { COMPONENT_ATTR, PART_ATTR, classesOf, elementsOf, parseHtml, visibleEle
 export const DRAW_ACCENT_BUDGET = 'DRAW_ACCENT_BUDGET';
 export const DRAW_TOO_MANY_BANDS = 'DRAW_TOO_MANY_BANDS';
 export const DRAW_TOO_MANY_BADGES = 'DRAW_TOO_MANY_BADGES';
-export const DRAW_TASTE_CODES = Object.freeze([DRAW_ACCENT_BUDGET, DRAW_TOO_MANY_BANDS, DRAW_TOO_MANY_BADGES]);
 /** How close (OKLab deltaE x100) a pixel is to the accent to count as accent. */
 const ACCENT_TOLERANCE = 8;
 /** The side of the solid block (device pixels) an accent pixel must belong to: fills count, strokes do not. */
@@ -119,7 +118,7 @@ export function htmlTasteFindings(html, { settings = drawLoopSettings(), label =
 }
 
 /** The accent colour a render declares: its `--accent` (var() chains resolved within the same scope), else null. */
-export function accentOf(html, { name = '--accent' } = {}) {
+function accentOf(html, { name = '--accent' } = {}) {
   const css = [...String(html).matchAll(/<style\b[^>]*>([\s\S]*?)<\/style>/gi)].map((m) => m[1]).join('\n');
   const { base } = parseCssCustomProperties(css);
   let value = base.get(name)?.value ?? null;
@@ -207,7 +206,7 @@ function countSolidAccentPixels(mask, width, height, block, sum) {
  * The accent share of a decoded RGBA image: {share, accentPixels, measuredPixels}. `exempt` rects are in image pixels.
  * A pixel counts only inside a solid `block` x `block` square of accent pixels (a morphological opening).
  */
-export function accentShareOf(img, accent, { exempt = [], tolerance = ACCENT_TOLERANCE, block = ACCENT_BLOCK } = {}) {
+function accentShareOf(img, accent, { exempt = [], tolerance = ACCENT_TOLERANCE, block = ACCENT_BLOCK } = {}) {
   const { width: W, height: H, data } = img;
   const L = accent.oklab;
   const mask = accentMaskOf(data, W, H, L, tolerance);

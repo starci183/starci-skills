@@ -22,13 +22,13 @@ export const dbTypesPath = 'supabase/types/database.types.ts';
 
 /** The folder of the app's migrations, and the first line of the committed types: the digest of the migrations they were generated from. */
 const MIGRATIONS_DIR = 'supabase/migrations';
-export const TYPES_STAMP = '// migrations-sha256: ';
+const TYPES_STAMP = '// migrations-sha256: ';
 
 /**
  * The sha256 of the app's migrations, hex: every `supabase/migrations/*.sql` by name, each as name, NUL, its text with LF line ends,
  * NUL. The offline codegen hook of a lite app (templates/app/codegen-lite) computes the same digest and refuses types stamped with another.
  */
-export function migrationsDigest(root) {
+function migrationsDigest(root) {
   const dir = path.join(root, MIGRATIONS_DIR);
   const hash = createHash('sha256');
   for (const name of (fs.existsSync(dir) ? fs.readdirSync(dir) : []).filter((file) => file.endsWith('.sql')).sort()) {

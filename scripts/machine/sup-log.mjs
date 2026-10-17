@@ -25,7 +25,7 @@ export function refsOf({ workflowId = null, jobId = null, repo = null, commits =
 }
 
 /** One typed row ({kind, msg, data?, refs?, level?, at?}) as a machine_logs row of actor supervisor. Pure. */
-export const machineRow = (r) => ({
+const machineRow = (r) => ({
   actor: SUP_ACTOR, kind: String(r.kind), msg: String(r.msg ?? '').slice(0, 4000), level: LEVELS.has(r.level) ? r.level : 'info',
   data: r.data ?? null, refs: Array.isArray(r.refs) && r.refs.length ? r.refs.map(String) : null, at: Number.isFinite(r.at) ? r.at : Date.now(),
   workflowId: r.data?.workflowId && !String(r.data.workflowId).includes(',') ? String(r.data.workflowId) : null,

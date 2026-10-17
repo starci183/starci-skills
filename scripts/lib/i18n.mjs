@@ -49,8 +49,6 @@ export function loadCatalog(root = skillRoot, { scope = 'runtime' } = {}) {
   return cache.get(key);
 }
 
-/** Forget the cached catalogs (a spec that rewrites a catalog file). */
-export const resetCatalogCache = () => cache.clear();
 
 /** The names each `pattern` match captures (group 1) in `text`, in match order (`sort` sorts them). */
 export const captureNames = (text, pattern, { sort = false } = {}) => {

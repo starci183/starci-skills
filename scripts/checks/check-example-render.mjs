@@ -38,12 +38,12 @@ async function materializedRenderFindings(root, name, repoRoot) {
 }
 
 /** Source examples contain names only; judge a temporary app whose declared members are freshly sealed. */
-export async function exampleRenderFindings(root, name, repoRoot = path.join(root, 'examples', name)) {
+async function exampleRenderFindings(root, name, repoRoot = path.join(root, 'examples', name)) {
   return withMaterializedExample(root, repoRoot, (app) => materializedRenderFindings(root, name, app));
 }
 
 /** Every example's findings: [{example, code, path, message}], by example then as reported. */
-export async function checkExampleRender(root = skillRoot) {
+async function checkExampleRender(root = skillRoot) {
   return (await mapInOrder(discoverExampleApps(root), (name) => exampleRenderFindings(root, name))).flat();
 }
 

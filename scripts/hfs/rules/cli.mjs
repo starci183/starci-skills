@@ -10,7 +10,7 @@ import { found } from './read.mjs';
 const CLI_REQUIRED = 'BE_CLI_REQUIRED';
 
 /** The one name of the cli app, its kind, and what its image is called below it. */
-export const CLI_APP = 'cli';
+const CLI_APP = 'cli';
 const CLI_KIND = 'cli';
 const IMAGE = 'Dockerfile';
 const CLI_FEATURE_SLOT = 'be.cli';

@@ -9,11 +9,11 @@ const LEGACY_SLOT_VERSION = Object.freeze([3, 1, 0]);
 export const REPORT_ONLY_CODES = Object.freeze(['RT_COVERAGE_NO_WITNESS', 'RT_COVERAGE_NO_EXAMPLE']);
 const ruleNumber = (rule) => Number(/^R([0-9]+)$/.exec(rule.id)?.[1] ?? Infinity);
 
-export function legacyCoverageRule(rule) {
+function legacyCoverageRule(rule) {
   return ruleNumber(rule) < 247 && !META_FIELDS.some((field) => Object.hasOwn(rule, field));
 }
 
-export function legacyCoverageSlot(slot) {
+function legacyCoverageSlot(slot) {
   if (SLOT_META_FIELDS.some((field) => Object.hasOwn(slot, field))) return false;
   if (slot.since === undefined) return false;
   const match = /^(\d+)\.(\d+)\.(\d+)$/.exec(slot.since);

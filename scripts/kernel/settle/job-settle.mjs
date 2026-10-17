@@ -95,7 +95,7 @@ function unsettledViolations(db, { now = Date.now(), maxAgeMs = settlerSettings(
 /* ------------------------------------------------------------ actions */
 
 /** `starci kernel <verb> ... --json` as the runtime: {ok, value, error, code} */
-export function runApi(args, { env = process.env, timeoutMs = 600_000 } = {}) {
+function runApi(args, { env = process.env, timeoutMs = 600_000 } = {}) {
   const r = runNode([API_FILE, ...args, '--json'], { cwd: SKILL_ROOT, timeout: timeoutMs, env: runtimeEnv(env), maxBuffer: 64 * 1024 * 1024 });
   const value = jsonOf(r.stdout), err = jsonOf(r.stderr);
   const ok = r.status === 0 && value?.ok !== false;

@@ -178,7 +178,7 @@ const USAGE_TAIL_MARK = new RegExp([String.raw`\s--`, String.raw`(?=\s|$)`].join
 
 /** --flag names of a usage string (the global five are the dispatcher's, never a verb's;
  * parenthesized prose and flag-family placeholders like --until-<type> are not flags). */
-export const flagsOfUsage = (text) => [...new Set(
+const flagsOfUsage = (text) => [...new Set(
     [...String(text ?? '').split(USAGE_TAIL_MARK, 1)[0].replace(USAGE_PARENS, ' ').matchAll(USAGE_FLAG)].map((m) => m[1]))]
   .filter((f) => !GLOBAL_FLAGS.has(f) && !f.endsWith('-'));
 
@@ -303,7 +303,7 @@ const appParityFindings = (root, groups, bad, skipped) => {
 };
 
 /** The whole parity report: {ok, findings, skipped, verbs}. */
-export function checkCliParity(root = DEFAULT_ROOT, { files = null } = {}) {
+function checkCliParity(root = DEFAULT_ROOT, { files = null } = {}) {
   const findings = [];
   const skipped = [];
   const bad = (what, detail) => findings.push({ rule: RULE, what, detail });
@@ -358,7 +358,7 @@ const parityText = (report) => {
   return { exitCode: report.ok ? 0 : 1, text: `${lines.join('\n')}\n` };
 };
 
-export function checkCliParityMain(argv) {
+function checkCliParityMain(argv) {
   let root = DEFAULT_ROOT;
   let json = false;
   for (let i = 0; i < argv.length; i++) {

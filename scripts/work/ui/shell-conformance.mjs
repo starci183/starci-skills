@@ -85,7 +85,7 @@ export function productLocaleOf(workRoot) {
  * Whether a ui record is the drawing of a planned visible layout - `surface: layout` at a planned node whose
  * layout.design names it. That draw is the one a greenfield lockup is cropped from, so it cannot wait for one.
  */
-export function isPlannedLayoutDrawing(tree, record) {
+function isPlannedLayoutDrawing(tree, record) {
   if (!isLayoutTree(tree) || record?.surface !== 'layout' || typeof record.route !== 'string') return false;
   const resolved = appOfUi(tree, record);
   if (resolved.error) return false;
@@ -382,7 +382,7 @@ function targetFindings(workRoot, dir, indexFile, own, shell, uiRecords) {
 }
 
 /** Check the actual tree, shell, UI or implementation record under current structural rules. */
-export function checkShellConformance(target) {
+function checkShellConformance(target) {
   const resolved = path.resolve(target);
   const dir = fs.existsSync(resolved) && fs.statSync(resolved).isFile() ? path.dirname(resolved) : resolved;
   const workRoot = workRootOf(dir);
@@ -397,7 +397,7 @@ export function checkShellConformance(target) {
   return { schema: 'starci/shell-conformance@2', ok: refused.length === 0, mode, target: slash(dir), workRoot: slash(workRoot), refused, suspect: pick('suspect'), info: pick('info'), findings };
 }
 
-export function shellConformanceMain(argv = []) {
+function shellConformanceMain(argv = []) {
   const args = argv.filter((a) => a !== '--json');
   if (args.includes('--help') || args.includes('-h') || args.length !== 1) {
     return { exitCode: args.length === 1 ? 0 : 2, text: 'Usage: starci work shell-conformance <work-root | shell-dir | ui-record-dir | impl-record-dir> [--json]\n\nHolds the layout tree (.starciwork/shell/index.yaml, work/layout-tree@1), every ui record\'s route, surface, ancestors and composites, and an implementation\'s app/ files to the real frontend. Exit 0 is clean, 1 lists refusals, 2 is a bad argument.\n' };

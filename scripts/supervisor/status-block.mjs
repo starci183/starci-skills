@@ -19,7 +19,7 @@ import { isSpecRun } from '../lib/env.mjs';
  * Everything the block shows, from machine.sqlite over the machine handle `m` (seats row 'supervisor', sup_signals,
  * sup_events ticks, pushes, land_runs, the [Worker] board): {seat, enabled, ticks, board, pushes, lands}.
  */
-export function supervisorSnapshot(m, { now = Date.now() } = {}) {
+function supervisorSnapshot(m, { now = Date.now() } = {}) {
   const events = (kinds, limit) => m.supEvents({ kinds, limit }).map((e) => ({ kind: e.kind, entity_id: e.entity_id, created_at: e.created_at, payload: e.payload ?? {} }));
   const ticks = events(['supervisor-tick'], 6).map((e) => ({ at: e.created_at, owed: e.payload.owed ?? null, clusters: e.payload.clusters ?? null }));
   // The newest push per repository (machine.sqlite pushes) and the newest land-gate runs (land_runs).
@@ -127,7 +127,7 @@ function renderPushes(snap, t, now, lines) {
   }
 }
 
-export function renderSupervisorBlock(snap, { language = ownerLanguage(), land = { busy: false, current: null }, now = Date.now(), quota = null } = {}) {
+function renderSupervisorBlock(snap, { language = ownerLanguage(), land = { busy: false, current: null }, now = Date.now(), quota = null } = {}) {
   if (!snap) return null;
   const t = blockTexts(language);
   const lines = [renderSeat(snap, t), renderTick(snap, t, now)];

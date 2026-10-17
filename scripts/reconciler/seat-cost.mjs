@@ -17,7 +17,7 @@ const tokensOf = (db, where, ...args) => Number(db.prepare(`SELECT COALESCE(SUM(
 const percentile = (sorted, p) => (sorted.length ? sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * p))] : null);
 
 /** The wakes of a seat joined with the tokens of the usage rows they own: [{seq, at, cause, worked, turns, tokens}]. Pure. */
-export function wakesWithUsage(judged, usage) {
+function wakesWithUsage(judged, usage) {
   const byAt = new Map(usage.map((row) => [row.seq, row]));
   return judged.map((wake) => ({ ...wake, turns: byAt.get(wake.seq)?.turns ?? 0, tokens: byAt.get(wake.seq)?.tokens ?? 0 }));
 }
@@ -38,7 +38,7 @@ function byCause(wakes, skipped) {
 }
 
 /** One seat's row: wakes, empty wakes and their share, withheld wakes, tokens per wake and the cause table. Pure over the joined wakes. */
-export function seatRow({ seat, name, wakes, skipped = [], tokens = null }) {
+function seatRow({ seat, name, wakes, skipped = [], tokens = null }) {
   const spent = wakes.filter((wake) => wake.tokens > 0).map((wake) => wake.tokens).sort((a, b) => a - b);
   const empty = wakes.filter((wake) => !wake.worked).length;
   const own = tokens ?? wakes.reduce((sum, wake) => sum + wake.tokens, 0);
@@ -62,7 +62,7 @@ export function supervisorSeatOf(db, { now = Date.now(), since = 0 } = {}) {
 }
 
 /** The rows with `sharePercent` of the total the machine recorded (`total` = seats + attempts). Pure. */
-export function withShares(rows, total) {
+function withShares(rows, total) {
   return rows.map((row) => ({ ...row, sharePercent: total > 0 ? Math.round((1000 * row.tokens) / total) / 10 : 0 }));
 }
 
@@ -72,7 +72,7 @@ export function seatsOverEmptyBound(rows, config = seatCostConfig()) {
 }
 
 /** The seat cost of the whole machine: {seats: [...], totalTokens, bound}. `machine` and `ledgers` are open readers; nothing is written. */
-export function collectSeatCost({ machineDb, ledgers, now = Date.now() }) {
+function collectSeatCost({ machineDb, ledgers, now = Date.now() }) {
   const rows = [];
   let attemptTokens = 0;
   for (const ledger of ledgers) {

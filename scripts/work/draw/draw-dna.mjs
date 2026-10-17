@@ -78,7 +78,6 @@ const DOT_CLASS = /(?:^|[-_])(dot|status-dot|dot-indicator)(?:$|[-_])/i;
  */
 export const alertActionVariantFor = (tone) => tone === 'informative' && 'primary' || tone === 'negative' && 'danger' || 'secondary';
 export const DRAW_ASSET_SLOT_UNDECLARED = 'DRAW_ASSET_SLOT_UNDECLARED';
-export const DRAW_DNA_CODES = Object.freeze([DRAW_OFF_GRAMMAR_COMPONENT, DRAW_NOTICE_NOT_ALERT, DRAW_RATIO_NOT_METER, DRAW_ALERT_ANATOMY, DRAW_METER_TRACK, DRAW_ASSET_SLOT_UNDECLARED]);
 /** The attribute a drawing marks an artwork slot with; interface.asset fills it (scripts/work/asset-slot.mjs). */
 export const ASSET_SLOT_ATTR = 'data-asset-slot';
 export const COMPONENT_ATTR = 'data-grammar-component';

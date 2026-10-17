@@ -43,7 +43,7 @@ const observation = (source, observedAt, readAt, extra = {}) => ({ source, obser
   cached: false, refreshing: false, availability: 'available', error: null, ...extra });
 
 /** Injected probes make cache/failure projections verifiable without probing this host. */
-export function createHostReader({ clock = Date.now, osReader = os, probeReaders = probes } = {}) {
+function createHostReader({ clock = Date.now, osReader = os, probeReaders = probes } = {}) {
   function cache(source, ttl, load, initial) {
     let value = initial, observedAt = null, readAt = null, inflight = null, error = null;
     return () => {

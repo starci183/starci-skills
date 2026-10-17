@@ -15,7 +15,7 @@ import path from 'node:path';
  * starts the worker in the system home then. A trust home (specs) re-roots the source under `<root>/system`, a
  * directory of its own beside the managed `<root>/.codex`.
  */
-export function codexMirrorSource({ env = process.env } = {}) {
+function codexMirrorSource({ env = process.env } = {}) {
   const root = env.STARCI_AGENT_TRUST_HOME || null;
   if (root) return path.join(root, 'system', '.codex');
   return env.CODEX_HOME ? null : path.join(os.homedir(), '.codex');

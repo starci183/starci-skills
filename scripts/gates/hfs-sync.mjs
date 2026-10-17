@@ -35,7 +35,7 @@ export const CODES = Object.freeze([
 ]);
 
 /** { ok, findings: [{ code, file, message }] } for the repository at `root`. */
-export async function checkHfsSync(root, { presets } = {}) {
+async function checkHfsSync(root, { presets } = {}) {
   const findings = [];
   const add = (code, file, message) => findings.push({ code, file, message });
   try {

@@ -50,8 +50,6 @@ const SYMBOL_IN_FILE = new RegExp(String.raw`\x60([\w.$]+)\(\)\x60\s+in\s+(\w[\w
 
 class CiteInputError extends Error {}
 
-/** A file the cite scan reads whole (prose) vs one whose comments alone are read (a string literal is data). */
-const PROSE_EXT = /\.(?:ya?ml|md)$/;
 const SOURCE_EXT = /\.(?:mjs|cjs|js|mts|cts|ts|tsx|jsx)$/;
 const CITE_EXT = /\.(?:ya?ml|md|mjs|cjs|js|mts|cts|ts|tsx|jsx)$/;
 /** The slot manifests: a `path:`/`requires:`/`allows:`/`forbids:`/`roles:` value there declares a slot's shape (judged by the HFS engine, incl. forbidden tombstones and product-repo paths), never cites this tree. */
@@ -78,7 +76,7 @@ const expandBraces = (token) => {
 };
 
 /** A token the tree cannot decide: a glob, a placeholder, or runtime state. */
-export const isUnverifiable = (token) => token.includes('*') || token.includes('<') || token.includes('>')
+const isUnverifiable = (token) => token.includes('*') || token.includes('<') || token.includes('>')
   || (/(^|\/)\.starci[a-z]*\//.test(token) && !/(^|\/)\.starci\/host\//.test(token))
   || token.includes('node_modules/');
 
@@ -129,7 +127,7 @@ function commentsAsText(file, text) {
 const CITE_TRAILING_CHAR = /[.,;)]/;
 
 /** Every path and symbol reference one contract file makes, with line numbers. */
-export function citesIn(text) {
+function citesIn(text) {
   const cites = [];
   const lines = text.split('\n');
   const addPath = (line, token, form) => {
@@ -215,7 +213,7 @@ const citesCheckedIn = (root, rel, prose, readTarget, dead) => {
   return checked;
 };
 
-export function checkContractCites(root = DEFAULT_ROOT, scan = DEFAULT_SCAN) {
+function checkContractCites(root = DEFAULT_ROOT, scan = DEFAULT_SCAN) {
   const dead = [];
   const contents = new Map();
   const readTarget = (abs) => {
@@ -234,9 +232,7 @@ export function checkContractCites(root = DEFAULT_ROOT, scan = DEFAULT_SCAN) {
   return { schema: 'starci/contract-cites@1', ok: dead.length === 0, filesScanned: files.length, citesChecked: checked, dead };
 }
 
-export const CITED_PATH_MISSING = 'RT_CITED_PATH_MISSING';
-/** The runtime's live prose (rule R122): every tracked doc, yaml and source file of this tree outside history. */
-const RUNTIME_CITE_ROOTS = Object.freeze(['modules/kernel', 'modules/goal', 'modules/ops', 'modules/supervisor', 'modules/reconciler', 'modules/host', 'modules/models', 'skills', 'init', 'CONTEXT.md', 'README.md', 'CONTRIBUTING.md', 'ui/README.md', 'ui/CONTRACT.md']);
+const CITED_PATH_MISSING = 'RT_CITED_PATH_MISSING';
 
 const NOT_TRACKED_DIRS = new Set(['.git', 'node_modules', '.starciwork', 'dist']);
 
@@ -245,7 +241,7 @@ const NOT_TRACKED_DIRS = new Set(['.git', 'node_modules', '.starciwork', 'dist']
  * a source file read through its comments — outside history (SCAN_HISTORY) and the generated copy roots. Tracked means
  * git ls-files; a tree that is not a Git work tree falls back to the filesystem (a spec fixture).
  */
-export function runtimeCiteScan(root = DEFAULT_ROOT) {
+function runtimeCiteScan(root = DEFAULT_ROOT) {
   const generated = generatedRootsOf(root);
   const scoped = (rel) => CITE_EXT.test(rel) && !isHistoryPath(rel) && !generated.some((g) => rel.startsWith(g));
   try {
@@ -272,7 +268,7 @@ const citeMainText = (report) => {
   return { exitCode: 1, text: `${lines.join('\n')}\n` };
 };
 
-export function checkContractCitesMain(argv) {
+function checkContractCitesMain(argv) {
   let root = DEFAULT_ROOT, json = false;
   const scan = [];
   for (let i = 0; i < argv.length; i++) {

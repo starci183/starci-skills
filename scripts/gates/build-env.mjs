@@ -8,7 +8,7 @@ import path from 'node:path';
 import { readEnv } from '../lib/env.mjs';
 
 /** The SWC native-binding cache directory: STARCI_SWC_CACHE when set, else `starci-swc-cache` under the user's home. */
-export const swcCacheDir = (env = process.env, home = os.homedir()) => readEnv('STARCI_SWC_CACHE', env) ?? path.join(home, 'starci-swc-cache');
+const swcCacheDir = (env = process.env, home = os.homedir()) => readEnv('STARCI_SWC_CACHE', env) ?? path.join(home, 'starci-swc-cache');
 
 /** `env` with SWC_NATIVE_BINDING_CACHE naming the (created) SWC cache directory. */
 export function withSwcCache(env = process.env) {

@@ -27,7 +27,7 @@ import { operationDispatchOf } from './verbs/shared/rows.mjs';
 import { isMain } from '../lib/is-main.mjs';
 
 /** The header line that keeps Orca's completeness verdict with the stored output. */
-export const outputHeader = (out) => {
+const outputHeader = (out) => {
   const fallback = out.fallbackReason ? ` fallback=${out.fallbackReason}` : '';
   const clipping = out.clipping?.length ? ` clipping=${out.clipping.join(',')}` : '';
   return `[worker-read dispatch=${out.dispatch} source=${out.source}${fallback} contentComplete=${out.contentComplete === true}${clipping}]`;
@@ -38,7 +38,7 @@ export const outputHeader = (out) => {
  * `read` is worker-read's one-page call ({dispatch, source, cursor, limit}) → workerRead's shape (specs inject it).
  * Returns {text, source, contentComplete, clipping} where text starts with outputHeader.
  */
-export function readWorkerOutput(dispatch, { read = undefined } = {}) {
+function readWorkerOutput(dispatch, { read = undefined } = {}) {
   if (!dispatch) return null;
   try {
     const out = workerOutput({ dispatch, ...(read ? { read } : {}) });
@@ -58,7 +58,7 @@ export function captureWorker(dispatch, { read = undefined, repoRoots = [] } = {
  * One snapshot pass over a ledger's open attempts (not settled, no end state, terminal not closed): each whose last
  * snapshot is older than `everyMs` gets a new one, read by the job's Dispatch. Returns {checked, written, unchanged, unreadable}.
  */
-export function snapshotOpenAttempts(ledger, { now = Date.now(), everyMs = TRANSCRIPT_SNAPSHOT_MS, read = undefined, repoRoots = [] } = {}) {
+function snapshotOpenAttempts(ledger, { now = Date.now(), everyMs = TRANSCRIPT_SNAPSHOT_MS, read = undefined, repoRoots = [] } = {}) {
   const db = ledger.db;
   const open = db.prepare(`SELECT a.attempt_id,a.workflow_id,a.worktree_path,j.payload_json,
       (SELECT max(at) FROM attempt_transcript_snapshots s WHERE s.attempt_id=a.attempt_id) AS last_at

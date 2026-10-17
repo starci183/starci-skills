@@ -37,7 +37,7 @@ const SENDER_MISSING = (detail) => ({ ok: false, reason: 'workflow-sender-termin
  * is never a foreign terminal: first a plain terminal of the runtime's own worktree (the Run's current coordinator when it is
  * one, so the entry Run stays reusable), else the live Supervisor seat, the runtime's own authority. Pure.
  */
-export function headlessSenderOf({ listing, recorded = new Set(), seats = new Set(), coordinator = null, root } = {}) {
+function headlessSenderOf({ listing, recorded = new Set(), seats = new Set(), coordinator = null, root } = {}) {
   const entries = entryTerminalsOf({ listing, recorded, owned: seats, root });
   const entry = entries.includes(coordinator) ? coordinator : entries[0];
   if (entry) return { ok: true, handle: entry, source: 'runtime-worktree' };

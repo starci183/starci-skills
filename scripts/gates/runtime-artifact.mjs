@@ -33,7 +33,7 @@ const WORK_SEGMENT = '.starciwork';
  * `.starciwork` anywhere else is host-local work state, and any other file in a `secrets/` directory is refused everywhere. `secret.env.example` is allowed because only `secret.env` is private.
  * Matching ignores letter case and reads a backslash as `/`, so a renamed copy from a case-insensitive host is still refused.
  */
-export function forbiddenEntries(paths, allowedWork = new Set()) {
+function forbiddenEntries(paths, allowedWork = new Set()) {
   const found = [];
   for (const entry of paths) {
     const lowered = entry.replaceAll('\\', '/').toLowerCase();
@@ -53,12 +53,12 @@ export function forbiddenEntries(paths, allowedWork = new Set()) {
 }
 
 /** The `.starciwork` paths the package `files` list names explicitly (a glob or a negation is not an explicit name). */
-export function explicitWorkPaths(files) {
+function explicitWorkPaths(files) {
   return new Set(files.filter((file) => typeof file === 'string' && !/[*?!]/.test(file) && file.split('/').includes(WORK_SEGMENT)));
 }
 
 /** The inventory.txt text: every packed file sorted by path with its byte size, one `<size>\t<path>` line each. */
-export function inventoryText(packedFiles) {
+function inventoryText(packedFiles) {
   const byPath = (a, b) => {
     if (a.path < b.path) return -1;
     if (a.path > b.path) return 1;
@@ -73,7 +73,7 @@ export function inventoryText(packedFiles) {
  * The release-metadata.json document. Identity comes from the packed package.json and the CI environment, never from a constant,
  * so the metadata cannot drift from the archive it sits beside.
  */
-export function releaseMetadata({ manifest, packed, tarball, sha256, bytes, env, nodeVersion }) {
+function releaseMetadata({ manifest, packed, tarball, sha256, bytes, env, nodeVersion }) {
   return {
     schema: 'starci/runtime-artifact@1',
     name: manifest.name,

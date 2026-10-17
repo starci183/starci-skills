@@ -28,20 +28,20 @@ import { isMain } from '../lib/is-main.mjs';
 const JUDGEMENT_KIND = 'supervisor-judgement';
 const DIGEST_SENT_KIND = 'notifier-digest-sent';
 const URGENT_SENT_KIND = 'notifier-urgent-sent';
-export const URGENT_KEY_MS = 6 * 3_600_000;
+const URGENT_KEY_MS = 6 * 3_600_000;
 const URGENT_CLASSES = Object.freeze(['service-quarantined', 'crash-loop', 'ram-critical', 'ledger-corrupt', 'supervisor-di-overdue']);
 const DAY = 86_400_000;
 
 /* ------------------------------------------------------------ pure planners */
 
 /** Whether a digest is due: never sent, or the last one is at least `everyMs` old; `force` always. Pure. */
-export const digestDue = ({ lastSentAt = null, now, everyMs, force = false }) => force || lastSentAt == null || now - lastSentAt >= everyMs;
+const digestDue = ({ lastSentAt = null, now, everyMs, force = false }) => force || lastSentAt == null || now - lastSentAt >= everyMs;
 
 /**
  * Which urgent items to send now: an allowed class, and no send of the same key within `perKeyMs`; one per key per
  * call. Pure over `items` [{class, key, text}] and `sent` {key: lastSentAt}. {due, skipped: [{key, why}]}.
  */
-export function planUrgent(items, sent = {}, { now, perKeyMs = URGENT_KEY_MS } = {}) {
+function planUrgent(items, sent = {}, { now, perKeyMs = URGENT_KEY_MS } = {}) {
   const due = [], skipped = [], seen = new Set();
   for (const i of items) {
     if (!URGENT_CLASSES.includes(i.class)) { skipped.push({ key: i.key, why: `class ${i.class} is not an urgent class` }); continue; }
@@ -74,7 +74,7 @@ function progressLines(rows, language = ownerLanguage()) {
  * The digest text. Pure over what the caller read: `progress` rows, `actions`/`owed` for digestText, `gc` line,
  * `violations` [{code}], `lands` [{kind, id, at}], `judgements` [{text, at}], `ownerWaits` [text].
  */
-export function composeDigest({ digestText, progress = [], actions = [], owed = null, gc = null, trend = null, violations = [], lands = [], judgements = [], ownerWaits = [], language = ownerLanguage(), now }) {
+function composeDigest({ digestText, progress = [], actions = [], owed = null, gc = null, trend = null, violations = [], lands = [], judgements = [], ownerWaits = [], language = ownerLanguage(), now }) {
   const t = T(translator(language));
   const base = digestText({ actions, owed: { ...owed, items: owed?.items ?? [], ownerWaits }, gc, trend, progress: progressLines(progress, language), language, now });
   const lines = [base];
@@ -164,7 +164,7 @@ function ledgerDigest(repo, { env, now, workflowView, listDecisions, ledgerFileF
 }
 
 /** Everything the digest reads: live workflows' progress (progress-rca.mjs), GC line, violations, owner waits. `repos` defaults to config.yaml supervisor.repos. */
-export async function digestInputs({ env = process.env, now = Date.now(), repos = null } = {}) {
+async function digestInputs({ env = process.env, now = Date.now(), repos = null } = {}) {
   const [{ productRepos, supervisorSettings }, { openLedgerReader, ledgerFileFor }, { workflowView }, { listDecisions }] = await Promise.all([
     import('../machine/home.mjs'), import('../../engine/db/ledger.mjs'), import('../kernel/progress-rca.mjs'), import('../machine/decisions.mjs')]);
   const progress = [], ownerWaits = [];

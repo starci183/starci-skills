@@ -127,7 +127,7 @@ function safePayloadTarget(target) {
 
 // Plan host changes before any payload mutation. Only exact installer-owned text is replaced.
 // AGENTS.md is always planned; CLAUDE.md/DEVIN.md enter the plan only when the host opted in.
-export function bootstrapPlan(repo, opts, manifest = null) {
+function bootstrapPlan(repo, opts, manifest = null) {
   for (const name of [...HOST_BOOTSTRAP_NAMES, '.gitignore']) {
     const stat = lstatSync(path.join(repo, name), { throwIfNoEntry: false });
     if (stat && (!stat.isFile() || stat.isSymbolicLink())) throw new Error(name + ': bootstrap target must be a regular owned file, not a symlink/junction');

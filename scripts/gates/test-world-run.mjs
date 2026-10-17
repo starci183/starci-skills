@@ -219,7 +219,7 @@ export function testWorldFindings(summary) {
   return out;
 }
 
-export function buildTestWorldRun({ root, project, tests = null, rules = testWorldRules(), npm = runNpm, run = true }) {
+function buildTestWorldRun({ root, project, tests = null, rules = testWorldRules(), npm = runNpm, run = true }) {
   if (!WORLD_PROJECTS[project]) throw new Error(`--project must be one of ${Object.keys(WORLD_PROJECTS).join(', ')}; ${USAGE}`);
   const abs = path.resolve(root);
   const specs = specsOf(abs, project, tests).map((rel) => judgeSpec(rel, fs.readFileSync(path.join(abs, rel), 'utf8'), rules));

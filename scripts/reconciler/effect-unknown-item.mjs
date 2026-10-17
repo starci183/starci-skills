@@ -5,7 +5,7 @@
 const OPENED_BY = 'job-controller';
 
 /** The Supervisor's runtime-defect item for a job stuck in effect_unknown. Pure. */
-export function effectUnknownDecision(f, ledgerId, { now, settings }) {
+function effectUnknownDecision(f, ledgerId, { now, settings }) {
   const minutes = Math.round((now - f.updatedAt) / 60_000);
   return {
     schema: 'starci/decision-item@1', kind: 'runtime-defect', idempotencyKey: `effect-unknown:${f.jobId}`, decider: 'supervisor', ledger: ledgerId, workflowId: f.workflowId,

@@ -82,7 +82,7 @@ import { positiveNumber } from '../lib/number.mjs';
 export const SCHEMA = 'starci/gc-report@1';
 /** The supervisor-ledger event the tick records per GC run (tick.mjs); the owner digest sums them (actions.mjs). */
 export const GC_EVENT_KIND = 'supervisor-gc';
-export const COLLECTORS = Object.freeze(['agents', 'shells', 'lanes', 'tmp', 'leases', 'lanelogs']);
+const COLLECTORS = Object.freeze(['agents', 'shells', 'lanes', 'tmp', 'leases', 'lanelogs']);
 export const DEFAULTS = Object.freeze({ gcMinAgeMs: 600_000, gcLaneGraceMs: 1_800_000, sweepMs: 1_800_000,
   leaseMinAgeMs: 60_000, laneLogMinAgeMs: 86_400_000, laneLogRetentionMs: 1_209_600_000, laneIdleMs: LANE_IDLE_MS, ...LANE_DEFAULTS });
 /** The DESIGN §15.3 leftover class of each new collector's item and the step whose bug it points at. */
@@ -141,13 +141,13 @@ export function tabTitles(visualLayouts = []) {
 }
 
 /** True when a title is a plain Orca shell tab's: "Terminal <n>", or the name of its worktree folder. */
-export function isShellTitle(title, { worktreeName = null } = {}) {
+function isShellTitle(title, { worktreeName = null } = {}) {
   const t = String(title ?? '').trim();
   return SHELL_TITLE.test(t) || Boolean(worktreeName && t === worktreeName);
 }
 
 /** True when a terminal screen holds nothing but PowerShell prompts (wrapped lines joined back). */
-export function onlyPrompts(screen) {
+function onlyPrompts(screen) {
   if (screen == null) return false;
   const joined = String(screen).replace(/\r?\n/g, '');
   if (!PROMPT.test(joined)) return false;
@@ -178,7 +178,7 @@ export function classifyLeases({ rows = [], now = Date.now(), minAgeMs = DEFAULT
  * The lane-log plan. Pure. `top`: [{name, mtimeMs, isFile}] at the lanes root; `archived`: the same in
  * <archiveRoot>/lane-logs. {move: [name], purge: [name]}: only plain files named *.err/*.json/*.log, never a directory.
  */
-export function planLaneLogs({ top = [], archived = [], now = Date.now(), minAgeMs = DEFAULTS.laneLogMinAgeMs, retentionMs = DEFAULTS.laneLogRetentionMs }) {
+function planLaneLogs({ top = [], archived = [], now = Date.now(), minAgeMs = DEFAULTS.laneLogMinAgeMs, retentionMs = DEFAULTS.laneLogRetentionMs }) {
   const old = (e, ms) => e.isFile === true && Number(e.mtimeMs) > 0 && now - Number(e.mtimeMs) >= ms;
   return { move: top.filter((e) => LANE_LOG.test(e.name) && old(e, minAgeMs)).map((e) => e.name),
     purge: archived.filter((e) => LANE_LOG.test(e.name) && old(e, retentionMs)).map((e) => e.name) };
@@ -224,7 +224,7 @@ function purgeLaneLog(acc, { apply, fsx, settings, archiveDir, archived }, name)
 }
 
 /** Decide and (apply) archive the lane logs. `fsx` {list(dir), move(from, to), remove(file)} is the spec seam. {items, freedBytes, errors}. */
-export function collectLaneLogs({ apply = false, env = process.env, now = Date.now(), settings, fsx = null }) {
+function collectLaneLogs({ apply = false, env = process.env, now = Date.now(), settings, fsx = null }) {
   const base = lanesRoot({ env });
   const archiveDir = path.join(settings.archiveRoot, 'lane-logs');
   const list = fsx?.list ?? dirEntries;
@@ -384,7 +384,7 @@ function runtimeWorkers({ sup, ledgers, list = (run) => workerListAll({ run }) }
  *   orphan-shell  a child-less `powershell -NoExit` under the Orca daemon, older than minAgeMs, beyond the number of
  *                 terminals Orca lists (`listedCount`): no tab owns that many shells; the oldest go first
  */
-export function orphanProcesses({ table, now = Date.now(), minAgeMs = DEFAULTS.gcMinAgeMs, listedCount = null }) {
+function orphanProcesses({ table, now = Date.now(), minAgeMs = DEFAULTS.gcMinAgeMs, listedCount = null }) {
   const byPid = new Map(table.map((p) => [p.pid, p]));
   const parentOf = (p) => { const q = byPid.get(p.ppid); return q && !(q.created && p.created && q.created > p.created) ? q : null; };
   const old = (p) => Number(p.created) > 0 && now - Number(p.created) >= minAgeMs;

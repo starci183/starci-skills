@@ -20,7 +20,7 @@ import { withTempEnv } from '../../../engine/temp-root.mjs';
  * is a request for raw bytes, not an encoding: spawnSync encodes a string `input` with it and throws
  * ERR_UNKNOWN_ENCODING, so it reaches spawnSync as encoding:null (Buffer output either way).
  */
-export const gitSpawn = (file, args, options = {}) => {
+const gitSpawn = (file, args, options = {}) => {
   assertMutationFence({ kind: 'git-effect', args });
   const spawn = { encoding: 'utf8', windowsHide: true, ...options };
   if (spawn.encoding === 'buffer') spawn.encoding = null;
@@ -76,5 +76,5 @@ export const gitExecutable = (options = null) => {
   return found;
 };
 
-/** The output ceiling of the whole-diff and `cat-file --batch` calls `test affected` batches (a release diff is tens of megabytes). */
-export const BATCH_MAX_BUFFER = 1024 * 1024 * 1024;
+/** The output ceiling of the whole-diff and `cat-file --batch` calls batch (a release diff is tens of megabytes). */
+const BATCH_MAX_BUFFER = 1024 * 1024 * 1024;

@@ -14,7 +14,7 @@ const PROBES = Object.freeze({
 });
 
 /** The capabilities `brief` declares: the route.riskHints that name a probe. */
-export const capabilitiesOf = (brief) => (Array.isArray(brief?.route?.riskHints) ? brief.route.riskHints : []).filter((hint) => Object.hasOwn(PROBES, hint));
+const capabilitiesOf = (brief) => (Array.isArray(brief?.route?.riskHints) ? brief.route.riskHints : []).filter((hint) => Object.hasOwn(PROBES, hint));
 
 /** The unmet capability prerequisites of `brief` on this host, probed from `dirs` (the tree the op runs in) and the runtime: [{kind, code, capability, missing, why, fix}]. */
 export const hostCapabilityGaps = ({ brief, dirs = [], runtime }) => capabilitiesOf(brief).map((hint) => PROBES[hint](dirs, runtime === undefined ? {} : { runtime })).filter(Boolean);

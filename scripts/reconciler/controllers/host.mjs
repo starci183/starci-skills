@@ -76,14 +76,14 @@ const SUPERVISOR_WATCHDOG = 'scripts/supervisor/supervisor-watchdog.mjs';
 const FOOTPRINT_SCAN = 'scripts/guards/footprint-scan.mjs';
 
 // A read-only probe answer that a --repair pass would act on (scripts/kernel/kernel-watchdog.mjs statusTick/kernelTick).
-export const NEEDS_REPAIR = new Set(['restart-needed', 'wake-needed', 'queued-input', 'staged-input']);
+const NEEDS_REPAIR = new Set(['restart-needed', 'wake-needed', 'queued-input', 'staged-input']);
 // Only a completed replacement counts toward seat quarantine.
 export const REPLACED = new Set(['restarted']);
 const DOWN_BEFORE_BOOT = new Set(['failed', 'backoff', 'starting', 'quarantined']);
 const TERMINAL_LIST = 'scripts/api/orca/terminal-list.mjs';
 
 /** The goal problem of a workflow's newest goal text, or null (INV-W4; scripts/goal/goal-text.mjs). */
-export function goalProblem(markdown, refusal) {
+function goalProblem(markdown, refusal) {
   if (markdown == null || !String(markdown).trim()) return 'goal-text-missing';
   return refusal(markdown) ? 'goal-text-unresolved' : null;
 }
@@ -176,7 +176,7 @@ async function dueAttempts(ctx, l, cutoff) {
   } catch { return 0; } // an old-schema ledger has no attempts to snapshot
 }
 
-export function createHostController(deps = {}) {
+function createHostController(deps = {}) {
   const lazy = (fn) => { let v; let done = false; return () => { if (!done) { v = fn(); done = true; } return v; }; };
   const settings = lazy(deps.settings ?? (() => hostSettings()));
   const registry = lazy(deps.registry ?? (() => serviceRegistry({ settings: settings(), ports: servicePorts() })));

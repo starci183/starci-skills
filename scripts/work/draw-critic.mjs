@@ -57,7 +57,7 @@ const CRITIQUE_SCHEMA = 'starci/draw-critique@1';
 const RUBRIC_SCHEMA = 'starci/draw-rubric@1';
 
 /** The built-in rubric: the r5 bake-off critic sheet (<tmp>/draw-bakeoff/r5/inputs/08-RUBRIC.md), brand-neutral. */
-export const DEFAULT_RUBRIC = Object.freeze({
+const DEFAULT_RUBRIC = Object.freeze({
   schema: RUBRIC_SCHEMA,
   source: 'built-in default (scripts/work/draw-critic.mjs)',
   checks: [
@@ -130,7 +130,7 @@ const gateIdsOf = (rubric) => [...new Set((rubric.checks ?? []).filter((c) => c?
 const DRAW_SUBJECT = Object.freeze({ title: 'draw', objective: 'independent critique of one draw-loop round' });
 
 /** The one file the critic writes, in its clean directory. */
-export const VERDICT_FILE = 'verdict.json';
+const VERDICT_FILE = 'verdict.json';
 
 /**
  * The critic's Task spec. It never sees the drawing brief, the worker's notes or any earlier round: only the clean
@@ -153,7 +153,7 @@ function criticPrompt({ dir, images, html = 'screen.html', rubricFile = 'rubric.
 }
 
 /** The verdict JSON out of the critic's verdict file (the last {...} block that parses). */
-export function parseVerdict(text) {
+function parseVerdict(text) {
   const s = String(text ?? '');
   for (let end = s.lastIndexOf('}'); end >= 0; end = s.lastIndexOf('}', end - 1)) {
     for (let start = s.lastIndexOf('{', end); start >= 0; start = s.lastIndexOf('{', start - 1)) {
@@ -168,7 +168,7 @@ export function parseVerdict(text) {
 }
 
 /** Normalise a verdict against its rubric: every rubric check present, beauty a number capped by a failed gate. */
-export function normaliseVerdict(v, rubric) {
+function normaliseVerdict(v, rubric) {
   const byId = new Map((Array.isArray(v?.checks) ? v.checks : []).filter((c) => c?.id).map((c) => [String(c.id), c]));
   const checks = (rubric.checks ?? []).map((c) => {
     const got = byId.get(String(c.id));

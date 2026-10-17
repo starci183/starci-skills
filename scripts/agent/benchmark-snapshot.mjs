@@ -18,7 +18,7 @@ import { skillRoot, starciSourceRoot } from '../../engine/runtime-root.mjs';
 import { scorecardFor, UNROUTED, localDay, shortPool, pctText } from './model-scorecard.mjs';
 import { readJsonFile as readJson } from '../lib/json.mjs';
 
-export const SNAPSHOTS_DIR = path.join(skillRoot, 'benchmark', 'snapshots');
+const SNAPSHOTS_DIR = path.join(skillRoot, 'benchmark', 'snapshots');
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 
@@ -28,7 +28,7 @@ const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const localDate = localDay;
 
 /** The snapshot file name for one date and window. */
-export const snapshotName = (date, sinceHours) => `${date}-${sinceHours}h.json`;
+const snapshotName = (date, sinceHours) => `${date}-${sinceHours}h.json`;
 
 /**
  * The Work owner repo of every .workspaces/projects/<p>/work.json binding under `sourceRoot`
@@ -52,7 +52,7 @@ export function boundRepos({ sourceRoot = starciSourceRoot() } = {}) {
 }
 
 /** The newest snapshot in `dir` of the same window whose name sorts before `name`, or null. */
-export function previousSnapshot(dir, name, sinceHours) {
+function previousSnapshot(dir, name, sinceHours) {
   const same = new RegExp(String.raw`^\d{4}-\d{2}-\d{2}-${sinceHours}h\.json$`);
   let files = [];
   try { files = fs.readdirSync(dir).filter((f) => same.test(f) && f < name).sort(); } catch { return null; }
@@ -66,7 +66,7 @@ const round = (x, digits = 1) => (x == null ? null : Math.round(x * 10 ** digits
 const diff = (a, b) => (a == null || b == null ? null : a - b);
 
 /** Per-pool change from `prev` to `next`: jobs, pass/fail/blocked in percentage points, median in minutes. */
-export function snapshotDelta(next, prev) {
+function snapshotDelta(next, prev) {
   const pools = {};
   const names = [...new Set([...Object.keys(next.pools ?? {}), ...Object.keys(prev?.pools ?? {})])];
   for (const pool of names) {
@@ -90,7 +90,7 @@ const signed = (x, unit = '') => {
 };
 
 /** The short text the CLI prints: the written file, then one delta line per pool (or a first-snapshot note). */
-export function formatDelta({ file, snapshot, previous, delta }) {
+function formatDelta({ file, snapshot, previous, delta }) {
   const lines = [`benchmark snapshot ${path.basename(file)}: ${snapshot.jobs} jobs over ${snapshot.repos.length} repo(s), window ${snapshot.window.label}`];
   if (!previous) { lines.push(`no earlier ${snapshot.window.label} snapshot: this is the baseline`); return lines.join('\n'); }
   lines.push(`delta vs ${previous.file}: jobs ${snapshot.jobs} (${signed(delta.jobsDelta)})`);
@@ -106,7 +106,7 @@ export function formatDelta({ file, snapshot, previous, delta }) {
  * Take one snapshot. Refuses (throws code EEXIST) when <dir>/<date>-<N>h.json exists, before reading any ledger.
  * Returns { file, snapshot, previous, delta }.
  */
-export function takeSnapshot({ repos = null, sinceHours, now = Date.now(), date = localDate(now), dir = SNAPSHOTS_DIR,
+function takeSnapshot({ repos = null, sinceHours, now = Date.now(), date = localDate(now), dir = SNAPSHOTS_DIR,
   sourceRoot = starciSourceRoot() } = {}) {
   const hours = Number(sinceHours);
   if (Number.isNaN(hours) || hours <= 0) throw Object.assign(new Error('--since-hours needs a positive number'), { code: 'EUSAGE' });

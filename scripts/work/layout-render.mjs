@@ -113,7 +113,7 @@ async function renderLayout(request) {
 }
 
 /** argv -> {exitCode, text}. */
-export async function layoutRenderMain(argv = []) {
+async function layoutRenderMain(argv = []) {
   let request;
   try { request = requestOf(argv); } catch (error) { return { exitCode: 2, text: `layout-render: ${error.message}\n${USAGE}` }; }
   if (isLiteWorkRoot(request.work)) return { exitCode: 0, text: request.json ? `${JSON.stringify({ ok: true, skipped: true, reason: 'lite .starciwork holds only workspace.yaml and brand/ (plus .gitignore)' }, null, 2)}\n` : 'SKIP: lite .starciwork holds only workspace.yaml and brand/ (plus .gitignore)\n' };

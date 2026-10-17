@@ -15,7 +15,7 @@ const LOCAL = /^(?:file:|link:|portal:|workspace:|\.{0,2}\/|[A-Za-z]:[\\/])/;
 const SECTIONS = ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies'];
 
 /** Every @starci/grammar spec in one manifest object: [{section, spec, ok, reason}]. */
-export function grammarPinsOf(manifest) {
+function grammarPinsOf(manifest) {
   return SECTIONS.flatMap((section) => {
     const spec = manifest?.[section]?.[PACKAGE];
     if (spec == null) return [];
@@ -25,7 +25,7 @@ export function grammarPinsOf(manifest) {
 }
 
 /** All manifests under `repo` that name the grammar: [{file, section, spec, ok, reason}]. */
-export function grammarPinsIn(repo) {
+function grammarPinsIn(repo) {
   const out = [];
   for (const full of walkFiles(path.resolve(repo), {maxDepth: 4, ignoreReadErrors: true,
     exclude: name => name === 'node_modules' || name.startsWith('.'), filter: name => name === 'package.json'})) {

@@ -58,7 +58,7 @@ export function tabTitlesOf(visualLayouts, terminals = []) {
  * One unbound terminal's verdict: {action:'close'|'keep', kind, reason, marker?}.
  * `titles` are the tab and pane titles; `screen` the frame (null when unreadable).
  */
-export function classifyStrayTerminal({ titles = [], screen }) {
+function classifyStrayTerminal({ titles = [], screen }) {
   if (screen == null) return { action: 'keep', kind: null, reason: 'unreadable' };
   const shellPrompt = exitedAgentPromptRow(screen);
   if (shellPrompt) return { action: 'close', kind: 'shell', reason: 'bare-shell', shellPrompt };
@@ -70,7 +70,7 @@ export function classifyStrayTerminal({ titles = [], screen }) {
 }
 
 /** The handles a ledger binds, and whether a launch is in flight there. Read-only. */
-export function ledgerBindings(repo, { now = Date.now() } = {}) {
+function ledgerBindings(repo, { now = Date.now() } = {}) {
   return withLedgerRead(repo, (db) => {
     const bound = new Set();
     let busy = null;

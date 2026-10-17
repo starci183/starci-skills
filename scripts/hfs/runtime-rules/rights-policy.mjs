@@ -73,7 +73,7 @@ function catalogEntryFindings(zone, tracked, catalogued, bad) {
 }
 
 /** R224 findings of one parsed protected zone; `tracked(file)` and `catalogued(code)` are the tree's facts. */
-export function zoneFindings({ file = ZONE_FILE, zone, tracked, catalogued }) {
+function zoneFindings({ file = ZONE_FILE, zone, tracked, catalogued }) {
   const bad = (message) => finding('RIGHTS_PROTECTED_ZONE', file, message);
   if (!zone) return [bad('the declaration does not parse as a map')];
   const found = [...declaredZoneFindings(zone, bad), ...catalogEntryFindings(zone, tracked, catalogued, bad)];

@@ -24,16 +24,16 @@ import { allocationMs } from '../../engine/config.mjs';
 // prompt sat staged in the input box, `/exit` + Enter submitted that prompt and
 // restarted a settled op (three leaked op terminals, 2026-09-24). The first
 // Ctrl+C clears the input box, the second exits.
-export const QUIT_COMMAND = { claude: '\u0003\u0003', codex: '/quit' };
+const QUIT_COMMAND = { claude: '\u0003\u0003', codex: '/quit' };
 const QUIT_ENTER = { claude: false };
 // modules/models/runtimes.yaml allocation.quitAgent.waitMs.
-export const QUIT_WAIT_MS = allocationMs('quitAgent.waitMs');
+const QUIT_WAIT_MS = allocationMs('quitAgent.waitMs');
 
 // The agents a terminal can run, for the quit to type. 'devin' is named even though QUIT_COMMAND
 // has no entry for it: recognising it keeps Claude's double Ctrl+C out of a Devin TUI's input box
 // (quitAgent returns null, the close still runs - the alternative, falling through to 'claude',
 // typed \u0003\u0003 into the wrong CLI).
-export const KNOWN_TERMINAL_AGENTS = Object.freeze(['claude', 'codex', 'devin']);
+const KNOWN_TERMINAL_AGENTS = Object.freeze(['claude', 'codex', 'devin']);
 
 /**
  * A terminal's explicit known provider for provider-specific quit input.

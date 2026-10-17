@@ -31,8 +31,7 @@ export function discoverExampleApps(root) {
 }
 
 /** The generic services-block template a starcistacks follow-up leg is pointed at (S11-02: one template
- *  for every repository - the per-repository blocks it replaced are spec fixtures under
- *  tests/fixtures/starcistacks-services/, never a run-time read). */
+ *  for every repository). */
 export const STACK_DECLARATION_TEMPLATE = `${EXAMPLES_ROOT}/starcistacks-services/template.services.yaml`;
 
 /** The reference app declaration scripts/hfs/derived-fields.mjs samples for per-field slot ownership. */
@@ -76,7 +75,7 @@ function referenceFile(root, relative, { directory = false, exact = false } = {}
 
 /** Read and validate complete source references. Duplicate IDs refuse before
  * lookup; source, compiler and test pointers stay within one declared HFS app. */
-export function loadExampleCatalog(root, { file = EXAMPLE_CATALOG_FILE } = {}) {
+function loadExampleCatalog(root, { file = EXAMPLE_CATALOG_FILE } = {}) {
   const catalog = parseYaml(fs.readFileSync(referenceFile(root, file), 'utf8'));
   const schema = parseYaml(fs.readFileSync(referenceFile(root, 'modules/schemas/code-example-catalog.schema.yaml'), 'utf8'));
   const errors = validateAgainstSchema(catalog, schema);

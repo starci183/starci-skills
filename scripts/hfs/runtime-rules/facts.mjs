@@ -17,7 +17,7 @@ const finding = (file, line, message) => {
 };
 
 /** The problem a fact's slot evaluation finds in `manifest`, or null when the fact holds. */
-export function slotProblem(fact, manifest) {
+function slotProblem(fact, manifest) {
   const want = fact.slot ?? {};
   const slot = manifest.slots.find((entry) => entry.id === want.id);
   if (!slot) return `fact ${fact.id} names slot ${want.id}, which slots.yaml does not declare`;

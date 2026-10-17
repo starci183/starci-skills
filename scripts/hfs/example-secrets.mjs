@@ -135,7 +135,7 @@ function commandEnvironment() {
 }
 
 /** Run an installed app command in a sealed temporary copy, returning its exit code and preserving report artifacts. */
-export async function runMaterializedCommand(repoRoot, command, args = [], { run = runProgram } = {}) {
+async function runMaterializedCommand(repoRoot, command, args = [], { run = runProgram } = {}) {
   return withMaterializedExample(repoRoot, '.', (app) => {
     const launch = commandLaunch(command, args);
     const result = run(launch.file, launch.args, { cwd: app, env: commandEnvironment(), stdio: 'inherit', windowsHide: true });

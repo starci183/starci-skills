@@ -31,7 +31,7 @@ const countOf = (kind, rel, text) => (kind.applies(rel) ? (withoutComments(text)
  * The findings over `files` ({relativePath: text}) against `released` ({relativePath: text of the landing parent, or null}): a file that spells an input
  * more often than the landing parent held it. Pure.
  */
-export function rootAdhocFindings(files, released) {
+function rootAdhocFindings(files, released) {
   return Object.entries(files).filter(([rel]) => inScope(rel)).flatMap(([rel, text]) => KINDS.flatMap((kind) => {
     const now = countOf(kind, rel, text);
     const before = countOf(kind, rel, released[rel]);
@@ -49,7 +49,7 @@ function landingBase(root) {
 }
 
 /** Run the check on the runtime at `root`: against the tree before the check landed; a history that does not hold the landing commit has no baseline and passes. */
-export function checkRootAdhoc(root = skillRoot) {
+function checkRootAdhoc(root = skillRoot) {
   const base = landingBase(root);
   if (!base) return [];
   const files = trackedSources(root, inScope);

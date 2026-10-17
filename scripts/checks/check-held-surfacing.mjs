@@ -24,7 +24,7 @@ import { escapeRegExp } from '../lib/regex.mjs';
 
 export const CODE = 'RT_HELD_UNSURFACED';
 export const CATALOG_FILE = 'modules/kernel/failure-codes.yaml';
-export const MECHANISMS = Object.freeze(['decision-item', 'sla-clock', 'incident', 'digest', 'notifier', 'caller', 'open']);
+const MECHANISMS = Object.freeze(['decision-item', 'sla-clock', 'incident', 'digest', 'notifier', 'caller', 'open']);
 const OWNING_ROLES = Object.freeze(['supervisor', 'owner']);
 const OPENS_DECISION = /openDecision\w*\(|\.di\(|\bdi\(|openSupDecision\(/;
 const OPENS_INCIDENT = /openIncident\(/;
@@ -32,7 +32,7 @@ const SETS_CLOCK = /\b(?:clock|openClock|setClock|openSlaEpisode)\(/;
 const CONTROLLER_DIR = 'scripts/reconciler/';
 
 /** The catalogue entries this check judges: a runtime fault given to the Supervisor or the owner. */
-export const heldEntries = (catalog) => Object.entries(catalog).filter(([, entry]) => entry?.kind === 'runtime-fault' && OWNING_ROLES.includes(entry.owner));
+const heldEntries = (catalog) => Object.entries(catalog).filter(([, entry]) => entry?.kind === 'runtime-fault' && OWNING_ROLES.includes(entry.owner));
 
 const finding = (code, message) => ({ code: CODE, path: CATALOG_FILE, message: `${code}: ${message}` });
 const literal = (name) => new RegExp(`['"\`]${escapeRegExp(String(name))}['"\`]`);
@@ -63,12 +63,12 @@ export function entryFindings(code, entry, world) {
 }
 
 /** The findings of the whole catalogue. Pure over `world` = {sla, departures, cases, has(file), refute(entry, patterns, what)}. */
-export function heldSurfacingFindings(catalog, world) {
+function heldSurfacingFindings(catalog, world) {
   return heldEntries(catalog).flatMap(([code, entry]) => entryFindings(code, entry, world));
 }
 
 /** The world of a tree at `root`: its registries, and the file reads the proofs make. */
-export function worldOf(root) {
+function worldOf(root) {
   const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
   const sla = parseYaml(read('modules/reconciler/sla.yaml')).codes ?? {};
   const departures = new Set(Object.keys(parseYaml(read('modules/reconciler/operating-standard.yaml')).departures ?? {}));
@@ -82,7 +82,7 @@ export function worldOf(root) {
 }
 
 /** Run the check on the runtime at `root`. */
-export function checkHeldSurfacing(root = skillRoot) {
+function checkHeldSurfacing(root = skillRoot) {
   const catalog = parseYaml(fs.readFileSync(path.join(root, CATALOG_FILE), 'utf8'));
   return heldSurfacingFindings(catalog, worldOf(root));
 }

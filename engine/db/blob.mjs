@@ -78,7 +78,7 @@ const stateIgnored = (top, stateDir) => {
 // A writer root is outside every checkout (including worktrees whose .git is a file), or it is under this runtime's own
 // .runtime directory AND that directory is listed in the checkout's .gitignore (or .git/info/exclude), so a blob store can
 // never be committed. Fail closed: a root under any other path in a checkout, or a .runtime nobody ignores, refuses.
-export function ensureExternalRoot(root, stateDirectory = runtimeStateDir()) {
+function ensureExternalRoot(root, stateDirectory = runtimeStateDir()) {
   const real = canonicalPath(root), stateDir = canonicalPath(stateDirectory); // canonical on both sides: a link into a checkout cannot hide it
   let cursor = real;
   while (true) {

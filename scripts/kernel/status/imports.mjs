@@ -32,7 +32,7 @@ const importsCacheMs = () => {
 };
 
 /** The trees to scan for one workflow: its open workflow worktree from part A's registry ([] when it has none). */
-export function importTreesOf(db, { workflowId, worktreeOf = (id) => workflowWorktreeOf({ env: process.env }, id) }) {
+function importTreesOf(db, { workflowId, worktreeOf = (id) => workflowWorktreeOf({ env: process.env }, id) }) {
   const rec = worktreeOf(workflowId);
   return rec?.path && fs.existsSync(rec.path) ? [{ path: path.resolve(rec.path), kind: 'workflow', repoRoot: rec.repoRoot ? path.resolve(rec.repoRoot) : null }] : [];
 }

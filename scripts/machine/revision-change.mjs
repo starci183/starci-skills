@@ -59,7 +59,7 @@ const markdownKind = (line) => {
 };
 
 /** The structure of a file's text: the mapping keys and list lengths of a YAML file, the heading, bullet and blank-line sequence of Markdown, the exact text of anything else. */
-export function structureOf(file, text) {
+function structureOf(file, text) {
   if (/\.ya?ml$/.test(file)) return JSON.stringify(structureOfValue(parseYaml(text)));
   if (/\.md$/.test(file)) return String(text).split('\n').map(markdownKind).join(',');
   return String(text);

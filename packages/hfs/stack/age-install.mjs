@@ -5,7 +5,7 @@ import { firstLine } from './context.mjs';
 const AGE_VERSION = 'v1.2.1';
 const AGE_URL = `https://github.com/FiloSottile/age/releases/download/${AGE_VERSION}/age-${AGE_VERSION}-linux-amd64.tar.gz`;
 /** sha256 of the official linux/amd64 archive of AGE_VERSION. */
-export const AGE_SHA256 = '7df45a6cc87d4da11cc03a539a7470c15b1041ab2b396af088fe9990f7c79d50';
+const AGE_SHA256 = '7df45a6cc87d4da11cc03a539a7470c15b1041ab2b396af088fe9990f7c79d50';
 const INSTALL = { dnf: 'sudo -n dnf install -y age', yum: 'sudo -n yum install -y age', apk: 'sudo -n apk add age', 'apt-get': 'sudo -n apt-get install -y age' };
 
 const STATIC_INSTALL = [

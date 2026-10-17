@@ -91,7 +91,7 @@ function runAssertion({id, command}, cwd) {
   return {id, command: recorded, exit, outcome, observation: `${recorded} exited ${exit}`};
 }
 
-export function generateEvidence({workRoot, recordId, cwd, assertions, now = () => new Date()}) {
+function generateEvidence({workRoot, recordId, cwd, assertions, now = () => new Date()}) {
   // Compact format: a collapsed criterion's id (`ac.x.y` inlined, or `parent#frag`) resolves to the
   // record that now carries it - evidence is written beside that record and `record:` names the
   // record's own id, which is what check-example-work.mjs's sibling rule demands.

@@ -103,7 +103,7 @@ const LEDGER_BUSY_TIMEOUT_MS=15000;
  * the reconciler engine): SQLite 3.50.4 (node:sqlite of Node 25.2.1) sits in the WAL-reset bug range 3.7.0–3.51.2 when two
  * connections checkpoint concurrently.
  */
-export const LEDGER_PRAGMAS=Object.freeze({synchronous:'NORMAL',foreign_keys:'ON',temp_store:'MEMORY',cache_size:-16000,
+const LEDGER_PRAGMAS=Object.freeze({synchronous:'NORMAL',foreign_keys:'ON',temp_store:'MEMORY',cache_size:-16000,
   journal_size_limit:67108864,trusted_schema:'OFF',wal_autocheckpoint:0});
 const CHECKPOINTER_AUTOCHECKPOINT=8000;
 const READ_PRAGMAS=Object.freeze({query_only:'ON',temp_store:'MEMORY',cache_size:-16000,trusted_schema:'OFF'});
@@ -134,8 +134,6 @@ const metaOf=db=>Object.fromEntries(db.prepare('SELECT key,value FROM meta').all
 const assertWritableFile=(file,busyTimeoutMs)=>{if(fs.statSync(file).size===0){return;}const reader=openLedgerReader(file,{verify:false,busyTimeoutMs});try{if(hasTable(reader,'meta'))assertOperationalLedger(metaOf(reader));}finally{reader.close();}};
 /** True when the ledger `db` holds `table`. */
 export {hasTable as hasLedgerTable} from '../../scripts/lib/sqlite.mjs';
-/** True when `table` of the ledger `db` has `column`. */
-export const hasLedgerColumn=(db,table,column)=>db.prepare(`PRAGMA table_info(${table})`).all().some(c=>c.name===column);
 const versionTuple=v=>String(v).split('.').map(Number);
 const olderThan=(a,b)=>{const x=versionTuple(a),y=versionTuple(b);for(let i=0;i<Math.max(x.length,y.length);i++){if((x[i]??0)!==(y[i]??0))return (x[i]??0)<(y[i]??0);}return false;};
 
@@ -246,7 +244,7 @@ const columnsOf=(db,table)=>{
  * message, a report, a check command, an incident detail... Identity columns (ids, shas, paths of record) are never
  * touched. events.payload_json is redacted in appendEvent, before its digest is taken.
  */
-export const REDACTED_COLUMNS=Object.freeze({
+const REDACTED_COLUMNS=Object.freeze({
   logs:['msg','data_json','refs_json'],reports:['report_json'],check_runs:['command','note','summary_json','attribution_json'],
   incidents:['detail','last_progress'],inbox:['payload_json','disposition_json'],decision_items:['summary','payload_json','evidence_json'],
   decisions:['rationale','result_json'],contracts:['markdown','context_json'],api_requests:['result_json'],op_attempts:['settle_json','why_json'],

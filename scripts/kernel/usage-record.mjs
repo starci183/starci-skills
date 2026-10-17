@@ -414,7 +414,7 @@ function recordCriticRuns(ledger, { index, out, dryRun, now, openLedger, openLed
  * One pass: settled attempts without usage (every registered ledger), every Kernel session (its workflow's ledger) and the
  * Supervisor sessions (machine.sqlite). `dryRun` reads and reports, writes nothing. Returns a summary.
  */
-export async function sweepUsage({ env = process.env, home = os.homedir(), now = Date.now(), lookbackMs = DEFAULT_LOOKBACK_MS, dryRun = false, archiveRoot = null, ledgerName = null, detail = false, ledgerFiles = null } = {}) {
+async function sweepUsage({ env = process.env, home = os.homedir(), now = Date.now(), lookbackMs = DEFAULT_LOOKBACK_MS, dryRun = false, archiveRoot = null, ledgerName = null, detail = false, ledgerFiles = null } = {}) {
   const [{ openMachineReader, withMachine, recordMachineLlmUsage }, { openLedger, openLedgerReader }] = await Promise.all([
     import('../../engine/db/machine.mjs'), import('../../engine/db/ledger.mjs'),
   ]);

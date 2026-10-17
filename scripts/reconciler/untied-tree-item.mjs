@@ -14,7 +14,7 @@ const LIVE = new Set(['open', 'claimed', 'escalated']);
 const hashOf = (text) => crypto.createHash('sha256').update(text).digest('hex').slice(0, 10);
 
 /** The groups of review items by repository: [{repo, key, trees: [{path, branch}]}]. Pure. */
-export function untiedGroups(items) {
+function untiedGroups(items) {
   const byRepo = Map.groupBy((items ?? []).filter((item) => item.reason === 'unstamped-orphan' && item.repoRoot), (item) => path.resolve(item.repoRoot));
   return [...byRepo].map(([repo, rows]) => {
     const unique = new Map(rows.map((row) => [path.resolve(row.path), { path: row.path, branch: row.branch ?? null }]));
@@ -25,7 +25,7 @@ export function untiedGroups(items) {
 }
 
 /** The Decision Item of one group. Pure over the tree facts. */
-export function untiedDecision(group, facts) {
+function untiedDecision(group, facts) {
   const lines = facts.map((tree) => untiedTreeLine(tree));
   return {
     schema: 'starci/decision-item@1', kind: UNTIED_ITEM_KIND, decider: 'supervisor', ledger: 'supervisor', idempotencyKey: group.key,
@@ -36,7 +36,7 @@ export function untiedDecision(group, facts) {
 }
 
 /** The live items of this kind whose key is not among `wanted` (the set changed or the trees are gone). Pure. */
-export const staleItems = (dis, wanted) => dis.filter((di) => di.kind === UNTIED_ITEM_KIND && LIVE.has(di.status) && !wanted.has(di.idempotencyKey));
+const staleItems = (dis, wanted) => dis.filter((di) => di.kind === UNTIED_ITEM_KIND && LIVE.has(di.status) && !wanted.has(di.idempotencyKey));
 
 /** Close those items on the machine writer `m`; the ids closed. */
 function closeStale(m, wanted, now, repos) {

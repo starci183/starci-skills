@@ -36,10 +36,10 @@ import { isMain } from '../lib/is-main.mjs';
 import { altOf } from '../lib/source-phrases.mjs';
 import { tempRoot } from '../../engine/temp-root.mjs';
 
-export const GUIDANCE_CODE = 'RT_GUIDANCE_REFUSED_COMMAND';
+const GUIDANCE_CODE = 'RT_GUIDANCE_REFUSED_COMMAND';
 
 /** The guidance files of a tree: repository-relative POSIX paths. */
-export const isGuidanceFile = (rel) => (rel.startsWith('modules/') && (rel.endsWith('.yaml') || rel.endsWith('.md'))
+const isGuidanceFile = (rel) => (rel.startsWith('modules/') && (rel.endsWith('.yaml') || rel.endsWith('.md'))
   && rel !== CATALOG_FILE)
   || /^skills\/[^/]+\/(?:SKILL\.md|references\/.+\.md)$/.test(rel)
   || /^\.starci\/host\/.+\.md$/.test(rel);
@@ -60,7 +60,7 @@ function parenSpans(s) {
 }
 
 /** The commands a sentence shows: [{text, at, end}] (at/end: the span's place in the sentence). */
-export function commandSpans(sentence, { prose = true } = {}) {
+function commandSpans(sentence, { prose = true } = {}) {
   const s = String(sentence);
   const out = [];
   for (const m of s.matchAll(/`([^`]+)`/g)) out.push({ text: m[1], at: m.index, end: m.index + m[0].length });
@@ -118,7 +118,7 @@ export async function refusalOf(command) {
 }
 
 /** The findings of one text unit: [{command, code, sentence}]. `prose`: double-quoted spans count (Markdown, not YAML). */
-export async function textFindings(text, { prose = true } = {}) {
+async function textFindings(text, { prose = true } = {}) {
   const items = [];
   for (const sentence of sentencesOf(text)) for (const span of commandSpans(sentence, { prose })) items.push({ sentence, span });
   const verdicts = await Promise.all(items.map((item) => refusalOf(item.span.text)));
@@ -142,7 +142,7 @@ function stringLeaves(value, key = '', out = []) {
 }
 
 /** The text units of a Markdown document: [{key, text, fenced}] - prose paragraphs, table cells and fenced code lines. */
-export function markdownUnits(text) {
+function markdownUnits(text) {
   const out = [];
   let para = [], fence = false, lastSentence = '', line0 = 0;
   const flush = () => {
@@ -167,7 +167,7 @@ export function markdownUnits(text) {
 }
 
 /** {ok, findings: [{file, key, command, code, sentence}], files} over the tracked guidance of `root`. */
-export async function scanGuidance(root = skillRoot, { files = null } = {}) {
+async function scanGuidance(root = skillRoot, { files = null } = {}) {
   const listed = files ?? (() => { const r = lsFiles([], { cwd: root, maxBuffer: 64 * 1024 * 1024 }); return r.status === 0 ? r.stdout.split('\n').filter(Boolean) : []; })();
   const findings = [];
   let count = 0;

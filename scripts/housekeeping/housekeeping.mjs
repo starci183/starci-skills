@@ -32,7 +32,7 @@ const SKILL_ROOT = path.resolve(path.dirname(selfFile), '..', '..');
 export const SCHEMA = 'starci/housekeeping-report@1';
 
 /** The areas a run covers, in sweep order: name -> the lib module and the export that sweeps it. */
-export const AREAS = Object.freeze({
+const AREAS = Object.freeze({
   tmp: { module: './hk-tmp.mjs', sweep: 'sweepTmp' },
   sessions: { module: './hk-sessions.mjs', sweep: 'sweepAgentSessions' },
   claude: { module: './hk-claude.mjs', sweep: 'sweepClaudeTranscripts' },
@@ -43,7 +43,7 @@ export const AREAS = Object.freeze({
   ledgers: { module: './hk-ledger.mjs', sweep: 'sweepLedgers' },
   orphanledgers: { module: './hk-orphan-ledgers.mjs', sweep: 'sweepOrphanLedgers' },
 });
-export const AREA_NAMES = Object.freeze(Object.keys(AREAS));
+const AREA_NAMES = Object.freeze(Object.keys(AREAS));
 
 const csv = (v) => (v ? String(v).split(',').map((s) => s.trim()).filter(Boolean) : []);
 const number = (v) => positiveNumber(v, 0);
@@ -76,7 +76,7 @@ export function parseArgs(argv = []) {
  * keys also at top level and `housekeeping` present — so a sweep reading `allocation.housekeeping.*` and a
  * sweep reading `allocation.*` directly both see the declared windows. Specs inject `allocation` verbatim.
  */
-export function housekeepingAllocation(allocation = allocationSettings()) {
+function housekeepingAllocation(allocation = allocationSettings()) {
   const hk = allocation?.housekeeping ?? {};
   return { ...allocation, ...hk, housekeeping: hk };
 }
@@ -120,7 +120,7 @@ const nodeModulesEntries = (root) => { try { return fs.readdirSync(path.join(roo
  * the sweeps (`depsRoot`, the runtime by default): a sweep that removed a scratch or lane tree must never reach it
  * through a node_modules junction (live-node-modules-wiped, 2026-09-29), and a drop fails the run.
  */
-export async function runHousekeeping({ apply = false, only = null, env = process.env, now = Date.now(), sweeps = null, allocation = null, depsRoot = SKILL_ROOT } = {}) {
+async function runHousekeeping({ apply = false, only = null, env = process.env, now = Date.now(), sweeps = null, allocation = null, depsRoot = SKILL_ROOT } = {}) {
   const started = Date.now();
   const names = only ?? AREA_NAMES;
   const depsBefore = nodeModulesEntries(depsRoot);

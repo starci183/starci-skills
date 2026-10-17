@@ -4,9 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { diff } from '../api/git/diff.mjs';
-import { diffNames } from '../api/git/diff-names.mjs';
 import { lsFiles } from '../api/git/ls-files.mjs';
-import { porcelainStatus } from '../api/git/porcelain-status.mjs';
 import { runNode } from '../api/node/run-node.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { lines } from '../lib/verb-call.mjs';
@@ -27,7 +25,7 @@ export function runOutcome(result) {
 }
 
 /** Tracked/staged/working plus untracked files: the default L0/L1 change set. */
-export function workingChanges(root, deps = {}) {
+function workingChanges(root, deps = {}) {
   if (deps.changedFiles) return pathList(deps.changedFiles(root));
   const runDiff = deps.diff ?? diff;
   const runLsFiles = deps.lsFiles ?? lsFiles;
@@ -43,18 +41,7 @@ export function changedPathsOf(args, root, deps = {}) {
   return named.length ? named : workingChanges(root, deps);
 }
 
-export function committedChanges(root, against, deps = {}) {
-  if (deps.changedAgainst) return pathList(deps.changedAgainst(root, against));
-  const selected = (deps.diffNames ?? diffNames)(root, against, 'HEAD');
-  return pathList(selected ?? []);
-}
 
-/** Whether the checkout has no staged, tracked-working or untracked changes. */
-export function cleanTree(root, deps = {}) {
-  if (deps.cleanTree) return Boolean(deps.cleanTree(root));
-  const result = (deps.porcelainStatus ?? porcelainStatus)(root, { untracked: 'all' });
-  return result?.ok === true && !String(result.stdout ?? '').trim();
-}
 
 /** Tracked files matching a Git pathspec. */
 export function tracked(root, pathspec, deps = {}) {
@@ -78,7 +65,7 @@ export function runStarci(root, argv, { cwd = root, env, maxBuffer = 64 * 1024 *
 }
 
 /** Configured runtime self-checks, retaining the manifest's path-to-id relation. */
-export function runtimeSelfChecks(root, deps = {}) {
+function runtimeSelfChecks(root, deps = {}) {
   if (deps.runtimeSelfChecks) return deps.runtimeSelfChecks(root);
   const file = path.join(root, 'knowledge', 'hfs', 'runtime-slots.yaml');
   const manifest = parseYaml(fs.readFileSync(file, 'utf8'));

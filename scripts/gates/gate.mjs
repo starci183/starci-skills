@@ -160,7 +160,7 @@ const lintKey = (finding) => `${posixPath(finding.path ?? '')}|${finding.engine}
 const countBy = (items, key) => { const m = new Map(); for (const item of items) { m.set(key(item), (m.get(key(item)) ?? 0) + 1); } return m; };
 
 /** Head lint findings minus the base's, per (file, engine/rule) count: {fresh[], preexisting}. */
-export function newLintFindings(head, baseCounts) {
+function newLintFindings(head, baseCounts) {
   const counts = countBy(head, lintKey);
   const grown = new Set([...counts].filter(([key, n]) => n > (baseCounts.get(key) ?? 0)).map(([key]) => key));
   const fresh = head.filter((finding) => grown.has(lintKey(finding)));

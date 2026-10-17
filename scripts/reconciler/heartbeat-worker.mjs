@@ -23,15 +23,15 @@ import { openMachine } from '../../engine/db/machine.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 /** The main thread ticks every second; not ticking for this long is a stall. */
-export const STALL_MIN_MS = 3000;
+const STALL_MIN_MS = 3000;
 /** A stall this long is written to machine_logs (then again every STALL_REPEAT_MS). */
-export const STALL_LOG_MS = 15_000;
-export const STALL_REPEAT_MS = 60_000;
+const STALL_LOG_MS = 15_000;
+const STALL_REPEAT_MS = 60_000;
 /** Default: past this a blocked main thread is a hung engine; the worker stops renewing so ensure replaces it. */
 export const DEFAULT_STALL_MAX_MS = 300_000;
 
 /** Pure: what the worker does at a tick, the main thread not ticking for `stallMs`. {renew, log, withheld}. */
-export function heartbeatPlan({ stallMs, leader, renewDue = true, stallMaxMs = DEFAULT_STALL_MAX_MS, loggedAt = null, sinceMs = 0 }) {
+function heartbeatPlan({ stallMs, leader, renewDue = true, stallMaxMs = DEFAULT_STALL_MAX_MS, loggedAt = null, sinceMs = 0 }) {
   const withheld = stallMs >= stallMaxMs;
   const log = stallMs >= STALL_LOG_MS && (loggedAt == null || sinceMs - loggedAt >= STALL_REPEAT_MS);
   return { renew: Boolean(leader) && renewDue && !withheld, log, withheld };

@@ -17,12 +17,12 @@ const RECENT_ACTIONS = 5;
 const OPEN_ITEMS = 6;
 
 /** The rotation rule of the Supervisor: {afterWakes, afterTokens, minIntervalMs, event, bootEvents}. */
-export const supervisorRule = () => seatCostConfig().rotation.supervisor;
+const supervisorRule = () => seatCostConfig().rotation.supervisor;
 
 const marks = (list) => list.map(() => '?').join(',');
 
 /** What the seat has received and spent since its latest boot: {bootAt, wakes, tokens}. Machine store reads only. */
-export function supervisorSinceBoot(db, rule = supervisorRule()) {
+function supervisorSinceBoot(db, rule = supervisorRule()) {
   const bootAt = Number(db.prepare(`SELECT MAX(created_at) AS at FROM sup_events WHERE kind IN (${marks(rule.bootEvents)})`).get(...rule.bootEvents)?.at ?? 0);
   const wakes = supervisorWakeLog(db).filter((wake) => wake.at >= bootAt).length;
   return { bootAt, wakes, tokens: tokensSinceBoot(db, { subjectType: 'supervisor-turn', bootAt, skip: 1 }) };
@@ -46,7 +46,7 @@ function blockOf(db, now, rule) {
 }
 
 /** The verdict of one watchdog pass: {due, reason, blocked, since}. Pure over the store handle `db`. */
-export function rotationVerdict(db, now, rule = supervisorRule()) {
+function rotationVerdict(db, now, rule = supervisorRule()) {
   const since = supervisorSinceBoot(db, rule);
   const due = rotationDue(since, rule);
   return { ...due, since, blocked: due.due ? blockOf(db, now, rule) : null };

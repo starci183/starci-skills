@@ -16,7 +16,7 @@ const HELP =
   'Usage: starci runtime check --only ruling-cites -- [--root <tree>] [--json]\n\nR274: reject superseded citations, staleWhen statements and unmatched owner-ruling dates.\nExit 0 clean, 1 findings, 2 invalid arguments or catalogs.';
 
 /** Scan tracked and unignored new instruction surfaces, excluding generated runtime copies before reading. */
-export function checkRulingCites(root = skillRoot) {
+function checkRulingCites(root = skillRoot) {
   const readCatalog = (rel) => {
     const catalog = parseYaml(fs.readFileSync(path.join(root, rel), 'utf8'));
     const entries = rel === RULES_FILE ? catalog?.rules : catalog?.rulings;
@@ -39,7 +39,7 @@ export function checkRulingCites(root = skillRoot) {
   };
 }
 
-export function checkRulingCitesMain(argv) {
+function checkRulingCitesMain(argv) {
   const args = parseCheckArgs(argv, { name: NAME, help: HELP, root: skillRoot });
   if (args.exitCode !== undefined) return args;
   try {

@@ -46,7 +46,7 @@ function acceptanceStep(ref, index, inline) {
 }
 
 /** The acceptance ids a set of proved record ids stands for, following declared links and compact criteria without cycling. */
-export function acceptanceIdsOf(proved, index) {
+function acceptanceIdsOf(proved, index) {
   const inline = indexInlineCriteria(new Map([...index].map(([id, data]) => [id, { data }])));
   const pending = [...proved], seen = new Set(), acceptance = new Set();
   while (pending.length) {
@@ -70,7 +70,7 @@ export function traceOf(acceptance, tests) {
 }
 
 /** The line status shows for a trace. */
-export function traceLine(trace) {
+function traceLine(trace) {
   const availability = trace.unavailable ? '; unavailable: ' + oneLine(trace.unavailable) : '';
   return `acceptance-trace: ${trace.cited} of ${trace.total} cited, ${trace.uncitedTests.length} tests uncited${availability}`;
 }

@@ -60,7 +60,7 @@ function dryFs() {
 const isStale = (handler, read) => (read.state === 'stamped' ? read.stamp !== handler.current() : read.state === 'stale');
 
 /** Migrates one target of one artefact: {artefact, target, state: 'current' | 'migrated' | 'absent' | 'skipped' | 'refused', before, after, code?, detail?}. */
-export function migrateTarget(id, target, { root, apply = true }) {
+function migrateTarget(id, target, { root, apply = true }) {
   const handler = HANDLERS[id];
   const base = { artefact: id, target };
   let before;
@@ -82,7 +82,7 @@ export function migrateTarget(id, target, { root, apply = true }) {
  * The repositories and worktrees of the live workflows: every unremoved worktree row that belongs to a workflow, and its repository, that exist on disk.
  * `machine` is an open machine store. Every live workflow is covered, running or about to wake.
  */
-export function workflowTargets(machine) {
+function workflowTargets(machine) {
   const rows = machine.liveWorktrees().filter((row) => row.workflow_id);
   const paths = rows.flatMap((row) => [row.path, row.repo_root]).filter(Boolean).map((p) => path.resolve(p));
   return [...new Set(paths)].filter((p) => fs.existsSync(p)).sort(byCodeUnit);

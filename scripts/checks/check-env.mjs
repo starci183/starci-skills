@@ -42,7 +42,7 @@ const VARIABLE_NAME = /^[A-Z][A-Z0-9_]*$/;
  * `direct` is true for a read of `process.env` itself; a read of an injected `env`, an alias or `readEnv('NAME', ...)` is not direct.
  * `literals` lists every UPPER_SNAKE string literal: a catalogued name spelled that way (a set of controlled names) is named, not stale.
  */
-export function envFacts(text, rel = 'x.mjs') {
+function envFacts(text, rel = 'x.mjs') {
   const t = ts();
   const source = parseSource(text, rel);
   const aliases = new Set(['env']);
@@ -93,7 +93,7 @@ export function envFacts(text, rel = 'x.mjs') {
 }
 
 /** The catalog's variables: {NAME: {purpose, kind}} and the reader module; throws on an unreadable catalog. */
-export function parseCatalog(text) {
+function parseCatalog(text) {
   const doc = parseYaml(text) ?? {};
   return { reader: doc.reader, variables: doc.variables ?? {} };
 }
@@ -132,7 +132,7 @@ const fileEnvFindings = (facts, ctx) => {
  * The findings of a source set: [{code, path, line, message}]. files: [{rel, text}] (the runtime sources among them are
  * judged); catalog: parseCatalog(...); failureCodes: the names of modules/kernel/failure-codes.yaml (a STARCI_* refusal code is not a variable).
  */
-export function envFindings(files, catalog, failureCodes = new Set(), exampleNames = null) {
+function envFindings(files, catalog, failureCodes = new Set(), exampleNames = null) {
   const findings = [];
   // Windows environment names are case-insensitive (ComSpec is COMSPEC), so names compare upper-cased.
   const known = new Set(Object.keys(catalog.variables).map((n) => n.toUpperCase()));
@@ -152,7 +152,7 @@ export function envFindings(files, catalog, failureCodes = new Set(), exampleNam
 }
 
 /** The variable names secret.env.example lists, commented or not (NAME=). */
-export const exampleNamesOf = (text) => new Set([...text.matchAll(/^#?[ \t]*([A-Z][A-Z0-9_]*)=/gm)].map((m) => m[1]));
+const exampleNamesOf = (text) => new Set([...text.matchAll(/^#?[ \t]*([A-Z][A-Z0-9_]*)=/gm)].map((m) => m[1]));
 
 /** Run the check on the runtime at `root`. */
 function checkEnv(root = skillRoot) {

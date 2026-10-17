@@ -31,7 +31,7 @@ import { artifactHoldReason } from '../machine/artifact-hold.mjs';
 
 export const ORPHAN_LEDGER_CODE = 'LEDGER_ORPHAN_STATE_ROOT';
 /** A registered (any state) ledger whose directory is gone entirely — registry drift, distinct from an unreachable source root. */
-export const REGISTERED_DIR_MISSING_REASON = 'registered-dir-missing';
+const REGISTERED_DIR_MISSING_REASON = 'registered-dir-missing';
 
 const exists = (p) => { try { return fs.existsSync(p); } catch { return false; } };
 /** Case-insensitive, separator-normalized directory identity, for comparing a disk path against a DB-recorded one. */
@@ -74,7 +74,7 @@ const rootsOfRow = (row) => {
  * unions them, deduped. A missing file, an unreadable/foreign-schema ledger, or workflows with no source roots at
  * all yields []; never throws.
  */
-export function sourceRootsFromLedgerFile(file) {
+function sourceRootsFromLedgerFile(file) {
   if (!exists(file)) return [];
   let handle;
   try { handle = inspectLedger({ file }); } catch { return []; }
@@ -92,7 +92,7 @@ export function sourceRootsFromLedgerFile(file) {
  * null | 'no-source-roots' | 'source-roots-unreachable' for a list of source roots. Pure given `unreachable`
  * (a spec seam; production default is the real isUnderTempDir/fs.existsSync check against `env`).
  */
-export function orphanReason(roots, { env = process.env, unreachable = (root) => isUnderTempDir(root, { env }) || !exists(root) } = {}) {
+function orphanReason(roots, { env = process.env, unreachable = (root) => isUnderTempDir(root, { env }) || !exists(root) } = {}) {
   if (!roots || roots.length === 0) return 'no-source-roots';
   return roots.every((root) => unreachable(root)) ? 'source-roots-unreachable' : null;
 }
@@ -153,7 +153,7 @@ export function orphanLedgerFindings({ env = process.env, machineFile = null } =
  * Moves one orphan ledger's whole directory (never deletes) to <stateRoot>/archive/orphan-ledgers/<date>/<id>/,
  * then retires its row (engine/db/machine.mjs setLedgerState — the one writer). Returns {moved:true, from, to}.
  */
-export function archiveOrphanLedger(finding, { env = process.env, now = Date.now() } = {}) {
+function archiveOrphanLedger(finding, { env = process.env, now = Date.now() } = {}) {
   const from = path.dirname(finding.file);
   if (!exists(from)) throw new Error(`orphan ledger directory missing: ${from}`);
   const to = path.join(starciLocalRoot(env), 'archive', 'orphan-ledgers', dateStamp(now), finding.ledgerId);

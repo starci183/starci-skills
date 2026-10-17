@@ -46,7 +46,7 @@
 // (the first live run: a Kernel dropped one character of it and its stage never ran).
 //
 // It is step `launch-smoke` of the pre-workflow readiness (docs/releasing.md "Pre-workflow readiness", docs/host-contract.md); it starts real agents, so it
-// is run by hand once per runtime release, never by a check or a spec (tests/kernel/launch-smoke.spec.mjs fakes the client).
+// is run by hand once per runtime release, never by a check or a spec.
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -75,7 +75,7 @@ const SCRIPT = path.join(SKILL_ROOT, 'scripts', 'kernel', 'launch-smoke.mjs');
  * (scripts/kernel/workflow-worktree.mjs, scripts/kernel/workflow-checkpoint.mjs), each replaceable (specs). `ctx` is
  * the context those two modules take; `git` runs one git command ({ok, stdout, error}).
  */
-export async function defaultClient() {
+async function defaultClient() {
   const [lib, startWorker, critic, show, read, stop, release, update, list, wt, cp, tree] = await Promise.all([
     import('../agent/lib.mjs'), import('../agent/start-worker.mjs'), import('../work/draw-critic.mjs'),
     import('../api/orca/worker-show.mjs'), import('../api/orca/worker-read.mjs'), import('../api/orca/worker-stop.mjs'),
@@ -100,7 +100,7 @@ export async function defaultClient() {
 const SMOKE_CALLS = { 'rev-parse': revParseQuery, 'ls-files': lsFiles, status: gitStatus, show: gitShow, branch: (rest, options) => branchList(rest.filter((a) => a !== '--list'), options) }; /* the smoke's git calls by verb: the git seam takes the whole argv */ const smokeGit = ([verb, ...rest], dir) => (verb === 'merge-base' && rest[0] === '--is-ancestor' ? { ok: isAncestor(dir, rest[1], rest[2]), stdout: '', error: '' } : gitResultOf(SMOKE_CALLS[verb](rest, { dir })));
 
 /** worker-start's worktree arguments (['--worktree', x, '--repo', y, ...]) as startAgent's named options. */
-export function worktreeParamsOf(args = []) {
+function worktreeParamsOf(args = []) {
   const out = {};
   const names = { worktree: 'worktree', repo: 'repo', 'base-branch': 'baseBranch', name: 'name' };
   for (let i = 0; i < args.length; i += 1) {
@@ -114,7 +114,7 @@ export function worktreeParamsOf(args = []) {
  * The byte manifest of an app's main checkout: its HEAD, every tracked file's sha256 read from disk (a missing file is
  * null), and the sorted top-level node_modules listing (null without one). {ok, head, files, nodeModules} | {ok:false, error}.
  */
-export function mainManifest({ appRoot, git }) {
+function mainManifest({ appRoot, git }) {
   const head = git(['rev-parse', 'HEAD'], appRoot);
   const listed = git(['ls-files', '-z'], appRoot);
   if (!head.ok || !listed.ok) return { ok: false, error: head.ok ? listed.error : head.error };
@@ -128,7 +128,7 @@ export function mainManifest({ appRoot, git }) {
 }
 
 /** before -> after: {added, changed, removed} tracked paths, and whether the node_modules listing is unchanged. */
-export function manifestDiff(before, after) {
+function manifestDiff(before, after) {
   const added = Object.keys(after.files).filter((f) => !(f in before.files)).sort(byCodeUnit);
   const removed = Object.keys(before.files).filter((f) => !(f in after.files) || after.files[f] === null).sort(byCodeUnit);
   const changed = Object.keys(before.files).filter((f) => f in after.files && after.files[f] !== null && after.files[f] !== before.files[f]).sort(byCodeUnit);
@@ -136,7 +136,7 @@ export function manifestDiff(before, after) {
 }
 
 /** The no-op Task spec of `role`: a parent runs its stage (starting its children), every agent marks its result line. */
-export function noopSpec({ role, script = SCRIPT }) {
+function noopSpec({ role, script = SCRIPT }) {
   const command = (verb) => `starci release launch-smoke ${verb} --as ${role}`;
   const report = '2. Then report worker_done exactly once, as your Orca worker preamble instructs: --outcome succeeded if the command exited 0, else --outcome failed.';
   const steps = CHILDREN[role]
@@ -217,7 +217,7 @@ const sleepWhile = (waiting, { deadline, now, sleep, refresh = null }) => repeat
  * launched and not yet marked. A launch is recorded after attestation at the latest, so it waits up to `waitMs`.
  * {state} | {error}.
  */
-export async function resolveState({ role, env = process.env, parent = stateParentOf(), waitMs = 60000, sleep = defaultSleep, now = Date.now }) {
+async function resolveState({ role, env = process.env, parent = stateParentOf(), waitMs = 60000, sleep = defaultSleep, now = Date.now }) {
   const handle = env.ORCA_TERMINAL_HANDLE || null;
   const deadline = now() + waitMs;
   return repeatInOrder(async () => {
@@ -233,7 +233,7 @@ export async function resolveState({ role, env = process.env, parent = statePare
  * `mark`: the role's one result line. An op role first writes its owned file into the workflow worktree; the failing
  * op writes it too and then answers ok:false, so its agent reports failed.
  */
-export function markResult({ role, state, now = Date.now }) {
+function markResult({ role, state, now = Date.now }) {
   const r = ROLES[role] ?? {};
   let owned = null;
   if (r.side) {
@@ -257,7 +257,7 @@ const concurrentOps = (ops, wf, orca) => ops.map((c) => opRecordOf(c, wf.workflo
  * result line. The Kernel's stage first waits for the workflow worktree to be recorded and asks the dispatcher whether
  * its children may run together. {ok, role, children, entry, error?}; also written to stages/<role>.json.
  */
-export async function runStage({ role, state, orca, env = process.env, root = SKILL_ROOT, script = SCRIPT, waitMs = 60000, holdMs = 0, sleep = defaultSleep, now = Date.now }) {
+async function runStage({ role, state, orca, env = process.env, root = SKILL_ROOT, script = SCRIPT, waitMs = 60000, holdMs = 0, sleep = defaultSleep, now = Date.now }) {
   const children = CHILDREN[role];
   const done = (receipt) => { writeJsonFile(stageFile(state, role), receipt); return receipt; };
   if (!children) return done({ ok: false, role, error: `${role} has no child to start` });
@@ -521,7 +521,7 @@ const finishLeg = async ({ wf, orca, workflowId, appRepo, feApp, before, now, sl
  * checkout (also its Orca repository selector); `timeoutMs` bounds the wait for every agent to settle. Returns the
  * starci/launch-smoke@2 result; never throws.
  */
-export async function runSmoke({ entry = readEnv('ORCA_TERMINAL_HANDLE') || null, orca, appRepo = null, root = SKILL_ROOT, script = SCRIPT, noop = noopAgent(),
+async function runSmoke({ entry = readEnv('ORCA_TERMINAL_HANDLE') || null, orca, appRepo = null, root = SKILL_ROOT, script = SCRIPT, noop = noopAgent(),
   timeoutMs = 1200000, releaseTimeoutMs = 600000, pollMs = 5000, sleep = defaultSleep, now = Date.now, stateRoot = tempRoot(), workflowId = `smoke-${Date.now().toString(36)}` }) {
   const startedAt = now();
   const out = { schema: SMOKE_SCHEMA, ok: false, entry, noop: noop?.error ? null : { provider: noop.provider, model: noop.model, effort: noop.effort },

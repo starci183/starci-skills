@@ -79,7 +79,7 @@ const selfFile = fileURLToPath(import.meta.url);
  * Discover the controller modules of `dir`: [{name, file, module}] and the load errors [{file, error}].
  * A module must default-export {name == file name, reconcile()}; anything else is a load error.
  */
-export async function discoverControllers(dir = CONTROLLERS_DIR) {
+async function discoverControllers(dir = CONTROLLERS_DIR) {
   const controllers = [], errors = [];
   let files = [];
   try { files = fs.readdirSync(dir).filter((f) => f.endsWith('.mjs')).sort(); }
@@ -560,7 +560,7 @@ const reloadWatchedFiles = (root = SKILL_ROOT) => [
  * self-reloads and clean exits never count), so an engine that was safe because of a crash loop that has since aged out
  * comes back in normal mode instead of staying shadow forever. Returns {safe, inherited, reevaluated, starts, max, windowMs}.
  */
-export function safeForStart({ argv = [], reloaded = false, numbers = reconcilerNumbers(), now = Date.now(), record = () => crashLoopRecord({ now, windowMs: numbers.crashLoop.windowMs }) } = {}) {
+function safeForStart({ argv = [], reloaded = false, numbers = reconcilerNumbers(), now = Date.now(), record = () => crashLoopRecord({ now, windowMs: numbers.crashLoop.windowMs }) } = {}) {
   const inherited = argv.includes('--safe');
   if (!reloaded) return { safe: inherited, inherited, reevaluated: false };
   const { max, windowMs } = numbers.crashLoop;

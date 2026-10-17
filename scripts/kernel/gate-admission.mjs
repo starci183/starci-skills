@@ -12,7 +12,7 @@ import { proofsOwedUnder } from './settle-revision.mjs';
 
 const NEWER = Object.freeze({ code: 'gate-newer-than-admission' });
 /** The failure code of a refusal for a proof the job's admission never taught. */
-export const GATE_NEWER_CODE = NEWER.code;
+const GATE_NEWER_CODE = NEWER.code;
 /** The settle refusals whose proof is the runtime's to produce: neither a choice of the Kernel nor a failure of the op. */
 export const RUNTIME_OWED_CODES = Object.freeze(new Set([GATE_NEWER_CODE, 'op-critic-verdict-missing']));
 
@@ -35,7 +35,7 @@ const TAUGHT_BY = Object.freeze({
 const DISPATCH_CONTRACT = '# dispatch contract';
 
 /** Whether the contract the job was admitted under taught the step that produces the proof `code` names; true when the code names a proof no step teaches or the contract is no dispatch prompt. */
-export function admissionTaught(db, jobId, code) {
+function admissionTaught(db, jobId, code) {
   const token = TAUGHT_BY[code];
   if (!token) return true;
   const markdown = String(latestContractOf(db, jobId)?.markdown ?? '');

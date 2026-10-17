@@ -166,7 +166,7 @@ export function summaryLine(sc) {
 }
 
 /** The human table: pool x kind rows, then one totals line per pool. */
-export function formatTable(sc) {
+function formatTable(sc) {
   const head = ['pool', 'kind', 'jobs', 'pass%', 'fail%', 'blk%', 'rework%', 'med-min'];
   const rows = [];
   for (const [pool, p] of Object.entries(sc.pools))

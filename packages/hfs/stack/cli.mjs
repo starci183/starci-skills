@@ -18,7 +18,7 @@ const VALUE = new Set(['--env', '--image', '--source-sha', '--previous', '--out'
 const REPEAT = new Set(['--image', '--keep', '--extra-compose', '--project']);
 
 /** Splits argv into { flags, positional }; an unknown flag or a flag without its value is a refusal. */
-export function parseFlags(argv) {
+function parseFlags(argv) {
   const flags = {};
   const positional = [];
   for (let index = 0; index < argv.length; index += 1) {
@@ -37,7 +37,7 @@ export function parseFlags(argv) {
 }
 
 /** `--image api=ghcr.io/o/x@sha256:...` (repeatable or comma separated) -> { api: 'ghcr.io/o/x@sha256:...' }. */
-export function parseImages(values = []) {
+function parseImages(values = []) {
   const out = {};
   for (const item of values.flatMap((value) => value.split(','))) {
     const at = item.indexOf('=');

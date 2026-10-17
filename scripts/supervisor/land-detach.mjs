@@ -12,7 +12,7 @@ import { lanesRoot } from '../machine/home.mjs';
 const FOREGROUND = '--foreground';
 
 /** The land arguments the child runs: the caller's own, the answer as JSON, and the flag that keeps the child from detaching again. */
-export function foregroundArgv(argv) {
+function foregroundArgv(argv) {
   const own = argv.filter((word) => word !== FOREGROUND && word !== '--json');
   return [FOREGROUND, '--json', ...own];
 }

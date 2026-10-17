@@ -9,8 +9,8 @@
 // the tree as a link and asserts zero (scripts/api/fs/safe-remove.mjs removeLinksUnder), then `orca worktree rm`
 // (scripts/api/orca/worktree-rm.mjs, handed only a tree without a link: worktree-links-present; check-worktree-add keeps this module its one
 // caller), the main checkout asserted untouched. Never git's worktree removal, never a raw delete.
-// The Orca calls are scripts/api/orca/ call files, bundled as orcaWorktreeClient (the `orca` seam a spec fakes:
-// tests/helpers/fake-orca-worktrees.mjs); the git ones are scripts/api/git/ call files composed in worktree-git.mjs.
+// The Orca calls are scripts/api/orca/ call files, bundled as orcaWorktreeClient (the `orca` seam);
+// the git ones are scripts/api/git/ call files composed in worktree-git.mjs.
 import fs from 'node:fs';
 import path from 'node:path';
 import { ORCA_KINDS } from '../lib/worktree-kinds.mjs';
@@ -28,7 +28,7 @@ import { linksUnder } from '../api/fs/links-under.mjs';
 
 /**
  * Orca's removal of the worktree `id:<repoId>::<dir>`, asked only while the tree holds no link: Orca walks a junction and deletes
- * what it leads to (tests/api-orca/orca-worktree-rm-live.spec.mjs measures it). A tree with a link, or a selector that names no
+ * what it leads to. A tree with a link, or a selector that names no
  * directory, is refused {ok:false, errorCode:'worktree-links-present'} and Orca is not asked.
  */
 function removeLinkFree({ worktree, force = false }) {
@@ -51,7 +51,7 @@ export const orcaWorktreeClient = Object.freeze({ create: worktreeCreate, remove
  * the owner's id (a workflow id, a critic name). cap: default worktrees.capPerRepo for a workflow, none for a critic.
  * {ok, pending, repoRoot} | {ok:false, reason:'worktree-cap'|'worktree-registry-unavailable', live?, cap?, detail}
  */
-export function reserveOrcaSlot({ repoRoot, kind, slotKey, owner = {}, cap = undefined, env = process.env, git = null, settings = worktreeSettings() }) {
+function reserveOrcaSlot({ repoRoot, kind, slotKey, owner = {}, cap = undefined, env = process.env, git = null, settings = worktreeSettings() }) {
   if (!ORCA_KINDS.includes(kind)) throw new Error(`reserveOrcaSlot: ${kind} is not an Orca kind (${ORCA_KINDS.join(', ')})`);
   const home = mainRootOf(repoRoot, { git });
   const pending = pendingPathOf(home, kind, slotKey);

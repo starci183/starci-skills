@@ -41,7 +41,7 @@ const OPERATIONS_WORKER = path.join(path.dirname(fileURLToPath(import.meta.url))
 export const appModulePath = (app) => `apps/${app}/src/app.module.ts`;
 
 /** The repository-relative path of an app's snapshot. */
-export const snapshotPath = (app) => `contracts/${app}/schema.graphql`;
+const snapshotPath = (app) => `contracts/${app}/schema.graphql`;
 
 /** The `paths` aliases of a tsconfig as [{ prefix, targets }], `@modules/*` giving prefix `@modules/`. Pure. */
 export function aliasesOf(paths, baseDir) {
@@ -57,7 +57,7 @@ export function aliasTarget(aliases, specifier) {
 }
 
 /** The api apps of a declaration that can serve GraphQL: kind `api`. Pure. */
-export const apiApps = (declaration) => (declaration.apps ?? []).filter((app) => app.kind === 'api').map((app) => app.name);
+const apiApps = (declaration) => (declaration.apps ?? []).filter((app) => app.kind === 'api').map((app) => app.name);
 
 /** The text written to a snapshot file: the printed schema and one final newline. Pure. */
 export const snapshotText = (printed) => `${printed.replace(/\n+$/, '')}\n`;

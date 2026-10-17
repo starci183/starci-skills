@@ -50,7 +50,7 @@ export function mergeReports(reports) {
  * indexes, and a finding about hfs.json, a workflow, a config file or a directory is not on one, so it is filed on this
  * file and its message names the real path. Null when the tracked tree has no source file.
  */
-export function anchorOf(tracked, sourceRoots) {
+function anchorOf(tracked, sourceRoots) {
   const roots = sourceRoots.map((root) => `${posix(root).replace(/\/$/, '')}/`);
   return [...tracked].map(posix).filter((file) => SOURCE_FILE.test(file) && roots.some((root) => file.startsWith(root))).sort(cmp)[0] ?? null;
 }

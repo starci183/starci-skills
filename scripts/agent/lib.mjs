@@ -61,7 +61,7 @@ const withoutDelivered = (screen, delivered) => {
     return text.length < 12 || !own.includes(text);
   }).join('\n');
 };
-export const failureOnScreen = (adapter, screen, delivered = null) => {
+const failureOnScreen = (adapter, screen, delivered = null) => {
   const judged = withoutDelivered(screen, delivered);
   for (const failure of failureMatchers(adapter)) {
     const match = failure.re.exec(judged);
@@ -98,7 +98,7 @@ export function gateAutoAnswerRule(adapter, gate) {
 }
 
 /** Where the menu cursor sits relative to the option labelled `label`, or null. */
-export function gateMenuPosition(screen, label) {
+function gateMenuPosition(screen, label) {
   const rows = String(screen ?? '').split(/\r?\n/).slice(-40).map((line) => line.replace(/^\s*[│┃]\s?/u, ''));
   const want = String(label).toLowerCase();
   let target = -1;
@@ -303,7 +303,7 @@ export function deliverPrompt({ handle, adapter, prompt, dispatchId = 'prompt', 
 // PROMPT_DELIVERY_STALLED, a transient launch fault (never quota, never the model). A terminal whose
 // process incarnation the host no longer accepts is refused TERMINAL_INCARNATION_STALE, never transient.
 export { PROMPT_DELIVERY_STALLED };
-export const TERMINAL_INCARNATION_STALE = 'terminal-incarnation-stale';
+const TERMINAL_INCARNATION_STALE = 'terminal-incarnation-stale';
 function sendPrompt(handle, text, adapter, io) {
   const send = io?.send ?? terminalSend, read = io?.read ?? terminalRead, sleep = io?.sleep ?? sleepSync;
   const waitSubmit = Math.ceil(submissionTimeoutMs(adapter) / 1000);

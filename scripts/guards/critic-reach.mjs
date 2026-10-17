@@ -8,7 +8,7 @@ import path from 'node:path';
 import { pathKey, sameOrUnder, slash } from '../lib/path-key.mjs';
 import { refusal } from './rights.mjs';
 
-export const CRITIC_REACH_CODE = 'RIGHTS_CRITIC_REACH';
+const CRITIC_REACH_CODE = 'RIGHTS_CRITIC_REACH';
 const USE = 'read only the files in your own directory and write only the verdict file there; report with worker_done or an escalation';
 const OPTION_PATH = /^-(?:path|filepath|literalpath)$/i;
 // Programs whose operands are text, not paths: only an expansion could smuggle a path into them.

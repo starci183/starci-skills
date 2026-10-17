@@ -19,12 +19,12 @@ export const CODE = 'RT_COVERAGE_MATRIX';
 export { REPORT_ONLY_CODES };
 
 /** One catalog-driven static pass; fixture catalogs use the same path as the real repository. */
-export function hfsCoverageFindings(context) {
+function hfsCoverageFindings(context) {
   return applyCoverageRatchet(context, [...coverageRuleFindings(context), ...coverageLedgerFindings(context), ...coverageCiteFindings(context)]);
 }
 
 /** Read only authored, non-secret sources. Missing ledgers remain coverage findings until their batches land. */
-export async function loadCoverageContext(root = skillRoot) {
+async function loadCoverageContext(root = skillRoot) {
   const manifest = loadSlotManifest({ root });
   const catalog = loadRuleCatalog({ root, manifest });
   const files = coverageSources(root);
@@ -38,7 +38,7 @@ export async function loadCoverageContext(root = skillRoot) {
     rulings: yaml('modules/kernel/owner-rulings.yaml'), hfsRulings: yaml('knowledge/hfs/rulings.yaml') };
 }
 
-export function coverageReport(findings, inventory = {}) {
+function coverageReport(findings, inventory = {}) {
   const errors = findings.filter((item) => item.level !== 'warning');
   const warnings = findings.filter((item) => item.level === 'warning');
   const legacy = warnings.filter((item) => item.legacy);
@@ -48,7 +48,7 @@ export function coverageReport(findings, inventory = {}) {
     legacyBacklog: { total: legacy.length, byCode }, findings };
 }
 
-export async function checkHfsCoverage(root = skillRoot, { witness = false, judge } = {}) {
+async function checkHfsCoverage(root = skillRoot, { witness = false, judge } = {}) {
   let context;
   try { context = await loadCoverageContext(root); } catch (error) {
     return { ok: false, errors: 1, warnings: 0, findings: [], refusal: {

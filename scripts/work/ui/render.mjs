@@ -6,7 +6,6 @@ import {decodePng} from '../png.mjs';
 import {TOKEN_TOLERANCE,defaultGrammarRoot,deltaEOk,oklabToOklch,parseColor,readBrandRecord,rgbToOklab} from '../brand/brand.mjs';
 import {slash} from '../../lib/path-key.mjs';
 import {objectList, byCodeUnit} from '../../lib/list.mjs';
-import {formatCheckLines} from '../../lib/check-format.mjs';
 import {generatedDrawingsOf} from './ui-shapes.mjs';
 
 /**
@@ -26,7 +25,7 @@ import {generatedDrawingsOf} from './ui-shapes.mjs';
  * it, a PNG format this decoder does not read, a brand that names no mascot. An unproven claim must not read
  * as a proven one, so a `skip` never makes a run `ok:false` and never makes it green either.
  */
-export const RENDER_CHECKS='starci/render-checks@1';
+const RENDER_CHECKS='starci/render-checks@1';
 export const CHECK_IDS=['palette-off-brand','primary-absent','entity-list-in-card','mascot-slot-missing'];
 
 /**
@@ -37,12 +36,12 @@ export const CHECK_IDS=['palette-off-brand','primary-absent','entity-list-in-car
  * deltaE 6, about three just-noticeable differences - is wide enough for a token that was painted at ninety
  * percent over a light surface and still narrow enough that a different hue stays a different hue.
  */
-export const PALETTE_TOLERANCE=TOKEN_TOLERANCE*12;
+const PALETTE_TOLERANCE=TOKEN_TOLERANCE*12;
 /**
  * A bucket is an offender only when it dominates: two percent of the saturated pixels of a screen is a filled
  * button, a chart series or a banner, not the fringe of an antialiased glyph.
  */
-export const MIN_BUCKET_SHARE=0.02;
+const MIN_BUCKET_SHARE=0.02;
 /** OKLab chroma below this is grey to a reader; the brand's palette question is about colour, not about ink. */
 const CHROMA_FLOOR=0.04;
 /** Lightness outside this band is the page's paper and its ink: near-white and near-black are never a palette. */
@@ -75,7 +74,7 @@ export {decodePng};
  * or an antialiased edge collapses into the colour it is a shade of, and each bucket reports the mean of the
  * pixels that landed in it - the colour a reader would name if asked.
  */
-export function dominantColours(png,{buckets=DEFAULT_BUCKETS,chromaFloor=CHROMA_FLOOR,minLightness=MIN_LIGHTNESS,maxLightness=MAX_LIGHTNESS}={}){
+function dominantColours(png,{buckets=DEFAULT_BUCKETS,chromaFloor=CHROMA_FLOOR,minLightness=MIN_LIGHTNESS,maxLightness=MAX_LIGHTNESS}={}){
   const steps=Math.max(2,Math.floor(buckets));
   const grid=new Map();
   let saturated=0,considered=0;
@@ -207,7 +206,7 @@ const ROW_TAGS=new Set(['div','li','tr','article','section','a']);
  * tags, comments, doctypes and the contents of `script`/`style` are survived rather than rejected, because a
  * browser survived them too when it captured the picture beside the file.
  */
-export function scanMarkup(html){
+function scanMarkup(html){
   const source=String(html??'');
   const root={tag:'#root',classes:[],children:[],parent:null,depth:0};
   const stack=[root];
@@ -474,11 +473,6 @@ export function runRenderChecks({uiDir,captureDir=null,brandTree,family=null,gra
     grammar:{family:grammarFamily,cardClasses:cards.classes,source:cards.source,...(cards.error?{note:cards.error}:{})}};
 }
 
-/** One line per check, for a person reading a terminal. */
-export function formatRenderChecks(result){
-  const header=`render ${result.brand.family??'(no family)'} rev ${result.brand.rev}: ${result.node.candidates} candidate${result.node.candidates===1?'':'s'}, ${result.ok?'no failing check':'failing checks'}`;
-  return formatCheckLines(header,result.checks);
-}
 
 /** The kernel hook of a frontend operation's ui node lives in render-hook.mjs; this module hands it on. */
 export {renderChecksFor,uiDirOf} from './render-hook.mjs';

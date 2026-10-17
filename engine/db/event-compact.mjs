@@ -8,7 +8,7 @@ import { redactData } from '../../scripts/lib/redact.mjs';
 
 /** Declared sizes: the ledger event bound and the inline summary caps (every cap keeps the summary far below the bound). */
 export const EVENT_LIMITS = Object.freeze({ payloadBytes: 16384, rows: 8, ids: 8, stringChars: 200, lineChars: 600, depth: 8 });
-export const ADMISSION_SCHEMA = 'starci/agent-admission@1';
+const ADMISSION_SCHEMA = 'starci/agent-admission@1';
 export const REFUSAL_SCHEMA = 'starci/admission-refusal@1';
 
 const clip = (value, max = EVENT_LIMITS.stringChars) => (typeof value === 'string' && value.length > max ? `${value.slice(0, max)}...` : value);

@@ -19,16 +19,16 @@ const CR = String.fromCodePoint(13);
 const LF = String.fromCodePoint(10);
 
 /** True for content that is not text: a NUL byte in the first 8 KiB. Binary files are never rewritten. */
-export const isBinary = (bytes) => bytes.subarray(0, 8192).includes(0);
+const isBinary = (bytes) => bytes.subarray(0, 8192).includes(0);
 
 /** Every CRLF of a string becomes LF. */
-export const lfText = (text) => text.replaceAll(CR + LF, LF);
+const lfText = (text) => text.replaceAll(CR + LF, LF);
 
 /**
  * Line endings of a text file as the services need them: every CRLF becomes LF (a script rendered from a Windows checkout failed with
  * `set: Illegal option -`). Binary content is returned untouched. Takes and returns a Buffer.
  */
-export function lfBytes(bytes) {
+function lfBytes(bytes) {
   if (isBinary(bytes) || !bytes.includes(13)) return bytes;
   return Buffer.from(lfText(bytes.toString('latin1')), 'latin1');
 }
@@ -37,14 +37,14 @@ export function lfBytes(bytes) {
 export const configBytes = (file) => lfBytes(fs.readFileSync(file));
 
 /** The key that makes the version suffix of a secret name unguessable from the name alone: a local fixture key or the age identity. */
-export function versionKeyOf(ctx) {
+function versionKeyOf(ctx) {
   const key = ctx.env.STARCI_SECRET_VERSION_KEY || ctx.env.SOPS_AGE_KEY;
   if (!key) throw refusal('STACK_VERSION_KEY_MISSING', 'STARCI_SECRET_VERSION_KEY (a local fixture) or SOPS_AGE_KEY is needed to version the secret names');
   return key;
 }
 
 /** `<stack>-<key>-v<10 hex of HMAC(versionKey, key NUL value)>`: a changed value is a new name, an unchanged one keeps its name. */
-export function secretRuntimeName(stack, key, value, versionKey) {
+function secretRuntimeName(stack, key, value, versionKey) {
   const version = createHmac('sha256', versionKey).update(`${key}\0${value}`).digest('hex').slice(0, 10);
   const name = `${stack}-${key.toLowerCase().replaceAll('_', '-')}-v${version}`;
   if (name.length > MAX_NAME) throw refusal('STACK_SECRET_NAME_TOO_LONG', `the Swarm secret name for ${key} would exceed ${MAX_NAME} characters`);

@@ -43,10 +43,10 @@ import { appendOutbox, readInbox, takeInbox, validSupervisorId } from '../machin
 import { readSupervisor, SUPERVISOR_ID, seatOf, supervisorMode } from '../machine/home.mjs';
 import { isSpecRun, readEnv } from '../lib/env.mjs';
 
-export const WAIT_TIMEOUT_EXIT = 124;
+const WAIT_TIMEOUT_EXIT = 124;
 
 /** Split `text` into parts of at most `max` characters, preferring line breaks. */
-export function splitText(text, max = TEXT_MAX) {
+function splitText(text, max = TEXT_MAX) {
   const parts = [];
   let rest = String(text ?? '');
   while (rest.length > max) {
@@ -92,7 +92,7 @@ async function sendTelegramParts({ settings, label, text, replyTo, apiBase, fetc
  * Send one supervisor's answer to the owner: every part prefixed "[<label>]" (numbered when split),
  * the first a reply to the Telegram message of inbox item `to` (which is marked read). Never throws.
  */
-export async function replyToOwner({ id, text, to = null }, {
+async function replyToOwner({ id, text, to = null }, {
   env = process.env, settings = null, apiBase = env.STARCI_TELEGRAM_API_BASE || DEFAULT_API_BASE, fetchImpl = fetch, sleepImpl,
 } = {}) {
   const s = settings ?? telegramSettings({ env });
@@ -130,7 +130,7 @@ const chatSessionOf = (env = process.env) => String(env?.CLAUDE_CODE_SESSION_ID 
  * (scripts/supervisor/start-supervisor.mjs) takes it - only an Orca terminal, and while the supervisor seat names
  * a terminal only that one. `seatTerminal` defaults to the recorded seat. --force overrides both.
  */
-export function registrationRefusal({ id, terminal, force = false, seatTerminal = undefined, mode = undefined, env = process.env }) {
+function registrationRefusal({ id, terminal, force = false, seatTerminal = undefined, mode = undefined, env = process.env }) {
   if (id !== SUPERVISOR_ID || force) return null;
   if ((mode ?? supervisorMode({ env })) === 'chat') {
     if (terminal) return `channel '${SUPERVISOR_ID}' belongs to the owner's chat session (config.yaml supervisor.mode chat): the Orca terminal ${terminal} does not take it (--force overrides; read it with inbox --peek)`;
@@ -153,7 +153,7 @@ export function registrationRefusal({ id, terminal, force = false, seatTerminal 
  *     the channel was registered from drains.
  * `registered` is the channel record (default: the stored one); `registeredTerminal` overrides its terminal.
  */
-export function drainRefusal({ id, terminal = null, session = undefined, seatTerminal = undefined, registeredTerminal = undefined, registered = undefined, mode = undefined, env = process.env }) {
+function drainRefusal({ id, terminal = null, session = undefined, seatTerminal = undefined, registeredTerminal = undefined, registered = undefined, mode = undefined, env = process.env }) {
   if (id !== SUPERVISOR_ID) return null;
   if ((mode ?? supervisorMode({ env })) === 'chat') return chatDrainRefusal({ id, terminal, session, registeredTerminal, registered, env });
   const seat = seatTerminal !== undefined ? seatTerminal : readSupervisor((m) => seatOf(m)?.value?.terminal ?? null, null, { env });
@@ -178,13 +178,13 @@ function chatDrainRefusal({ id, terminal, session, registeredTerminal, registere
   return null;
 }
 
-export const waitLine = (item) => `TELEGRAM ${item.id}: ${String(item.text ?? '').replace(/\s+/g, ' ').trim().slice(0, 200)}`;
+const waitLine = (item) => `TELEGRAM ${item.id}: ${String(item.text ?? '').replace(/\s+/g, ' ').trim().slice(0, 200)}`;
 
 /**
  * Resolve with the unread inbox items of `id` as soon as there is at least one (they stay unread),
  * or with null after `timeoutMs`. Polls sup_messages every `intervalMs` (one indexed read).
  */
-export function waitForInbox(id, { env = process.env, timeoutMs = Infinity, intervalMs = 1000 } = {}) {
+function waitForInbox(id, { env = process.env, timeoutMs = Infinity, intervalMs = 1000 } = {}) {
   return new Promise((resolve) => {
     let done = false, timer = null, deadline = null;
     const finish = (value) => {

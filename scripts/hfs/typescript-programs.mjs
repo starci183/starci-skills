@@ -9,14 +9,6 @@ import { byCodeUnit } from '../lib/list.mjs';
 // builds afresh.
 const runs = new AsyncLocalStorage();
 
-/** A program run: run(fn) shares what is built inside fn; release() drops it. */
-export function typeScriptProgramRun() {
-  const values = new Map();
-  return {
-    run: fn => runs.run(values, fn),
-    release: () => values.clear(),
-  };
-}
 
 function keyOf(value) {
   if (value === undefined) return 'u';

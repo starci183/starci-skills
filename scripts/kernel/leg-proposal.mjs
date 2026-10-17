@@ -17,7 +17,7 @@ const RESOURCE_WRITE = /^\.starciwork\/(_resources\/[^<{/]+)\//;
 const NODE_FEATURE = /\.starciwork\/features\/([^/]+)/;
 
 /** The literal families (`ui`, `sds`, ...) the manifest writes under a feature, in code-unit order. */
-export function featureFamiliesOf(brief) {
+function featureFamiliesOf(brief) {
   const families = new Set();
   for (const write of Array.isArray(brief?.writes) ? brief.writes : []) {
     const found = FEATURE_WRITE.exec(typeof write?.path === 'string' ? write.path.trim() : '');

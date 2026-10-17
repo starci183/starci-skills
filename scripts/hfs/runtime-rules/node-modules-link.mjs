@@ -104,7 +104,7 @@ function spawnLinkFindings(scope, byLine, file, node, found) {
 }
 
 /** The RT_NODE_MODULES_LINK findings of one parsed source. */
-export function fileLinkFindings({ path: file, text, source }) {
+function fileLinkFindings({ path: file, text, source }) {
   const t = ts();
   const found = [];
   if (!NODE_MODULES.test(text)) return found;

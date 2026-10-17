@@ -390,7 +390,7 @@ export const ledgerLookup = ({ repo = null, db, ledgers = [] }) => (wf) => {
  * but the Kernel has not moved' while every wake was skipped kernel-busy for 8.5 h and the Kernel enqueued
  * the next leg 9 s before the alert).
  */
-export function busyWhy(status, kernelTurn = () => null) {
+function busyWhy(status, kernelTurn = () => null) {
   const working = workingWorkers(status);
   if (working.length) return `worker ${working.map((wk) => wk.jobId).join(', ')} mid-turn`;
   return WORKING_LIVENESS.has(kernelTurn()) ? 'its Kernel is mid-turn' : null;
@@ -408,7 +408,7 @@ const activeStaleMsOf = () => { try { return allocationMs('liveness.activeStaleM
  * op-interface.implement-26e189461a's Devin turn was "Thinking 97m+" with commands running while status read
  * a liveness outside active and stall alerted STALLED idle 94m on a frontier that was only waiting for it.
  */
-export function workingWorkers(status, activeStaleMs = activeStaleMsOf()) {
+function workingWorkers(status, activeStaleMs = activeStaleMsOf()) {
   const flagged = new Set(NOT_WORKING_LISTS.flatMap((key) => status?.frontier?.[key] ?? []));
   const fresh = (ms) => ms != null && Number.isFinite(Number(ms)) && Number.isFinite(Number(activeStaleMs)) && Number(activeStaleMs) > 0 && Number(ms) <= Number(activeStaleMs);
   return (status?.workers ?? []).filter((wk) => WORKING_LIVENESS.has(wk.liveness)

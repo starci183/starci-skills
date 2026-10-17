@@ -3,7 +3,7 @@
 import {isMain} from '../lib/is-main.mjs';
 import {GRAMMAR_DIST_FIX,defaultGrammarPackageRoot,grammarDistMessage,grammarDistStatus} from '../gates/grammar-dist.mjs';
 
-export function grammarDistMain(argv=[]){
+function grammarDistMain(argv=[]){
   if(argv.includes('--help'))return {exitCode:0,text:`Usage: starci runtime check --only grammar-dist -- [--root <packages/grammar>] [--json]\n\nFails unless the grammar dist is the build of the current source (build stamp + source digest + dist digest + --* tokens). Fix: ${GRAMMAR_DIST_FIX}.\n`};
   const at=argv.indexOf('--root');
   const status=grammarDistStatus(at>=0?argv[at+1]:defaultGrammarPackageRoot());

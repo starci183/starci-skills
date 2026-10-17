@@ -232,6 +232,6 @@ export function opJudgeFindings(facts) {
 }
 
 /** Run the check on the runtime at `root`. */
-export const checkOpJudge = (root = skillRoot) => opJudgeFindings(loadFacts(root));
+const checkOpJudge = (root = skillRoot) => opJudgeFindings(loadFacts(root));
 
 if (isMain(import.meta.url)) process.exit(printFindings(checkOpJudge(), 'OK: every op declares who judges its product, and the declarations match the runtime tables.'));

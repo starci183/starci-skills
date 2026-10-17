@@ -24,7 +24,7 @@ import { positiveNumber } from '../lib/number.mjs';
 
 const DEBUG_LOG_RETENTION_MS = 14 * 86_400_000; // Q5
 const WORKFLOW_RETENTION_MS = 30 * 86_400_000; // Q6
-export function workflowPurgeApproval(repo,config){
+function workflowPurgeApproval(repo,config){
   const profile=config===undefined?workflowPurgeSettings():workflowPurgeSettings(config);
   if(!profile)return null;
   const key=p=>{const real=fs.realpathSync(p);return process.platform==='win32'?real.toLowerCase():real;};

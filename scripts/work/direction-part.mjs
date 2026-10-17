@@ -29,7 +29,7 @@ const PART_NAME = /\.content\.(png|jpe?g|webp)$/i;
 export const isPartName = (file) => PART_NAME.test(String(file));
 
 /** The part file name a composite <name>.<ext> is drawn from by convention: <name>.content.<ext>. */
-export const partNameOf = (file) => (isPartName(file) || !IMAGE_EXT.test(String(file)) ? null : String(file).replace(IMAGE_EXT, '.content.$1'));
+const partNameOf = (file) => (isPartName(file) || !IMAGE_EXT.test(String(file)) ? null : String(file).replace(IMAGE_EXT, '.content.$1'));
 
 /** The work/ui-screen@1 record owning `file`: the nearest ancestor index.yaml of that schema, or null. */
 function uiRecordOf(file, cache = new Map()) {

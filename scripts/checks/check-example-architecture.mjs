@@ -24,7 +24,7 @@ import { withMaterializedExample } from '../hfs/example-secrets.mjs';
 const USAGE = 'usage: starci runtime check --only example-architecture -- [--examples <dir>] [--only <name>]';
 
 /** The example directories under `examplesDir` that declare an hfs.json, by name. */
-export function exampleDirs(examplesDir, only) {
+function exampleDirs(examplesDir, only) {
   return fs.readdirSync(examplesDir, { withFileTypes: true })
     .filter((e) => e.isDirectory() && fs.existsSync(path.join(examplesDir, e.name, 'hfs.json')) && (!only || e.name === only))
     .map((e) => e.name).sort(byCodeUnit);
@@ -107,7 +107,7 @@ async function checkMaterializedExample(examplesDir, name, { bin, runner, withEx
 }
 
 /** Lint disposable apps with freshly sealed members and their installed dependency links. */
-export function checkExamples({ examplesDir, only, bin, runner, withExample = withMaterializedExample } = {}) {
+function checkExamples({ examplesDir, only, bin, runner, withExample = withMaterializedExample } = {}) {
   return Promise.all(exampleDirs(examplesDir, only).map((name) =>
     checkMaterializedExample(examplesDir, name, { bin, runner, withExample })));
 }
@@ -136,7 +136,7 @@ const resultLines = (r) => {
   return lines;
 };
 
-export function formatResults(results) {
+function formatResults(results) {
   const lines = [];
   for (const r of results) lines.push(...resultLines(r));
   const bad = results.filter((r) => r.status !== 'clean').length;

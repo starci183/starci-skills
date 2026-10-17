@@ -10,7 +10,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '.
  * The CLI verb (modules/cli/commands/<group>/<verb>.yaml) that owns each connector service's script. The script path itself is
  * never written here: serviceScript reads it from that verb's `impl.script`, so a moved or renamed script is one catalog edit.
  */
-export const SERVICE_VERBS = Object.freeze({
+const SERVICE_VERBS = Object.freeze({
   'ask-gateway': ['connect', 'ask-gateway'],
   'ask-tunnel': ['connect', 'tunnel'],
   'telegram-bridge': ['supervisor', 'telegram-bridge'],

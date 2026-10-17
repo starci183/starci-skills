@@ -90,8 +90,8 @@ import { bridgeText } from './telegram-bridge-text.mjs';
 import { starciSourceRoot } from '../../engine/runtime-root.mjs';
 import { isSpecRun } from '../lib/env.mjs';
 const SERVE_ASK_FILE = fileURLToPath(new URL('../kernel/ask-server-main.mjs', import.meta.url));
-export const BRIDGE_NAME = 'telegram-bridge';
-export const BRIDGE_FILE = fileURLToPath(import.meta.url);
+const BRIDGE_NAME = 'telegram-bridge';
+const BRIDGE_FILE = fileURLToPath(import.meta.url);
 export const ONLINE_MS = 30 * 60 * 1000;
 export const POLL_TIMEOUT_S = 50;
 const ALLOWED_UPDATES = ['message', 'callback_query'];
@@ -105,7 +105,7 @@ const numericId = (v) => (Number.isSafeInteger(Number(v)) && String(v).trim() !=
 /* ------------------------------------------------------------ state (machine.sqlite) */
 
 /** The bridge's connectors row: {pid, startedAt, offset, ...}, or null. The update offset is the row's cursor. */
-export const bridgeState = (env = process.env) => {
+const bridgeState = (env = process.env) => {
   const record = connectorState(BRIDGE_NAME, env);
   return record ? { ...record, offset: Number.isSafeInteger(record.cursor?.offset) ? record.cursor.offset : null } : null;
 };
@@ -166,7 +166,7 @@ export function heartbeatSupervisor(id, { env = process.env, now = Date.now() } 
 }
 
 /** Every registered supervisor, online ones first, then by label. */
-export function listSupervisors({ env = process.env, now = Date.now(), onlineMs } = {}) {
+function listSupervisors({ env = process.env, now = Date.now(), onlineMs } = {}) {
   return connectorStates(CHANNEL_PREFIX, env)
     .map((row) => getSupervisor(row.name.slice(CHANNEL_PREFIX.length), env))
     .filter(Boolean)
@@ -181,7 +181,7 @@ const readRoutes = (env) => {
   return doc && typeof doc === 'object' && doc.chats && typeof doc.chats === 'object' ? doc : { schema: 'starci/telegram-route@1', chats: {} };
 };
 const writeRoutes = (env, doc) => writeConnectorState(ROUTE_ROW, { kind: 'telegram-route', cursor: doc }, env);
-export const chatRoute = (chatId, env = process.env) => readRoutes(env).chats[String(chatId)] ?? null;
+const chatRoute = (chatId, env = process.env) => readRoutes(env).chats[String(chatId)] ?? null;
 
 /* ------------------------------------------------------------ Bot API */
 
@@ -212,7 +212,7 @@ const defaultStatusMessages = (config, env) => {
 
 // The repositories whose open asks /asks and /creds list: the connector repos, every product repo
 // config.yaml supervisor.repos names (the workflows the supervisor runs) and every repo a notice named.
-export const bridgeAskRepos = ({ env = process.env, config = ownerConfig() ?? undefined } = {}) => {
+const bridgeAskRepos = ({ env = process.env, config = ownerConfig() ?? undefined } = {}) => {
   try {
     const source = starciSourceRoot(env);
     const supervised = reportRepos([], config).map((repo) => path.resolve(source, repo));
@@ -237,7 +237,7 @@ const readAskState = (ledgerFile, workflowId, dispatchId, now) => {
  * connector starter, the public base, the waits and the sweep interval (0 sweeps every round).
  * `pollOnce()` runs one getUpdates round; `handleUpdate()` one update.
  */
-export function createBridge({
+function createBridge({
   env = process.env, settings = () => telegramSettings({ env }), apiBase = env.STARCI_TELEGRAM_API_BASE || DEFAULT_API_BASE,
   fetchImpl = fetch, sleepImpl = sleep, now = Date.now, log = () => {}, onlineMs, timeoutS = POLL_TIMEOUT_S,
   statusMessages = () => defaultStatusMessages(ownerConfig(), env),
@@ -683,7 +683,7 @@ export function ensureTelegramBridge({ env = process.env, config = undefined, ro
 const BRIDGE_HEAD_PATHS = Object.freeze(['scripts/connectors/', 'scripts/lib/', 'scripts/supervisor/progress-report.mjs', 'scripts/kernel/ask-server.mjs', 'engine/']);
 
 /** What the bridge process runs: its own file and its direct imports. A change to one, or a new runtime HEAD, reloads it. */
-export const bridgeReloadFiles = (root = configRoot) => [
+const bridgeReloadFiles = (root = configRoot) => [
   'scripts/supervisor/telegram-bridge.mjs', 'scripts/connectors/telegram.mjs', 'scripts/connectors/lib.mjs', 'scripts/connectors/tunnel.mjs',
   'scripts/supervisor/progress-report.mjs', 'scripts/kernel/ask-server.mjs', 'scripts/machine/self-reload.mjs', 'scripts/machine/sup-messages.mjs', 'engine/config.mjs',
 ].map((rel) => path.join(root, ...rel.split('/')));

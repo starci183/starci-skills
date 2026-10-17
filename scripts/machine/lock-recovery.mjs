@@ -8,7 +8,7 @@ import { indexLock } from '../api/git/index-lock.mjs';
 import { processList } from '../api/process/process-list.mjs';
 import { isSpecRun } from '../lib/env.mjs';
 
-export const LOCK_EVENT = 'git-index-lock-removed';
+const LOCK_EVENT = 'git-index-lock-removed';
 
 /** Git-family processes on this host: [{pid, name, commandLine}], or null when the probe failed. A spec run (NODE_TEST_CONTEXT) never reads the host process table. */
 export function listGitProcesses({ platform = process.platform, run, env = process.env } = {}) {

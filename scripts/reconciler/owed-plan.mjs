@@ -8,7 +8,7 @@ import { clipLine } from '../lib/clip.mjs';
 const minutes = (ms) => Math.round(ms / 60_000);
 
 /** The stuck[] waits of the status that outlived their critical bound and that the table names: [{item, id, ageMs, diKind}]. Pure. */
-export function overdueOwedWaits({ stuck = [], now, table = {}, stuckSla = {} }) {
+function overdueOwedWaits({ stuck = [], now, table = {}, stuckSla = {} }) {
   const overdue = [];
   for (const item of stuck) {
     const diKind = table[item.kind];

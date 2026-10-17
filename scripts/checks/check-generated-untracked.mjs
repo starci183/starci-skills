@@ -15,7 +15,7 @@ import { RUNTIME_MANIFEST_FILE, loadSlotManifest, ruleParams } from '../hfs/slot
 import { generatedUntrackedFindings } from '../hfs/runtime-rules/generated-untracked.mjs';
 
 /** The GENERATED_UNTRACKED findings of the runtime at `root`: every git-tracked file under a generated root. */
-export function checkGeneratedUntracked(root = skillRoot) {
+function checkGeneratedUntracked(root = skillRoot) {
   const manifest = loadSlotManifest({ root, file: path.join(root, RUNTIME_MANIFEST_FILE) });
   const params = ruleParams(manifest, 'runtime');
   const tracked = gitOutputOf(lsFiles(['-z'], { dir: root, maxBuffer: 64 * 1024 * 1024 }), 'git ls-files -z').split('\0').filter(Boolean);

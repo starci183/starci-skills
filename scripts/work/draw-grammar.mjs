@@ -58,7 +58,7 @@ function mainWorktreeOf(dir) {
  * packages/grammar when its build is FRESH (grammar-dist.mjs: stamped from the current source), else the live main
  * worktree's fresh build (a lane checkout), else the runtime's built but stale dist - named stale, never silently.
  */
-export function claudeDistRoots({ skillRoot = SKILL_ROOT, grammarDist = null, env = process.env, status = grammarDistStatus, mainOf = mainWorktreeOf } = {}) {
+function claudeDistRoots({ skillRoot = SKILL_ROOT, grammarDist = null, env = process.env, status = grammarDistStatus, mainOf = mainWorktreeOf } = {}) {
   const pinned = grammarDist ?? env.STARCI_GRAMMAR_DIST ?? null;
   if (pinned) return [{ root: path.resolve(pinned), status: null, via: grammarDist ? '--grammar-dist' : 'STARCI_GRAMMAR_DIST' }];
   const own = path.join(skillRoot, 'packages', 'grammar');
@@ -84,7 +84,7 @@ function grammarCandidates({ productDir, skillRoot = SKILL_ROOT, grammarDist = n
 const parse = (v) => { const m = /^(\d+)\.(\d+)\.(\d+)/.exec(String(v ?? '').trim()); return m ? m.slice(1, 4).map(Number) : null; };
 const cmp = (a, b) => (a[0] - b[0]) || (a[1] - b[1]) || (a[2] - b[2]);
 /** Minimal semver range test: exact, ^, ~, >=, * (enough for a dependency line); null when unreadable. */
-export function satisfiesRange(version, range) {
+function satisfiesRange(version, range) {
   const v = parse(version);
   if (!v || range == null) return null;
   const r = String(range).trim();

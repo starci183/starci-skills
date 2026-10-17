@@ -58,7 +58,7 @@ function diOptionsOf(di, subject) {
 }
 
 /** `starci kernel <verb> [--flag [value]]...` as {verb, args}, or null for any other text. */
-export function parseKernelCommand(text) {
+function parseKernelCommand(text) {
   const words = String(text ?? '').match(/'[^']*'|"[^"]*"|\S+/g)?.map((w) => w.replace(/^(['"])(.*)\1$/, '$2')) ?? [];
   if (words[0] !== 'starci' || words[1] !== 'kernel' || !words[2] || words[2].startsWith('-')) return null;
   const args = {};

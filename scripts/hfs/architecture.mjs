@@ -26,7 +26,7 @@ function parseArchitectureArgs(argv) {
   return {root, base};
 }
 
-export function architectureMain(argv, {check = checkArchitecture, write = (text) => process.stdout.write(text), fail = (text) => process.stderr.write(text)} = {}) {
+function architectureMain(argv, {check = checkArchitecture, write = (text) => process.stdout.write(text), fail = (text) => process.stderr.write(text)} = {}) {
   let parsed;
   try { parsed = parseArchitectureArgs(argv); } catch (error) { fail(`${error.message}\n`); return 2; }
   let report;

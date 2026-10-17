@@ -166,7 +166,7 @@ function checkOpManifests(root, findings) {
   leafRestatedFindings(leafRestated, findings);
 }
 
-export function checkSchemaShared({ root = skillRoot } = {}) {
+function checkSchemaShared({ root = skillRoot } = {}) {
   const findings = [];
   checkWorkSchemas(root, findings);
   checkOpManifests(root, findings);

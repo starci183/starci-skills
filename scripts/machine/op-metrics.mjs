@@ -49,11 +49,10 @@ import { fmtMs } from '../lib/time.mjs';
 import { aggregate, inList, jobRecords } from './op-health.mjs';
 import { clipLine } from '../lib/clip.mjs'; import { isMain } from '../lib/is-main.mjs';
 
-export const SNAPSHOT_KIND = 'supervisor-op-metrics';
+const SNAPSHOT_KIND = 'supervisor-op-metrics';
 /** metrics_snapshots.kind of these snapshots (DBTREE B6). */
 const METRICS_KIND = 'op-health';
 export const WAIT_KINDS = Object.freeze(['owner-gate', 'peer-wait', 'dependency', 'retry-cap', 'deferred-settle', 'queued-ready', 'throttled']);
-export const SEVERITIES = Object.freeze(['ok', 'warn', 'critical']);
 /** queuedBecause values that are the runtime's capacity, not the workflow's own order. */
 const THROTTLE_CAUSES = Object.freeze(['pool-full', 'circuit-open', 'max-ops', 'path-lease', 'host-resources-low']);
 
@@ -85,7 +84,7 @@ const pct = (rate) => (rate == null ? '-' : `${Math.round(rate * 100)}%`);
 
 
 /** severity of a wait of `ageMs` against {warnMs, criticalMs}. */
-export const severityOf = (ageMs, sla) => { if (ageMs >= sla.criticalMs) { return 'critical'; } if (ageMs >= sla.warnMs) { return 'warn'; } return 'ok'; };
+const severityOf = (ageMs, sla) => { if (ageMs >= sla.criticalMs) { return 'critical'; } if (ageMs >= sla.warnMs) { return 'warn'; } return 'ok'; };
 
 /** Op health of one ledger (or one workflow of it) over the window. */
 export function opMetrics(db, { now = Date.now(), windowMs = telemetrySettings().windowMs, workflowId = null } = {}) {
@@ -252,25 +251,11 @@ export function stuckOf({ db, workflowId, now = Date.now(), sla = telemetrySetti
   return out.sort((a, b) => rank[b.severity] - rank[a.severity] || b.ageMs - a.ageMs);
 }
 
-/** Stuck items past their SLA as Supervisor owed actions (owed.mjs item shape plus severity). Pure. */
-export const stuckOwedItems = (stuck, { repo = null } = {}) => stuck.filter((s) => s.severity !== 'ok').map((s) => ({
-  key: s.key, class: 'supervisor', kind: `stuck-${s.kind}`, workflowId: s.workflowId, repo, severity: s.severity, owner: s.owner,
-  incidentId: s.incidentId, jobId: s.jobId, raisedAt: s.since, ageMin: Math.round(s.ageMs / 60_000),
-  summary: `${s.kind}${s.cause && s.cause !== s.kind ? ' (' + s.cause + ')' : ''} ${s.incidentId ?? s.jobId ?? ''} ${fmtMs(s.ageMs)}; next: ${s.owner}${s.detail ? ' - ' + s.detail : ''}`,
-  action: stuckAction(s), line: stuckLine(s),
-}));
 
-/** What the Supervisor does about one stuck item (the owner of its next action decides the verb). */
-function stuckAction(s) {
-  if (s.owner === 'owner') return 'the owner holds it: make sure the ask reached the owner (Telegram /asks), remind once per digest; never answer it';
-  if (s.owner === 'supervisor') { if (s.kind === 'retry-cap') { return 'diagnose the repeated failure (root cause, not a blind retry), then tell the Kernel the disposition'; } if (s.kind === 'throttled') { return 'capacity holds it: check the pool/circuit/lease holder and free or re-route it'; } return 'no owner ask names this gate: rule it or type it (--until-*) and tell the Kernel'; }
-  if (String(s.owner).startsWith('peer:')) return `notify the peer Kernel ${s.owner.slice(5)} (what it owes is its next move) and the waiting Kernel`;
-  return 'wake the Kernel (notify.mjs) with the item; a second breach is a wake/dispatch defect to fix in a lane';
-}
 export const stuckLine = (s) => 'STUCK ' + s.severity + ' ' + s.workflowId + ' ' + s.kind + (s.cause && s.cause !== s.kind ? '/' + s.cause : '') + ' ' + (s.incidentId ?? s.jobId ?? '-') + (s.opId ? ' (' + s.opId + ')' : '') + ' age=' + fmtMs(s.ageMs) + ' next=' + s.owner + (s.detail ? ': ' + clipLine(s.detail, 160) : '');
 
 /** {total, ok, warn, critical, byKind: {<kind>: n past SLA}, byOwner: {<owner>: n past SLA}} of stuck items. Pure. */
-export function stuckCounts(stuck) {
+function stuckCounts(stuck) {
   const out = { total: stuck.length, ok: 0, warn: 0, critical: 0, byKind: {}, byOwner: {} };
   for (const s of stuck) {
     out[s.severity]++;
@@ -296,7 +281,7 @@ export const snapshotPayload = (metrics, stuck = []) => ({ schema: 'starci/op-me
 /** Record one snapshot: a machine.sqlite metrics_snapshots row (kind 'op-health', worker-wide). Returns snap_id. */
 export const recordSnapshot = (m, payload) => m.recordMetrics({ kind: METRICS_KIND, windowMs: payload?.windowMs ?? null, subject: SNAPSHOT_KIND, data: payload });
 /** The newest `limit` snapshots (machine.sqlite metrics_snapshots over the machine handle `m`), oldest first: [{at, ...payload}]. */
-export const readSnapshots = (m, { limit = 96 } = {}) => m.db.prepare('SELECT at, data_json, data_sha FROM metrics_snapshots WHERE kind=? AND ledger_id IS NULL ORDER BY snap_id DESC LIMIT ?')
+const readSnapshots = (m, { limit = 96 } = {}) => m.db.prepare('SELECT at, data_json, data_sha FROM metrics_snapshots WHERE kind=? AND ledger_id IS NULL ORDER BY snap_id DESC LIMIT ?')
   .all(METRICS_KIND, limit).reverse().map((r) => ({ at: Number(r.at), ...fullJson(JSON.parse(r.data_json ?? 'null')) }));
 
 const TREND_TEXT = (tr, d) => tr('Op health {window}: success {rate}{rateDelta}, median wait {wait}{waitDelta}, stuck {stuck} ({critical} critical){stuckDelta}{top}{vs}',
@@ -308,7 +293,7 @@ const signed = (n, fmt) => { if (n == null || n === 0) { return ''; } return ` (
  * One short trend line from snapshots (oldest first): the newest against the one closest to `trendMs` before it.
  * null when there is no snapshot. Pure.
  */
-export function trendLine(snaps, { trendMs, language = ownerLanguage() } = {}) {
+function trendLine(snaps, { trendMs, language = ownerLanguage() } = {}) {
   const last = snaps[snaps.length - 1];
   if (!last?.totals) return null;
   const target = last.at - trendMs;

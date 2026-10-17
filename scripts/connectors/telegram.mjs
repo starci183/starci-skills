@@ -135,7 +135,7 @@ export function askMessage({ workflow, question, link = null, expiresAt = null, 
  * The one plain message for an ask the runtime answered with its recommendation (config.yaml
  * asks.autoAcceptRecommended; serve-ask.mjs autoAcceptAsk): the pick and the question, no form link.
  */
-export function autoAcceptedMessage({ workflow, question, label, language }) {
+function autoAcceptedMessage({ workflow, question, label, language }) {
   const t = textFor(language), tr = translator(language);
   const text = clip(String(question?.text ?? '').trim(), 2500), pick = clip(String(label ?? '').trim(), 300);
   const line = tr('Auto-picked the recommended option: {pick} — question: {text}. To change it, answer the kernel / supervisor again.', { pick, text });
@@ -163,7 +163,7 @@ export const sendMessage = ({ token, chatId, text, markup = null, ...rest }) =>
     .then((r) => (r.ok ? { ...r, messageId: r.result?.message_id ?? null } : r));
 
 /** getUpdates -> the chats that messaged the bot: id, type and name only (never message text). */
-export async function discoverChats({ token, apiBase = DEFAULT_API_BASE, fetchImpl = fetch }) {
+async function discoverChats({ token, apiBase = DEFAULT_API_BASE, fetchImpl = fetch }) {
   const r = await botCall({ token, method: 'getUpdates', payload: { allowed_updates: ['message', 'channel_post', 'my_chat_member'] }, apiBase, fetchImpl, attempts: 1 });
   if (!r.ok) return r;
   const chats = new Map();
@@ -268,7 +268,7 @@ const withStore = (env, fn) => withHostMutex(SENT_LOCK, async () => {
 /** The message ids that show one ask. */
 const messageIdsOf = (entry) => [...new Set((Array.isArray(entry?.messageIds) ? entry.messageIds : []).filter(Number.isInteger))];
 /** Read the store (no lock): a snapshot for lookups. */
-export const readSentStore = (env = process.env) => readMachine(storeOf, emptyStore(), { env });
+const readSentStore = (env = process.env) => readMachine(storeOf, emptyStore(), { env });
 /** Change the store under its lock; `fn(store)` mutates it and returns the result. */
 const updateSentStore = (fn, { env = process.env } = {}) => withStore(env, (store) => fn(store));
 /** The ask a button key names ({askKey, key, repo, ledgerFile, workflowId, dispatchId, ...}), or null. */
@@ -299,7 +299,7 @@ export const recordAskMessage = ({ workflowId, dispatchId, repo = null, ledgerFi
 const DRAW_REVIEW_ASK = 'draw-review';
 const CAPTION_MAX = 1000;
 /** The line under a draw-review notice: how the owner answers by replying. */
-export const drawReplyHint = (language) => translator(language)('Answer by REPLYING to this message (or to one image): "ok" / "approve" accepts (add "golden" to make it the reference); anything else is your feedback and the drawing is redrawn.');
+const drawReplyHint = (language) => translator(language)('Answer by REPLYING to this message (or to one image): "ok" / "approve" accepts (add "golden" to make it the reference); anything else is your feedback and the drawing is redrawn.');
 
 /** The caption of a draw-review album: the shapes, the round and the notes this drawing answers. */
 function drawAlbumCaption(question, language) {

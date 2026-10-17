@@ -15,7 +15,7 @@ const ANSWERED_EVENT = 'gate-answered';
 const UNCLASSIFIED = 'unclassified';
 
 /** The table's gate block, numbers resolved: {ackMs, resolutions[], deferAfter}. */
-export const gatePolicyOf = () => {
+const gatePolicyOf = () => {
   const { gate } = incidentPolicy();
   return { ackMs: boundValue(gate.ackMs), resolutions: list(gate.resolutions), deferAfter: gate.deferAfter };
 };

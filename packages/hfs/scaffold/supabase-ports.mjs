@@ -17,7 +17,7 @@ export const SUPABASE_PORT_VARIABLES = Object.freeze(Object.keys(OFFSETS).map((k
 const hash = (text) => [...text].reduce((value, char) => Math.imul(value ^ char.charCodeAt(0), 16777619) >>> 0, 2166136261);
 
 /** The first port of the project's block. */
-export const supabasePortBase = (project) => RANGE_START + (hash(String(project)) % BLOCK_COUNT) * BLOCK_SIZE;
+const supabasePortBase = (project) => RANGE_START + (hash(String(project)) % BLOCK_COUNT) * BLOCK_SIZE;
 
 /** { supabasePortApi: '41231', ... }: the variables a skeleton file fills. */
 export function supabasePortVars(project) {

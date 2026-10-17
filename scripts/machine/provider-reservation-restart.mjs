@@ -12,7 +12,7 @@ import { workerShow } from '../api/orca/worker-show.mjs';
 import { ENDED_DISPATCH_STATES } from '../../engine/db/provider-reservations.mjs';
 import { terminalTree } from './worker-close.mjs';
 
-export const HELD_CLOCK = 'PROVIDER_RESERVATION_HELD';
+const HELD_CLOCK = 'PROVIDER_RESERVATION_HELD';
 export const heldEntity = (id) => `provider-reservation:${id}`;
 
 const createdKnown = (value) => Number.isSafeInteger(value) && value > 0;

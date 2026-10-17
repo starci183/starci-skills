@@ -8,7 +8,7 @@ import { headTime } from '../api/git/head-time.mjs';
 import { porcelainStatus } from '../api/git/porcelain-status.mjs';
 
 /** Why a thing is listed and never touched. */
-export const UNTIED = 'the runtime cannot tie it to a workflow';
+const UNTIED = 'the runtime cannot tie it to a workflow';
 
 /** The reason line of a listed thing: the phrase, then what was seen. */
 export const untiedWhy = (seen) => `${UNTIED}: ${seen}`;

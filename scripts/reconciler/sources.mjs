@@ -76,7 +76,7 @@ function routesFor(routes, kind) {
 }
 
 /** Route one event through every controller: [{controller, key, reason}]. */
-export function routeEvent(event, controllers) {
+function routeEvent(event, controllers) {
   const out = [];
   for (const c of controllers) {
     for (const route of routesFor(c.routes, event.kind)) {
@@ -119,7 +119,7 @@ function pollSupervisor(m, ledger, { batch = EVENT_BATCH } = {}) {
  * One poll of one ledger. `m` is the engine's machine.sqlite handle (engine_cursors). Returns
  * {ledgerId, events: [...], first?, error?}. `reader` is the seam (openLedgerReader).
  */
-export function pollLedger(m, ledger, { now = Date.now(), reader = openLedgerReader, batch = EVENT_BATCH } = {}) {
+function pollLedger(m, ledger, { now = Date.now(), reader = openLedgerReader, batch = EVENT_BATCH } = {}) {
   const { ledgerId, file } = ledger;
   if (ledgerId === 'supervisor' && !file) {
     try { return pollSupervisor(m, ledger, { batch }); } catch (error) { return { ledgerId, events: [], error: String(error?.message ?? error).slice(0, 300) }; }

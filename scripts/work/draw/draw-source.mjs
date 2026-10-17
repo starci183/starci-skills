@@ -109,7 +109,7 @@ function classifySpacing(bare, step) {
 }
 
 /** How one class reads: {kind: layout|token|free|paint, rule?}. */
-export function classifyClass(token) {
+function classifyClass(token) {
   const bare = String(token).replace(RESPONSIVE, '').replace(/^!/, '');
   let spacing = null;
   for (const pattern of SPACING_RX) {
@@ -324,7 +324,7 @@ export function sourceFindings(text, { file = 'source.draw.tsx', rationale = [],
 }
 
 /** Findings of the fixtures: each one is {state, props, on} (the drawing law's XBase input). */
-export function fixtureFindings(fixtures) {
+function fixtureFindings(fixtures) {
   const out = [];
   for (const { file, value } of fixtures) {
     const label = path.basename(file);

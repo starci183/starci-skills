@@ -120,7 +120,7 @@ const askTextOf = (question) => foldText(`${question?.text ?? ''} ${list(questio
  * shared-system / owner-decision (deferred-to-handover), recommended (a business choice carrying its recommendation,
  * taken provisionally). `classes` lists every owner-only class the text touches.
  */
-export function autopilotAskClass({ opId = null, question = null, subject = null } = {}) {
+function autopilotAskClass({ opId = null, question = null, subject = null } = {}) {
   if (opId === HANDOVER_OP) return { class: 'owner-handover', classes: [] };
   if (subject === HANDOVER_CREDENTIALS_SUBJECT || question?.checklist === HANDOVER_CREDENTIALS_SUBJECT) return { class: 'owner-handover', classes: ['credential'] };
   const kind = askKindOf(question);

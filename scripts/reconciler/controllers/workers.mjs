@@ -72,7 +72,7 @@ function workersDecision({ kind, key, summary, entity, evidence = [], options = 
  * smallest id first, then the cycle's direction) so the same cycle always has the same key. Tarjan SCC, then one
  * cycle per strongly connected component of 2+ members. Pure.
  */
-export function waitCycles(edges) {
+function waitCycles(edges) {
   const adj = new Map();
   for (const e of edges) { if (!e?.from || !e?.to || e.from === e.to) { continue; } if (!adj.has(e.from)) { adj.set(e.from, new Set()); } adj.get(e.from).add(e.to); if (!adj.has(e.to)) { adj.set(e.to, new Set()); } }
   let index = 0;
@@ -104,7 +104,7 @@ export function waitCycles(edges) {
  * The deps pass: one `deadlock` DI per wait cycle, one `cross-workflow` DI per hub-blocker / unowned-need finding.
  * `graphs` [{ledgerId, edges: [{from, to, via}], findings: [{kind, workflows, summary, proposal}]}]. Pure.
  */
-export function planDeps({ graphs = [], now, settings = DEFAULTS, language = ownerLanguage() }) {
+function planDeps({ graphs = [], now, settings = DEFAULTS, language = ownerLanguage() }) {
   const tr = translator(language);
   const edges = graphs.flatMap((g) => (g.edges ?? []).map((e) => ({ ...e, ledgerId: g.ledgerId })));
   const ledgerOf = (wf) => graphs.find((g) => (g.edges ?? []).some((e) => e.from === wf || e.to === wf))?.ledgerId ?? null;
@@ -137,7 +137,7 @@ export function planDeps({ graphs = [], now, settings = DEFAULTS, language = own
 }
 
 /** The owed pass: one Supervisor DI per open cluster (cluster.mjs clusterOwed), keyed by the cluster id. Pure. */
-export function planOwed({ clusters = [], now, settings = DEFAULTS, language = ownerLanguage() }) {
+function planOwed({ clusters = [], now, settings = DEFAULTS, language = ownerLanguage() }) {
   const tr = translator(language);
   return clusters.filter((c) => !c.fixedBy).map((c) => {
     const first = c.items?.[0] ?? {};
@@ -156,7 +156,7 @@ export function planOwed({ clusters = [], now, settings = DEFAULTS, language = o
  * The land pass: the clocks to hold. `land` = landStatus(); `events` = the newest land-passed/land-failed rows
  * [{kind, id, at}] newest first; `dist` = grammarDistStatus() or null. Pure. {set: [{entity, state, slaMs, enteredAt?}], clear: [{entity, state}]}.
  */
-export function planLand({ land = null, events = [], dist = null, now, settings = DEFAULTS }) {
+function planLand({ land = null, events = [], dist = null, now, settings = DEFAULTS }) {
   const set = [], clear = [];
   if (land?.busy) set.push({ entity: 'land:queue', state: 'LAND_QUEUE_STALL', slaMs: settings.landStallMs, enteredAt: Number(land.current?.at ?? land.current?.startedAt) || now });
   else clear.push({ entity: 'land:queue', state: 'LAND_QUEUE_STALL' });
@@ -176,7 +176,7 @@ export function planLand({ land = null, events = [], dist = null, now, settings 
  * instead. A changed signature or head is a new key that supersedes the repo's older push DI (supersedeEntity), so
  * the one live DI always carries the current reason with its full output blob (MB-03). Pure.
  */
-export function planPush({ results = [], now, settings = DEFAULTS, language = ownerLanguage() }) {
+function planPush({ results = [], now, settings = DEFAULTS, language = ownerLanguage() }) {
   const tr = translator(language);
   const decisions = [], incomplete = [];
   for (const r of results.filter((x) => x?.refused || (x?.pushed === false && x?.error && !x?.skipped))) {

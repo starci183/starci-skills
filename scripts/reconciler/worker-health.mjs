@@ -28,7 +28,7 @@ const RESET_HINT_WAIT = String.raw`\s+(?:in|after)\s+`;
 const RESET_HINT_UNITS = ['s', 'sec', 'secs', 'seconds?', 'm', 'min', 'mins', 'minutes?', 'h', 'hr', 'hours?'].join('|');
 const RESET_HINT_DURATION = String.raw`(\d+(?:\.\d+)?)\s*(${RESET_HINT_UNITS})\b`;
 const RESET_HINT = new RegExp(RESET_HINT_TERMS + RESET_HINT_WAIT + RESET_HINT_DURATION, 'i');
-export const NUDGE = Object.freeze({
+const NUDGE = Object.freeze({
   retry: 'Retry: continue your task from where you stopped.',
   idle: 'Continue your task, or file your report with starci kernel report if done.',
   report: 'File your report now with starci kernel report',
@@ -39,7 +39,7 @@ export const HEALTH_DEFAULTS = Object.freeze({
 });
 
 /** The reset hint of a rate-limit screen in ms from now ("resets in 5 minutes", "try again in 30s", "retry after 2h"), or null. */
-export function resetHintMs(text) {
+function resetHintMs(text) {
   const m = RESET_HINT.exec(String(text ?? ''));
   if (!m) return null;
   const n = Number(m[1]), u = m[2].toLowerCase();

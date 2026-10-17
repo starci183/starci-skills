@@ -162,7 +162,7 @@ const machineIds = () => [
  * backend composition and data machine and frontend repository machine. A spec about another rule judges its own
  * report without these (they have their own specs); every one of them is in ARCHITECTURE_RULE_IDS.
  */
-export const HFS_MACHINE_RULE_IDS = Object.freeze((() => {
+const HFS_MACHINE_RULE_IDS = Object.freeze((() => {
   const ordinary = new Set([...COMMON_RULE_IDS, ...BACKEND_RULE_IDS, ...FRONTEND_RULE_IDS, ...OWNER_RULE_IDS, ...GRAMMAR_RULE_IDS, ...REGISTRATION_RULE_IDS,
     ...SWR_DATA_RULE_IDS, SOURCE_LAYOUT_RULE_ID, SOURCE_NAME_RULE_ID, PUBLIC_CONTRACT_RULE_ID, READONLY_BOUNDARY_RULE_ID]);
   return [...new Set(machineIds().filter((id) => !ordinary.has(id)))].sort(byCodeUnit);

@@ -79,7 +79,7 @@ function pageFunctionsByModule(t, files) {
 }
 
 /** The undeclared-identifier findings of the runtime modules under `root`. */
-export function checkUndeclaredIdentifiers(root = skillRoot) {
+function checkUndeclaredIdentifiers(root = skillRoot) {
   const t = ts();
   const files = runtimeModules(root);
   const pageFunctions = pageFunctionsByModule(t, files);

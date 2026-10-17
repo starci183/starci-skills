@@ -7,7 +7,7 @@
 import { SIGNAL, signalRow } from '../machine/debug-signals.mjs';
 
 /** The kinds of thing whose host observation and ledger claim a drift code compares. */
-export const DRIFT_KINDS = Object.freeze(['terminal', 'process', 'seat', 'worktree', 'reservation', 'lease']);
+const DRIFT_KINDS = Object.freeze(['terminal', 'process', 'seat', 'worktree', 'reservation', 'lease']);
 
 function driftRow({ ev }, state, now) {
   const entity = `${ev.entity.type}:${ev.entity.id}`;

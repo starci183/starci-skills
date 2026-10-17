@@ -31,7 +31,7 @@ export {parseCssCustomProperties,parseTokenData,readSourceTokens} from './brand-
  * absent grammar snapshot or a source file this repository does not carry leaves the claim unproven, and an
  * unproven claim must not read as a proven one.
  */
-export const BRAND_CHECKS='starci/brand-checks@1';
+const BRAND_CHECKS='starci/brand-checks@1';
 export const CHECK_IDS=['tokens-match-source','contrast-aa','primary-danger-distinct','mascot-assets-present','icon-set-only','tokens-in-grammar','direction'];
 /** WCAG 2.x: text needs 4.5:1, a non-text indicator (primary on its surface) needs 3:1. */
 const DEFAULT_MIN_CONTRAST=4.5;
@@ -51,7 +51,7 @@ const softToneOf=token=>{const match=/^(success|warning|info|danger)-soft$/.exec
  * must be 20 apart from the primary - a fifth of the whole perceptual range - or a user reads "delete" as
  * "continue". The match tolerance is half a unit: below perception, wide enough for hex/oklch rounding.
  */
-export const MIN_PRIMARY_DANGER_DELTA=20;
+const MIN_PRIMARY_DANGER_DELTA=20;
 const ASSET_EXTENSIONS=['.png','.svg','.webp','.jpg','.jpeg'];
 export const OFFENDER_CAP=20;
 const SCAN_EXCLUDED=new Set(['node_modules','dist','.next','.git','.dist','coverage','build','out','.turbo','.cache']);
@@ -95,7 +95,7 @@ export function readBrandRecord(tree){
 }
 
 /** The token names one grammar family's DNA declares. `.yaml` authored, `.json` built - both are the canon. */
-export function grammarTokenNames({family,grammarRoot=defaultGrammarRoot()}){
+function grammarTokenNames({family,grammarRoot=defaultGrammarRoot()}){
   if(!family)return {file:null,names:[],error:'the brand declares no identity.family'};
   if(!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(family))return {file:null,names:[],error:'the declared family is not a usable directory name'};
   const candidates=['DNA.yaml','DNA.yml','DNA.json'].map(name=>path.join(grammarRoot,family,name));
@@ -117,21 +117,15 @@ const check=(id,outcome,detail,evidence={})=>({id,outcome,detail,evidence});
 const brandTokens=brand=>objectList(brand?.color?.tokens).filter(token=>typeof token.token==='string');
 const byRole=(tokens,role)=>tokens.find(token=>token.role===role)??null;
 
-/**
- * The stages a brand is checked at. `decide` (brand.decide, the default) lets a token the app has not written
- * yet stand on its declared `valueSource` reference; `verify` (review.verify) does not: by then
- * interface.implement has written the app theme, and a planned token still absent from it is refused.
- */
-export const BRAND_STAGES=Object.freeze(['decide','verify']);
 const STAGE_ALIASES=Object.freeze({decide:'decide','brand.decide':'decide',verify:'verify','review.verify':'verify'});
-export function brandStage(value){
+function brandStage(value){
   if(value===undefined||value===null||value==='')return 'decide';
   const stage=STAGE_ALIASES[String(value)];
   if(!stage)throw new Error(`Unknown brand check stage ${JSON.stringify(value)}: expected one of ${Object.keys(STAGE_ALIASES).join(', ')}.`);
   return stage;
 }
 /** The statuses tokens-match-source accepts: the app source carries the colour, or (decide only) its reference file or its ruling does. */
-export const TOKEN_PASS_STATUSES=Object.freeze(['match','planned-from-reference','planned-from-ruling']);
+const TOKEN_PASS_STATUSES=Object.freeze(['match','planned-from-reference','planned-from-ruling']);
 const isPlannedToken=token=>token?.valueSource!==undefined&&token?.valueSource!==null;
 
 export const checkValueSource=options=>checkSource({findReceipt:findOwnerReceipt,...options});
@@ -144,7 +138,7 @@ export const checkValueSource=options=>checkSource({findReceipt:findOwnerReceipt
  * declared source carries the token the normal match applies, and at the `verify` stage a planned token
  * still absent from every declared source is `planned-source-missing`.
  */
-export function checkTokensMatchSource({brand,sourceRoot,stage='decide',brandDir=null}){
+function checkTokensMatchSource({brand,sourceRoot,stage='decide',brandDir=null}){
   const id='tokens-match-source';
   const phase=brandStage(stage);
   const tokens=brandTokens(brand);
@@ -210,7 +204,7 @@ export function checkTokensMatchSource({brand,sourceRoot,stage='decide',brandDir
  * decimals of WCAG ratio move by about 0.01 between a hex and its oklch spelling; a twentieth is below any
  * visible change and far above that rounding, so a colour that moved after the answer is a new question.
  */
-export const CONTRAST_EXCEPTION_TOLERANCE=0.05;
+const CONTRAST_EXCEPTION_TOLERANCE=0.05;
 /** The receipt serve-ask writes when an ask is answered (scripts/kernel/ask-server.mjs). */
 export const OWNER_ANSWER_SCHEMA='starci/ask-answer@1';
 const OWNER_ANSWERER='owner';
@@ -398,7 +392,7 @@ function contrastFailures(pairs,bad,refused){
  * a refused exception fails the check. An exception pair no token declares as a fill (muted text on a
  * surface, link ink on the canvas) is measured from its two tokens, so an accepted pair is never unmeasured.
  */
-export function checkContrastAa({brand,brandDir=null}){
+function checkContrastAa({brand,brandDir=null}){
   const id='contrast-aa';
   const tokens=brandTokens(brand);
   const minimum=Number.isFinite(brand?.color?.policy?.minContrast)?Number(brand.color.policy.minContrast):DEFAULT_MIN_CONTRAST;
@@ -432,7 +426,7 @@ export function checkContrastAa({brand,brandDir=null}){
  * 3. Destructive must not look like primary. The owner may overrule this - some brands are one hue - but
  * then the affordance has to carry the meaning, and the check says so instead of going quiet.
  */
-export function checkPrimaryDangerDistinct({brand}){
+function checkPrimaryDangerDistinct({brand}){
   const id='primary-danger-distinct';
   const tokens=brandTokens(brand);
   const primary=byRole(tokens,'primary'),danger=byRole(tokens,'danger');
@@ -455,7 +449,7 @@ export function checkPrimaryDangerDistinct({brand}){
  * 4. A mascot that is named but absent is a mascot nobody can draw with. Bytes are hashed: a declared
  * sha256 is verified, an undeclared one is reported so the owner can pin the asset they reviewed.
  */
-export function checkMascotAssetsPresent({brand,tree,brandDir}){
+function checkMascotAssetsPresent({brand,tree,brandDir}){
   const id='mascot-assets-present';
   const assets=objectList(brand?.mascot?.assets).filter(asset=>typeof asset.path==='string'&&asset.path);
   const declared=objectList(brand?.mascot?.assets);
@@ -542,7 +536,7 @@ function iconOffendersOf(files,root,allowed,forbidden){
  * package is an offender unless `iconography.set` or `custom` names it. Relative imports are the product's
  * own files and are never judged here.
  */
-export function checkIconSetOnly({brand,sourceRoot}){
+function checkIconSetOnly({brand,sourceRoot}){
   const id='icon-set-only';
   const iconography=brand?.iconography??{};
   const allowed=[...(Array.isArray(iconography.set)?iconography.set:[]),...(Array.isArray(iconography.custom)?iconography.custom:[])].filter(entry=>typeof entry==='string'&&entry);
@@ -565,7 +559,7 @@ export function checkIconSetOnly({brand,sourceRoot}){
  * 6. A brand overrides real tokens; it never invents names. A token name the grammar family's DNA does not
  * declare would style nothing, so the record would read as applied while the product looked untouched.
  */
-export function checkTokensInGrammar({brand,family,grammarRoot}){
+function checkTokensInGrammar({brand,family,grammarRoot}){
   const id='tokens-in-grammar';
   const tokens=brandTokens(brand);
   const canon=grammarTokenNames({family,grammarRoot});
@@ -855,7 +849,7 @@ export function checkDirection({brand,family,grammarRoot,brandDir}){
  * `sources[]` paths are relative to; without it the two source-reading checks skip and say so. The result
  * is `ok` only when no check failed - a skipped check never makes a brand proven.
  */
-export function runBrandChecks({tree,sourceRoot=null,grammarRoot=defaultGrammarRoot(),stage='decide'}={}){
+function runBrandChecks({tree,sourceRoot=null,grammarRoot=defaultGrammarRoot(),stage='decide'}={}){
   if(!tree)throw new Error('runBrandChecks needs a Work tree.');
   const phase=brandStage(stage);
   const record=readBrandRecord(tree);
@@ -868,7 +862,7 @@ export function runBrandChecks({tree,sourceRoot=null,grammarRoot=defaultGrammarR
 }
 
 /** One line per check, for a person reading a terminal. */
-export function formatBrandChecks(result){
+function formatBrandChecks(result){
   const header=`brand ${result.brand.family??'(no family)'} rev ${result.brand.rev}${result.stage?' ('+result.stage+' stage)':''}: ${result.ok?'no failing check':'failing checks'}`;
   return formatCheckLines(header,result.checks);
 }
@@ -877,7 +871,7 @@ export function formatBrandChecks(result){
  * `starci work brand <work-root> [--source <repository-root>] [--stage decide|verify] [--json]`.
  * Exit 0 when no check failed, 1 when one did or the input is broken (no brand record, an unknown stage).
  */
-export function brandMain(argv=[]){
+function brandMain(argv=[]){
   const usage='Usage: starci work brand <work-root> [--source <repository-root>] [--stage decide|verify] [--json]\n';
   if(argv.includes('--help'))return {exitCode:0,text:usage};
   const valueOf=flag=>{const at=argv.indexOf(flag);return at>=0?argv[at+1]:undefined;};

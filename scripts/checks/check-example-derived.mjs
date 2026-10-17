@@ -46,7 +46,7 @@ const authoredFieldProblems = (workRoot, problems) => {
   }
 };
 
-export function checkExampleDerived(workRoot, problems) {
+function checkExampleDerived(workRoot, problems) {
   if (isLiteWorkRoot(workRoot)) return {checked: false, skipped: true};
   for (const rel of ['_derived/index.yaml', '_derived/frontier.md', '_derived/critique.yaml', '_derived/critique.md']) {
     if (!isProductPath(rel)) problems.push(`${rel}: generated Work output is outside the product boundary`);
@@ -62,7 +62,7 @@ export function checkExampleDerived(workRoot, problems) {
 }
 
 /** Check every declared example app's own Work tree; malformed own roots refuse. */
-export function checkExampleDerivedTrees(root, problems) {
+function checkExampleDerivedTrees(root, problems) {
   const roots = exampleWorkRoots(root);
   for (const workRoot of roots) checkExampleDerived(workRoot, problems);
   return roots;

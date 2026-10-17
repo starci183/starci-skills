@@ -15,12 +15,12 @@ import { pathKey, posixPath } from '../lib/path-key.mjs';
 import { runtimeRootOf } from './rights.mjs';
 
 const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-export const PROTECTED_ZONE_FILE = 'modules/kernel/protected-zone.yaml';
+const PROTECTED_ZONE_FILE = 'modules/kernel/protected-zone.yaml';
 
 const cache = new Map();
 
 /** {zones: [{id, why, matchers}], catalog: [{file, ids, codes}]} parsed from the declaration of `root`, or an empty zone when unreadable. */
-export function loadProtectedZone({ root = SKILL_ROOT, read = (file) => fs.readFileSync(file, 'utf8') } = {}) {
+function loadProtectedZone({ root = SKILL_ROOT, read = (file) => fs.readFileSync(file, 'utf8') } = {}) {
   const key = pathKey(root);
   if (cache.has(key)) return cache.get(key);
   let parsed = null;

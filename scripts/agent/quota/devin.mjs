@@ -75,7 +75,7 @@ const WINDSURF_API_KEY_LINE = new RegExp(String.raw`^\s*windsurf_api_key\s*=\s*(
  * value; anything else in the file is ignored. The value is returned, never
  * printed.
  */
-export function readWindsurfApiKey(file = devinCredentialsFile()) {
+function readWindsurfApiKey(file = devinCredentialsFile()) {
   let text;
   try { text = fs.readFileSync(file, 'utf8'); } catch { return null; }
   const m = WINDSURF_API_KEY_LINE.exec(text);
@@ -88,7 +88,7 @@ const asNumber = (v) => { if (v === null || v === undefined || v === '') { retur
 const iso = (unix) => { const n = asNumber(unix); return n == null ? null : new Date(n * 1000).toISOString(); };
 
 /** The probe result for one planStatus body. Pure; exported for the spec. */
-export function planToResult(plan, { policy = allocationSettings()?.admission, now = Date.now(), observedAt = now, account = 'default' } = {}) {
+function planToResult(plan, { policy = allocationSettings()?.admission, now = Date.now(), observedAt = now, account = 'default' } = {}) {
   const daily = asNumber(plan?.dailyQuotaRemainingPercent);
   const weekly = asNumber(plan?.weeklyQuotaRemainingPercent);
   if (daily == null && weekly == null) {

@@ -346,4 +346,4 @@ export function loadArchitectureConfig(repositoryRoot, { hfs } = {}) {
   };
 }
 
-export { canonical, enclosingRepository, exactKeys, isInside, slash };
+export { canonical, exactKeys, isInside, slash };

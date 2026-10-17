@@ -37,7 +37,7 @@ const GLOB = { test: isGlobSegment };
  * all sit in a prefix that one bound record or owned path spells out in full;
  * the rest of the path is appended to it. Returns [] when nothing resolves.
  */
-export function resolveReadPath(pattern, bindings) {
+function resolveReadPath(pattern, bindings) {
   const parts = segments(normRel(pattern));
   const last = parts.map((part) => PLACEHOLDER.test(part)).lastIndexOf(true);
   if (parts.some((part) => !PLACEHOLDER.test(part) && (GLOB.test(part) || /[<>]/.test(part)))) return [];
@@ -177,7 +177,7 @@ const implUiVerdicts = (repo, workParts, parts, impl) => {
 };
 
 /** modules/models/runtimes.yaml allocation.drawLoop.directionPrerequisite: the direction gate is on. */
-export function directionPrerequisiteOn() {
+function directionPrerequisiteOn() {
   try { return allocationSettings().drawLoop?.directionPrerequisite === true; } catch { return false; }
 }
 

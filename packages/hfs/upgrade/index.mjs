@@ -413,7 +413,7 @@ async function model({ root, to, presets, manifest }) {
  * Plans or applies the lite -> full migration. Returns the ordered public plan (`{op,path,why}[]`) in both modes.
  * `presets` and `lock` are test seams for the full managed render and npm lock resolution.
  */
-export async function upgradeEdition({
+async function upgradeEdition({
   root,
   to,
   plan = false,

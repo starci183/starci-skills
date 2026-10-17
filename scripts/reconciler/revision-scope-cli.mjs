@@ -9,7 +9,7 @@ import { revParse } from '../api/git/rev-parse.mjs';
 import { deployLine, deployRoles } from './revision-deploy.mjs';
 
 /** The payload and the line of one scope query; `to` defaults to the HEAD of `root`. */
-export function revisionScope({ root = skillRoot, from, to = null }) {
+function revisionScope({ root = skillRoot, from, to = null }) {
   const target = to ?? String(revParse(root, 'HEAD') ?? '').trim();
   const payload = deployRoles(root, from, target);
   return { payload, line: deployLine(payload) };

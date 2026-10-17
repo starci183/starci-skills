@@ -5,7 +5,7 @@
 const SIGNALS = Object.freeze({ SIGHUP: 1, SIGINT: 2, SIGTERM: 15, SIGBREAK: 21 });
 
 /** A registry of undo functions bound to `proc`. */
-export function createInterruptRegistry({ proc = process } = {}) {
+function createInterruptRegistry({ proc = process } = {}) {
   const undos = new Set();
   const handlers = new Map();
 

@@ -56,7 +56,7 @@ const LAW_TOKEN_SUFFIX = /(?<![)"'\x60,;:.])[)"'\x60,;:.]+$/;
 const TRAILING_SLASHES = /(?<!\/)\/+$/;
 
 /** The Source-law path tokens a free-form manifest `path:` string names, in order. */
-export function lawTokens(text) {
+function lawTokens(text) {
   const out = [];
   for (const word of String(text ?? '').split(LAW_WORD_SPLIT)) {
     const token = word.replace(LAW_TOKEN_PREFIX, '').replace(LAW_TOKEN_SUFFIX, '').replaceAll('\\', '/').replace(TRAILING_SLASHES, '');

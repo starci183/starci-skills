@@ -26,7 +26,7 @@ const matchAny = (file, globs) => globs.flatMap(braceVariants).some((pattern) =>
 const globList = (value) => stringList(value, { blank: false });
 
 /** The policy itself, or a typed refusal: CANON_DIGEST_ALGORITHM_UNKNOWN, CANON_DIGEST_FRAMING_UNKNOWN, CANON_DIGEST_POLICY_INVALID. */
-export function assertDigestPolicy(policy) {
+function assertDigestPolicy(policy) {
   if (!policy || typeof policy !== 'object' || Array.isArray(policy)) throw fail('CANON_DIGEST_POLICY_INVALID', 'The canon content digest policy is not an object.');
   if (!CANON_DIGEST_ALGORITHMS.includes(policy.algorithm)) throw fail('CANON_DIGEST_ALGORITHM_UNKNOWN', `The canon digest algorithm ${JSON.stringify(policy.algorithm)} is not one of ${CANON_DIGEST_ALGORITHMS.join(', ')}.`);
   if (!CANON_DIGEST_FRAMINGS.includes(policy.framing)) throw fail('CANON_DIGEST_FRAMING_UNKNOWN', `The canon digest framing ${JSON.stringify(policy.framing)} is not one of ${CANON_DIGEST_FRAMINGS.join(', ')}.`);
@@ -35,7 +35,7 @@ export function assertDigestPolicy(policy) {
 }
 
 /** Whether posix relative `file` is selected by the policy's include and exclude globs. */
-export const selectedByPolicy = (file, policy) => matchAny(file, policy.include) && !matchAny(file, policy.exclude);
+const selectedByPolicy = (file, policy) => matchAny(file, policy.include) && !matchAny(file, policy.exclude);
 
 /** The PUBLISHED file list of the package whose source is `directory`: `npm pack --dry-run --json --ignore-scripts`. */
 export function packedFiles(directory) {

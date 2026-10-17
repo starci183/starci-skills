@@ -127,7 +127,7 @@ const selectBindings = ({ files, resolver, sourceOf, catalog, add }) => {
 };
 
 /** Check only contract-selected bindings; factories and classes are not skipped as ordinary data exports. */
-export function publicDocFindings({ files, read, resolver, catalog, parse = parseSource, compiler = ts }) {
+function publicDocFindings({ files, read, resolver, catalog, parse = parseSource, compiler = ts }) {
   const t = compiler();
   const fileSet = new Set(files);
   const parsed = new Map();
@@ -174,7 +174,7 @@ export function publicDocFindings({ files, read, resolver, catalog, parse = pars
 }
 
 /** Inspect the current runtime tree, including new nonignored paths; never run or import a selected implementation. */
-export function scanRuntimePublicDocs(root = skillRoot, deps = {}) {
+function scanRuntimePublicDocs(root = skillRoot, deps = {}) {
   const files = deps.files ?? readTrackedTextFiles(root, { listFiles: lsFiles, workingTree: true });
   const manifest = deps.manifest ?? loadSlotManifest({ root, file: path.join(root, RUNTIME_MANIFEST_FILE) });
   const repo = readRepoDeclaration(manifest, root);

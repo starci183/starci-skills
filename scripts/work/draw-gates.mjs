@@ -39,7 +39,7 @@ import { slash } from './work-io.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { byCodeUnit } from '../lib/list.mjs';
 
-export const GATES_SCHEMA = 'starci/draw-gates@1';
+const GATES_SCHEMA = 'starci/draw-gates@1';
 const OWNER_GATE_CODE = 'DRAW_NOT_OWNER_ACCEPTED';
 const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const REFUSAL_FILE = String.raw`(.+?\.(?:ya?ml|json))`;
@@ -63,7 +63,7 @@ const cmd = (script, args) => `starci work ${WORK_VERBS.get(script)} ${args.join
 const fileOf = (f, fallback) => (typeof f?.path === 'string' && f.path ? f.path.split('#')[0] : fallback);
 
 /** Parse `<path>: <message> [CODE]` refusal lines (starci runtime validate --json) into {file, code, message}. */
-export function refusalsOf(lines, cwd, repo) {
+function refusalsOf(lines, cwd, repo) {
   return (Array.isArray(lines) ? lines : []).map((line) => {
     const m = REFUSAL_LINE.exec(String(line));
     if (!m) return { file: null, code: null, message: String(line) };
@@ -82,7 +82,7 @@ const spawnJson = (script, args, cwd) => {
  * Run every gate. `remeasure` false skips the draw-metrics re-render. `runners` replaces the spawned gates and the
  * re-measure (tests): {validate(uiDir, repo), shell(uiDir, repo), metrics({repo, files})}.
  */
-export async function drawGates({ ui, repo, files = [], remeasure = true, runners = {} }) {
+async function drawGates({ ui, repo, files = [], remeasure = true, runners = {} }) {
   const uiDir = path.resolve(ui);
   const root = path.resolve(repo);
   const uiRel = rel(root, uiDir);

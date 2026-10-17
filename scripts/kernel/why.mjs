@@ -19,7 +19,7 @@ import { translator } from '../lib/i18n.mjs';
 import { clipLine } from '../lib/clip.mjs';
 import { latestCheckRuns } from '../machine/evidence-store.mjs';
 
-export const WHY_SCHEMA = 'starci/why@1';
+const WHY_SCHEMA = 'starci/why@1';
 
 /** One code explained: the catalog entry, or {code, known:false} for a code the catalog does not carry. */
 export function explainCode(code, catalog = failureCodeCatalog()) {
@@ -97,7 +97,7 @@ const blobFacts = (row, readBlob, codes, lines) => {
  * `codes`/`lines` come from summary_json (codes, evidence, failing) and from the check's stdout/output blob
  * (a refused[] / findings[] list, or `[CODE]` tokens in plain text).
  */
-export function checkFacts(row, readBlob = readBlobText) {
+function checkFacts(row, readBlob = readBlobText) {
   const summary = parseJson(row.summary_json, null) ?? {};
   const codes = [...(Array.isArray(summary.codes) ? summary.codes : [])];
   const lines = [];

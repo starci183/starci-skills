@@ -18,11 +18,11 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '.
 
 const YAML_ROOTS = Object.freeze(['modules', 'knowledge']);
 
-export function moduleYamlFiles(dirs = YAML_ROOTS.map(name => path.join(root, name))) {
+function moduleYamlFiles(dirs = YAML_ROOTS.map(name => path.join(root, name))) {
   return [dirs].flat().flatMap(dir => walkFiles(dir, {filter: name => /\.ya?ml$/i.test(name)})).sort(byCodeUnit);
 }
 
-export function unparseableYaml(files = moduleYamlFiles()) {
+function unparseableYaml(files = moduleYamlFiles()) {
   const bad = [];
   for (const file of files) {
     try { parseYaml(fs.readFileSync(file, 'utf8')); }

@@ -56,7 +56,7 @@ const CHECKS = {
 };
 
 /** Judges the `database:` block. Returns { config } or { problems }; `baseline` is the one required field. */
-export function normalizeDatabase(block) {
+function normalizeDatabase(block) {
   if (!plain(block)) return { problems: ['database: must be a mapping'] };
   const problems = [];
   for (const [key, value] of Object.entries(block)) {
@@ -159,7 +159,7 @@ function tableVersions(text) {
 }
 
 /** Remote (and local) versions from `supabase migration list`: the JSON form, or the older table. */
-export const parseMigrationList = (text) => jsonVersions(text) ?? tableVersions(text);
+const parseMigrationList = (text) => jsonVersions(text) ?? tableVersions(text);
 
 /** The versions a `db push --dry-run` would apply. */
 export const pendingVersions = (text) => [...new Set([...text.matchAll(PENDING)].map((match) => match[1]))];
@@ -245,7 +245,7 @@ export const listRemote = (session) => parseMigrationList(runCli(session, ['migr
 /* ---- the plan */
 
 /** Pure: what to do given the remote history. `done` means baseline + forward are present and nothing else is. */
-export function planMigration(model, remote) {
+function planMigration(model, remote) {
   const done = [...model.pushVersions].every((version) => remote.has(version)) && [...remote].every((version) => model.allowed.has(version));
   const sim = new Set(remote);
   const repairs = model.decl.restamp.filter((pair) => sim.has(pair.from));
@@ -329,7 +329,7 @@ function applyPlan(session, plan) {
  * `starci app db migrate`. options: { execute, linked, urlEnv }. Dry run reads the remote history once and prints the plan; --execute (with
  * STARCI_DB_ARMED=1) applies it. Already baseline + forward: `nothing to do`, no mutating call, ok.
  */
-export async function migrateDatabase(ctx, decl, options = {}) {
+async function migrateDatabase(ctx, decl, options = {}) {
   const model = buildModel(ctx.cwd, decl);
   const session = { ctx, model, target: resolveTarget(ctx, decl, options) };
   const remote = listRemote(session);

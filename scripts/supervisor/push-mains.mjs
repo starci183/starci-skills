@@ -72,7 +72,7 @@ export function scanDiff({ diff = '', files = [] } = {}) {
  *  when `encText(file)` can read it (a --unified=0 diff of an edited sops YAML holds only its changed lines), else
  *  on its added lines. Anything else in a `.enc` file is scanned like any other file, and a `.enc` under
  *  `.starcistacks/` that is not a sops envelope refuses the push by itself (sops-not-envelope). */
-export function diffScanner(files = [], { encText = null } = {}) {
+function diffScanner(files = [], { encText = null } = {}) {
   const findings = [];
   for (const file of files) for (const rule of FORBIDDEN_FILES) if (rule.test(slash(file))) findings.push({ file, line: null, pattern: rule.name });
   let file = null, line = 0, enc = null;
@@ -108,8 +108,8 @@ export function diffScanner(files = [], { encText = null } = {}) {
 
 /** The one fix a refused plaintext test credential gets (owner ruling push-scan-test-secrets-encrypted): the product
  *  repository's own .starcistacks + sops convention, or a value generated per run. */
-export const TEST_SECRET_HINT = `move it to .starcistacks/<stack>/secrets/test/<name> and encrypt it with the repository's own command (${setCommand('<name>', '<stack>')}; commit only the .enc, read it with testSecret() from scripts/uat/test-secret.mjs) or generate it per run; never a plaintext literal`;
-export const scanHint = (findings = []) => (findings.some((f) => f.pattern === 'assigned-secret') ? TEST_SECRET_HINT : null);
+const TEST_SECRET_HINT = `move it to .starcistacks/<stack>/secrets/test/<name> and encrypt it with the repository's own command (${setCommand('<name>', '<stack>')}; commit only the .enc, read it with testSecret() from scripts/uat/test-secret.mjs) or generate it per run; never a plaintext literal`;
+const scanHint = (findings = []) => (findings.some((f) => f.pattern === 'assigned-secret') ? TEST_SECRET_HINT : null);
 
 /** Scan the range `from..to` of `cwd`: {ok, findings, files}. The diff is written to a temp file and read
  *  in chunks, never held whole in a spawn buffer (a 64 MB overflow read as `scan failed: git diff failed`). */

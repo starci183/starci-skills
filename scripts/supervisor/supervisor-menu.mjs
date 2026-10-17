@@ -68,7 +68,7 @@ const subjectOf = (di, ledger) => {
 };
 
 /** One menu item for a Decision Item and its ledger ({repoRoot}|null). */
-export function menuItemOf(di, ledger) {
+function menuItemOf(di, ledger) {
   const kind = kindOfItem(di);
   const spec = supervisorMenuCatalog().kinds.find((entry) => entry.id === kind);
   const subject = subjectOf(di, ledger);

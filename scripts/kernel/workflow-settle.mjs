@@ -26,7 +26,7 @@ const mainOf = (ctx) => ctx?.main ?? 'main';
 const extraFiles = (files) => (files.length > 3 ? ` (+${files.length - 3})` : '');
 
 /** The preserved ref of a milestone rebase that conflicted with main at `onto`: the branch head it could not move. */
-export const milestoneRefOf = (workflowId, onto) => `refs/heads/${PRESERVED_WORKFLOW_PREFIX}/${workflowId}/rebase-${String(onto).slice(0, 12)}`;
+const milestoneRefOf = (workflowId, onto) => `refs/heads/${PRESERVED_WORKFLOW_PREFIX}/${workflowId}/rebase-${String(onto).slice(0, 12)}`;
 
 /** The live ops of the workflow other than `opId` (part A's TERMINAL_JOB_STATUSES); [] without a ledger. */
 function liveSiblingsOf(ctx, { workflowId, opId }) {

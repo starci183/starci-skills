@@ -31,7 +31,7 @@ function yamlValue(root, key) {
 }
 
 /** The effective value `key` resolves to in the tree at `root`, or undefined. */
-export function resolveDefault(root, key) {
+function resolveDefault(root, key) {
   if (key.includes(':')) return yamlValue(root, key);
   const example = parseYaml(fs.readFileSync(path.join(root, EXAMPLE_FILE), 'utf8'));
   const block = key.split('.')[0];
@@ -40,7 +40,7 @@ export function resolveDefault(root, key) {
 }
 
 /** The RT_DOCUMENTED_DEFAULT_DRIFT findings over {rel: text}: [{code, path, line, message}]. */
-export function documentedDefaultFindings(files, root = skillRoot) {
+function documentedDefaultFindings(files, root = skillRoot) {
   const findings = [];
   for (const [rel, text] of Object.entries(files)) {
     if (!SURFACE.test(rel) || isHistoryPath(rel)) continue;
@@ -56,6 +56,6 @@ export function documentedDefaultFindings(files, root = skillRoot) {
 }
 
 /** Run the scan on the working tree at `root`. */
-export const checkDocumentedDefaults = (root = skillRoot) => documentedDefaultFindings(workingTreeTexts(root, lsFiles, (rel) => SURFACE.test(rel)), root);
+const checkDocumentedDefaults = (root = skillRoot) => documentedDefaultFindings(workingTreeTexts(root, lsFiles, (rel) => SURFACE.test(rel)), root);
 
 if (isMain(import.meta.url)) process.exit(printFindings(checkDocumentedDefaults(), 'OK: every documented default equals the value the code reads.'));

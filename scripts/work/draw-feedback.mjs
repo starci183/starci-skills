@@ -44,10 +44,10 @@ import { appendReviewRow, completeReviewEntry } from './draw-feedback-board.mjs'
 const DRAW_FEEDBACK_SCHEMA = 'starci/draw-feedback@1';
 export const DRAW_FEEDBACK_UNADDRESSED = 'DRAW_FEEDBACK_UNADDRESSED';
 /** Ledger events (payloads are names, ids and digests; the note text is the owner's own words). */
-export const DRAW_OWNER_RULING = 'draw-owner-ruling';
+const DRAW_OWNER_RULING = 'draw-owner-ruling';
 const DRAW_OWNER_RULING_CLASSIFIED = 'draw-owner-ruling-classified';
-export const DRAW_REDRAW_OWED = 'draw-redraw-owed';
-export const KNOWLEDGE_CHANGE_REQUESTED = 'knowledge-change-requested';
+const DRAW_REDRAW_OWED = 'draw-redraw-owed';
+const KNOWLEDGE_CHANGE_REQUESTED = 'knowledge-change-requested';
 const KNOWLEDGE_CHANGE_RESOLVED = 'knowledge-change-resolved';
 export const GRAMMAR_PROPOSAL_FILED = 'grammar-proposal-filed';
 const NOTE_CLASSES = Object.freeze(['product-direction', 'grammar', 'knowledge', 'one-off']);
@@ -82,7 +82,7 @@ export function dnaNamesFor(workRoot, { grammarRoot = defaultGrammarRoot() } = {
  * knowledge rule id or speaks of knowledge; grammar when it asks for a component, variant or anatomy DNA lacks;
  * product-direction when it is a product-wide rule (always/never, colour, type, spacing, brand); else one-off.
  */
-export function classifyNote(words, { dnaNames = [] } = {}) {
+function classifyNote(words, { dnaNames = [] } = {}) {
   const s = String(words ?? '');
   const rule = RULE_ID.exec(s)?.[0] ?? null;
   if (rule || KNOWLEDGE_WORDS.test(s)) return { class: 'knowledge', target: rule, as: null, why: rule ? `cites the knowledge rule ${rule}` : 'speaks of a knowledge rule' };
@@ -298,7 +298,7 @@ function feedbackStatus(dir) {
 }
 
 /** The brief block a redraw carries verbatim: every open owner note of the shape (by id) and every learned ruling. */
-export function briefBlock(dir, { shape = null } = {}) {
+function briefBlock(dir, { shape = null } = {}) {
   const record = readYaml(path.join(dir, 'index.yaml'));
   const workRoot = workRootOf(dir);
   const notes = openNotesOf(record).filter((n) => !shape || !n.shape || stateKey(n.shape) === stateKey(shape) || stateKey(String(n.shape).split('#').pop()) === stateKey(shape));
@@ -477,7 +477,7 @@ export function reportFeedbackFindings(db, { repo, report }) {
 // classify (the Kernel or the critic reclassifies; structure confirms)
 // ---------------------------------------------------------------------------------------------------------
 
-export function classifyNoteInRecord(dir, { noteId, cls, target = null, as = null, by = 'kernel', write = false, knowledgeRoot = null }) {
+function classifyNoteInRecord(dir, { noteId, cls, target = null, as = null, by = 'kernel', write = false, knowledgeRoot = null }) {
   const file = path.join(dir, 'index.yaml');
   const record = readYaml(file);
   const workRoot = workRootOf(dir);

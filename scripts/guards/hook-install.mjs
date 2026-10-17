@@ -42,8 +42,8 @@ const safeName = (s) => String(s).replace(/[^A-Za-z0-9._-]/g, '_');
 // A single-quoted shell word: ' wrapped as '\'' (close, escaped quote, reopen).
 const SQUOTE = String.raw`'\''`;
 export const shellQuote = (s) => `'${String(s).replaceAll('\\', '/').replaceAll("'", SQUOTE)}'`;
-export const JOB_GUARD_TTL_MS = allocationMs('jobGuard.ttlMs');
-export const terminalsDir = (skillRoot = path.resolve(here, '..', '..')) => path.join(guardsRoot(skillRoot), 'terminals');
+const JOB_GUARD_TTL_MS = allocationMs('jobGuard.ttlMs');
+const terminalsDir = (skillRoot = path.resolve(here, '..', '..')) => path.join(guardsRoot(skillRoot), 'terminals');
 
 // tmp + rename: a reader never sees a torn guard file. Files of the directory older than JOB_GUARD_TTL_MS are pruned: a
 // guard outlives its worker only as history.

@@ -7,7 +7,7 @@ import path from 'node:path';
 import { runNode } from '../api/node/run-node.mjs';
 export { gateLooseningCheck } from './land-gate-loosening.mjs';
 
-export const FULL_CHECK_ENTRY = 'packages/cli/bin/starci.mjs';
+const FULL_CHECK_ENTRY = 'packages/cli/bin/starci.mjs';
 
 /** `node <args>` through scripts/api/node, STARCI_RUNTIME = the tree it runs in (the CLI otherwise reads the per-user record, the live checkout): {ok, stdout, stderr}. */
 const nodeRunner = (args, options) => { const r = runNode(args, { ...options, env: { ...process.env, STARCI_RUNTIME: options.cwd } }); return { ok: !r.error && r.status === 0, stdout: String(r.stdout ?? ''), stderr: String(r.stderr ?? r.error?.message ?? '') }; };

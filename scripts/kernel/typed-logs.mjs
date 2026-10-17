@@ -44,7 +44,7 @@ import { defaultLogLevel, fitPreparedLogData, normalizeLogRefs, rowsOfEvent, scr
 export { rowsOfEvent };
 export const LOG_ACTORS = Object.freeze(['kernel', 'op', 'runtime', 'check', 'land']);
 export const LOG_LEVELS = Object.freeze(['info', 'warn', 'error']);
-export const LOG_TRUNCATED = 'log.truncated';
+const LOG_TRUNCATED = 'log.truncated';
 const MSG_MAX = 300;
 const REFS_MAX = 20;
 const REF_MAX = 500;
@@ -58,7 +58,7 @@ function logSettings() {
 }
 
 /** The typed logs live in the repository's ledger (its logs table). */
-export const logsFileFor = (repo) => ledgerFileFor(repo);
+const logsFileFor = (repo) => ledgerFileFor(repo);
 
 // ---------------------------------------------------------------------------------------------- kinds
 // Each kind names its data fields: required and optional, by type. Extra fields are kept (they count against
@@ -105,7 +105,7 @@ export const LOG_KINDS = Object.freeze({
 });
 
 /** The shape findings of `data` for `kind`: [] when it fits. */
-export function validateLogData(kind, data) {
+function validateLogData(kind, data) {
   const spec = LOG_KINDS[kind];
   if (!spec) return [`kind '${kind}' is not a log kind (${Object.keys(LOG_KINDS).join('|')})`];
   if (data != null && (typeof data !== 'object' || Array.isArray(data))) return ['data must be a JSON object'];
@@ -266,7 +266,7 @@ const ledgerKeyOf = (ledgerDb) => {
  * Derive typed rows from every ledger event past this ledger's cursor (DERIVED_EVENT_KINDS), in batches, and move the
  * cursor. `ledgerDb` may be read-only. Returns {events, inserted, duplicate, cursor}. `dryRun` counts only.
  */
-export function syncDerivedLogs(logs, ledgerDb, { batch = 1000, maxBatches = 300, dryRun = false, repo = null, rederive = false } = {}) {
+function syncDerivedLogs(logs, ledgerDb, { batch = 1000, maxBatches = 300, dryRun = false, repo = null, rederive = false } = {}) {
   const ledgerKey = ledgerKeyOf(ledgerDb);
   const cursorName = `events:${ledgerKey}`;
   // --rederive starts from seq 0 without lowering the stored cursor (it only ever moves forward).

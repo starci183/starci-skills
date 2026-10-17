@@ -30,7 +30,7 @@ function learningControllerSettings(file = LEARNING_FILE) {
  * Violations -> learning items, one per invariant code: {key, class: 'invariant', subject, size, evidence, firstSeenAt,
  * lastAt}. `violations` [{code, dedupeKey, at}] (sla.mjs events), counted inside `windowMs`. Pure.
  */
-export function violationItems(violations, { now, windowMs = DEFAULTS.windowMs }) {
+function violationItems(violations, { now, windowMs = DEFAULTS.windowMs }) {
   const byCode = new Map();
   for (const v of violations) {
     if (!v?.code || now - Number(v.at ?? now) > windowMs) continue;
@@ -47,7 +47,7 @@ export function violationItems(violations, { now, windowMs = DEFAULTS.windowMs }
  * What one pass decides. Pure over `items`, the learning `state` (lessons.mjs learningState) and the helpers
  * `newHypotheses` / `measureExperiments` (injected so a spec can run it without a ledger). {decisions, hypotheses, verdicts}.
  */
-export function planLearning({ items, state, settings, now, newHypotheses, measureExperiments, dueMs = DEFAULTS.decisionDueMs, language = ownerLanguage() }) {
+function planLearning({ items, state, settings, now, newHypotheses, measureExperiments, dueMs = DEFAULTS.decisionDueMs, language = ownerLanguage() }) {
   const tr = translator(language);
   const hypotheses = newHypotheses(items, state, { minRepeats: settings.minRepeats });
   const verdicts = measureExperiments(state, { items, now, measureMs: settings.measureMs, successDrop: settings.successDrop });
@@ -61,7 +61,7 @@ export function planLearning({ items, state, settings, now, newHypotheses, measu
   return { decisions, hypotheses, verdicts };
 }
 
-export async function reconcileLearning(key, ctx, { settings = learningControllerSettings(), deps = {} } = {}) {
+async function reconcileLearning(key, ctx, { settings = learningControllerSettings(), deps = {} } = {}) {
   if (key !== KEY) return { ok: false, key, skipped: 'unknown-key' };
   const now = ctx.now();
   const lessons = deps.lessons ?? await import('../../machine/lessons.mjs');
