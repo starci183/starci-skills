@@ -8,7 +8,8 @@
  * schemas `supabase/config.toml` declares under [api]; the CLI reaches Docker, so nothing here runs inside a check that has
  * no stack. `run` is the command runner - `(file, args, {cwd})` answering the spawnSync result `{status, stdout, stderr}` -
  * the default spawns the `supabase` binary with an argument array, never a shell string and never printing env; a spec's fake
- * keeps Docker out of the suite. A run that cannot produce the text throws DbTypesError (HFS_EMIT_DB_TYPES_FAILED).
+ * keeps Docker out of the suite. Before generation, `migration list --local` must prove that the database's applied versions
+ * equal the migration filename stamps (HFS_EMIT_DB_TYPES_STALE otherwise). Unreadable history or failed generation throws HFS_EMIT_DB_TYPES_FAILED.
  */
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
@@ -44,12 +45,12 @@ const DB_TYPES_SLOT = 'app.supabase.types';
 const CONFIG_FILE = 'supabase/config.toml';
 const SUPABASE_CLI = 'supabase';
 
-/** A types emit that could not run: the code modules/kernel/failure-codes.yaml catalogues as HFS_EMIT_DB_TYPES_FAILED. */
+/** A types emit refuses unreadable history or failed generation with HFS_EMIT_DB_TYPES_FAILED, and unequal applied versions with HFS_EMIT_DB_TYPES_STALE. */
 class DbTypesError extends Error {
-  constructor(message, details = {}) {
-    super(`HFS_EMIT_DB_TYPES_FAILED: ${message}`);
+  constructor(message, details = {}, code = 'HFS_EMIT_DB_TYPES_FAILED') {
+    super(`${code}: ${message}`);
     this.name = 'DbTypesError';
-    this.code = 'HFS_EMIT_DB_TYPES_FAILED';
+    this.code = code;
     this.details = details;
   }
 }
@@ -97,6 +98,47 @@ function apiSchemas(root) {
   return (toml?.api?.schemas ?? []).filter((schema) => typeof schema === 'string');
 }
 
+/** The applied column of `migration list --local` is the local database history; the Local column only describes files. Unreadable history cannot authorize an emit. */
+function appliedVersions(text) {
+  const lines = String(text ?? '').split(/\r?\n/);
+  const header = lines.findIndex((line) => /^\s*Local\s*\|\s*Remote\s*\|/i.test(line));
+  if (header < 0) throw new DbTypesError('the local migration history is unreadable; expected the Local | Remote migration list', { file: dbTypesPath });
+  const versions = new Set();
+  for (const line of lines.slice(header + 1)) {
+    if (/^[\s|+-]+$/.test(line)) continue;
+    if (!line.includes('|')) continue;
+    const cells = line.split('|').map((cell) => cell.trim());
+    if (cells.length !== 3 || cells.slice(0, 2).some((cell) => cell && !/^\d+$/.test(cell))) {
+      throw new DbTypesError('the local migration history contains an unreadable row', { file: dbTypesPath });
+    }
+    if (cells[1]) versions.add(cells[1]);
+  }
+  return versions;
+}
+
+/** Every applied local version must equal a migration filename stamp, including gaps and extra versions even when the heads match. */
+function requireCurrentDatabase(root, run) {
+  const dir = path.join(root, MIGRATIONS_DIR);
+  const expected = new Set();
+  for (const name of (fs.existsSync(dir) ? fs.readdirSync(dir) : []).filter((file) => file.endsWith('.sql'))) {
+    const stamp = /^(\d+)(?:_|\.sql$)/.exec(name)?.[1];
+    if (!stamp) throw new DbTypesError(`${MIGRATIONS_DIR} contains a SQL file without a migration version`, { file: dbTypesPath });
+    expected.add(stamp);
+  }
+  let result;
+  try { result = run(SUPABASE_CLI, ['migration', 'list', '--local'], { cwd: root }); } catch {
+    throw new DbTypesError('supabase migration list --local could not run; the local migration history must be readable before emitting types', { file: dbTypesPath });
+  }
+  if (result?.error || result?.signal || result?.status !== 0) {
+    throw new DbTypesError('supabase migration list --local failed; the local migration history must be readable before emitting types', { file: dbTypesPath });
+  }
+  const applied = appliedVersions(result.stdout);
+  if (applied.size !== expected.size || [...expected].some((version) => !applied.has(version))) {
+    const head = (versions) => [...versions].sort().at(-1) ?? 'none';
+    throw new DbTypesError(`the local database is at ${head(applied)}, the migrations folder at ${head(expected)}; run "npm run db:reset" then emit again`, { file: dbTypesPath }, 'HFS_EMIT_DB_TYPES_STALE');
+  }
+}
+
 /**
  * The freshly generated text of `dbTypesPath` for the app at `root`: `supabase gen types typescript --local` (the running
  * local stack), narrowed to the [api] schemas of supabase/config.toml. A failing CLI, a spawn error and an empty answer all
@@ -104,6 +146,7 @@ function apiSchemas(root) {
  */
 function emitDbTypesWithRunner({ root, run }) {
   const schemas = apiSchemas(root);
+  requireCurrentDatabase(root, run);
   const args = ['gen', 'types', 'typescript', '--local', ...(schemas.length ? ['--schema', schemas.join(',')] : [])];
   const command = `${SUPABASE_CLI} ${args.join(' ')}`;
   let result;
