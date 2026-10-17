@@ -8,7 +8,8 @@ import { skillRoot } from '../../engine/runtime-root.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { loadSlotManifest, resolveRepoDeclaration } from '../hfs/slots.mjs';
 import { qualityServices } from '../hfs/ci-declaration.mjs';
-import { discoverExampleApps } from '../lib/example-refs.mjs';
+import { discoverExampleApps, EXAMPLES_ROOT } from '../lib/example-refs.mjs';
+import { readTextFile } from '../lib/read-text.mjs';
 import { mapInOrder } from '../lib/in-order.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { appSource, renderRepo, renderTargets, writtenContent } from '../../packages/hfs/sync/index.mjs';
@@ -19,11 +20,10 @@ import { renderReadmeBadges } from '../../packages/hfs/sync/readme-badges.mjs';
 
 const CODE = 'RT_RENDERED_NOT_PRETTIER';
 const USAGE = 'usage: starci runtime check --only rendered-prettier [-- --root <runtime tree>]';
-const read = (root, file) => fs.existsSync(path.join(root, file)) ? fs.readFileSync(path.join(root, file), 'utf8') : '';
 
 /** Judge whole files after sync applies file, scripts and marked-block ownership, including README prose outside its block. */
 function wholeFiles(root, targets) {
-  return targets.map(target => ({ path: target.path, content: writtenContent(target, read(root, target.path)) }));
+  return targets.map(target => ({ path: target.path, content: writtenContent(target, readTextFile(root, target.path) ?? '') }));
 }
 
 /** Every service axis crosses every other axis, including absent build values and private badges without a public token. */
@@ -105,7 +105,7 @@ async function caseFindings(name, files, judge) {
 }
 
 /** Render all examples, all starter shapes and the per-edition service matrix without network or an app installation. */
-export async function renderedPrettierFindings(root = skillRoot, { readTemplate } = {}) {
+async function renderedPrettierFindings(root = skillRoot, { readTemplate } = {}) {
   const presets = { sonarExclusions: createRequire(path.join(root, 'package.json'))('./packages/jest-preset/index.cjs').sonarExclusions() };
   const manifest = loadSlotManifest({ root });
   const judge = formatJudge(root);
@@ -117,16 +117,18 @@ export async function renderedPrettierFindings(root = skillRoot, { readTemplate 
       const rendered = readTemplate ? renderTargets(hfs, presets, { manifest, source: appSource(appRoot), readTemplate }) : targets;
       return caseFindings('example/' + name, wholeFiles(appRoot, rendered), judge);
     });
-    const shapes = ['full', 'lite', 'shape-slot'];
-    const scaffolds = await mapInOrder(shapes, async shape => {
-      const declaration = shape === 'shape-slot' ? JSON.parse(read(root, 'examples/shape-slot/hfs.json')) : starterDeclaration('render-' + shape, manifest, shape);
+    // Each example's own declaration is re-scaffolded as a starter shape (the slot shape included), beside the full and lite starters.
+    const starters = ['full', 'lite'].map(shape => ({ shape, declaration: starterDeclaration('render-' + shape, manifest, shape) }));
+    const fromExamples = discoverExampleApps(root).map(name => ({ shape: 'example-' + name, declaration: JSON.parse(readTextFile(root, `${EXAMPLES_ROOT}/${name}/hfs.json`)),
+      stacks: readTextFile(root, `${EXAMPLES_ROOT}/${name}/.starcistacks/application-stacks.yaml`) }));
+    const scaffolds = await mapInOrder([...starters, ...fromExamples], async ({ shape, declaration, stacks }) => {
       const appRoot = path.join(temporary, shape);
       scaffoldFixture(appRoot, declaration, manifest);
-      if (shape === 'shape-slot') fs.writeFileSync(path.join(appRoot, '.starcistacks/application-stacks.yaml'), read(root, 'examples/shape-slot/.starcistacks/application-stacks.yaml'));
+      if (stacks !== undefined) fs.writeFileSync(path.join(appRoot, '.starcistacks/application-stacks.yaml'), stacks ?? '');
       const source = appSource(appRoot);
       const base = renderTargets(declaration, presets, { manifest, source, readTemplate });
       const findings = await caseFindings('scaffold/' + shape, wholeFiles(appRoot, base), judge);
-      if (shape === 'shape-slot') return findings;
+      if (stacks !== undefined) return findings;
       const matrixApp = structuredClone(declaration);
       if (matrixApp.sides.fe.apps.length === 1) matrixApp.sides.fe.apps.push({ name: 'landing', kind: 'next' });
       const matrix = await mapInOrder(serviceCases(), item => {
