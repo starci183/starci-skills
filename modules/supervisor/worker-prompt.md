@@ -10,7 +10,7 @@ Incidents:  {incidents}
 Your checkout (EPHEMERAL staging worktree of the runtime, temp branch `{branch}`, based on main {base}):
             {staging}
 File leases (the only files you may change): {files}
-Specs that must pass (done criteria): {specs}
+Package specs that must pass, when the fix touches a package (done criteria): {specs}
 
 ## Brief
 
@@ -27,8 +27,8 @@ Specs that must pass (done criteria): {specs}
   reset, rebase, amend or stash, never --no-verify.
 - Change only the leased files. If the fix needs another file, stop and say so in your report (outcome `blocked`,
   `--needs <csv>`); the Supervisor extends the lease or reassigns.
-- Reproduce the defect first with a spec under `tests/` (a new or extended `*.spec.mjs`) that fails before your fix
-  and passes after it. Run specs with `starci test run --level L1 --spec <files>`.
+- Write no runtime test (owner ruling no-runtime-specs): a spec outside packages/, examples/ and e2e/ is refused by
+  RT_SPEC_PLACEMENT. Prove the fix with the rule or check that holds it and a green `starci runtime verify --base <ref>`.
 - Keep every file loadable: `node --check` on each changed .mjs, a YAML/JSON parse of each changed module file.
 - Change the existing canonical owner and its directly owning whole specs; current contracts and native checks apply without dated waiver files.
 - Grow the kernel api by files, not by editing its shared lines (scripts/kernel/api-extensions.mjs): a new verb is
@@ -49,8 +49,8 @@ Specs that must pass (done criteria): {specs}
 
 File exactly one report, then stop (the Supervisor lands your commit through the land gate and removes this checkout):
 
-  node {skillRoot}/scripts/supervisor/workers.mjs report --job {jobId} --outcome done --commit <sha> --specs <csv> --summary "<one paragraph>"
+  node {skillRoot}/scripts/supervisor/workers.mjs report --job {jobId} --outcome done --commit <sha> --summary "<one paragraph>"
 
-Outcomes: `done` (commit + the reproducing spec passes), `diagnosed` (a diagnosis brief: your findings, root cause
+Outcomes: `done` (commit + `starci runtime verify` green on it), `diagnosed` (a diagnosis brief: your findings, root cause
 and the fix you propose in `--summary` or `--summary-file`, no commit), `blocked` (with `--needs` or `--summary` saying what is
 missing), `failed` (with `--summary`). After the report, exit your CLI.

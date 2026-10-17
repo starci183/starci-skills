@@ -43,11 +43,10 @@ Optional keys:
   (`<n>s`, `<n>m` or `<n>h`, positive; default `10m` = `debugLoop.interval`) and the positive integer worktree alert threshold of
   `starci debug run core-watch` (default `40` = `debugLoop.worktreeLimit`). Both keys are optional and read through `engine/config.mjs`
   `debugLoopSettings`. The removed `debug` and `coreDebug` keys are refused by name. <!-- [removed-list] -->
-- `specs` — `{harness?, unit?, e2e?}` booleans or null (owner, 2026-09-28 and 2026-09-29; `engine/config.mjs`
+- `specs` — `{unit?, e2e?}` booleans or null (owner, 2026-09-28 and 2026-09-29; `engine/config.mjs`
   `specsSettings`, defaults in `SPEC_DEFAULTS`); a config without the key gets the defaults, so the shipped example
-  carries no block. `harness` (default **false** = `specs.harness`, touching-only): `.claude` work writes and runs the specs of new or changed
-  code, the land gate runs only the specs touching the landed files (`land.mjs --specs touching`, its default) and refuses
-  `--specs all` unless `harness: true`; `--specs none` needs `--reason`. The full `.claude` suite runs in exactly one place,
+  carries no block. Both families are product workflow switches: the runtime has no specs of its own (owner ruling
+  `no-runtime-specs`), and the full release proof runs in exactly one place:
   `/starci release` selects the [release procedure](../skills/starci/references/release.md), after the owner sees
   the concrete release context and approves it with `OK`; this needs no specs key. That procedure invokes
   `starci release cut` through `scripts/supervisor/release-cut-cli.mjs` and `scripts/supervisor/release-cut.mjs`.
@@ -79,7 +78,7 @@ Optional keys:
   it instead of serving it; `excludes` names the ask classes that always reach the owner (`engine/config.mjs`
   `ASKS_DEFAULTS`; a handover ask is always excluded; `draw-review` opts drawings out - otherwise a drawing
   the owner did not ask to review is accepted without the owner)
-- `release` — `{suite?}` or null: `suite` is `local` (default) or `ci` — where the full suite of a release is judged ([Where the suite runs](releasing.md#where-the-suite-runs))
+- `release` — `{suite?}` or null: `suite` is `local` (default) or `ci` — where the Linux parity of a release is judged ([Where the suite runs](releasing.md#where-the-suite-runs))
 - `uat` — `{maxConcurrent?}` or null: the machine-wide ceiling of concurrent UAT runs (`scripts/uat/uat-slots.mjs`;
   default `engine/config.mjs` `UAT_DEFAULTS`)
 
@@ -311,4 +310,4 @@ repository variable of the same name). With neither set, the pre-cut check refus
 
 ## Where a release's suite runs (`release`)
 
-`release: {suite?: local | ci}` (config.yaml, gitignored) says who judges the full test suite of a release. `local` is the shipped default and today's behaviour: `starci release cut` runs the root suite and the Linux parity container. `ci` is the owner's recorded choice (modules/kernel/owner-rulings.yaml `release-suite-ci`, 2026-10-09): the cut plans neither, the GitHub `ci` workflow runs the suite after the push, and the pre-push gate accepts a record without a local root-suite row only while this file says `ci`. `none` is refused with `Invalid config.yaml: release.suite...`: the suite does not vanish, it moves to CI, so the value says so. An unknown key or another value is refused the same way. The trade is stated in [releasing](releasing.md#where-the-suite-runs).
+`release: {suite?: local | ci}` (config.yaml, gitignored) says who judges the Linux parity of a release. `local` is the shipped default: `starci release cut` runs the root rows (the package clean-test, the scaffold e2e and the checks) and the Linux parity container. `ci` is the owner's recorded choice (modules/kernel/owner-rulings.yaml `release-suite-ci`, 2026-10-09): the cut does not plan the Linux parity, the GitHub `ci` workflow runs it after the push, and the pre-push gate accepts a record that delegates it only while this file says `ci`; the root rows run locally in both modes. `none` is refused with `Invalid config.yaml: release.suite...`: the Linux parity does not vanish, it moves to CI, so the value says so. An unknown key or another value is refused the same way. The trade is stated in [releasing](releasing.md#where-the-suite-runs).

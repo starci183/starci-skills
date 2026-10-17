@@ -13,7 +13,7 @@ purpose: |
   Either way it is the decision desk of the machine and nothing else. The runtime drives: the controllers do every mechanical
   duty and open a Decision Item when a judgment is needed. The Supervisor answers ONE typed choice per item of its menu
   (modules/supervisor/supervisor-menu.yaml) and the runtime executes it. It changes no runtime code: a defect of the runtime is
-  recorded for Debug (starci supervisor actions record --item runtime-defect:<cause>), which fixes it in .claude with a spec.
+  recorded for Debug (starci supervisor actions record --item runtime-defect:<cause>), which fixes it in .claude.
   The Telegram bridge only relays (chat). docs/supervisor.md is the short architecture note.
 
   Two classes of error exist. A happy error is the system working as designed and meeting a stop (a Kernel waits on a question,
@@ -120,7 +120,7 @@ selfLearning:
   purpose: |
     The Supervisor records what it learns and changes no runtime code. Owner ruling supervisor-self-learning
     (modules/kernel/owner-rulings.yaml): every defect and every owner feedback is recorded; Debug turns the recorded defects
-    into changes of .claude with a spec. Tooling: scripts/machine/lessons.mjs; op metrics come from scripts/machine/op-metrics.mjs.
+    into changes of .claude. Tooling: scripts/machine/lessons.mjs; op metrics come from scripts/machine/op-metrics.mjs.
   loop:
     observe: "every tick: the owed actions carry a failure SIGNATURE (an OWED cluster id - root-cause label + distinctive token: check name, finding code, file - or <class>:<subject>); SLA breaches and op-metrics failure classes feed the same list"
     diagnose: "a signature repeated >= runtimes.yaml supervisorLearning.minRepeats times opens ONE hypothesis (supervisor-hypothesis: symptom, cause class gate-defect | brief-gap | runtime-flow | env | contract-churn, evidence refs). Consult first: lessons.mjs match --signature <s> (owner lessons weigh ownerWeight, above self-derived ones)"
@@ -370,7 +370,7 @@ guardrails:
       is refused with the menu and the decision verb's spelling; the answer is the menu, never a way around the guard.
   - id: no-runtime-change
     rule: the Supervisor changes no file of .claude and lands nothing (RUNTIME_CHANGE_OWNED_BY_DEBUG). A defect of the
-      runtime is recorded with its evidence, once per cause; Debug fixes it with a spec.
+      runtime is recorded with its evidence, once per cause; Debug fixes it.
   - id: no-op-authority
     rule: the Supervisor never runs op work, dispatches jobs, settles reports, or writes .starciwork product records - analysis
       may conclude "the op must redo this", and the redo is a ruling to the Kernel, which re-plans through cli.mjs

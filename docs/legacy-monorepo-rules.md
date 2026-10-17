@@ -1,9 +1,7 @@
 Owner: knowledge/hfs/rules.yaml
 # Legacy monorepo rules
 
-Lite and full use the same npm workspace layout. The edition-specific fixtures in
-`tests/hfs/legacy-monorepo-coverage.spec.mjs` exercise the real monorepo checker
-with conforming manifests and one changed fact at a time.
+Lite and full use the same npm workspace layout.
 
 ## R143 root workspace manifest
 
@@ -37,5 +35,3 @@ declared API app, including when a worker is also present. This shape applies
 to a single service and to multiple services in both lite and full editions.
 The scaffold writes this configuration through `nestCli(app)` in
 `packages/hfs/scaffold/app.mjs`; there is no managed Nest CLI template file.
-The dedicated `tests/hfs/hfs-mono-nest-projects-coverage.spec.mjs` fixtures
-exercise accepted configurations and independent violations in each edition.

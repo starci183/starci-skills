@@ -381,8 +381,7 @@ $defs:
             - kind
         description: Withdrawing content is a breaking change by definition - the record stops saying
           something it said - so a withdrawal recorded as editorial or clarifying is refused rather than
-          accepted and quietly under-reported. It is the same rule scripts/work/validate/work-change.mjs runs as
-          WITHDRAWS_WITHOUT_BREAKING, stated here so a record is refused at its shape as well as at the gate.
+          accepted and quietly under-reported; a record is refused at its shape.
   timestamp:
     type: string
     pattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$

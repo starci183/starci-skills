@@ -180,10 +180,10 @@ not run the unit project or establish that coverage passed. R273 requires
 supplied lcov evidence; the current app-check command catalog does not yet expose
 the alpha.15 coverage-input option.
 
-Runtime coverage is separate: `scripts/hfs/runtime-coverage-scope.mjs` derives
-measured `.mjs` files from required slots in `knowledge/hfs/runtime-slots.yaml`,
-excluding none slots, specs and declared generated output. Its
-`coverage/lcov.info` report is distinct from a product's `be/coverage/lcov.info`.
+The runtime measures no coverage of its own: it has no specs (owner ruling
+`no-runtime-specs`). `scripts/hfs/runtime-coverage-scope.mjs` derives only the
+source its Sonar project analyses, from the required slots in
+`knowledge/hfs/runtime-slots.yaml`.
 R247's coverage matrix concerns links across the standard, not a code-coverage
 percentage.
 

@@ -63,8 +63,7 @@ The server gate every project is selected onto is `starci-quality`; its conditio
 Every product repository scans here (local ops through `scripts/gates/sonar-local.mjs`, GitHub CI
 through the public host): starci-academy-backend, starci-academy-fe, nivo-backend, nivo-fe,
 starci-next, starci-next-fe, mia-mia-backend, miamia-fe, tedo-landing — the set is each repository's
-`services.sonar.projects` entry, listed in the host declaration
-(`tests/fixtures/starcistacks-services/starci-academy-backend.application-stacks.yaml`). A product's own
+`services.sonar.projects` entry, listed in the host declaration. A product's own
 per-project analysis token stays in **its** custody
 (`.starcistacks/dev/runtime/files/sonarqube-<key>-token.key.enc`, written through that repository's stack-secret tool), never in this extension. The example apps under `examples/` do not use this server and have no member here.
 
@@ -73,5 +72,4 @@ per-project analysis token stays in **its** custody
 This server is the heavy path (Docker, a scanner run, an analysis token). The rules SonarCloud flagged on this runtime are also
 enforced without any server, in seconds, by the `sonar-rules` self-check (`starci runtime check --only sonar-rules`; rule table in
 `scripts/gates/sonar-rules-table.mjs`, scope read from `sonar-project.properties`), which `npm run check`, the Supervisor's land
-gate and the pre-commit hook run. SonarCloud stays the final measurement; `tests/gates/sonar-local.spec.mjs` is hermetic (in-process
-fake servers, no Docker) and never needs this server.
+gate and the pre-commit hook run. SonarCloud stays the final measurement.

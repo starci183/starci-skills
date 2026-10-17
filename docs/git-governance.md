@@ -1,4 +1,4 @@
-Task: keep the runtime's remote main still between releases, and cut each release with its annotated tag, finished notes and a full-suite receipt of the exact commit
+Task: keep the runtime's remote main still between releases, and cut each release with its annotated tag, finished notes and a green-rows receipt of the exact commit
 
 # Git governance
 
@@ -16,13 +16,13 @@ it uses the same git call files as the CLI's git verbs, never a git process of i
 
 ## The model
 
-1. **Work starts local.** Lane branches live in worktrees. A land fast-forwards LOCAL main after the land gate and the dependent specs only; a land never pushes, and nobody pushes main to obtain a CI or SonarCloud reading.
-2. **A push of the runtime main is a release.** The remote `main` and the `v*` tags move once per release, in one atomic push of main and one annotated tag `v<version>`, or neither moves. The installed pre-push hook (`scripts/guards/release-push-gate.mjs`) refuses a push that deletes main, a push that is not a fast-forward, and a push of main or of a `v*` tag whose commit is not a release commit. A release commit satisfies the release definition (`scripts/guards/release-definition.mjs`, the code `starci release cut` also runs): (a) `package.json` `version` differs from the version at the remote main's head; (b) the tag is `v<version>`, annotated, on that commit; (c) `CHANGELOG.md` has a dated heading `## [<version>] — YYYY-MM-DD` with no TODO, PENDING, TBD or in-preparation mark (R222); (d) the L4 record of exactly that commit (`<git common dir>/starci-release/<sha>.l4.json`, written by the cut) names the tag and holds a green row for each of the full root suite, the packages suites and the checks (`RECEIPT_STEPS` in the definition names the rows). The refusal names what is missing and the command that produces it. There is no bypass switch. Any other ref (a lane branch, `refs/backup/*`) is not the hook's business. The product repositories the Supervisor pushes through `push-mains` are outside this rule: they keep their own hooks and cadence.
+1. **Work starts local.** Lane branches live in worktrees. A land fast-forwards LOCAL main after the land gate and the verify receipt (check, package clean-test, scaffold e2e) only; a land never pushes, and nobody pushes main to obtain a CI or SonarCloud reading.
+2. **A push of the runtime main is a release.** The remote `main` and the `v*` tags move once per release, in one atomic push of main and one annotated tag `v<version>`, or neither moves. The installed pre-push hook (`scripts/guards/release-push-gate.mjs`) refuses a push that deletes main, a push that is not a fast-forward, and a push of main or of a `v*` tag whose commit is not a release commit. A release commit satisfies the release definition (`scripts/guards/release-definition.mjs`, the code `starci release cut` also runs): (a) `package.json` `version` differs from the version at the remote main's head; (b) the tag is `v<version>`, annotated, on that commit; (c) `CHANGELOG.md` has a dated heading `## [<version>] — YYYY-MM-DD` with no TODO, PENDING, TBD or in-preparation mark (R222); (d) the L4 record of exactly that commit (`<git common dir>/starci-release/<sha>.l4.json`, written by the cut) names the tag and holds a green row, RUN on that commit, for each of the package clean-test, the scaffold e2e and the checks (`RECEIPT_STEPS` in the definition names the rows). The refusal names what is missing and the command that produces it. There is no bypass switch. Any other ref (a lane branch, `refs/backup/*`) is not the hook's business. The product repositories the Supervisor pushes through `push-mains` are outside this rule: they keep their own hooks and cadence.
 3. **One flow, in order.**
    1. Freeze: every lane of the release is on local main and every worktree is clean.
    2. One release commit: the version bump and the CHANGELOG section (generated from the land merge commits, finished by a person).
    3. Publish the packages from that commit, re-pin the examples, commit.
-   4. `starci release cut --tag v<version>` (`--plan` first: it reports what the cut would run and require, and runs, tags and pushes nothing): it checks the notes (R222) and the release definition as far as it holds before the suite, runs L4 once (the full row of the [test ladder](source-process.md): every spec, the packages suites, lint, checks, tsc, the
+   4. `starci release cut --tag v<version>` (`--plan` first: it reports what the cut would run and require, and runs, tags and pushes nothing): it checks the notes (R222) and the release definition as far as it holds before the rows, runs L4 once (the full row of the [test ladder](source-process.md): the packages suites, the scaffold e2e, lint, checks, tsc, the
       example installs, proofs and images, and the Linux-parity step: the light CI jobs run once in a Linux container on this host before the push, so the first GitHub run is not the first Linux run; each step to a recorded log; a skip caused by missing infrastructure fails it), makes sure main did not move, scans the pushed range, creates the
       ANNOTATED tag on the release commit with the CHANGELOG section as its message, and pushes main and the tag atomically.
    5. Linux parity before the push: the CI jobs run locally on Linux, because every local gate runs on the author's machine and CI does not.
@@ -40,7 +40,7 @@ it uses the same git call files as the CLI's git verbs, never a git process of i
 Every commit message is `type(scope): summary` with one of the types `feat`, `fix`, `refactor`, `test`, `docs`, `chore`, `land` or `release`, followed by trailers:
 
 - `Co-Authored-By:` the agent or person that wrote it, and a lane or workflow id (`Lane:` or `Workflow:`);
-- a land commit also carries `Land-Verified:` (the pre-verified tip), `Specs: n/n` and `Check: n/n`, so a land states what it ran;
+- a land commit also carries `Land-Verified:` (the pre-verified tip), `Check: n/n` and `Tests: packages g/t, e2e p/t <base>..<tip>`, so a land states what it ran;
 - a release commit is `release(<version>): ...` and its CHANGELOG section is the tag message.
 
 ## What the release flow refuses
@@ -57,7 +57,7 @@ Every commit message is `type(scope): summary` with one of the types `feat`, `fi
 
 A parked remote is not a refusal: the owner may park the remote's push url (a `pushurl` that reads `DISABLED-<reason>`) so that nothing but the release can push. The release cut pushes through the remote's fetch url for its one push, moves the remote-tracking ref itself and never writes the configuration; any other push url is the owner's choice and is used as set.
 
-L4 runs once per release, on the exact commit that is pushed. Landing runs only the dependent specs, so a red surfaces at the release cut, before anything leaves the machine, or in the CI run of the release push: the lands are merge commits on main, which keeps a
+L4 runs once per release, on the exact commit that is pushed. Landing runs only the verify receipt's proofs, so a red surfaces at the release cut, before anything leaves the machine, or in the CI run of the release push: the lands are merge commits on main, which keeps a
 bisection over them cheap, and a red found after the push is fixed forward with the next commit or tag and recorded under Known limitations, never by moving a tag.
 
 ## Risks and how they are handled

@@ -25,8 +25,7 @@ provenance:
   driftCheck: |
     `starci work grammar-knowledge` re-measures the package source and reports every row of
     this file that no longer matches it (renderer list, kind, group, props type, classes, rule ids;
-    token names, values, fallbacks and owners; counts; the package version). `tests/work-ui/grammar-knowledge.spec.mjs`
-    runs the same comparison through `starci test run --level L1 --spec tests/work-ui/grammar-knowledge.spec.mjs`, so the snapshot cannot silently fall behind the package
+    token names, values, fallbacks and owners; counts; the package version), so the snapshot cannot silently fall behind the package
     again. Line positions (`source`), use counts (`uses`, `alsoReadBy`) and `digests` are pointers that
     `--write` refreshes; they are not compared.
   method: |
@@ -249,7 +248,7 @@ observations:
   - id: every-renderer-stamps-rule-ids
     observation: |
       Every one of the 100 renderers stamps at least one `data-contract` rule id (`claims` /
-      `computedClaims` per renderer above; `tests/work-ui/grammar-contracts.spec.mjs` holds it). The base
+      `computedClaims` per renderer above). The base
       renderers mostly claim paint - spacing, font, tone, surface, boundary, overflow ids the
       shipped declaration carries. The 53 renderers added in
       0.5.0 claim behaviour instead: A11Y, FOCUS, FIELD, CONTROL-STATE, STATE, FEEDBACK, ICON, MEDIA,
@@ -2835,11 +2834,9 @@ gaps:
       `-time-field`, `-date-picker`) and 20 names on HeroUI parts whose vendor paint Common leaves as it
       is (`-list`, `-list-popover`, `-calendar-grid`, `-slider-track`, `-slider-fill`, …). A stylesheet
       that selects on them adds to the anatomy; it styles nothing the package already styles. The list
-      is `CONSUMER_HOOK_CLASSES` in `tests/work-ui/grammar-contracts.spec.mjs`, which fails on any other
-      unpainted class and on a hook the emitting renderer's docs do not name
+      is the 32 names above; any other unpainted class, or a hook the emitting renderer's docs do not name, is a defect
     evidence:
       - scripts/work/ui/grammar-knowledge.mjs
-      - tests/work-ui/grammar-contracts.spec.mjs
       - packages/grammar/src/common/components-forms.css
       - packages/grammar/src/common/components-navigation.css
       - packages/grammar/src/common/components-overlays.css

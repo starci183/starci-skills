@@ -35,7 +35,7 @@ routes:
 # The OWED classes of modules/supervisor/supervise.yaml mission.classes and how each reaches this menu: `direct` = the Decision Item kind a controller
 # opens for the Supervisor; `ladder` = the Kernel's Decision Item kind that climbs to the Supervisor when the Kernel leaves it past its bound (it
 # arrives as `escalated:` and takes the route of its kind, else kernel-escape); `gate` = it is answered as the supervisor-gate it belongs to. Every class
-# of supervise.yaml has a row here (tests/supervisor/supervisor-owed-menu.spec.mjs), so a class added there without a menu path is red.
+# of supervise.yaml has a row here: a class added there gets its menu path in the same change.
 owedClasses:
   progress-stall: {reaches: direct, diKind: progress-stall}
   kernel-proposal: {reaches: direct, diKind: kernel-proposal}

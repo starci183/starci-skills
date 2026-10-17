@@ -46,9 +46,8 @@ its actual qualification remain owned by the runtime paths above.
 | `envelopes.yaml` | The operation-input / report envelopes exchanged with agents |
 
 `calls.yaml` is an **enforced** contract, not documentation:
-`tests/repo/provider-orca.spec.mjs` proves every `scripts/api/orca/*.mjs`
-wrapper's verb and `--flag` set is declared by a `calls:` entry, and every
-entry names a real, allowed command from `api.yaml`.
+`scripts/api/orca/lib.mjs` builds every argv from it and throws before the
+process runs on a verb or `--flag` that no `calls:` entry declares.
 
 Where the runtime keeps its own mechanism instead of Orca's, or wraps an Orca call
 with a policy of its own, is recorded row by row in `orca-boundary.md`. That page
@@ -70,11 +69,7 @@ default args (Orca settings `agentDefaultArgs`: claude
 devin `--permission-mode bypass --respect-workspace-trust false`); the runtime
 passes only `--agent`, and `--model`/`--effort` where the card takes them.
 `terminal create` and `orchestration dispatch` remain forbidden for agent orchestration
-(`api.yaml` `forbiddenForStarciOrchestration`). Owner-authorized release maintenance may prepare
-one plain PowerShell shell in the canonical Source through `scripts/api/orca/terminal-create.mjs`.
-The adapter accepts no input and issues only the fixed worktree/shell/title parameters; it starts no agent
-and types no command. The host-boundary check recognizes only that single native call by its AST shape,
-not a pathname-wide exemption. Receipt loss is unknown custody, never an automatic retry.
+(`api.yaml` `forbiddenForStarciOrchestration`); the runtime creates no terminal of its own, a release cut runs from a plain shell.
 A cut started outside an actual Orca terminal still refuses after preparation; the native terminal
 must run the next cut and inherit its own actual context. A read-only cut plan never creates a shell.
 

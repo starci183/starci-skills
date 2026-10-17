@@ -238,7 +238,7 @@ Every failed, blocked, refused, requeued or waiting attempt has a plain-language
 **Debug** (modules/kernel/roles.yaml#debug): The owner's eyes: a loop of the owner's chat for a limited stabilisation period, not part of steady-state operation.
 - Does:
   - Audits whether each of the four roles above and the runtime floor did its job, each tick, through the digest: per op its attempt, report, evidence and hold; per Critic that it ran, on another provider, saw only the product, and had its verdict used; per Kernel seat that it is alive, acked the runtime revision, acts on ready work and takes the policy steps; per Supervisor seat that it is alive and answers gates inside their bound. Each stuck thing is a happy error or a bug of exactly one role; Debug removes bugs only, and happy errors stay with the chain.
-  - For every departure records a finding (role, broken duty, evidence, remedy) and changes .claude at once so the role cannot repeat it: the contract block or generated prompt, a policy-table rule, a gate or guard refusal, or a runtime fix with a spec, carried onto the host. Records the case in the edge-case registry in the same change. A fix of a defect found on a live host is done only when a replay spec built from the sequence that showed it passes (ruling debug-replay-before-done).
+  - For every departure records a finding (role, broken duty, evidence, remedy) and changes .claude at once so the role cannot repeat it: the contract block or generated prompt, a policy-table rule, a gate or guard refusal, or a runtime fix, carried onto the host. Records the case in the edge-case registry in the same change. A fix of a defect found on a live host is done when the runtime change and its edge-case entry land and starci runtime verify is green (ruling debug-replay-before-done).
   - Owns the edge-case registry, the operating standard and the queue of runtime defects the Supervisor records. A leftover is evidence that its owner failed its cleanup duty; Debug may trigger the existing collector to unblock, and the finding is still the owner's.
   - Reports results to the owner, and retires itself when the stable criteria below hold.
 - Must clean up:
@@ -262,7 +262,7 @@ Every failed, blocked, refused, requeued or waiting attempt has a plain-language
 - A bug in this role (the chain neither fixes nor works around it; Debug removes it with a change to .claude) is detected by:
   - a departure of a role stands with no edge-case entry: a departure printed with remedy none in starci debug digest
   - Debug loosens a gate or check to let a workflow pass: RT_GATE_LOOSENING over the commits since the last release
-  - Debug changes the runtime without recording the case: RT_EDGE_CASE_REGISTRY: a covered entry without its rule and spec
+  - Debug changes the runtime without recording the case: RT_EDGE_CASE_REGISTRY: a covered entry without its rule
   - the loop runs on after its end condition holds, or its standing is not printed: the standing against each end-condition criterion in the digest
 - Audits: Op, Critic, Kernel, Supervisor, the runtime.
 - Retires when:
@@ -297,10 +297,10 @@ runtime role contract.
 ## R233: edge-case evidence
 
 `RT_EDGE_CASE_REGISTRY` names an invalid entry in `modules/reconciler/edge-cases.yaml`.
-Record its listed family and real occurrence. A covered case names an existing handling rule
-and reproducing spec; an open case explains why it remains open. A covered defect found on a
-live host also names a replay spec using the replay harness. Repair the missing evidence
-before marking a case covered, in either edition.
+Record its listed family and real occurrence. A covered case names an existing handling rule;
+an open case explains why it remains open. A `spec:` is optional and names only a package spec
+or the scaffold e2e; no entry names a runtime test or a replay spec (owner ruling
+`no-runtime-specs`). Repair the missing evidence before marking a case covered, in either edition.
 
 <a id="r236"></a>
 

@@ -8,33 +8,33 @@ change that contradicts them is a bug in the code.
 
 ```sh
 npm ci
-npm run check   # starci runtime check: structure only, it never runs a spec
-starci test affected --run   # the specs your change can break (see Verification)
-starci runtime verify --base <tip you cut from>   # check AND the affected specs on one commit: the line a lane reports
+npm run check   # starci runtime check: structure only, it runs no test
 npm run test:packages   # starci release clean-test: the spec suite of every package under packages/
+npm run test:e2e   # starci release scaffold-e2e: the full and lite scaffolds installed, built and run for real
+starci runtime verify --base <tip you cut from>   # check, package clean-test and scaffold e2e on one commit: the line a lane reports
 ```
 
 `npm run check` is the repository wrapper for `starci runtime check`. During a focused
 change, run one check with `starci runtime check --only <name>`.
 
-`npm run check` and `npm test` do not run the spec suites of the packages under `packages/` (the eslint canons, stylelint,
-tsconfig, prettier-config, jest-preset, test-world, grammar, heroicons, cli, hfs). `npm run test:packages` runs all of them, each from a
+`npm run check` runs no test. `npm run test:packages` runs the spec suites of the packages under `packages/` (the eslint
+canons, stylelint, tsconfig, prettier-config, jest-preset, test-world, grammar, heroicons, cli, hfs), each from a
 clean install of its own manifest and lockfile (about four minutes); `npm run test:packages -- --changed <file>...` or
 `-- --base <rev>` limits it to the packages those files belong to, a runtime file a package bundles into its generated
-`runtime/` copy (`scripts/hfs/**`, `scripts/lib/**`, `knowledge/**`) included. Run it after a change to such a file. CI runs it on
-every run and the land gate runs it for the packages a land touches.
+`runtime/` copy (`scripts/hfs/**`, `scripts/lib/**`, `knowledge/**`) included. `npm run test:e2e` runs the scaffold
+e2e under `e2e/`; Docker, npm and the source canon registry are prerequisites, and a skipped test is red.
 
 ## Verification
 
-Run `starci runtime verify --base <tip you cut from>` on the committed, clean tree and report its verdict; [useful verification](docs/verify-proof.md) owns the receipt and acceptance rules.
-The affected-spec selection and reuse rules belong to [test affected](modules/cli/commands/test/affected.yaml); fix a red file, rerun it, then rerun the affected set.
-Where the full suite runs belongs to [releasing](docs/releasing.md#where-the-suite-runs).
+Run `starci runtime verify --base <tip you cut from>` on the committed, clean tree and report its last line; [useful verification](docs/verify-proof.md) owns the receipt and acceptance rules.
+It joins the runtime check, `starci release clean-test --base <base>` (the packages the change touches) and `starci release scaffold-e2e` on one commit in one receipt; `starci git land`, `starci runtime deploy` and the release read the same receipt.
+What the release cut runs belongs to [releasing](docs/releasing.md#where-the-suite-runs).
 
 The supported Node.js 22/24 branches are declared in `package.json` `engines.node` and summarized in
 [README prerequisites](README.md). Unflagged `node:sqlite` and the runtime capability checks are
 required. Runtime code uses Node builtins, the vendored `engine/yaml.mjs` bundle and the production
 dependencies declared in `package.json`: `libpg-query` parses PostgreSQL/PLpgSQL and `smol-toml`
-parses TOML. `devDependencies` support contributor specs and tooling:
+parses TOML. `devDependencies` support the scaffold e2e and tooling:
 
 - `ajv` — schema assertions inside specs.
 - `typescript`, `next`, `swr`, `@nestjs/*`, `@jest/globals`, `@types/jest` — fixture-resolution
@@ -43,24 +43,42 @@ parses TOML. `devDependencies` support contributor specs and tooling:
 - `yaml`, `esbuild` — only needed to rebuild the vendored `engine/yaml.mjs` bundle; the bundle is
   frozen, so most contributors never touch these.
 
+## No runtime tests in .claude
+
+Owner ruling `no-runtime-specs` (2026-10-17, owner thay, `modules/kernel/owner-rulings.yaml`): "Tests in packages/ and
+examples/ stay; the .claude runtime's own specs are removed entirely; delete codecov. Real tests (package clean-test +
+scaffold e2e) decide." Amended the same day: Codecov stays for `packages/` and `examples/`; only the runtime coverage goes.
+Added the same day: no runtime tests in `.claude` contributions.
+
+A runtime test is a spec that exercises the .claude runtime's own code (scripts/, modules/, kernel/supervisor/work graph,
+checks, gates, CLI internals) and lives outside packages/ and examples/, e.g. tests/work/*.spec.mjs and
+tests/supervisor/*.spec.mjs. Do not write one.
+
+Allowed:
+
+- Package specs under `packages/**`, run by `starci release clean-test`.
+- The example apps' own tests under `examples/**`.
+- The scaffold e2e under `e2e/`, run by `starci release scaffold-e2e`.
+
+`RT_SPEC_PLACEMENT` (R118, part of `npm run check`) refuses any other spec or test file. A runtime change is proved by the
+rule or check that holds it and by a green `starci runtime verify --base <ref>`.
+
 ## Test conventions
 
-- Specs are flat: `tests/*.spec.mjs`, `node:test` + `node:assert`. No jest/vitest at root.
-- Fixtures are built in tmp dirs (`fs.mkdtempSync` / `tests/fixtures/` builders) — never write into
-  the repo under test, never commit generated fixture output.
+- Package and e2e specs use `node:test` + `node:assert`. No jest/vitest at root.
+- Fixtures are built in tmp dirs (`fs.mkdtempSync`); never write into the repo under test, never commit generated
+  fixture output.
 - Temp files: the runtime creates every temporary file under `tempRoot()` (`engine/temp-root.mjs`: env
   `STARCI_TEMP_ROOT`, then `config.yaml roots.temp`, else the OS temp directory); runtime code calls `makeTempDir`/`tempPath` (`scripts/api/fs/`) or `tempRoot`,
-  never `os.tmpdir()` or `fs.mkdtempSync(os.tmpdir())`, and its children get `TEMP`/`TMP`/`TMPDIR` from `tempChildEnv` (`engine/temp-root.mjs`), which the `scripts/api/` spawn wrappers apply. The suite
-  preload `tests/setup/isolated-temp.mjs` reads only the environment, never the owner's `config.yaml`: it makes a fresh per-spec root inside
-  `STARCI_TEMP_ROOT` (else the OS temp directory) and points `TEMP`, `TMP`, `TMPDIR` and `STARCI_TEMP_ROOT` at it, so
-  `STARCI_TEMP_ROOT=<dir on another drive> node --test ...` puts the whole suite's files there. A spec run never reads the checkout's own `config.yaml` either:
-  `loadConfig` and `inspectOwnerConfig` (`engine/config.mjs`) see an owner file only from under the directory `STARCI_OWNER_CONFIG_WITHIN` names (the spec preload sets it to the spec's temp root), where a fixture wrote it, so a lane clone, the release host and a clean checkout give one result.
-- The release cut runs the suite under conditions a plain run of the whole suite does not have (`STARCI_REQUIRE_APP_INSTALLS=1`, `STARCI_REQUIRE_ORCA_LIVE=1`, real `npm ci` of every example app, a fresh `packages/test-world` build, the host's concurrency budget, an Orca terminal, a Docker daemon). `starci release env-test` (`npm run test:release-env`) runs the suite exactly so (`--lane` leaves out the Orca requirement a lane clone cannot meet; `--reuse-installs` keeps installed example apps): run it before asking for a release cut, and after a change to a spec's isolation, a verb catalog row or a git-dependent gate.
-- No real network. Provider CLIs (`orca`, `devin`, `claude`, `codex`) are stubbed or recorded; a
-  spec that would spawn a real agent is wrong.
-- Specs may spawn `starci <group> <verb>` under test with `spawnSync` — that is the sanctioned
-  process boundary. Assert exit codes and ledger state, not stdout poetry.
-- Shared helpers live in `tests/helpers/`; the ledger fixture is `tests/helpers/ledger-fixture.mjs`.
+  never `os.tmpdir()` or `fs.mkdtempSync(os.tmpdir())`, and its children get `TEMP`/`TMP`/`TMPDIR` from `tempChildEnv` (`engine/temp-root.mjs`), which the `scripts/api/` spawn wrappers apply. The e2e
+  preload `e2e/setup/isolated-temp.mjs` reads only the environment, never the owner's `config.yaml`: it makes a fresh per-spec root inside
+  `STARCI_TEMP_ROOT` (else the OS temp directory) and points `TEMP`, `TMP`, `TMPDIR` and `STARCI_TEMP_ROOT` at it. An e2e run never reads the checkout's own `config.yaml` either:
+  `loadConfig` and `inspectOwnerConfig` (`engine/config.mjs`) see an owner file only from under the directory `STARCI_OWNER_CONFIG_WITHIN` names (the preload sets it to the spec's temp root), so a lane clone, the release host and a clean checkout give one result.
+- No real network beyond what the scaffold e2e installs. Provider CLIs (`orca`, `devin`, `claude`, `codex`) are never
+  spawned by a spec.
+- Specs may spawn `starci <group> <verb>` under test with `spawnSync`: that is the sanctioned
+  process boundary. Assert exit codes and state, not stdout poetry.
+- Shared e2e helpers live in `e2e/helpers/`, the preloads in `e2e/setup/`.
 
 ## Evidence policy
 
@@ -174,7 +192,7 @@ Removing or renaming any key, flag, verb, field or code adds, in the same commit
 bare name is a common word), what replaced it, and the release that removed it. The runtime's refusal of that spelling reads
 the same entry, so the refusal says what to write instead. The self-check `removed-vocabulary` (`RT_REMOVED_VOCABULARY`)
 scans `skills/`, `docs/`, `README.md`, `CONTEXT.md`, `CONTRIBUTING.md`, `modules/` and `knowledge/` and refuses any removed
-spelling there; a spec (`tests/**/*.spec.mjs`) may spell one only on a line, or under a test title, that says refuse, reject, removed, throws or unknown, so a spec of a removed thing is deleted or turned into a refusal assertion. The same commit rewrites every instruction that still teaches it. Exempt: the list file, `CHANGELOG.md`
+spelling there. The same commit rewrites every instruction that still teaches it. Exempt: the list file, `CHANGELOG.md`
 and a removed-list, which is a line carrying the marker `[removed-list]` or a block under a marker that stands alone on a
 comment line (`<!-- [removed-list] -->` in Markdown, `# [removed-list]` in yaml) up to the next blank line.
 
@@ -182,7 +200,7 @@ comment line (`<!-- [removed-list] -->` in Markdown, `# [removed-list]` in yaml)
 
 - The checks required by [useful verification](docs/verify-proof.md) pass for the cut's actual change.
 - `node --check` on every edited `.mjs`.
-- Verify before committing: run the thing you changed, not just the tests that happen to cover it.
+- Verify before committing: run the thing you changed, then `starci runtime verify`.
 - Do not commit `config.yaml`, `settings.local.json`, `.starciwork/`, `node_modules/` or anything
   else `.gitignore` covers.
 
@@ -190,7 +208,7 @@ comment line (`<!-- [removed-list] -->` in Markdown, `# [removed-list]` in yaml)
 
 The remote `main` of this repository is not pushed between releases. A land fast-forwards LOCAL main under the [verification rules](#verification); nobody pushes to obtain a CI or SonarCloud reading.
 Main goes to the remote exactly when a release milestone is cut, in one atomic push of main and one annotated `v*` tag, through `starci release cut --tag v<version>` (`--plan` reports what it would run and require; it runs nothing).
-The installed pre-push hook (`scripts/guards/release-push-gate.mjs`, written by `starci runtime link`) makes that mechanical: it refuses a push of `main` or of a `v*` tag unless the pushed commit is a release commit — the version moved past the remote main's, an annotated tag `v<version>` on it, a dated CHANGELOG heading for exactly that version, and the release record of that exact commit with a green full suite, packages suites and checks. The refusal names what is missing and the command that produces it; there is no bypass switch.
+The installed pre-push hook (`scripts/guards/release-push-gate.mjs`, written by `starci runtime link`) makes that mechanical: it refuses a push of `main` or of a `v*` tag unless the pushed commit is a release commit — the version moved past the remote main's, an annotated tag `v<version>` on it, a dated CHANGELOG heading for exactly that version, and the release record of that exact commit with green rows (`npm run test:packages`, `npm run test:e2e`, `npm run check`). The refusal names what is missing and the command that produces it; there is no bypass switch.
 R221 `CI_TRIGGERS_RELEASE_ONLY` refuses any other workflow trigger and R222 `RELEASE_NOTES` refuses a tag over unfinished CHANGELOG notes. The model, the release definition, the refusals and the risks are in [git governance](docs/git-governance.md).
 
 ## Editing contracts and prose
@@ -214,8 +232,8 @@ line; a review that finds a violation sends the change back.
 4. **Claims must execute.** `citation:`, `enforcedBy:`, `source:`, "validated by", "refuses",
    "verified before effects" name a file and a behaviour that exist. If the code does not do it,
    the yaml says so or the claim is removed. On the alpha line the default is to make the yaml
-   tell the truth; add code only where a test shows a real hole.
+   tell the truth; add code only where a real run shows a real hole.
 5. **Host calls go through `scripts/api/orca/`.** No agent-facing prose tells an agent to run
    `orca` or to read `modules/host/**`; agents call `scripts/kernel/cli.mjs` or a wrapper.
-6. **Every cut lands with evidence.** `node --check` on touched `.mjs`, the specs that cover the
-   touched surface, and — when a rule moved — the check that would catch it moving back.
+6. **Every cut lands with evidence.** `node --check` on touched `.mjs`, a green `starci runtime verify`, and,
+   when a rule moved, the check that would catch it moving back.

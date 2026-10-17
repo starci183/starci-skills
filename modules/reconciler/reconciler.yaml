@@ -48,7 +48,7 @@ controllers:
   lanes: {job: rc-job, host: rc-host, gc: rc-gc-resource, resource: rc-gc-resource, workflow: rc-sla-workflow, workers: rc-workers, learning: rc-workers}
   slaLayer: scripts/reconciler/sla.mjs slaPass(ctx), every 30 s when the module exists (lane rc-sla-workflow); its ctx mode follows the workflow controller
 
-# concern -> controller: the same map as scripts/reconciler/owns.mjs CONCERN_OWNER (tests/reconciler/reconciler-owns.spec.mjs checks it).
+# concern -> controller: the same map as scripts/reconciler/owns.mjs CONCERN_OWNER.
 concerns:
   job.settle: job
   job.worker: job

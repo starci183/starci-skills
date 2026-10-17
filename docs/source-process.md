@@ -10,13 +10,13 @@ workflows and ops). The git model (lands, fast-forward pushes of main, CI trigge
 | Level | Scope | When | Who runs it |
 |---|---|---|---|
 | L0 static | format and lint of the staged files, hygiene | every commit, seconds | the pre-commit hook |
-| L1 targeted | the specs of the changed unit and their importers; tsc and lint of the changed files; in the runtime `starci test affected --run` computes the set | while working, every op or worker attempt | the op gate, the worker |
+| L1 targeted | the specs of the changed unit and their importers; tsc and lint of the changed files; the runtime has no specs of its own, so a runtime change runs `starci runtime verify` | while working, every op or worker attempt | the op gate, the worker |
 | L2 dependent | the dependent-spec selection (imports and data paths) of the change against local main | lane to local main (pre-verify, land) | the lane lead (pre-verify), the coordinator (land) |
 | L3 boundary | the affected integration, contract and e2e specs when the change touches IO (database, queue, Kafka, webhook, saga, jobs) | at the land of that change only | the coordinator, opt-in by touched slot |
-| L4 full | every suite: runtime, packages, example unit, integration, e2e and contract, the Docker images, Sonar at zero, coverage per component, the Linux-parity CI jobs run locally | exactly once per release, before the tag | the release cut only |
+| L4 full | every suite: packages, the scaffold e2e, example unit, integration, e2e and contract, the Docker images, Sonar at zero, coverage per component, the Linux-parity CI jobs run locally | exactly once per release, before the tag | the release cut only |
 | L5 CI | the CI run on Linux | the release push of main and every tag, as the confirmation | the CI service |
 
-Everyday verification of the runtime is `starci runtime check` plus `starci test affected --run`, joined on one commit by `starci runtime verify` (the check alone never runs a spec and is not the proof a branch is fit to merge); the full suite is the lead's one run on the merged tree and the release cut's L4.
+Everyday verification of the runtime is `starci runtime verify`: the runtime check, `starci release clean-test` of the packages the change touches and `starci release scaffold-e2e`, joined on one commit in one receipt (the check alone runs no test and is not the proof a branch is fit to merge). The runtime has no specs of its own (owner ruling `no-runtime-specs`).
 
 On demand only: `unit.verify` and `e2e.verify` (the owner or the goal asks), and a debugging run of ONE red spec file. Never: the whole suite in a lane, a preview, an audit, a
 fresh clone or on main after a land; an install in a worktree someone else is editing; two heavy runs at once on the host (one lock).
@@ -32,13 +32,11 @@ the cause. There are no skip lists, no allowlists and no weakened specs.
 | L1 working (op gate, worker) | the specs of the change and their importers | the changed files | `starci app lint --changed` (apps), the self-checks touching the change (`.claude`) | the project(s) holding the changed files |
 | L2 land (local main) | the dependent specs (imports and data paths) | the changed files | the FULL check set (`starci check run --level L2`): fast and structural | every affected project |
 | L3 land touching IO | L2 plus the affected integration, contract and e2e specs | as L2 | as L2 | as L2 |
-| L4 release cut (once, before the tag) | ALL: the runtime, the packages, and each example's unit, integration, e2e and contract runs | the whole repository and stylelint | the full check, `starci app check` of every example, Sonar at zero and the coverage per component (the existing local gate scans each example and reads its dashboard; the local SonarQube stack is started for it when stopped and put back as found) | every project; first a real `npm ci` in every example, and last the Linux-parity step: the CI-equivalent light jobs derived from `.github/workflows` (installs, the full check set, package clean installs, per example codegen, typecheck, starci app lint and the builds; never a spec suite) in a Linux container on this host |
+| L4 release cut (once, before the tag) | ALL: the packages, the scaffold e2e, and each example's unit, integration, e2e and contract runs | the whole repository and stylelint | the full check, `starci app check` of every example, Sonar at zero and the coverage per component (the existing local gate scans each example and reads its dashboard; the local SonarQube stack is started for it when stopped and put back as found) | every project; first a real `npm ci` in every example, and last the Linux-parity step: the CI-equivalent light jobs derived from `.github/workflows` (installs, the full check set, package clean installs, per example codegen, typecheck, starci app lint and the builds; never a spec suite) in a Linux container on this host |
 | L5 CI (Linux, the release push of main and the tag) | as L4 | as L4 | as L4 | as L4 |
 
 Checks run in full from L2 because they are fast and catch structure errors early; the specs are the expensive part, so only L4 runs all of them. L4 is exactly the row above, each
-step to a recorded log; every skipped test is reported with its reason and every test must have passed in at least one leg, the host run or the Linux container run (the host-skipped spec files run in the container,
-whose shells are installed inside it only): a skip that passed in the other leg is listed with that leg, a skip nothing covered (missing infrastructure, a platform no leg has) fails it, and only the declared
-browser-conditional skips (draw-render, draw-rationale, draw-layer) may remain, listed by name. On demand: `unit.verify` (all unit specs of an app) and `e2e.verify` (all e2e of an app).
+step to a recorded log; every skipped test is reported with its reason, and a skipped scaffold e2e test fails it. On demand: `unit.verify` (all unit specs of an app) and `e2e.verify` (all e2e of an app).
 
 ## Rights by role
 
@@ -78,15 +76,11 @@ atomically, and L5 confirms. Images and deploys come from the TAG (the images wo
 | Full run on demand | no | no | `unit.verify` or `e2e.verify` when the owner or the goal asks |
 
 The **protected zone**, which path 2 may not edit (changes there come only through path 1): the guard and its role rights, the release cut and the git hooks, the CI workflow triggers,
-the test policy (spec selection, budgets, the `specs.*` switches), the host lock, the rule-catalog entries that enforce these, and the supervisor's own permission and model settings. A
+the test policy (the real tests of the runtime and the `specs.*` switches), the host lock, the rule-catalog entries that enforce these, and the supervisor's own permission and model settings. A
 self-upgrade that needs a change there files a proposal for the owner. Path 3 never edits `.claude`: an op that finds a harness defect records a lesson or an upgrade request, which
 path 2 or 1 picks up.
 
-## Test budget
-
-A land run targets 15 minutes end to end, and each spec file has a 60-second budget. The measured seconds of every slow spec live in `modules/kernel/spec-durations.yaml` with the one limit; a spec over the limit is reported as an advisory INFO finding ranked by its excess (rule R226, `RT_SPEC_OVER_BUDGET`) in the check stage and listed in the release record. It does not fail the check.
-
-A file goes over budget by repeating setup that one process can share. Reduce it without weakening a test: build one fixture per spec process and reset it between cases, copy a template instead of re-seeding, keep one resident real entry instead of a process per call, inject the clock the production code already accepts, and never hide the cost with a longer timeout. Every test, every assertion and every production entry stays; a speed-up is accepted only with equal test and assertion counts and the mutations of the original spec still caught.
+## Syntax
 
 Every tracked JavaScript file must parse (rule R227, `RT_SYNTAX_INVALID`): a spec with a syntax error fails the check stage instead of a land run.
 
@@ -115,10 +109,6 @@ Shipped, as checks and code:
 
 `RT_SLOT_ID_SHAPE` reports a malformed slot identifier or inconsistent suffix vocabulary in an authored slot manifest. Use lowercase kebab segments separated by dots, a declared prefix and an existing parent or shared family. App-kind identifiers name a declared kind. Keep live and banned suffixes disjoint, refuse undeclared synonym pairs and retain both members of a declared same-concept exception. The app and runtime manifests are checked for both editions.
 
-## R226
-
-`RT_SPEC_OVER_BUDGET` is an advisory information finding when an existing spec exceeds the duration record's limit. `RT_SPEC_BUDGET_STALE` is an error when a recorded spec path no longer exists. Keep the record current and reduce repeated setup without removing assertions or lengthening timeouts. A live spec exactly at its limit passes. Both editions share the runtime duration record and check.
-
 ## R227
 
 `RT_SYNTAX_INVALID` reports each parser diagnostic in tracked `.mjs`, `.cjs` and `.js` authored source, with its file and line. Both editions use the same check. Generated roots, vendored build output and managed templates containing render tokens are excluded; clean authored JavaScript passes.
@@ -129,4 +119,4 @@ Shipped, as checks and code:
 
 ## R229
 
-`RT_REMOVED_VOCABULARY` reports obsolete names taught by runtime instruction surfaces, including their file, line and replacement from the removed-name catalog. Update instructions to the replacement. Historical records and explicitly marked removed lists are exempt; specs may use an obsolete name when asserting its refusal. Both editions use the same catalog and scan.
+`RT_REMOVED_VOCABULARY` reports obsolete names taught by runtime instruction surfaces, including their file, line and replacement from the removed-name catalog. Update instructions to the replacement. Historical records and explicitly marked removed lists are exempt. Both editions use the same catalog and scan.

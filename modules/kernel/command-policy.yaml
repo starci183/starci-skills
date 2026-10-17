@@ -12,7 +12,7 @@
 # the single place.
 roles:
   bound: [op, lead, supervisor, coordinator, critic]
-  # roles that may run a targeted `node --test <explicit spec files>` (L1 while working on the runtime); an op uses its gate
+  # roles that may run a targeted `node --test <explicit spec files>` (a package spec or the scaffold e2e); an op uses its gate
   node-test: [lead, supervisor, coordinator]
   # ops that may run a whole suite (the full unit / full e2e of an app)
   suite-ops: [unit.verify, e2e.verify]
@@ -71,11 +71,11 @@ supervisor:
   deny-programs: [sleep, node]
   use: "answer an item of the menu: starci supervisor status prints it, starci supervisor decide --item <id> --choice <choice> --reason <why> [--text <input>] answers it; a defect of the runtime is recorded with starci supervisor actions record --item runtime-defect:<cause> --action recorded --reason <why>"
 # The Op (a bound guard of role op). Its starci calls are its work: the capability verbs (starci app stack and the runtime-slot verbs for servers,
-# starci work draw-render for renders, starci work imagegen for images, starci test run and starci gate unit for tests, the checks) and its
+# starci work draw-render for renders, starci work imagegen for images, starci gate unit for tests, the checks) and its
 # report to its Kernel (starci kernel report). These groups are the control plane: the controllers, the Kernel and the Supervisor run them.
 op:
   deny-groups: [supervisor, reconciler, workflow, route, debug]
-  use: "an Op runs the capability verbs of its work (starci app stack for servers, starci work draw-render for renders, starci work imagegen for images, starci test run or starci gate unit for tests) and reports to its Kernel with starci kernel report"
+  use: "an Op runs the capability verbs of its work (starci app stack for servers, starci work draw-render for renders, starci work imagegen for images, starci gate unit for tests) and reports to its Kernel with starci kernel report"
 # Release path: refused to every bound role.
 release:
   verbs: [cut, publish]
@@ -165,10 +165,10 @@ npm:
     add: {code: RIGHTS_RAW_TOOL, use: starci npm install adds exact-pinned dependencies and is limited to lead or owner}
     update: {code: RIGHTS_RAW_TOOL, use: starci npm install is the owner-controlled dependency-change path using canon pins}
     uninstall: {code: RIGHTS_RAW_TOOL, use: starci npm install is the owner-controlled dependency-change path using canon pins}
-    test: {code: RIGHTS_RAW_TOOL, use: starci test affected --run in the runtime (the specs your change can break; the full suite is the release cut) or starci gate unit --root <app> in an app}
-    t: {code: RIGHTS_RAW_TOOL, use: starci test affected --run in the runtime (the specs your change can break; the full suite is the release cut) or starci gate unit --root <app> in an app}
-    run: {code: RIGHTS_RAW_TOOL, use: 'starci test affected --run runs the specs your change can break; starci work layout-render serves the app for a layout capture; use starci release sync-runtime for package runtime copies and grammar preparation, or starci check run, starci lint run, starci typecheck run, starci app stack, or starci gate run for other scripts'}
-    run-script: {code: RIGHTS_RAW_TOOL, use: 'starci test affected --run runs the specs your change can break; use starci check run, starci lint run, starci typecheck run, starci app stack, or starci gate run for other scripts'}
+    test: {code: RIGHTS_RAW_TOOL, use: starci runtime verify in the runtime (the check, package clean-test and scaffold e2e; the full proof is the release cut) or starci gate unit --root <app> in an app}
+    t: {code: RIGHTS_RAW_TOOL, use: starci runtime verify in the runtime (the check, package clean-test and scaffold e2e; the full proof is the release cut) or starci gate unit --root <app> in an app}
+    run: {code: RIGHTS_RAW_TOOL, use: 'starci runtime verify proves a runtime change; starci work layout-render serves the app for a layout capture; use starci release sync-runtime for package runtime copies and grammar preparation, or starci check run, starci lint run, starci typecheck run, starci app stack, or starci gate run for other scripts'}
+    run-script: {code: RIGHTS_RAW_TOOL, use: 'starci runtime verify proves a runtime change; use starci check run, starci lint run, starci typecheck run, starci app stack, or starci gate run for other scripts'}
     start: {code: RIGHTS_RAW_TOOL, use: 'starci app stack'}
     exec: {code: RIGHTS_RAW_TOOL, use: 'starci check run, starci lint run, starci typecheck run, or starci gate run for that tool'}
     link: {code: RIGHTS_RAW_TOOL, use: starci npm install is the dependency path; an agent never makes a package link}
@@ -188,12 +188,12 @@ raw-tools:
   shutdown: {use: 'ask the owner: a worker never shuts the host down'}
   reboot: {use: 'ask the owner: a worker never reboots the host'}
   next: {use: 'starci work layout-render serves the product app on localhost and captures a layout (brand.decide and interface.draw); a dev server started by hand renders nothing the runtime can use'}
-  jest: {use: starci test run in the runtime or starci gate unit --root <app> in an app}
-  vitest: {use: starci test run in the runtime or starci gate unit --root <app> in an app}
-  mocha: {use: starci test run in the runtime or starci gate unit --root <app> in an app}
-  playwright: {use: starci test run in the runtime or starci gate run --root <app> for the app's e2e proof}
-  cypress: {use: starci test run in the runtime or starci gate run --root <app> for the app's e2e proof}
-  pytest: {use: starci test run in the runtime or starci gate unit --root <app> in an app}
+  jest: {use: starci gate unit --root <app> in an app, or starci runtime verify in the runtime}
+  vitest: {use: starci gate unit --root <app> in an app, or starci runtime verify in the runtime}
+  mocha: {use: starci gate unit --root <app> in an app, or starci runtime verify in the runtime}
+  playwright: {use: starci gate run --root <app> for the app's e2e proof, or starci runtime verify in the runtime}
+  cypress: {use: starci gate run --root <app> for the app's e2e proof, or starci runtime verify in the runtime}
+  pytest: {use: starci gate unit --root <app> in an app, or starci runtime verify in the runtime}
   turbo: {use: 'starci gate run --root <app>'}
   nest: {use: 'starci gate run --root <app>'}
   curl: {use: 'ask the owner or use the service catalog command; a worker does not call the network by hand'}

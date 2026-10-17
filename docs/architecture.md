@@ -479,7 +479,7 @@ Every tracked path matches exactly one slot of the manifest (`knowledge/hfs/slot
 
 The repository tree layout adds seven codes. HFS_ROOT_ENTRY_FORBIDDEN names a root entry that no slot of the side or of the app root names, and HFS_ROOT_MARKDOWN_FORBIDDEN a root Markdown file other than the README. HFS_ROOT_SRC_FORBIDDEN_FE names a `src/` tree at the root of the fe side. HFS_SRC_LAYOUT_INVALID names a child of the back-end `src/` or `src/tests/` that no slot knows, and HFS_MODULE_TIER_INVALID a `src/modules/` folder that is not a module tier. HFS_WORK_IN_FE and HFS_STACKS_IN_SIDE name a `.starciwork` tree in the fe side and a `.starcistacks` tree in a side: both belong to the app root.
 
-Lite and full share this law. The enforcers are the app check (`scripts/hfs/check.mjs`), the architecture machine (`scripts/hfs/architecture/hfs.mjs`), the runtime check (`scripts/hfs/runtime-check.mjs`) and the back-end and front-end `slot-undeclared` lint rules, which report the path codes on the TypeScript file they visit. The proofs are `tests/hfs-proofs/hfs-slot-ownership.spec.mjs`, `tests/hfs-proofs/hfs-repository-tree-layout.spec.mjs` and `slot-ownership.spec.mjs` of the two lint packages.
+Lite and full share this law. The enforcers are the app check (`scripts/hfs/check.mjs`), the architecture machine (`scripts/hfs/architecture/hfs.mjs`), the runtime check (`scripts/hfs/runtime-check.mjs`) and the back-end and front-end `slot-undeclared` lint rules, which report the path codes on the TypeScript file they visit. The proofs are the `slot-ownership.spec.mjs` specs of the two lint packages.
 
 <a id="r03-filesystem-residue"></a>
 

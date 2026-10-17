@@ -16,7 +16,7 @@
 #   `afterWakes` wakes or spent `afterTokens` tokens since its boot is replaced at its next idle wake by a fresh seat that reads the ledger.
 # statusBounds: the size a bound seat reads per status call: the menu items printed (the rest are counted, with the way to the full view) and the
 #   characters of the text. The Kernel seat's default view is the one-line state and the Decide section; the full view stays behind `starci kernel status
-#   --full`. Checked by tests/kernel/seat-cost.spec.mjs on a large fixture.
+#   --full`.
 emptyWakeSharePercent: 35
 minWakes: 6
 wakeActMs: 120000

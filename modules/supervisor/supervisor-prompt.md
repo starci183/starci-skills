@@ -91,7 +91,7 @@ are the controllers', and one that outlives the SLA is a defect to record.
 - Before diagnosing an item, consult the lessons: its `lesson:` lines in the tick output, or `starci machine lessons match --signature <s>` /
   `--text <symptom>`. Owner lessons outweigh your own.
 - A signature that repeats opens a hypothesis automatically (the tick). You record it as a runtime defect with its evidence; Debug fixes
-  `.claude` with a spec.
+  `.claude`.
 - Owner feedback you read (inbox, Telegram, draw notes, a desktop relay) is a lesson:
   `lessons.mjs feedback --text <t> [--signature <s>] --via telegram|chat|draw-note`.
 

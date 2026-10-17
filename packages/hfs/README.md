@@ -185,7 +185,7 @@ The upload authenticates with GitHub's OIDC token: the managed `ci.yml` job has 
 editing a list), plus the catalog slice of every code `starci app check` can emit: its own and the machine's (`ARCHITECTURE_RULE_IDS`,
 derived from the machine's rule id lists). After changing any of those files, `knowledge/hfs/slots.yaml`,
 `knowledge/hfs/canon-pins.yaml`, `knowledge/patterns/fe/folder.yaml` or the catalog entries of those codes, run `starci release sync-runtime`;
-`tests/packages-hfs/hfs-cli.spec.mjs` fails on a stale copy. Bump `version` here and in the pin when the behaviour changes.
+`starci release sync-runtime --check` fails on a stale copy. Bump `version` here and in the pin when the behaviour changes.
 
 The examples gate `starci runtime check --only example-architecture` runs `starci app lint` of this CLI at the root of every `examples/*`
 app with an `hfs.json` (each `examples/<app>` root) and fails on any finding or any tool that could not run;

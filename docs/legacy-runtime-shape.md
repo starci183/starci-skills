@@ -22,7 +22,7 @@ These runtime repository rules use the same source ownership, tiers and naming s
 
 ## Spec placement
 
-`RT_SPEC_PLACEMENT` reports runtime specs outside an area directory, specs in production source directories and package files using the `.test.` suffix. Use `tests/<area>/<module>[.<topic>].spec.mjs` for runtime specs, the dedicated helpers and setup directories for shared support, and the fixtures directory for data. Package specs use the `.spec.` suffix beside package source.
+`RT_SPEC_PLACEMENT` refuses every runtime test (owner ruling `no-runtime-specs`): a spec or test file is allowed only as a package spec beside package source (the `.spec.` suffix, never `.test.`), inside `examples/`, or as one of the declared scaffold e2e files under `e2e/` (slot `runtime.e2e`). Any other spec or test file, in `scripts/`, `engine/`, `modules/`, `ui/` or a `tests/` directory, is refused.
 
 ## Source name
 

@@ -4412,4 +4412,4 @@ requirements:
     editions: [lite, full]
     statement: "`starci app stack task <name>` refuses a missing or unknown task name with `STACK_TASK_UNDECLARED` (exit 2) and lists the declared names."
     status: advisory
-    reason: Runtime behavior of the `task` verb of the canon CLI, proved by tests/packages-hfs/hfs-stack-task.spec.mjs; it is not a property of app source, so no lint rule can enforce it.
+    reason: Runtime behavior of the `task` verb of the canon CLI (packages/hfs/stack/task.mjs); it is not a property of app source, so no lint rule can enforce it.
