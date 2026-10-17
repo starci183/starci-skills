@@ -1,11 +1,18 @@
 // context.mjs - the seams every stack module runs through: spawning tools, sleeping, the clock and the output.
 // Production uses the real implementations; a spec injects fakes.
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { defaultSops } from '../runtime/scripts/hfs/secret-sops.mjs';
 
 const MAX_BUFFER = 1 << 24;
 
 const realSpawn = (command, args, options = {}) => {
+  if (options.background) {
+    const childOptions = { ...options };
+    delete childOptions.background;
+    const child = spawn(command, args, { stdio: 'ignore', windowsHide: true, ...childOptions });
+    child.on('error', (error) => { child.spawnError = error; });
+    return child;
+  }
   const run = spawnSync(command, args, { encoding: 'utf8', maxBuffer: MAX_BUFFER, ...options });
   return { status: run.status, stdout: run.stdout ?? '', stderr: run.stderr ?? '', error: run.error };
 };
@@ -16,6 +23,8 @@ const realSleep = (ms) => new Promise((done) => { setTimeout(done, ms); });
  * The context of one stack invocation.
  *   cwd, env       the app root and the process environment
  *   spawn          (command, args, { input, env, cwd }) -> { status, stdout, stderr, error }; never a shell
+ *                  { background: true } -> ChildProcess, owned and killed by the command session
+ *   platform       POSIX control master or win32 loopback tunnel; sshPath optionally selects the POSIX SSH executable
  *   sleep, now     await sleep(ms); now() -> epoch ms
  *   stdout, stderr text writers
  *   fetch          the HTTP seam of verify (url, init) -> Response
@@ -29,6 +38,9 @@ export function stackContext(io = {}) {
     cwd,
     env,
     spawn: io.spawn ?? realSpawn,
+    platform: io.platform ?? process.platform,
+    username: io.username,
+    sshPath: io.sshPath,
     sleep: io.sleep ?? realSleep,
     now: io.now ?? Date.now,
     stdout: io.stdout ?? ((text) => process.stdout.write(text)),

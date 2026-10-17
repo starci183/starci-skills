@@ -13,6 +13,7 @@ import path from 'node:path';
 import { tool } from './context.mjs';
 import { restrictToUser, writePrivate } from './private-file.mjs';
 import { refusal } from './errors.mjs';
+import { createSshSession, sessionDirectory } from './ssh-session.mjs';
 
 const ACCOUNT = /^[A-Za-z0-9._@-]+$/u;
 const CI_VARIABLES = ['VPS_SSH_KEY', 'VPS_KNOWN_HOSTS', 'VPS_HOST', 'VPS_USER'];
@@ -33,11 +34,11 @@ export const remoteDocker = (run, args) => run(['docker', ...args.map(shellQuote
 
 const noop = () => {};
 
-function makeRunner(ctx, argv, { cleanup = noop, notes = [] } = {}) {
+function makeRunner(ctx, argv, { cleanup = noop, notes = [], connection } = {}) {
   const [command, ...head] = argv;
   const run = (remote, { input } = {}) => {
     const options = input === undefined ? {} : { input: lfOnly(input) };
-    const result = tool(ctx, command, [...head, lfOnly(remote)], options);
+    const result = connection ? connection.remote(lfOnly(remote), options) : tool(ctx, command, [...head, lfOnly(remote)], options);
     if (result.error) return { status: 127, stdout: '', stderr: `cannot run ${command}: ${result.error.message}` };
     return { status: result.status ?? 1, stdout: result.stdout, stderr: result.stderr };
   };
@@ -119,14 +120,21 @@ export function openSealedSession(ctx, config) {
 function sealedRunner(ctx, config) {
   const session = openSealedSession(ctx, config);
   const argv = ['ssh', '-T', '-i', session.keyFile, '-o', 'IdentitiesOnly=yes', '-o', `UserKnownHostsFile=${session.knownFile}`, '-o', `StrictHostKeyChecking=${session.strict}`, '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=20', session.account];
-  return makeRunner(ctx, argv, { cleanup: session.cleanup, notes: session.notes });
+  return sessionRunner(ctx, argv, session.dir, session.cleanup, session.notes);
+}
+
+function sessionRunner(ctx, argv, dir, cleanup, notes = []) {
+  const connection = createSshSession(ctx, { argv, controlPath: path.join(dir, 'cm').replaceAll('\\', '/'), cleanup });
+  return makeRunner(ctx, argv, { connection, cleanup: connection.close, notes });
 }
 
 /** The ssh runner of one invocation (see the top of the file). */
 function sshRunner(ctx, config, { sshCmd = null } = {}) {
+  if (ctx.stackSsh && !sshCmd) return makeRunner(ctx, ['ssh'], { connection: ctx.stackSsh });
   if (sshCmd) return makeRunner(ctx, sshCommandArgv(sshCmd));
   if (config.remote.sealed && ctx.env.STARCI_STACK_SEALED_SSH === '1') return sealedRunner(ctx, config);
-  return makeRunner(ctx, ['ssh', ...SSH_OPTIONS, config.remote.host]);
+  const dir = sessionDirectory();
+  return sessionRunner(ctx, ['ssh', ...SSH_OPTIONS, config.remote.host], dir, () => fs.rmSync(dir, { recursive: true, force: true }));
 }
 
 /**
@@ -150,7 +158,7 @@ export async function withRunner(ctx, config, options, deps, body) {
   try {
     return await body(run, run.notes ?? []);
   } finally {
-    run.cleanup?.();
+    await run.cleanup?.();
   }
 }
 
@@ -174,7 +182,7 @@ function ciInputs(ctx) {
 const sshBlock = (alias, inputs) => [
   '', `Host ${alias}`, `  HostName ${inputs.host}`, `  User ${inputs.user}`, '  IdentityFile ~/.ssh/deploy_key',
   '  StrictHostKeyChecking yes', '  BatchMode yes', '  ConnectTimeout 20', '  ServerAliveInterval 30',
-  '  ControlMaster auto', '  ControlPath ~/.ssh/cm-%C', '  ControlPersist 15m', '',
+  '  ControlMaster auto', '  ControlPath ~/.ssh/cm-%C', '  ControlPersist 60', '',
 ].join('\n');
 
 /** CI transport: pinned key, known_hosts, ssh config block and DOCKER_HOST=ssh://<alias> in $GITHUB_ENV. */
