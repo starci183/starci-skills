@@ -1,7 +1,7 @@
 import path from 'node:path';
+import { list } from '../lib/list.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 
-const list = (value) => Array.isArray(value) ? value : [];
 const nameOf = (item) => typeof item === 'string' ? item : item?.name;
 
 /** Each CI name belongs to one class and scope; declarations contain names and public configuration only. */

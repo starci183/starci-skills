@@ -1,6 +1,7 @@
 // R251: product workflow custody, immutable dependencies and release-only triggers, in both editions.
-import { parseWorkflow, workflowFindings } from '../runtime-rules/workflow-source.mjs';
-import { found, readText } from './read.mjs';
+import { parseWorkflow } from '../runtime-rules/workflow-source.mjs';
+import { found } from './read.mjs';
+import { appWorkflowFindings } from '../../lib/app-workflow-findings.mjs';
 import { isPlainObject as record } from '../../../engine/plain-object.mjs';
 import { workflowEventOptions } from '../../lib/workflow-events.mjs';
 
@@ -200,7 +201,6 @@ function perWorkflow({ path: file, text }) {
 }
 
 /** Synchronous R251 findings over the tracked workflows of a lite/full app. */
-export function deployWorkflowFindings({ repoRoot, files, all = files, repo, isRoot, inScope = () => true }) {
-  if (isRoot === false || repo?.kind !== 'app' || !['lite', 'full'].includes(repo.edition)) return [];
-  return workflowFindings({ files: all.filter((file) => inScope(file)), read: (file) => readText(repoRoot, file) }, perWorkflow);
+export function deployWorkflowFindings(ctx) {
+  return appWorkflowFindings(ctx, perWorkflow);
 }

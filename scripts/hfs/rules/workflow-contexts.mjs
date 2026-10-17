@@ -1,6 +1,7 @@
 // R299: GitHub Actions expressions use only contexts available at their workflow key.
-import { parseWorkflow, workflowFindings } from '../runtime-rules/workflow-source.mjs';
-import { found, readText } from './read.mjs';
+import { parseWorkflow } from '../runtime-rules/workflow-source.mjs';
+import { found } from './read.mjs';
+import { appWorkflowFindings } from '../../lib/app-workflow-findings.mjs';
 
 const WORKFLOW = ['github', 'inputs', 'vars'];
 const JOB_IF = ['github', 'needs', 'vars', 'inputs'];
@@ -74,7 +75,7 @@ function expressions(value) {
 }
 
 /** Source markers travel inside parsed scalar expressions, preserving flow maps, quoted keys and repeated values without matching comments. */
-export function workflowContextFindings({ path: file, text }) {
+function workflowContextFindings({ path: file, text }) {
   const marked = text.replace(/\$\{\{/g, (match, offset) => `${match} __hfs_context_line_${text.slice(0, offset).split('\n').length}__ `);
   const findings = [];
   function inspect(value, keys) {
@@ -97,7 +98,6 @@ export function workflowContextFindings({ path: file, text }) {
 }
 
 /** Judge every tracked workflow in scope at the full or lite app root, using the shared workflow selector. */
-export function workflowContextsFindings({ repoRoot, files, all = files, repo, isRoot, inScope = () => true }) {
-  if (repo?.kind !== 'app' || !['lite', 'full'].includes(repo.edition) || isRoot === false) return [];
-  return workflowFindings({ files: [...new Set(all)].filter((file) => inScope(file)), read: (file) => readText(repoRoot, file) }, workflowContextFindings);
+export function workflowContextsFindings(ctx) {
+  return appWorkflowFindings(ctx, workflowContextFindings, { dedupe: true });
 }

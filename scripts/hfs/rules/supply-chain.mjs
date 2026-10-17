@@ -111,7 +111,7 @@ function pinnedAction(value) {
 }
 
 /** Mark YAML keys before parsing so comments and script scalars are ignored while flow maps and quoted keys retain their source lines. */
-export function workflowPinFindings({ path: file, text }) {
+function workflowPinFindings({ path: file, text }) {
   const marked = text.replace(/(^|[\s{,])(?:"uses"|'uses'|uses)([ \t]*:)/gm, (match, prefix, colon, offset) => {
     const line = text.slice(0, offset + prefix.length).split('\n').length;
     return `${prefix}__hfs_action_uses_line_${line}__${colon}`;

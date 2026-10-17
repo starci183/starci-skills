@@ -18,7 +18,7 @@ export function rowcounts(session) {
 }
 
 /** Writes only ciphertext and its receipt permanently; a receipt is published only after header, size and hash checks. */
-export function dumpDatabase(ctx, options = {}) {
+function dumpDatabase(ctx, options = {}) {
   if (!options.out) throw refusal('DB_USAGE', '--out is required');
   const out = outsideRepository(ctx.cwd, path.resolve(ctx.cwd, options.out));
   const session = backupSession(ctx, options);

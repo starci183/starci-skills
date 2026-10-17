@@ -67,7 +67,7 @@ function verifyHead(session) {
 }
 
 /** Dry run validates custody and prints a plan; execute preserves chosen managed data, resets, restores and verifies the exact migration head. */
-export function resetDatabase(ctx, options = {}) {
+function resetDatabase(ctx, options = {}) {
   if (options.linked !== true || options.local || options.urlEnv !== undefined) throw refusal('DB_RESET_LINKED_REQUIRED', 'reset requires --linked; use npm run db:reset for a local database');
   if (!['keep', 'drop'].includes(options.auth) || !['keep', 'drop'].includes(options.storage)) throw refusal('DB_RESET_CHOICE_MISSING', 'explicit --auth keep|drop and --storage keep|drop are required');
   const session = backupSession(ctx, options);

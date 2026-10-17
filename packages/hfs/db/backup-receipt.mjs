@@ -88,7 +88,7 @@ export function backupRecipients(root) {
 }
 
 /** Header and size checks prove an age envelope exists; proving decryption requires the owner's identity separately. */
-export function checkArchive(file) {
+function checkArchive(file) {
   const size = fs.statSync(file).size;
   const fd = fs.openSync(file, 'r');
   const header = Buffer.alloc(22);
