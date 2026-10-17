@@ -634,6 +634,7 @@ rules:
       automated:
         - DB_CONFIG_POLICY
         - DB_TYPES_DRIFT
+        - HFS_EMIT_DB_TYPES_STALE
         - DB_EXTENSION_ALLOWED
         - DB_API_EXPOSED
         - DB_MIGRATION_DESTRUCTIVE

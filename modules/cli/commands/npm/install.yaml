@@ -27,6 +27,6 @@ json: starci/npm-install@1
 examples:
   - starci npm install typescript
   - starci npm install left-pad@1.3.0 --dev
-  - starci npm install @starci/cli@1.4.1 --dev
+  - starci npm install @starci/cli --dev
   - starci npm install --canon --dev
 editions: [full]

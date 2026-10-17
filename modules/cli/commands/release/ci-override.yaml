@@ -23,6 +23,6 @@ conventions:
   - "An override applies only to its exact SHA. It does not permit a cut when CI is unknown. Existing ruling IDs with another reason refuse."
 examples:
   - 'starci release ci-override --sha 0123456789abcdef0123456789abcdef01234567 --reason "Owner accepts this CI failure for the release"'
-  - 'starci release ci-override --repo D:/apps/example --sha 0123456789abcdef0123456789abcdef01234567 --reason "Owner accepts the failed run"'
+  - 'starci release ci-override --repo ../my-app --sha 0123456789abcdef0123456789abcdef01234567 --reason "Owner accepts the failed run"'
 editions:
   - full

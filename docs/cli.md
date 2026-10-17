@@ -2913,7 +2913,7 @@ json: starci/npm-install@1
 ```sh
 starci npm install typescript
 starci npm install left-pad@1.3.0 --dev
-starci npm install @starci/cli@1.4.1 --dev
+starci npm install @starci/cli --dev
 starci npm install --canon --dev
 ```
 
@@ -3142,7 +3142,7 @@ json: none
 
 ```sh
 starci release ci-override --sha 0123456789abcdef0123456789abcdef01234567 --reason "Owner accepts this CI failure for the release"
-starci release ci-override --repo D:/apps/example --sha 0123456789abcdef0123456789abcdef01234567 --reason "Owner accepts the failed run"
+starci release ci-override --repo ../my-app --sha 0123456789abcdef0123456789abcdef01234567 --reason "Owner accepts the failed run"
 ```
 
 ### starci release ci-status
