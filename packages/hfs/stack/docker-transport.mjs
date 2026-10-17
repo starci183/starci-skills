@@ -63,14 +63,14 @@ function privateSshEnvironment(ctx, env, dir, controlPath) {
     const include = originalHome ? `Include ${configPath(path.join(originalHome, '.ssh', 'config'))}\n` : '';
     writePrivate(ctx, config, ['Host *', ...controlLines(controlPath), 'Host *', include].join('\n'));
   }
-  const executable = ctx.sshPath ?? findSsh(ctx.env.PATH ?? process.env.PATH);
+  const executable = ctx.sshPath ?? findSsh(ctx.env.PATH);
   const bin = path.join(home, 'bin');
   fs.mkdirSync(bin, { mode: 0o700 });
   const shim = path.join(bin, 'ssh');
   writePrivate(ctx, shim, `#!/bin/sh\nexec ${posixQuote(executable)} -F ${posixQuote(config)} "$@"\n`);
   fs.chmodSync(shim, 0o700);
   const dockerConfig = env.DOCKER_CONFIG ?? (originalHome ? path.join(originalHome, '.docker') : undefined);
-  return { env: { ...env, HOME: home, PATH: `${bin}:${env.PATH ?? process.env.PATH ?? ''}`, ...(dockerConfig ? { DOCKER_CONFIG: dockerConfig } : {}) }, executable };
+  return { env: { ...env, HOME: home, PATH: `${bin}:${env.PATH ?? ctx.env.PATH ?? ''}`, ...(dockerConfig ? { DOCKER_CONFIG: dockerConfig } : {}) }, executable };
 }
 
 const posixQuote = (value) => "'" + value.replaceAll("'", "'\\''") + "'";

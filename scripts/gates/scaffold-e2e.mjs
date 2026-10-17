@@ -73,7 +73,7 @@ function testWorldInstallStale(dir, hash, record) {
 }
 
 /** Prepare only test-world's local lockfile install; the injected npm call never uses a shell and no linked node_modules is read or installed through. */
-export function prepareTestWorld(root, env = process.env, deps = {}) {
+function prepareTestWorld(root, env = process.env, deps = {}) {
   const dir = path.join(root, 'packages', 'test-world');
   const fail = (code, detail) => ({ ok: false, detail: `${code}: test-world ${detail}` });
   const link = linkedNodeModules(dir, deps.lstat ?? fs.lstatSync);
@@ -94,7 +94,7 @@ export function prepareTestWorld(root, env = process.env, deps = {}) {
 }
 
 /** The built output and test-world dependencies prepared before the run: {ok, lines}. `deps` replaces each preparation step. */
-export function prepareE2e({ root = runtimeRoot, env = process.env, deps = {} } = {}) {
+function prepareE2e({ root = runtimeRoot, env = process.env, deps = {} } = {}) {
   const steps = [(deps.grammar ?? prepareGrammar)(root, env), (deps.heroicons ?? prepareHeroicons)(root, env), (deps.testWorld ?? prepareTestWorld)(root, env)];
   return { ok: steps.every((step) => step.ok), lines: steps.map((step) => step.detail) };
 }

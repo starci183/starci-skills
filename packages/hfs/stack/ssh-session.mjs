@@ -38,7 +38,7 @@ setTimeout(() => finish(1), 5000);
 `;
 
 /** TCP Docker forwarding must never expose the manager on a non-loopback interface. */
-export function loopbackForward(bind, port, socket) {
+function loopbackForward(bind, port, socket) {
   if (bind !== '127.0.0.1') throw failure('STACK_SSH_SESSION', 'the Docker tunnel must bind 127.0.0.1');
   return `${bind}:${port}:${socket}`;
 }

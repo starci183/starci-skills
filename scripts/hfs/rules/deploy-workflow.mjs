@@ -1,7 +1,7 @@
 // R251: product workflow custody, immutable dependencies and release-only triggers, in both editions.
 import { parseWorkflow } from '../runtime-rules/workflow-source.mjs';
 import { found } from './read.mjs';
-import { appWorkflowFindings } from '../../lib/app-workflow-findings.mjs';
+import { appWorkflowFindings } from './app-workflow-findings.mjs';
 import { isPlainObject as record } from '../../../engine/plain-object.mjs';
 import { workflowEventOptions } from '../../lib/workflow-events.mjs';
 

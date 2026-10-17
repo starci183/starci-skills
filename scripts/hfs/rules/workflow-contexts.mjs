@@ -1,7 +1,7 @@
 // R299: GitHub Actions expressions use only contexts available at their workflow key.
 import { parseWorkflow } from '../runtime-rules/workflow-source.mjs';
 import { found } from './read.mjs';
-import { appWorkflowFindings } from '../../lib/app-workflow-findings.mjs';
+import { appWorkflowFindings } from './app-workflow-findings.mjs';
 
 const WORKFLOW = ['github', 'inputs', 'vars'];
 const JOB_IF = ['github', 'needs', 'vars', 'inputs'];

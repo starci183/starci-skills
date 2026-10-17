@@ -5375,6 +5375,16 @@ RUN_MEDIA_FAKE:
   owner: other-op:e2e.verify
   kind: check-finding
 
+SCAFFOLD_E2E_TEST_WORLD_PREPARE:
+  title: "Scaffold test-world preparation failed"
+  title_vi: "Scaffold test-world preparation failed"
+  meaning_vi: "The scaffold e2e cannot prepare test-world dependencies from its own lockfile."
+  causes_vi:
+    - "The local install cannot be inspected, npm ci fails, or its completion record is missing."
+  nextStep_vi: "Repair the local test-world install and rerun starci release scaffold-e2e."
+  owner: op-retry
+  kind: verb-refusal
+
 SCHEMA_INVALID:
   title: "Op manifest fails its schema"
   title_vi: "Bản mô tả op sai lược đồ"
