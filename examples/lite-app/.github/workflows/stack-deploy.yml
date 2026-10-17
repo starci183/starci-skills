@@ -50,7 +50,6 @@ jobs:
       packages: write
     env:
       STACK_ENVIRONMENT: ${{ inputs.environment }}
-      XDG_DATA_HOME: ${{ runner.temp }}/starci-data
     steps:
       - name: require release tag
         shell: bash
@@ -110,6 +109,7 @@ jobs:
           cache-to: type=gha,scope=web,mode=max
       - name: connect to the swarm manager
         env:
+          XDG_DATA_HOME: ${{ runner.temp }}/starci-data
           VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
           VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
           VPS_HOST: ${{ vars.VPS_HOST }}
@@ -117,6 +117,7 @@ jobs:
         run: npx --no-install starci app stack connect --env "$STACK_ENVIRONMENT" --execute
       - name: deploy the release
         env:
+          XDG_DATA_HOME: ${{ runner.temp }}/starci-data
           SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
           IMAGE_API: ${{ steps.names.outputs.api }}@${{ steps.build-api.outputs.digest }}
           IMAGE_WEB: ${{ steps.names.outputs.web }}@${{ steps.build-web.outputs.digest }}
@@ -126,6 +127,8 @@ jobs:
             --image "web=$IMAGE_WEB" \
             --source-sha "$GITHUB_SHA" --execute
       - name: disconnect from the swarm manager
+        env:
+          XDG_DATA_HOME: ${{ runner.temp }}/starci-data
         if: ${{ always() }}
         run: npx --no-install starci app stack disconnect --env "$STACK_ENVIRONMENT" --execute
 
@@ -139,7 +142,6 @@ jobs:
       packages: read
     env:
       STACK_ENVIRONMENT: ${{ inputs.environment }}
-      XDG_DATA_HOME: ${{ runner.temp }}/starci-data
     steps:
       - name: require release tag
         shell: bash
@@ -163,6 +165,7 @@ jobs:
           password: ${{ github.token }}
       - name: connect to the swarm manager
         env:
+          XDG_DATA_HOME: ${{ runner.temp }}/starci-data
           VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
           VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
           VPS_HOST: ${{ vars.VPS_HOST }}
@@ -170,6 +173,7 @@ jobs:
         run: npx --no-install starci app stack connect --env "$STACK_ENVIRONMENT" --execute
       - name: redeploy the stored release
         env:
+          XDG_DATA_HOME: ${{ runner.temp }}/starci-data
           SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
           RELEASE: ${{ inputs.release }}
         shell: bash
@@ -178,5 +182,7 @@ jobs:
           [ -z "$RELEASE" ] || release=(--release "$RELEASE")
           npx --no-install starci app stack rollback --env "$STACK_ENVIRONMENT" "${release[@]}" --execute
       - name: disconnect from the swarm manager
+        env:
+          XDG_DATA_HOME: ${{ runner.temp }}/starci-data
         if: ${{ always() }}
         run: npx --no-install starci app stack disconnect --env "$STACK_ENVIRONMENT" --execute

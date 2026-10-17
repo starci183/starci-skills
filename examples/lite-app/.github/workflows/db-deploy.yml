@@ -28,7 +28,6 @@ jobs:
       STACK_ENVIRONMENT: ${{ inputs.environment }}
       BACKUP_RECEIPT: ${{ inputs.backup_receipt }}
       SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
-      XDG_DATA_HOME: ${{ runner.temp }}/starci-data
     steps:
       - name: require release tag
         shell: bash
@@ -46,6 +45,8 @@ jobs:
         with:
           version: v3.13.2
       - name: materialize sealed custody and push migrations
+        env:
+          XDG_DATA_HOME: ${{ runner.temp }}/starci-data
         shell: bash
         run: |
           set -euo pipefail
