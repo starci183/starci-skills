@@ -563,6 +563,13 @@ rulings:
     supersedes: []
     enforcedBy: [scripts/supervisor/release-ci-override.mjs, scripts/supervisor/release-ci-override-cli.mjs, modules/kernel/command-policy.yaml]
 
+  - id: ci-override-574bfcaca06c
+    date: '2026-10-17'
+    source: "the owner at the terminal (starci release ci-override)"
+    ruling: "alpha.14 CI red (2h22m, old suite and OOM); alpha.20 replaces it and fixes CI"
+    supersedes: []
+    enforcedBy: [scripts/supervisor/release-cut.mjs]
+
 supersedes:
   'ruling:R212/case-2': ['ruling:R212/case-1']
   'ruling:R212/case-4': ['ruling:R212/case-1', 'ruling:R212/case-2']
