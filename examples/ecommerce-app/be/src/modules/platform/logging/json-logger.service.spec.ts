@@ -92,25 +92,25 @@ describe("JsonLogger", () => {
             },
         ])
     })
+})
 
-    describe("createJsonLogger", () => {
-        afterEach(() => {
-            jest.restoreAllMocks()
-        })
+describe("createJsonLogger", () => {
+    afterEach(() => {
+        jest.restoreAllMocks()
+    })
 
-        it("builds a logger that writes info to stdout and errors to stderr, stamped by the clock", () => {
-            const lines: Array<string> = []
-            jest.spyOn(process.stdout, "write").mockImplementation((chunk) => lines.push(`out:${String(chunk)}`) > 0)
-            jest.spyOn(process.stderr, "write").mockImplementation((chunk) => lines.push(`err:${String(chunk)}`) > 0)
-            const logger = createJsonLogger(new FakeClock("2026-05-06T07:08:09.000Z"))
+    it("builds a logger that writes info to stdout and errors to stderr, stamped by the clock", () => {
+        const lines: Array<string> = []
+        jest.spyOn(process.stdout, "write").mockImplementation((chunk) => lines.push(`out:${String(chunk)}`) > 0)
+        jest.spyOn(process.stderr, "write").mockImplementation((chunk) => lines.push(`err:${String(chunk)}`) > 0)
+        const logger = createJsonLogger(new FakeClock("2026-05-06T07:08:09.000Z"))
 
-            logger.info(LoggingLogEvent.ServerStarted)
-            logger.warn(LoggingLogEvent.StartupFailed)
+        logger.info(LoggingLogEvent.ServerStarted)
+        logger.warn(LoggingLogEvent.StartupFailed)
 
-            expect(lines).toEqual([
-                `out:${JSON.stringify({ level: "info", event: LoggingLogEvent.ServerStarted, time: "2026-05-06T07:08:09.000Z" })}\n`,
-                `err:${JSON.stringify({ level: "warn", event: LoggingLogEvent.StartupFailed, time: "2026-05-06T07:08:09.000Z" })}\n`,
-            ])
-        })
+        expect(lines).toEqual([
+            `out:${JSON.stringify({ level: "info", event: LoggingLogEvent.ServerStarted, time: "2026-05-06T07:08:09.000Z" })}\n`,
+            `err:${JSON.stringify({ level: "warn", event: LoggingLogEvent.StartupFailed, time: "2026-05-06T07:08:09.000Z" })}\n`,
+        ])
     })
 })

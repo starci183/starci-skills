@@ -28,7 +28,7 @@ const build = async () => {
     return { sessions: moduleRef.get(SessionService), cache, clock, keycloak, logger, ids }
 }
 
-describe("SessionService", () => {
+const registerIssueTests = (): void => {
     describe("issue", () => {
         it("returns the next id as the token and keeps the person and the refresh token behind it for an hour", async () => {
             const { sessions, cache } = await build()
@@ -51,7 +51,9 @@ describe("SessionService", () => {
             expect(first.sessionToken).not.toBe(second.sessionToken)
         })
     })
+}
 
+const registerVerifyTests = (): void => {
     describe("verify", () => {
         it("returns the person behind a live token", async () => {
             const { sessions } = await build()
@@ -84,7 +86,9 @@ describe("SessionService", () => {
             expect(await sessions.verify(sessionToken)).toBeNull()
         })
     })
+}
 
+const registerAuthenticateTests = (): void => {
     describe("authenticate", () => {
         it("succeeds with the person behind a live token", async () => {
             const { sessions } = await build()
@@ -99,7 +103,9 @@ describe("SessionService", () => {
             expect(await sessions.authenticate("unknown-token")).toBeRefused(SessionErrorCode.Invalid)
         })
     })
+}
 
+const registerRevokeOwnTests = (): void => {
     describe("revokeOwn", () => {
         it("ends a session of the person, then the provider session with its refresh token, and confirms it", async () => {
             const { sessions, cache, keycloak } = await build()
@@ -138,4 +144,11 @@ describe("SessionService", () => {
             )
         })
     })
+}
+
+describe("SessionService", () => {
+    registerIssueTests()
+    registerVerifyTests()
+    registerAuthenticateTests()
+    registerRevokeOwnTests()
 })

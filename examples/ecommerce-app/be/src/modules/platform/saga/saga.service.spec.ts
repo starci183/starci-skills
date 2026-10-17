@@ -44,183 +44,177 @@ const readOf = (state: { status: string; version: number } | null): readonly [st
     state === null ? [] : [state],
 ]
 
-describe("SagaService", () => {
-    describe("begin", () => {
-        it("starts the run in the caller transaction, stamped by the clock", async () => {
-            const manager = mockEntityManager({ query: [BEGIN_SAGA, []] })
-            const { service } = await build(mockEntityManager())
+describe("SagaService begin", () => {
+    it("starts the run in the caller transaction, stamped by the clock", async () => {
+        const manager = mockEntityManager({ query: [BEGIN_SAGA, []] })
+        const { service } = await build(mockEntityManager())
 
-            await service.begin({ manager, ...RUN })
+        await service.begin({ manager, ...RUN })
 
-            expect(manager.query).toHaveBeenCalledWith(BEGIN_SAGA, ["place-order", "o-1", new Date(AT)])
-        })
+        expect(manager.query).toHaveBeenCalledWith(BEGIN_SAGA, ["place-order", "o-1", new Date(AT)])
+    })
+})
+
+describe("SagaService state", () => {
+    it("answers where the run stands", async () => {
+        const { service } = await build(mockEntityManager({ query: [readOf({ status: "running", version: 1 })] }))
+
+        expect(await service.state(RUN)).toEqual({ correlationId: "o-1", status: "running", version: 1 })
     })
 
-    describe("state", () => {
-        it("answers where the run stands", async () => {
-            const { service } = await build(mockEntityManager({ query: [readOf({ status: "running", version: 1 })] }))
+    it("answers null when the run does not exist", async () => {
+        const { service } = await build(mockEntityManager({ query: [readOf(null)] }))
 
-            expect(await service.state(RUN)).toEqual({ correlationId: "o-1", status: "running", version: 1 })
+        expect(await service.state(RUN)).toBeNull()
+    })
+})
+
+describe("SagaService compensate successful compensation", () => {
+    it("claims the event, moves the run to compensating, runs the compensation and settles it as compensated", async () => {
+        const manager = mockEntityManager({
+            query: [
+                readOf({ status: "running", version: 1 }),
+                [MOVE_SAGA, [{ version: 2 }]],
+                [MOVE_SAGA, [{ version: 3 }]],
+            ],
         })
+        const { service, inbox, logger } = await build(manager)
+        const compensation = compensationOf()
 
-        it("answers null when the run does not exist", async () => {
-            const { service } = await build(mockEntityManager({ query: [readOf(null)] }))
+        expect(await service.compensate({ ...RUN, eventId: "e-1", step: STEP, compensation })).toBe("applied")
 
-            expect(await service.state(RUN)).toBeNull()
+        expect(inbox.claims).toEqual([{ source: "saga:place-order", eventId: "e-1" }])
+        expect(manager.query).toHaveBeenNthCalledWith(2, MOVE_SAGA, [
+            "place-order",
+            "o-1",
+            "running",
+            1,
+            "compensating",
+            new Date(AT),
+        ])
+        expect(manager.query).toHaveBeenNthCalledWith(3, MOVE_SAGA, [
+            "place-order",
+            "o-1",
+            "compensating",
+            2,
+            "compensated",
+            new Date(AT),
+        ])
+        expect(logger.info).toHaveBeenCalledWith(SagaLogEvent.Compensating, {
+            saga: "place-order",
+            correlationId: "o-1",
+            step: "reserve-order",
+            event: "order.placed",
         })
+        expect(compensation.run).toHaveBeenCalledWith("o-1")
+    })
+})
+
+describe("SagaService compensate ignored deliveries", () => {
+    it("does nothing for a redelivered event", async () => {
+        const { service } = await build(mockEntityManager(), false)
+        const compensation = compensationOf()
+
+        expect(await service.compensate({ ...RUN, eventId: "e-1", step: STEP, compensation })).toBe("duplicate")
+
+        expect(compensation.run).not.toHaveBeenCalled()
     })
 
-    describe("compensate", () => {
-        it("claims the event, moves the run to compensating, runs the compensation and settles it as compensated", async () => {
-            const manager = mockEntityManager({
-                query: [
-                    readOf({ status: "running", version: 1 }),
-                    [MOVE_SAGA, [{ version: 2 }]],
-                    [MOVE_SAGA, [{ version: 3 }]],
-                ],
-            })
-            const { service, inbox, logger } = await build(manager)
-            const compensation = compensationOf()
+    it("ignores an event of a run that does not exist or has settled", async () => {
+        const compensation = compensationOf()
+        const unknown = await build(mockEntityManager({ query: [readOf(null)] }))
+        const completed = await build(mockEntityManager({ query: [readOf({ status: "completed", version: 2 })] }))
+        const compensated = await build(mockEntityManager({ query: [readOf({ status: "compensated", version: 3 })] }))
 
-            expect(await service.compensate({ ...RUN, eventId: "e-1", step: STEP, compensation })).toBe("applied")
+        expect(await unknown.service.compensate({ ...RUN, eventId: "e-1", step: STEP, compensation })).toBe("ignored")
+        expect(await completed.service.compensate({ ...RUN, eventId: "e-2", step: STEP, compensation })).toBe("ignored")
+        expect(await compensated.service.compensate({ ...RUN, eventId: "e-3", step: STEP, compensation })).toBe(
+            "ignored",
+        )
 
-            expect(inbox.claims).toEqual([{ source: "saga:place-order", eventId: "e-1" }])
-            expect(manager.query).toHaveBeenNthCalledWith(2, MOVE_SAGA, [
-                "place-order",
-                "o-1",
-                "running",
-                1,
-                "compensating",
-                new Date(AT),
-            ])
-            expect(manager.query).toHaveBeenNthCalledWith(3, MOVE_SAGA, [
-                "place-order",
-                "o-1",
-                "compensating",
-                2,
-                "compensated",
-                new Date(AT),
-            ])
-            expect(logger.info).toHaveBeenCalledWith(SagaLogEvent.Compensating, {
-                saga: "place-order",
-                correlationId: "o-1",
-                step: "reserve-order",
-                event: "order.placed",
-            })
-            expect(compensation.run).toHaveBeenCalledWith("o-1")
-        })
-
-        it("does nothing for a redelivered event", async () => {
-            const { service } = await build(mockEntityManager(), false)
-            const compensation = compensationOf()
-
-            expect(await service.compensate({ ...RUN, eventId: "e-1", step: STEP, compensation })).toBe("duplicate")
-
-            expect(compensation.run).not.toHaveBeenCalled()
-        })
-
-        it("ignores an event of a run that does not exist or has settled", async () => {
-            const compensation = compensationOf()
-            const unknown = await build(mockEntityManager({ query: [readOf(null)] }))
-            const completed = await build(mockEntityManager({ query: [readOf({ status: "completed", version: 2 })] }))
-            const compensated = await build(
-                mockEntityManager({ query: [readOf({ status: "compensated", version: 3 })] }),
-            )
-
-            expect(await unknown.service.compensate({ ...RUN, eventId: "e-1", step: STEP, compensation })).toBe(
-                "ignored",
-            )
-            expect(await completed.service.compensate({ ...RUN, eventId: "e-2", step: STEP, compensation })).toBe(
-                "ignored",
-            )
-            expect(await compensated.service.compensate({ ...RUN, eventId: "e-3", step: STEP, compensation })).toBe(
-                "ignored",
-            )
-
-            expect(compensation.run).not.toHaveBeenCalled()
-        })
-
-        it("ignores the event when another transition moved the run first", async () => {
-            const { service } = await build(
-                mockEntityManager({ query: [readOf({ status: "running", version: 1 }), [MOVE_SAGA, []]] }),
-            )
-            const compensation = compensationOf()
-
-            expect(await service.compensate({ ...RUN, eventId: "e-1", step: STEP, compensation })).toBe("ignored")
-
-            expect(compensation.run).not.toHaveBeenCalled()
-        })
-
-        it("resumes a run that crashed while compensating without moving it to compensating again", async () => {
-            const manager = mockEntityManager({
-                query: [readOf({ status: "compensating", version: 2 }), [MOVE_SAGA, [{ version: 3 }]]],
-            })
-            const { service } = await build(manager)
-            const compensation = compensationOf()
-
-            expect(await service.compensate({ ...RUN, eventId: "e-1", step: STEP, compensation })).toBe("applied")
-
-            expect(manager.query).toHaveBeenCalledTimes(2)
-            expect(compensation.run).toHaveBeenCalledWith("o-1")
-        })
-
-        it("gives the event back and rethrows when the compensation fails, so the redelivery resumes the run", async () => {
-            const failure = new Error("order database down")
-            const { service, inbox } = await build(
-                mockEntityManager({
-                    query: [readOf({ status: "running", version: 1 }), [MOVE_SAGA, [{ version: 2 }]]],
-                }),
-            )
-            const compensation = compensationOf(() => Promise.reject(failure))
-
-            await expect(service.compensate({ ...RUN, eventId: "e-1", step: STEP, compensation })).rejects.toBe(failure)
-
-            expect(inbox.released).toEqual([{ source: "saga:place-order", eventId: "e-1" }])
-        })
+        expect(compensation.run).not.toHaveBeenCalled()
     })
 
-    describe("complete", () => {
-        it("claims the event and settles a running run as completed", async () => {
-            const manager = mockEntityManager({
+    it("ignores the event when another transition moved the run first", async () => {
+        const { service } = await build(
+            mockEntityManager({ query: [readOf({ status: "running", version: 1 }), [MOVE_SAGA, []]] }),
+        )
+        const compensation = compensationOf()
+
+        expect(await service.compensate({ ...RUN, eventId: "e-1", step: STEP, compensation })).toBe("ignored")
+
+        expect(compensation.run).not.toHaveBeenCalled()
+    })
+})
+
+describe("SagaService compensate recovery", () => {
+    it("resumes a run that crashed while compensating without moving it to compensating again", async () => {
+        const manager = mockEntityManager({
+            query: [readOf({ status: "compensating", version: 2 }), [MOVE_SAGA, [{ version: 3 }]]],
+        })
+        const { service } = await build(manager)
+        const compensation = compensationOf()
+
+        expect(await service.compensate({ ...RUN, eventId: "e-1", step: STEP, compensation })).toBe("applied")
+
+        expect(manager.query).toHaveBeenCalledTimes(2)
+        expect(compensation.run).toHaveBeenCalledWith("o-1")
+    })
+
+    it("gives the event back and rethrows when the compensation fails, so the redelivery resumes the run", async () => {
+        const failure = new Error("order database down")
+        const { service, inbox } = await build(
+            mockEntityManager({
                 query: [readOf({ status: "running", version: 1 }), [MOVE_SAGA, [{ version: 2 }]]],
-            })
-            const { service, inbox } = await build(manager)
+            }),
+        )
+        const compensation = compensationOf(() => Promise.reject(failure))
 
-            expect(await service.complete({ ...RUN, eventId: "e-1" })).toBe("applied")
+        await expect(service.compensate({ ...RUN, eventId: "e-1", step: STEP, compensation })).rejects.toBe(failure)
 
-            expect(inbox.claims).toEqual([{ source: "saga:place-order", eventId: "e-1" }])
-            expect(manager.query).toHaveBeenNthCalledWith(2, MOVE_SAGA, [
-                "place-order",
-                "o-1",
-                "running",
-                1,
-                "completed",
-                new Date(AT),
-            ])
+        expect(inbox.released).toEqual([{ source: "saga:place-order", eventId: "e-1" }])
+    })
+})
+
+describe("SagaService complete", () => {
+    it("claims the event and settles a running run as completed", async () => {
+        const manager = mockEntityManager({
+            query: [readOf({ status: "running", version: 1 }), [MOVE_SAGA, [{ version: 2 }]]],
         })
+        const { service, inbox } = await build(manager)
 
-        it("does nothing for a redelivered event", async () => {
-            const { service } = await build(mockEntityManager(), false)
+        expect(await service.complete({ ...RUN, eventId: "e-1" })).toBe("applied")
 
-            expect(await service.complete({ ...RUN, eventId: "e-1" })).toBe("duplicate")
-        })
+        expect(inbox.claims).toEqual([{ source: "saga:place-order", eventId: "e-1" }])
+        expect(manager.query).toHaveBeenNthCalledWith(2, MOVE_SAGA, [
+            "place-order",
+            "o-1",
+            "running",
+            1,
+            "completed",
+            new Date(AT),
+        ])
+    })
 
-        it("ignores an event of a run that does not exist or is not running any more", async () => {
-            const unknown = await build(mockEntityManager({ query: [readOf(null)] }))
-            const compensated = await build(
-                mockEntityManager({ query: [readOf({ status: "compensated", version: 3 })] }),
-            )
+    it("does nothing for a redelivered event", async () => {
+        const { service } = await build(mockEntityManager(), false)
 
-            expect(await unknown.service.complete({ ...RUN, eventId: "e-1" })).toBe("ignored")
-            expect(await compensated.service.complete({ ...RUN, eventId: "e-2" })).toBe("ignored")
-        })
+        expect(await service.complete({ ...RUN, eventId: "e-1" })).toBe("duplicate")
+    })
 
-        it("ignores the event when another transition moved the run first", async () => {
-            const { service } = await build(
-                mockEntityManager({ query: [readOf({ status: "running", version: 1 }), [MOVE_SAGA, []]] }),
-            )
+    it("ignores an event of a run that does not exist or is not running any more", async () => {
+        const unknown = await build(mockEntityManager({ query: [readOf(null)] }))
+        const compensated = await build(mockEntityManager({ query: [readOf({ status: "compensated", version: 3 })] }))
 
-            expect(await service.complete({ ...RUN, eventId: "e-1" })).toBe("ignored")
-        })
+        expect(await unknown.service.complete({ ...RUN, eventId: "e-1" })).toBe("ignored")
+        expect(await compensated.service.complete({ ...RUN, eventId: "e-2" })).toBe("ignored")
+    })
+
+    it("ignores the event when another transition moved the run first", async () => {
+        const { service } = await build(
+            mockEntityManager({ query: [readOf({ status: "running", version: 1 }), [MOVE_SAGA, []]] }),
+        )
+
+        expect(await service.complete({ ...RUN, eventId: "e-1" })).toBe("ignored")
     })
 })

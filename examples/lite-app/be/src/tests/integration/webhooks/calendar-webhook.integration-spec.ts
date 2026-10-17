@@ -1,15 +1,16 @@
-import { createHmac, randomUUID } from "node:crypto"
+import assert from "node:assert/strict"
+import { createHmac } from "node:crypto"
 import type { RawBodyRequest } from "@nestjs/common"
 import type { Request } from "express"
-import { FakeClock, mock } from "@starci/jest-preset"
+import { FakeClock, fakeIds, mock } from "@starci/jest-preset"
 import { CalendarWebhook } from "@features/webhooks/calendar/transport/http/calendar.webhook"
 import { CalendarDeliveryProcessor } from "@features/jobs/calendar-delivery/transport/queue/calendar-delivery.processor"
 import { ProcessCalendarDeliveryStep } from "@features/jobs/calendar-delivery/steps/process-calendar-delivery.step"
 import { CalendarInboxService } from "@modules/domain/calendar-inbox"
 import { CalendarsService } from "@modules/domain/calendars"
 import { Secret } from "@modules/platform/config"
-import { WebhookSignatureService } from "@modules/platform/http-security/webhook-signature.service"
-import type { HttpSecurityOptions } from "@modules/platform/http-security/http-security.options"
+import { WebhookSignatureService } from "@modules/platform/http-security"
+import type { HttpSecurityOptions } from "@modules/platform/http-security"
 import { HttpSecurityErrorCode } from "@modules/platform/http-security/errors/http-security.error"
 import type { JobClaims } from "@modules/platform/jobs"
 import type { Logger } from "@modules/platform/logging"
@@ -17,13 +18,13 @@ import { PgmqQueueTransportClient } from "@modules/platform/queue/pgmq-queue-tra
 import { QueueOutboxService } from "@modules/platform/queue/queue-outbox.service"
 import type { QueueOptions } from "@modules/platform/queue/queue.options"
 import { CalendarDeliveryQueue, CALENDAR_DELIVERY_QUEUE } from "@modules/queues/calendar-delivery"
-import { QueueDatabaseFixture } from "../../fixtures/queue.database.fixture"
+import { createQueueDatabaseWorld } from "../../world/queue.database.builder"
 
 const clock = new FakeClock("2026-10-14T00:00:00.000Z")
 const signingFixture = "integration-calendar-provider-fixture"
 const payload = { id: "calendar-proof" }
 const body = Buffer.from(JSON.stringify(payload))
-const request = { rawBody: body } as RawBodyRequest<Request>
+const request = mock<RawBodyRequest<Request>>({ rawBody: body })
 const securityOptions: HttpSecurityOptions = {
     allowedOrigins: [],
     rateLimit: { windowMs: 60_000, defaultLimit: 100, strictLimit: 10 },
@@ -74,19 +75,31 @@ describe("calendar webhook verification collaboration", () => {
 })
 
 /** Real receipt/pgmq transactions prove concurrent intake dedupe and deferred, locked receipt consumption. */
-const world = new QueueDatabaseFixture()
+const world = createQueueDatabaseWorld()
 
-const deliveryId = `webhook-proof-${randomUUID()}`
+const deliveryId = `webhook-proof-${fakeIds().next()}`
 
 const receiptIds: Array<string> = []
 
+interface CalendarReceiptIdRow {
+    readonly id: string
+}
+
+interface CalendarReceiptRow extends CalendarReceiptIdRow {
+    readonly processed_at: Date | null
+}
+
+interface CalendarReceiptReference {
+    readonly receiptId: string
+}
+
 interface RecordedJob {
     readonly id: string
-    readonly payload: { readonly receiptId: string }
+    readonly payload: CalendarReceiptReference
 }
 
 const committedHandoff = async (): Promise<RecordedJob> => {
-    const receipts: Array<{ id: string; processed_at: Date | null }> = await world.manager.query(
+    const receipts: Array<CalendarReceiptRow> = await world.manager.query(
         "SELECT id, processed_at FROM public.calendar_inbox WHERE provider = $1 AND delivery_id = $2",
         ["calendar", deliveryId],
     )
@@ -99,7 +112,7 @@ const committedHandoff = async (): Promise<RecordedJob> => {
     )
     expect(jobs).toHaveLength(1)
     const [job] = jobs
-    if (!job) throw new Error("Accepted calendar receipt must publish a typed queue outbox message")
+    assert(job !== undefined, "Accepted calendar receipt must publish a typed queue outbox message")
     expect(job.payload).toEqual({ receiptId: receipts[0]?.id })
     expect(
         await world.manager.query("SELECT message FROM pgmq.q_calendar_delivery WHERE message->>'jobId' = $1", [
@@ -160,7 +173,7 @@ describe("calendar webhook handoff (local Supabase integration)", () => {
     afterAll(async () => {
         try {
             if (world.isOpen) {
-                const receipts: Array<{ id: string }> = await world.manager.query(
+                const receipts: Array<CalendarReceiptIdRow> = await world.manager.query(
                     "SELECT id FROM public.calendar_inbox WHERE provider = $1 AND delivery_id = $2",
                     ["calendar", deliveryId],
                 )

@@ -1,12 +1,11 @@
 import { Module } from "@nestjs/common"
 import type { DynamicModule } from "@nestjs/common"
 import { APP_FILTER, APP_GUARD } from "@nestjs/core"
-import { SystemHealthHttpModule } from "@features/api/system-health"
-import { AuthGuard, CredentialGuard, IdentityModule } from "@modules/domain/identity"
-import { LivenessModule } from "@modules/domain/liveness"
-import { NoteModule } from "@modules/domain/note"
+import { AuthGuard, CredentialGuard } from "@modules/domain/identity"
 import { ErrorsFilter } from "@modules/platform/errors"
 import { OriginGuard, RateLimitGuard } from "@modules/platform/http-security"
+import { apiModules } from "./compose/api"
+import { domainModules } from "./compose/domain"
 import { platformModules } from "./compose/platform"
 import type { CoreOptions } from "./core.options"
 
@@ -17,13 +16,7 @@ export class AppModule {
     static register(options: CoreOptions): DynamicModule {
         return {
             module: AppModule,
-            imports: [
-                ...platformModules(options),
-                IdentityModule.register({ isGlobal: true }),
-                LivenessModule.register({ isGlobal: true }),
-                NoteModule.register({ isGlobal: true }),
-                SystemHealthHttpModule.register({}),
-            ],
+            imports: [...platformModules(options), ...domainModules(), ...apiModules()],
             providers: [
                 { provide: APP_FILTER, useClass: ErrorsFilter },
                 { provide: APP_GUARD, useClass: RateLimitGuard },

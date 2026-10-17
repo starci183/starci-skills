@@ -27,6 +27,7 @@ export interface QueueOptions {
 
 /** A one-off producer writes an outbox row and exits; the running app owns delivery. */
 export interface QueueOutboxOnlyOptions {
+    /** Registers only the transactional outbox writer, leaving delivery to the running app. */
     readonly outboxOnly: true
 }
 

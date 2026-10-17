@@ -15,6 +15,10 @@ declare module "express-serve-static-core" {
 export enum PublicReason {
     /** Liveness and readiness probes. */
     Health = "health",
+    /** An authentication handshake that establishes a session. */
+    AuthHandshake = "auth-handshake",
+    /** A public catalog read. */
+    CatalogRead = "catalog-read",
     /** A webhook whose signature is verified before its domain intake runs. */
     SignedWebhook = "signed-webhook",
 }

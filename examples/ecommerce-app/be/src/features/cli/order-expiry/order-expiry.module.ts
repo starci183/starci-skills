@@ -5,4 +5,4 @@ import { TickCli } from "./subs/tick.cli"
 
 @Module({ providers: [OrderExpiryCli, TickCli] })
 /** The expiry command group; the app composes its domain capability. */
-export class OrderExpiryModule extends ConfigurableModuleClass {}
+export class OrderExpiryCliModule extends ConfigurableModuleClass {}

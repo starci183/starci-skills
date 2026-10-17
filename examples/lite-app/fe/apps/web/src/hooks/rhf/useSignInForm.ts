@@ -21,10 +21,7 @@ const failureOf = (kind: string): SignInFailure => FAILURES.find((each) => each 
 const signInSchemaOf = (messages: Readonly<Record<"emailInvalid" | "passwordShort" | "passwordLong", string>>) =>
     z.object({
         email: z.email({ error: messages.emailInvalid }).max(254, { error: messages.emailInvalid }),
-        password: z
-            .string()
-            .min(8, { error: messages.passwordShort })
-            .max(256, { error: messages.passwordLong }),
+        password: z.string().min(8, { error: messages.passwordShort }).max(256, { error: messages.passwordLong }),
     })
 
 /** The values of the sign-in form. */

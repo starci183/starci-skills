@@ -35,7 +35,7 @@ const build = async (entityManager: MockEntityManager, claimed = true) => {
     return { service: moduleRef.get(OrderPaymentService), inbox, bus, logger, receipts }
 }
 
-describe("OrderPaymentService", () => {
+const registerRecordPaymentTests = (): void => {
     describe("recordPayment", () => {
         it("claims the event first, then moves the pending order to paid, publishes order.paid and enqueues the receipt in one committed transaction", async () => {
             const tx = fakeTransaction(
@@ -89,7 +89,9 @@ describe("OrderPaymentService", () => {
             expect(inbox.released).toEqual([{ source: "billing-payment-confirmed", eventId: "o-1" }])
         })
     })
+}
 
+const registerExpireOverdueTests = (): void => {
     describe("expireOverdue", () => {
         it("expires the overdue pending orders of the window the payload names and publishes order.expired for each in the same transaction", async () => {
             const cutoff = new Date("2026-02-03T02:05:06.000Z")
@@ -136,4 +138,9 @@ describe("OrderPaymentService", () => {
             expect(bus.writes).toEqual([])
         })
     })
+}
+
+describe("OrderPaymentService", () => {
+    registerRecordPaymentTests()
+    registerExpireOverdueTests()
 })

@@ -1,13 +1,13 @@
-import { randomUUID } from "node:crypto"
+import assert from "node:assert/strict"
 import type { EntityManager } from "typeorm"
-import { FakeClock, mock } from "@starci/jest-preset"
+import { FakeClock, fakeIds, mock } from "@starci/jest-preset"
 import type { Logger } from "@modules/platform/logging"
 import { BookingReminderQueue, BOOKING_REMINDER_QUEUE } from "@modules/queues/booking-reminder"
 import { PgmqQueueTransportClient } from "@modules/platform/queue/pgmq-queue-transport.client"
 import { QueueOutboxService } from "@modules/platform/queue/queue-outbox.service"
 import { QueueRelayService } from "@modules/platform/queue/queue-relay.service"
 import type { QueueOptions } from "@modules/platform/queue/queue.options"
-import { QueueDatabaseFixture } from "../../fixtures/queue.database.fixture"
+import { createQueueDatabaseWorld } from "../../world/queue.database.builder"
 
 const options: QueueOptions = {
     relayIntervalMs: 1,
@@ -29,32 +29,42 @@ const messages = (manager: EntityManager, bookingId: string) =>
         bookingId,
     ])
 
-/** Actual Supabase PostgreSQL transactions and pgmq messages; use a disposable local CLI database. */
-const world = new QueueDatabaseFixture()
-
-const bookingIds: Array<string> = []
-
-let transport: PgmqQueueTransportClient
-
-let producer: BookingReminderQueue
-
-const nextBooking = () => {
-    const id = `proof-${randomUUID()}`
-    bookingIds.push(id)
-    return id
+interface QueueProof {
+    readonly world: ReturnType<typeof createQueueDatabaseWorld>
+    readonly transport: PgmqQueueTransportClient
+    readonly producer: BookingReminderQueue
+    readonly nextBooking: () => string
 }
 
-const registerAtomicQueueProof = () => {
+const registerAtomicQueueProof = (proof: () => QueueProof) => {
     it("queue/enqueue-atomic-with-transaction: business outbox and pgmq message are invisible before commit and both vanish on rollback", async () => {
+        const { world, producer, nextBooking } = proof()
         const kept = nextBooking()
         const lost = nextBooking()
-        await world.manager.transaction(async (tx) => {
+        let inserted: () => void = () => {}
+        const ready = new Promise<void>((resolve) => {
+            inserted = resolve
+        })
+        let commit: () => void = () => {}
+        const observationComplete = new Promise<void>((resolve) => {
+            commit = resolve
+        })
+        const transaction = world.manager.transaction(async (tx) => {
             await producer.enqueueRemindBooking({ bookingId: kept }, tx)
             expect(await outboxRows(tx, kept)).toHaveLength(1)
             expect(await messages(tx, kept)).toHaveLength(1)
+            inserted()
+            await observationComplete
+        })
+        try {
+            // Surface a transaction failure instead of waiting forever for its insertion signal.
+            await Promise.race([ready, transaction])
             expect(await outboxRows(world.manager, kept)).toEqual([])
             expect(await messages(world.manager, kept)).toEqual([])
-        })
+        } finally {
+            commit()
+            await transaction
+        }
         await expect(
             world.manager.transaction(async (tx) => {
                 await producer.enqueueRemindBooking({ bookingId: lost }, tx)
@@ -69,8 +79,9 @@ const registerAtomicQueueProof = () => {
     })
 }
 
-const registerRelayIdentityProof = () => {
+const registerRelayIdentityProof = (proof: () => QueueProof) => {
     it("queue/relay-job-id-is-outbox-id: the real relay atomically sends a SQL-side row under its outbox identity once", async () => {
+        const { world, transport, nextBooking } = proof()
         const bookingId = nextBooking()
         const [row] = await world.manager.query<Array<{ id: string }>>(
             "INSERT INTO public.queue (queue, payload, created_at) VALUES ($1, $2::jsonb, now()) RETURNING id",
@@ -91,8 +102,9 @@ const registerRelayIdentityProof = () => {
     })
 }
 
-const registerSchedulerProof = () => {
+const registerSchedulerProof = (proof: () => QueueProof) => {
     it("queue/scheduler-fires-once: re-registering the migration's named cron job leaves one scheduler row and one tick sends one message", async () => {
+        const { world } = proof()
         const rolledBack = new Error("restore the scheduler and tick after proof")
         await expect(
             world.manager.transaction(async (tx) => {
@@ -102,8 +114,7 @@ const registerSchedulerProof = () => {
                 )
                 expect(jobs).toHaveLength(1)
                 const [job] = jobs
-                if (!job)
-                    throw new Error("Apply the example's public-surface Supabase migration before integration proofs")
+                assert(job, "Apply the example's public-surface Supabase migration before integration proofs")
                 expect(job.schedule).toBe("*/15 * * * *")
                 expect(job.command.trim()).toBe("select private.booking_reminder_tick()")
                 const first = await tx.query("SELECT cron.schedule($1, $2, $3) AS jobid", [
@@ -136,6 +147,22 @@ const registerSchedulerProof = () => {
 }
 
 describe("lite queue (local Supabase integration)", () => {
+    /** Actual Supabase PostgreSQL transactions and pgmq messages; use a disposable local CLI database. */
+    const world = createQueueDatabaseWorld()
+
+    const bookingIds: Array<string> = []
+    const ids = fakeIds("a19")
+
+    let transport: PgmqQueueTransportClient
+
+    let producer: BookingReminderQueue
+
+    const nextBooking = () => {
+        const id = `proof-${ids.next()}`
+        bookingIds.push(id)
+        return id
+    }
+
     beforeAll(async () => {
         await world.open()
         transport = new PgmqQueueTransportClient(options, world.manager, mock<Logger>())
@@ -156,7 +183,8 @@ describe("lite queue (local Supabase integration)", () => {
             await world.close()
         }
     })
-    registerAtomicQueueProof()
-    registerRelayIdentityProof()
-    registerSchedulerProof()
+    const proof = () => ({ world, transport, producer, nextBooking })
+    registerAtomicQueueProof(proof)
+    registerRelayIdentityProof(proof)
+    registerSchedulerProof(proof)
 })

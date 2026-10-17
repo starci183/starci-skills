@@ -3,11 +3,13 @@
 import { useTranslations } from "next-intl"
 import { useCallback, useState } from "react"
 import { useMutateCreateCalendarSwr, useMutateCreateResourceSwr } from "@/hooks/swr"
-import type { GraphQLResponse } from "@/modules/api"
 import { useGraphQLWithToast } from "@/modules/toast"
 
+/** The outcome of a create command, as exposed by the workspace's SWR mutation. */
+type CreateResponse = Awaited<ReturnType<ReturnType<typeof useMutateCreateResourceSwr>["trigger"]>>
+
 /** One create command of the workspace: runs its SWR mutation through modules/toast and keeps the id it created. */
-const useCreateCommand = (trigger: () => Promise<GraphQLResponse<{ readonly id: string }>>, successMessage: string) => {
+const useCreateCommand = (trigger: () => Promise<CreateResponse>, successMessage: string) => {
     const runGraphQL = useGraphQLWithToast()
     const [createdId, setCreatedId] = useState<string>()
     const create = useCallback(async () => {

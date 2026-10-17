@@ -1,10 +1,21 @@
+import { Test } from "@nestjs/testing"
 import { presignS3Get, signS3Request } from "./receipt-storage-signature.policy"
 
 const AT = new Date("2026-10-01T12:00:00.000Z")
 
+const functions = { presignS3Get, signS3Request }
+const SUBJECT: unique symbol = Symbol("integrations/receipt-storage/receipt-storage-signature.policy")
+const build = async () => {
+    const moduleRef = await Test.createTestingModule({
+        providers: [{ provide: SUBJECT, useValue: { presignS3Get, signS3Request } }],
+    }).compile()
+    return moduleRef.get<typeof functions>(SUBJECT)
+}
+
 describe("signS3Request", () => {
-    it("signs the host, exact payload hash and request date with SigV4", () => {
-        const headers = signS3Request({
+    it("signs the host, exact payload hash and request date with SigV4", async () => {
+        const subject = await build()
+        const headers = subject.signS3Request({
             method: "PUT",
             url: "https://s3.example.test/receipts/receipt-1.json",
             payload: Buffer.from("{}"),
@@ -25,8 +36,9 @@ describe("signS3Request", () => {
 })
 
 describe("presignS3Get", () => {
-    it("builds an RFC 3986 encoded, expiring SigV4 URL", () => {
-        const signed = presignS3Get({
+    it("builds an RFC 3986 encoded, expiring SigV4 URL", async () => {
+        const subject = await build()
+        const signed = subject.presignS3Get({
             url: "https://s3.example.test/receipts/receipt-1.json",
             at: AT,
             expiresInSeconds: 900,

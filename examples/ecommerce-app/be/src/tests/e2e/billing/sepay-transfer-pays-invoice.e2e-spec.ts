@@ -69,187 +69,252 @@ describe("sepay transfer pays an invoice", () => {
             (row) => row.event_name === PaymentConfirmedEvent.eventName,
         ).length
 
-    it("webhooks/bad-signature-is-refused: a delivery with a wrong signature is answered 401 and leaves the invoice open", async () => {
-        const orderId = await orderWithInvoice("sepay-bad-signature")
+    it("webhooks/bad-signature-is-refused: a delivery with a wrong signature is answered 401 and leaves the invoice open", () =>
+        refusesBadSignature(world, orderWithInvoice, confirmationCountOf))
 
-        await world.fake.sepay.failNext({ badSignature: true })
-        const delivery = await world.fake.sepay.settle({ reference: orderId, amount: 4500 })
+    it("webhooks/replay-is-refused: a correctly signed delivery older than the replay window is answered 401 and changes nothing", () =>
+        refusesReplay(world, orderWithInvoice, confirmationCountOf))
 
-        expect(delivery?.status).toBe(401)
-        expect(await readRows(world.db.billing, BILLING_PAYMENTS_OF_ORDER, [orderId])).toEqual([])
-        expect((await readRows(world.db.billing, INVOICES_OF_ORDER, [orderId]))[0]?.status).toBe("issued")
-        expect(await confirmationCountOf(orderId)).toBe(0)
-    })
+    it("webhooks/accepted-delivery-publishes-once: a valid transfer pays the invoice once, whatever the repeats", () =>
+        acceptsTransferOnce(world, orderWithInvoice, confirmationCountOf))
 
-    it("webhooks/replay-is-refused: a correctly signed delivery older than the replay window is answered 401 and changes nothing", async () => {
-        const orderId = await orderWithInvoice("sepay-replay")
-        await world.fake.sepay.failNext({ badSignature: true })
-        await world.fake.sepay.settle({ reference: orderId, amount: 4500 })
+    it("a transfer of the wrong amount is accepted by the door but pays nothing: the invoice stays open for a correct transfer", () =>
+        keepsWrongAmountOpen(world, orderWithInvoice))
 
-        const stale = await world.fake.sepay.replayWebhook(orderId, { ageMs: STALE_AGE_MS })
-
-        expect(stale.status).toBe(401)
-        expect(await readRows(world.db.billing, BILLING_PAYMENTS_OF_ORDER, [orderId])).toEqual([])
-        expect((await readRows(world.db.billing, INVOICES_OF_ORDER, [orderId]))[0]?.status).toBe("issued")
-        expect(await confirmationCountOf(orderId)).toBe(0)
-    })
-
-    it("webhooks/accepted-delivery-publishes-once: a valid transfer pays the invoice once, whatever the repeats", async () => {
-        const orderId = await orderWithInvoice("sepay-accepted")
-
-        const delivery = await world.fake.sepay.settle({ reference: orderId, amount: 4500 })
-
-        expect(delivery?.status).toBe(204)
-        const paid = await world.waitFor("billing records the payment of the order", async () => {
-            const rows = await readRows(world.db.billing, BILLING_PAYMENTS_OF_ORDER, [orderId])
-            return rows[0] ?? null
-        })
-        expect(paid).toMatchObject({ order_id: orderId, amount_minor_units: 4500 })
-        expect((await readRows(world.db.billing, INVOICES_OF_ORDER, [orderId]))[0]?.status).toBe("paid")
-        expect(await confirmationCountOf(orderId)).toBe(1)
-        const claimsAfterFirst = await readCount(world.db.billing, INBOX_CLAIM_COUNT, "sepay")
-        expect(claimsAfterFirst).toBeGreaterThanOrEqual(1)
-
-        // A completed redelivery must add neither another payment, claim nor confirmation outbox row.
-        const repeated = await world.fake.sepay.replayWebhook(orderId)
-        expect(repeated.status).toBe(204)
-        expect(await readRows(world.db.billing, BILLING_PAYMENTS_OF_ORDER, [orderId])).toHaveLength(1)
-        expect(await readCount(world.db.billing, INBOX_CLAIM_COUNT, "sepay")).toBe(claimsAfterFirst)
-        expect(await confirmationCountOf(orderId)).toBe(1)
-    })
-
-    it("a transfer of the wrong amount is accepted by the door but pays nothing: the invoice stays open for a correct transfer", async () => {
-        const orderId = await orderWithInvoice("sepay-wrong-amount")
-
-        const delivery = await world.fake.sepay.settle({ reference: orderId, amount: 1000 })
-
-        expect(delivery?.status).toBe(204)
-        expect(await readRows(world.db.billing, BILLING_PAYMENTS_OF_ORDER, [orderId])).toEqual([])
-        expect((await readRows(world.db.billing, INVOICES_OF_ORDER, [orderId]))[0]?.status).toBe("issued")
-    })
-
-    it("webhooks/failed-transaction-keeps-transfer-retryable: claim, payment and confirmation roll back together even when compensating DELETE is refused", async () => {
-        filterSpy.mockClear()
-        const controlOrderId = await orderWithInvoice("sepay-delete-control")
-        const orderId = await orderWithInvoice("sepay-rollback-retry")
-        const control = present(
-            await world.fake.sepay.settle({ reference: controlOrderId, amount: 4500 }),
-            "committed DELETE-control delivery",
-        )
-        await world.fake.sepay.failNext({ badSignature: true })
-        const original = present(
-            await world.fake.sepay.settle({ reference: orderId, amount: 4500 }),
-            "unclaimed target transfer",
-        )
-        let faultDelivery = original
-        const billing = world.infra.postgresql.connection("billing")
-        const outboxFault = billing.writeFault("event_outbox", "insert")
-        const deleteFault = billing.writeFault("inbox_claims", "delete")
-        const faultNames = [outboxFault.name, deleteFault.name]
-
-        // The database is slot-isolated, not test-isolated: Root schedules this spec alone and serially.
-        try {
-            expect(control.status).toBe(204)
-            expect(original.status).toBe(401)
-            expect(await readRows(world.db.billing, TRANSFER_CLAIM_COUNT, ["sepay", control.body])).toEqual([
-                { count: 1 },
-            ])
-            expect(await readRows(world.db.billing, TRANSFER_CLAIM_COUNT, ["sepay", original.body])).toEqual([
-                { count: 0 },
-            ])
-            expect(await readRows(world.db.billing, BILLING_FAULT_OBJECT_COUNT, faultNames)).toEqual([{ count: 0 }])
-
-            await outboxFault.install()
-            await deleteFault.install()
-            expect(await readRows(world.db.billing, BILLING_FAULT_OBJECT_COUNT, faultNames)).toEqual([{ count: 4 }])
-
-            // A BEFORE ROW fault is not invoked when the DELETE matches no row.
-            await world.db.billing.query(DELETE_TRANSFER_CLAIM, ["sepay", original.body])
-            await expect(world.db.billing.query(DELETE_TRANSFER_CLAIM, ["sepay", control.body])).rejects.toMatchObject({
-                driverError: { code: deleteFault.errorCode, detail: deleteFault.name },
-            })
-            expect(await readRows(world.db.billing, TRANSFER_CLAIM_COUNT, ["sepay", control.body])).toEqual([
-                { count: 1 },
-            ])
-            await expect(world.db.billing.query(DUPLICATE_OUTBOX_ROW, [orderId])).rejects.toMatchObject({
-                driverError: { code: outboxFault.errorCode, detail: outboxFault.name },
-            })
-
-            // Re-sign the captured body freshly; subsequent replays preserve these exact valid headers and bytes.
-            faultDelivery = await world.fake.sepay.replayWebhook(orderId, { ageMs: 1 })
-            expect(faultDelivery.body).toBe(original.body)
-            expect(faultDelivery.status).toBe(500)
-            const rollbackState = {
-                claims: await readRows(world.db.billing, TRANSFER_CLAIM_COUNT, ["sepay", faultDelivery.body]),
-                payments: await readRows(world.db.billing, BILLING_PAYMENTS_OF_ORDER, [orderId]),
-                invoiceStatus: (await readRows(world.db.billing, INVOICES_OF_ORDER, [orderId]))[0]?.status,
-                confirmations: await confirmationCountOf(orderId),
-            }
-            expect(rollbackState).toEqual({
-                claims: [{ count: 0 }],
-                payments: [],
-                invoiceStatus: "issued",
-                confirmations: 0,
-            })
-            const routeError = present(
-                filterSpy.mock.calls
-                    .map(([error]) => error)
-                    .find(
-                        (error): error is QueryFailedError =>
-                            error instanceof QueryFailedError &&
-                            error.query.startsWith("INSERT INTO event_outbox") &&
-                            error.parameters?.[0] === orderId,
-                    ),
-                "the actual billing HTTP route's outbox failure",
-            )
-            expect(routeError.driverError).toMatchObject({
-                code: outboxFault.errorCode,
-                detail: outboxFault.name,
-            })
-            expect(routeError.parameters).toEqual([
-                orderId,
-                PaymentConfirmedEvent.eventName,
-                expect.any(String),
-                orderId,
-                expect.stringContaining(orderId),
-                expect.any(Date),
-            ])
-        } finally {
-            // Attempt both removals even if one fails, then attempt control cleanup and both independent reads.
-            const removed = await Promise.allSettled([deleteFault.restore(), outboxFault.restore()])
-            const controlRemoved = await Promise.allSettled([
-                world.db.billing.query(DELETE_TRANSFER_CLAIM, ["sepay", control.body]),
-            ])
-            const readable = await Promise.allSettled([
-                readRows(world.db.billing, BILLING_FAULT_OBJECT_COUNT, faultNames),
-                readRows(world.db.billing, TRANSFER_CLAIM_COUNT, ["sepay", control.body]),
-            ])
-            expect(removed).toEqual([
-                expect.objectContaining({ status: "fulfilled" }),
-                expect.objectContaining({ status: "fulfilled" }),
-            ])
-            expect(controlRemoved).toEqual([expect.objectContaining({ status: "fulfilled" })])
-            expect(readable).toEqual([
-                { status: "fulfilled", value: [{ count: 0 }] },
-                { status: "fulfilled", value: [{ count: 0 }] },
-            ])
-        }
-
-        const retried = await world.fake.sepay.replayWebhook(orderId)
-        expect(retried.body).toBe(faultDelivery.body)
-        expect(retried.headers).toEqual(faultDelivery.headers)
-        expect(retried.status).toBe(204)
-        expect(await readRows(world.db.billing, TRANSFER_CLAIM_COUNT, ["sepay", retried.body])).toEqual([{ count: 1 }])
-        expect(await readRows(world.db.billing, BILLING_PAYMENTS_OF_ORDER, [orderId])).toHaveLength(1)
-        expect((await readRows(world.db.billing, INVOICES_OF_ORDER, [orderId]))[0]?.status).toBe("paid")
-        expect(await confirmationCountOf(orderId)).toBe(1)
-
-        const repeated = await world.fake.sepay.replayWebhook(orderId)
-        expect(repeated.body).toBe(retried.body)
-        expect(repeated.headers).toEqual(retried.headers)
-        expect(repeated.status).toBe(204)
-        expect(await readRows(world.db.billing, TRANSFER_CLAIM_COUNT, ["sepay", repeated.body])).toEqual([{ count: 1 }])
-        expect(await readRows(world.db.billing, BILLING_PAYMENTS_OF_ORDER, [orderId])).toHaveLength(1)
-        expect(await confirmationCountOf(orderId)).toBe(1)
-    })
+    it("webhooks/failed-transaction-keeps-transfer-retryable: claim, payment and confirmation roll back together even when compensating DELETE is refused", () =>
+        retriesRolledBackTransfer(world, orderWithInvoice, confirmationCountOf, filterSpy))
 })
+
+async function refusesBadSignature(
+    world: ReturnType<typeof useTestWorld>,
+    orderWithInvoice: (name: string) => Promise<string>,
+    confirmationCountOf: (orderId: string) => Promise<number>,
+): Promise<void> {
+    const orderId = await orderWithInvoice("sepay-bad-signature")
+
+    await world.fake.sepay.failNext({ badSignature: true })
+    const delivery = await world.fake.sepay.settle({ reference: orderId, amount: 4500 })
+
+    expect(delivery?.status).toBe(401)
+    expect(await readRows(world.db.billing, BILLING_PAYMENTS_OF_ORDER, [orderId])).toEqual([])
+    expect((await readRows(world.db.billing, INVOICES_OF_ORDER, [orderId]))[0]?.status).toBe("issued")
+    expect(await confirmationCountOf(orderId)).toBe(0)
+}
+
+async function refusesReplay(
+    world: ReturnType<typeof useTestWorld>,
+    orderWithInvoice: (name: string) => Promise<string>,
+    confirmationCountOf: (orderId: string) => Promise<number>,
+): Promise<void> {
+    const orderId = await orderWithInvoice("sepay-replay")
+    await world.fake.sepay.failNext({ badSignature: true })
+    await world.fake.sepay.settle({ reference: orderId, amount: 4500 })
+
+    const stale = await world.fake.sepay.replayWebhook(orderId, { ageMs: STALE_AGE_MS })
+
+    expect(stale.status).toBe(401)
+    expect(await readRows(world.db.billing, BILLING_PAYMENTS_OF_ORDER, [orderId])).toEqual([])
+    expect((await readRows(world.db.billing, INVOICES_OF_ORDER, [orderId]))[0]?.status).toBe("issued")
+    expect(await confirmationCountOf(orderId)).toBe(0)
+}
+
+async function acceptsTransferOnce(
+    world: ReturnType<typeof useTestWorld>,
+    orderWithInvoice: (name: string) => Promise<string>,
+    confirmationCountOf: (orderId: string) => Promise<number>,
+): Promise<void> {
+    const orderId = await orderWithInvoice("sepay-accepted")
+
+    const delivery = await world.fake.sepay.settle({ reference: orderId, amount: 4500 })
+
+    expect(delivery?.status).toBe(204)
+    const paid = await world.waitFor("billing records the payment of the order", async () => {
+        const rows = await readRows(world.db.billing, BILLING_PAYMENTS_OF_ORDER, [orderId])
+        return rows[0] ?? null
+    })
+    expect(paid).toMatchObject({ order_id: orderId, amount_minor_units: 4500 })
+    expect((await readRows(world.db.billing, INVOICES_OF_ORDER, [orderId]))[0]?.status).toBe("paid")
+    expect(await confirmationCountOf(orderId)).toBe(1)
+    const claimsAfterFirst = await readCount(world.db.billing, INBOX_CLAIM_COUNT, "sepay")
+    expect(claimsAfterFirst).toBeGreaterThanOrEqual(1)
+
+    // A completed redelivery must add neither another payment, claim nor confirmation outbox row.
+    const repeated = await world.fake.sepay.replayWebhook(orderId)
+    expect(repeated.status).toBe(204)
+    expect(await readRows(world.db.billing, BILLING_PAYMENTS_OF_ORDER, [orderId])).toHaveLength(1)
+    expect(await readCount(world.db.billing, INBOX_CLAIM_COUNT, "sepay")).toBe(claimsAfterFirst)
+    expect(await confirmationCountOf(orderId)).toBe(1)
+}
+
+async function keepsWrongAmountOpen(
+    world: ReturnType<typeof useTestWorld>,
+    orderWithInvoice: (name: string) => Promise<string>,
+): Promise<void> {
+    const orderId = await orderWithInvoice("sepay-wrong-amount")
+
+    const delivery = await world.fake.sepay.settle({ reference: orderId, amount: 1000 })
+
+    expect(delivery?.status).toBe(204)
+    expect(await readRows(world.db.billing, BILLING_PAYMENTS_OF_ORDER, [orderId])).toEqual([])
+    expect((await readRows(world.db.billing, INVOICES_OF_ORDER, [orderId]))[0]?.status).toBe("issued")
+}
+
+async function retriesRolledBackTransfer(
+    world: ReturnType<typeof useTestWorld>,
+    orderWithInvoice: (name: string) => Promise<string>,
+    confirmationCountOf: (orderId: string) => Promise<number>,
+    filterSpy: jest.SpiedFunction<ErrorsFilter["catch"]>,
+): Promise<void> {
+    filterSpy.mockClear()
+    const controlOrderId = await orderWithInvoice("sepay-delete-control")
+    const orderId = await orderWithInvoice("sepay-rollback-retry")
+    const control = present(
+        await world.fake.sepay.settle({ reference: controlOrderId, amount: 4500 }),
+        "committed DELETE-control delivery",
+    )
+    await world.fake.sepay.failNext({ badSignature: true })
+    const original = present(
+        await world.fake.sepay.settle({ reference: orderId, amount: 4500 }),
+        "unclaimed target transfer",
+    )
+    let faultDelivery = original
+    const billing = world.infra.postgresql.connection("billing")
+    const outboxFault = billing.writeFault("event_outbox", "insert")
+    const deleteFault = billing.writeFault("inbox_claims", "delete")
+    const faultNames = [outboxFault.name, deleteFault.name]
+
+    // The database is slot-isolated, not test-isolated: Root schedules this spec alone and serially.
+    try {
+        await installBillingFaults(world, control, original, orderId, outboxFault, deleteFault, faultNames)
+        // Re-sign the captured body freshly; subsequent replays preserve these exact valid headers and bytes.
+        faultDelivery = await world.fake.sepay.replayWebhook(orderId, { ageMs: 1 })
+        expect(faultDelivery.body).toBe(original.body)
+        expect(faultDelivery.status).toBe(500)
+        await verifyBillingRollback(world, orderId, faultDelivery, confirmationCountOf, filterSpy, outboxFault)
+    } finally {
+        await restoreBillingFaults(world, control, outboxFault, deleteFault, faultNames)
+    }
+
+    const retried = await world.fake.sepay.replayWebhook(orderId)
+    expect(retried.body).toBe(faultDelivery.body)
+    expect(retried.headers).toEqual(faultDelivery.headers)
+    expect(retried.status).toBe(204)
+    expect(await readRows(world.db.billing, TRANSFER_CLAIM_COUNT, ["sepay", retried.body])).toEqual([{ count: 1 }])
+    expect(await readRows(world.db.billing, BILLING_PAYMENTS_OF_ORDER, [orderId])).toHaveLength(1)
+    expect((await readRows(world.db.billing, INVOICES_OF_ORDER, [orderId]))[0]?.status).toBe("paid")
+    expect(await confirmationCountOf(orderId)).toBe(1)
+
+    const repeated = await world.fake.sepay.replayWebhook(orderId)
+    expect(repeated.body).toBe(retried.body)
+    expect(repeated.headers).toEqual(retried.headers)
+    expect(repeated.status).toBe(204)
+    expect(await readRows(world.db.billing, TRANSFER_CLAIM_COUNT, ["sepay", repeated.body])).toEqual([{ count: 1 }])
+    expect(await readRows(world.db.billing, BILLING_PAYMENTS_OF_ORDER, [orderId])).toHaveLength(1)
+    expect(await confirmationCountOf(orderId)).toBe(1)
+}
+
+type BillingWorld = ReturnType<typeof useTestWorld>
+type BillingFault = ReturnType<ReturnType<BillingWorld["infra"]["postgresql"]["connection"]>["writeFault"]>
+type TransferDelivery = Awaited<ReturnType<BillingWorld["fake"]["sepay"]["replayWebhook"]>>
+
+async function installBillingFaults(
+    world: BillingWorld,
+    control: TransferDelivery,
+    original: TransferDelivery,
+    orderId: string,
+    outboxFault: BillingFault,
+    deleteFault: BillingFault,
+    faultNames: Array<string>,
+): Promise<void> {
+    expect(control.status).toBe(204)
+    expect(original.status).toBe(401)
+    expect(await readRows(world.db.billing, TRANSFER_CLAIM_COUNT, ["sepay", control.body])).toEqual([{ count: 1 }])
+    expect(await readRows(world.db.billing, TRANSFER_CLAIM_COUNT, ["sepay", original.body])).toEqual([{ count: 0 }])
+    expect(await readRows(world.db.billing, BILLING_FAULT_OBJECT_COUNT, faultNames)).toEqual([{ count: 0 }])
+
+    await outboxFault.install()
+    await deleteFault.install()
+    expect(await readRows(world.db.billing, BILLING_FAULT_OBJECT_COUNT, faultNames)).toEqual([{ count: 4 }])
+
+    // A BEFORE ROW fault is not invoked when the DELETE matches no row.
+    await world.db.billing.query(DELETE_TRANSFER_CLAIM, ["sepay", original.body])
+    await expect(world.db.billing.query(DELETE_TRANSFER_CLAIM, ["sepay", control.body])).rejects.toMatchObject({
+        driverError: { code: deleteFault.errorCode, detail: deleteFault.name },
+    })
+    expect(await readRows(world.db.billing, TRANSFER_CLAIM_COUNT, ["sepay", control.body])).toEqual([{ count: 1 }])
+    await expect(world.db.billing.query(DUPLICATE_OUTBOX_ROW, [orderId])).rejects.toMatchObject({
+        driverError: { code: outboxFault.errorCode, detail: outboxFault.name },
+    })
+}
+
+async function verifyBillingRollback(
+    world: BillingWorld,
+    orderId: string,
+    faultDelivery: TransferDelivery,
+    confirmationCountOf: (orderId: string) => Promise<number>,
+    filterSpy: jest.SpiedFunction<ErrorsFilter["catch"]>,
+    outboxFault: BillingFault,
+): Promise<void> {
+    const rollbackState = {
+        claims: await readRows(world.db.billing, TRANSFER_CLAIM_COUNT, ["sepay", faultDelivery.body]),
+        payments: await readRows(world.db.billing, BILLING_PAYMENTS_OF_ORDER, [orderId]),
+        invoiceStatus: (await readRows(world.db.billing, INVOICES_OF_ORDER, [orderId]))[0]?.status,
+        confirmations: await confirmationCountOf(orderId),
+    }
+    expect(rollbackState).toEqual({
+        claims: [{ count: 0 }],
+        payments: [],
+        invoiceStatus: "issued",
+        confirmations: 0,
+    })
+    const routeError = present(
+        filterSpy.mock.calls
+            .map(([error]) => error)
+            .find(
+                (error): error is QueryFailedError =>
+                    error instanceof QueryFailedError &&
+                    error.query.startsWith("INSERT INTO event_outbox") &&
+                    error.parameters?.[0] === orderId,
+            ),
+        "the actual billing HTTP route's outbox failure",
+    )
+    expect(routeError.driverError).toMatchObject({
+        code: outboxFault.errorCode,
+        detail: outboxFault.name,
+    })
+    expect(routeError.parameters).toEqual([
+        orderId,
+        PaymentConfirmedEvent.eventName,
+        expect.any(String),
+        orderId,
+        expect.stringContaining(orderId),
+        expect.any(Date),
+    ])
+}
+
+async function restoreBillingFaults(
+    world: BillingWorld,
+    control: TransferDelivery,
+    outboxFault: BillingFault,
+    deleteFault: BillingFault,
+    faultNames: Array<string>,
+): Promise<void> {
+    // Attempt both removals even if one fails, then attempt control cleanup and both independent reads.
+    const removed = await Promise.allSettled([deleteFault.restore(), outboxFault.restore()])
+    const controlRemoved = await Promise.allSettled([
+        world.db.billing.query(DELETE_TRANSFER_CLAIM, ["sepay", control.body]),
+    ])
+    const readable = await Promise.allSettled([
+        readRows(world.db.billing, BILLING_FAULT_OBJECT_COUNT, faultNames),
+        readRows(world.db.billing, TRANSFER_CLAIM_COUNT, ["sepay", control.body]),
+    ])
+    expect(removed).toEqual([
+        expect.objectContaining({ status: "fulfilled" }),
+        expect.objectContaining({ status: "fulfilled" }),
+    ])
+    expect(controlRemoved).toEqual([expect.objectContaining({ status: "fulfilled" })])
+    expect(readable).toEqual([
+        { status: "fulfilled", value: [{ count: 0 }] },
+        { status: "fulfilled", value: [{ count: 0 }] },
+    ])
+}

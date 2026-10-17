@@ -1,5 +1,6 @@
 import "reflect-metadata"
 import { NestFactory } from "@nestjs/core"
+import type { Application } from "express"
 import { SystemClock } from "@modules/platform/clock"
 import { EnvSource } from "@modules/platform/config"
 import { applySecurityHeaders } from "@modules/platform/http-security"
@@ -14,6 +15,8 @@ async function bootstrap(): Promise<void> {
     const app = await NestFactory.create(AppModule.register(options))
     app.enableShutdownHooks()
     applySecurityHeaders(app)
+    const server: Application = app.getHttpAdapter().getInstance()
+    server.set("trust proxy", 0)
     // The shop's browser calls this GraphQL API directly (owner ruling 2026-10-13): the allowlisted origins may.
     app.enableCors({ origin: [...options.httpSecurity.allowedOrigins] })
     await app.listen(options.port)

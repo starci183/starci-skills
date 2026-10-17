@@ -1,5 +1,6 @@
 import "reflect-metadata"
 import { NestFactory } from "@nestjs/core"
+import type { Application } from "express"
 import { SystemClock } from "@modules/platform/clock"
 import { EnvSource } from "@modules/platform/config"
 import { applySecurityHeaders } from "@modules/platform/http-security"
@@ -14,6 +15,9 @@ async function bootstrap(): Promise<void> {
     const app = await NestFactory.create(AppModule.register(options), { rawBody: true })
     app.enableShutdownHooks()
     applySecurityHeaders(app)
+    const server: Application = app.getHttpAdapter().getInstance()
+    server.set("trust proxy", 0)
+    app.enableCors({ origin: [...options.httpSecurity.allowedOrigins] })
     await app.listen(options.port)
     createJsonLogger(new SystemClock()).info(LoggingLogEvent.ServerStarted, {
         service: "billing",

@@ -1,9 +1,7 @@
 import { Module } from "@nestjs/common"
 import type { DynamicModule } from "@nestjs/common"
-import { CliModule } from "@features/cli"
-import { ClockModule } from "@modules/platform/clock"
-import { DatabaseModule } from "@modules/platform/database"
-import { LoggingModule } from "@modules/platform/logging"
+import { cliModules } from "./compose/cli"
+import { platformModules } from "./compose/platform"
 import type { CliAppOptions } from "./cli.options"
 
 @Module({})
@@ -16,15 +14,7 @@ export class AppModule {
     static register(options: CliAppOptions): DynamicModule {
         return {
             module: AppModule,
-            imports: [
-                ClockModule.register({ isGlobal: true }),
-                LoggingModule.register({ isGlobal: true }),
-                DatabaseModule.register({
-                    isGlobal: true,
-                    connections: options.connections,
-                }),
-                CliModule.register({}),
-            ],
+            imports: [...platformModules(options), ...cliModules()],
         }
     }
 }

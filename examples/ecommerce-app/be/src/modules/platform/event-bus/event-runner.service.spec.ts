@@ -87,199 +87,205 @@ const build = async (register = true) => {
     return { runner, transport, logger, handle, subscriptions }
 }
 
-describe("EventRunnerService", () => {
-    describe("onApplicationBootstrap", () => {
-        it("subscribes to the main and retry topic of every registered event", async () => {
-            const { runner, subscriptions } = await build()
+describe("EventRunnerService onApplicationBootstrap", () => {
+    it("subscribes to the main and retry topic of every registered event", async () => {
+        const { runner, subscriptions } = await build()
 
-            await runner.onApplicationBootstrap()
+        await runner.onApplicationBootstrap()
 
-            expect(subscriptions.map((subscription) => subscription.topics)).toEqual([
-                ["run-1.events.probe", "run-1.events.probe.retry"],
-            ])
+        expect(subscriptions.map((subscription) => subscription.topics)).toEqual([
+            ["run-1.events.probe", "run-1.events.probe.retry"],
+        ])
+    })
+
+    it("subscribes to nothing when no consumer registered", async () => {
+        const { runner, transport } = await build(false)
+
+        await runner.onApplicationBootstrap()
+
+        expect(transport.subscribe).not.toHaveBeenCalled()
+    })
+
+    it("hands what the transport delivers to receive", async () => {
+        const { runner, subscriptions, handle } = await build()
+        handle.mockResolvedValue(undefined)
+        await runner.onApplicationBootstrap()
+
+        await subscriptions[0]?.onMessage(message())
+
+        expect(handle).toHaveBeenCalledTimes(1)
+    })
+})
+
+describe("EventRunnerService receive consumer delivery", () => {
+    it("hands the parsed event to its consumer with the event id and the first attempt", async () => {
+        const { runner, handle, transport } = await build()
+        handle.mockResolvedValue(undefined)
+
+        await runner.receive(message())
+
+        expect(handle).toHaveBeenCalledWith({
+            eventId: "o-1",
+            event: new PingEvent("o-1", { ref: "o-1" }),
+            attempt: 1,
         })
+        expect(transport.send).not.toHaveBeenCalled()
+    })
 
-        it("subscribes to nothing when no consumer registered", async () => {
-            const { runner, transport } = await build(false)
+    it("hands one event to every consumer registered for it and retries it once when any of them failed", async () => {
+        const { runner, handle, transport } = await build()
+        const second = jest.fn<Promise<void>, Array<never>>()
+        const third = jest.fn<Promise<void>, Array<never>>()
+        handle.mockRejectedValue(new Error("the first consumer failed"))
+        second.mockResolvedValue(undefined)
+        third.mockRejectedValue(new Error("the third consumer failed too"))
+        runner.add({ event: PingEvent, handle: second })
+        runner.add({ event: PingEvent, handle: third })
 
-            await runner.onApplicationBootstrap()
+        await runner.receive(message())
 
-            expect(transport.subscribe).not.toHaveBeenCalled()
+        expect(second).toHaveBeenCalledTimes(1)
+        expect(third).toHaveBeenCalledTimes(1)
+        expect(transport.send).toHaveBeenCalledTimes(1)
+    })
+})
+
+describe("EventRunnerService receive unhandled messages", () => {
+    it("leaves an event nobody here consumes alone", async () => {
+        const { runner, handle, transport, logger } = await build()
+
+        await runner.receive(
+            message({ value: JSON.stringify({ eventId: "x", eventName: "probe.other", payload: {} }) }),
+        )
+
+        expect(handle).not.toHaveBeenCalled()
+        expect(transport.send).not.toHaveBeenCalled()
+        expect(logger.warn).not.toHaveBeenCalled()
+    })
+
+    it("logs and skips a value that is not an envelope", async () => {
+        const { runner, handle, logger } = await build()
+
+        await runner.receive(message({ value: "not json" }))
+        await runner.receive(message({ value: JSON.stringify([1]) }))
+
+        expect(handle).not.toHaveBeenCalled()
+        expect(logger.error).toHaveBeenCalledWith(EventBusLogEvent.MessageSkipped, expect.any(SyntaxError), {
+            topic: "run-1.events.probe",
         })
+        expect(logger.warn).toHaveBeenCalledTimes(1)
+        expect(logger.warn).toHaveBeenCalledWith(EventBusLogEvent.MessageSkipped, { topic: "run-1.events.probe" })
+    })
+})
 
-        it("hands what the transport delivers to receive", async () => {
-            const { runner, subscriptions, handle } = await build()
-            handle.mockResolvedValue(undefined)
-            await runner.onApplicationBootstrap()
+describe("EventRunnerService receive invalid event payloads", () => {
+    it("buries an envelope the event class cannot read, without retrying it", async () => {
+        const { runner, handle, transport } = await build()
+        const value = JSON.stringify({ eventId: "o-2", eventName: "probe.ping", payload: {} })
 
-            await subscriptions[0]?.onMessage(message())
+        await runner.receive(message({ key: "o-2", value }))
 
-            expect(handle).toHaveBeenCalledTimes(1)
+        expect(handle).not.toHaveBeenCalled()
+        expect(transport.send).toHaveBeenCalledWith([
+            {
+                topic: "run-1.events.probe.dlq",
+                key: "o-2",
+                value,
+                headers: {
+                    attempt: "1",
+                    reason: "the envelope does not have the shape of the event",
+                    "origin-topic": "run-1.events.probe",
+                },
+            },
+        ])
+    })
+
+    it("buries once and runs no later consumer of the event when an envelope cannot be read", async () => {
+        const { runner, handle, transport } = await build()
+        const later = jest.fn<Promise<void>, Array<never>>()
+        runner.add({ event: PingEvent, handle: later })
+        const value = JSON.stringify({ eventId: "o-2", eventName: "probe.ping", payload: {} })
+
+        await runner.receive(message({ key: "o-2", value }))
+
+        expect(handle).not.toHaveBeenCalled()
+        expect(later).not.toHaveBeenCalled()
+        expect(transport.send).toHaveBeenCalledTimes(1)
+    })
+})
+
+describe("EventRunnerService receive failed deliveries", () => {
+    it("puts a failed delivery on the retry topic with the next attempt and a doubled backoff", async () => {
+        const { runner, handle, transport, logger } = await build()
+        const failure = new Error("the database is down")
+        handle.mockRejectedValue(failure)
+
+        await runner.receive(message({ headers: { attempt: "2" } }))
+
+        expect(transport.send).toHaveBeenCalledWith([
+            {
+                topic: "run-1.events.probe.retry",
+                key: "o-1",
+                value: message().value,
+                headers: { attempt: "3", "not-before": String(NOW + 1000) },
+            },
+        ])
+        expect(logger.error).toHaveBeenCalledWith(EventBusLogEvent.DeliveryFailed, failure, {
+            event: "probe.ping",
+            attempt: 2,
+        })
+        expect(logger.warn).toHaveBeenCalledWith(EventBusLogEvent.DeliveryRetried, {
+            event: "probe.ping",
+            attempt: 2,
+            reason: "the database is down",
         })
     })
 
-    describe("receive", () => {
-        it("hands the parsed event to its consumer with the event id and the first attempt", async () => {
-            const { runner, handle, transport } = await build()
-            handle.mockResolvedValue(undefined)
+    it("buries the delivery that ran out of attempts, naming the reason and the topic it came from", async () => {
+        const { runner, handle, transport, logger } = await build()
+        handle.mockRejectedValue("a text, not an error")
 
-            await runner.receive(message())
+        await runner.receive(message({ headers: { attempt: "5" } }))
 
-            expect(handle).toHaveBeenCalledWith({
-                eventId: "o-1",
-                event: new PingEvent("o-1", { ref: "o-1" }),
-                attempt: 1,
-            })
-            expect(transport.send).not.toHaveBeenCalled()
+        expect(transport.send).toHaveBeenCalledWith([
+            {
+                topic: "run-1.events.probe.dlq",
+                key: "o-1",
+                value: message().value,
+                headers: { attempt: "5", reason: "a text, not an error", "origin-topic": "run-1.events.probe" },
+            },
+        ])
+        expect(logger.warn).toHaveBeenCalledWith(EventBusLogEvent.DeliveryBuried, {
+            event: "probe.ping",
+            attempts: 5,
+            reason: "a text, not an error",
         })
+    })
+})
 
-        it("hands one event to every consumer registered for it and retries it once when any of them failed", async () => {
-            const { runner, handle, transport } = await build()
-            const second = jest.fn<Promise<void>, Array<never>>()
-            const third = jest.fn<Promise<void>, Array<never>>()
-            handle.mockRejectedValue(new Error("the first consumer failed"))
-            second.mockResolvedValue(undefined)
-            third.mockRejectedValue(new Error("the third consumer failed too"))
-            runner.add({ event: PingEvent, handle: second })
-            runner.add({ event: PingEvent, handle: third })
+describe("EventRunnerService receive retry timing", () => {
+    it("waits for the backoff of a retry message before handing it over", async () => {
+        const { runner, handle, transport } = await build()
+        handle.mockResolvedValue(undefined)
 
-            await runner.receive(message())
+        await runner.receive(
+            message({
+                topic: "run-1.events.probe.retry",
+                headers: { attempt: "2", "not-before": String(NOW + 800) },
+            }),
+        )
 
-            expect(second).toHaveBeenCalledTimes(1)
-            expect(third).toHaveBeenCalledTimes(1)
-            expect(transport.send).toHaveBeenCalledTimes(1)
-        })
+        expect(transport.wait).toHaveBeenCalledWith(800)
+        expect(handle).toHaveBeenCalledWith(expect.objectContaining({ attempt: 2 }))
+    })
 
-        it("leaves an event nobody here consumes alone", async () => {
-            const { runner, handle, transport, logger } = await build()
+    it("does not wait for a retry message whose backoff has passed", async () => {
+        const { runner, handle, transport } = await build()
+        handle.mockResolvedValue(undefined)
 
-            await runner.receive(
-                message({ value: JSON.stringify({ eventId: "x", eventName: "probe.other", payload: {} }) }),
-            )
+        await runner.receive(message({ headers: { attempt: "2", "not-before": String(NOW - 5) } }))
 
-            expect(handle).not.toHaveBeenCalled()
-            expect(transport.send).not.toHaveBeenCalled()
-            expect(logger.warn).not.toHaveBeenCalled()
-        })
-
-        it("logs and skips a value that is not an envelope", async () => {
-            const { runner, handle, logger } = await build()
-
-            await runner.receive(message({ value: "not json" }))
-            await runner.receive(message({ value: JSON.stringify([1]) }))
-
-            expect(handle).not.toHaveBeenCalled()
-            expect(logger.error).toHaveBeenCalledWith(EventBusLogEvent.MessageSkipped, expect.any(SyntaxError), {
-                topic: "run-1.events.probe",
-            })
-            expect(logger.warn).toHaveBeenCalledTimes(1)
-            expect(logger.warn).toHaveBeenCalledWith(EventBusLogEvent.MessageSkipped, { topic: "run-1.events.probe" })
-        })
-
-        it("buries an envelope the event class cannot read, without retrying it", async () => {
-            const { runner, handle, transport } = await build()
-            const value = JSON.stringify({ eventId: "o-2", eventName: "probe.ping", payload: {} })
-
-            await runner.receive(message({ key: "o-2", value }))
-
-            expect(handle).not.toHaveBeenCalled()
-            expect(transport.send).toHaveBeenCalledWith([
-                {
-                    topic: "run-1.events.probe.dlq",
-                    key: "o-2",
-                    value,
-                    headers: {
-                        attempt: "1",
-                        reason: "the envelope does not have the shape of the event",
-                        "origin-topic": "run-1.events.probe",
-                    },
-                },
-            ])
-        })
-
-        it("buries once and runs no later consumer of the event when an envelope cannot be read", async () => {
-            const { runner, handle, transport } = await build()
-            const later = jest.fn<Promise<void>, Array<never>>()
-            runner.add({ event: PingEvent, handle: later })
-            const value = JSON.stringify({ eventId: "o-2", eventName: "probe.ping", payload: {} })
-
-            await runner.receive(message({ key: "o-2", value }))
-
-            expect(handle).not.toHaveBeenCalled()
-            expect(later).not.toHaveBeenCalled()
-            expect(transport.send).toHaveBeenCalledTimes(1)
-        })
-
-        it("puts a failed delivery on the retry topic with the next attempt and a doubled backoff", async () => {
-            const { runner, handle, transport, logger } = await build()
-            const failure = new Error("the database is down")
-            handle.mockRejectedValue(failure)
-
-            await runner.receive(message({ headers: { attempt: "2" } }))
-
-            expect(transport.send).toHaveBeenCalledWith([
-                {
-                    topic: "run-1.events.probe.retry",
-                    key: "o-1",
-                    value: message().value,
-                    headers: { attempt: "3", "not-before": String(NOW + 1000) },
-                },
-            ])
-            expect(logger.error).toHaveBeenCalledWith(EventBusLogEvent.DeliveryFailed, failure, {
-                event: "probe.ping",
-                attempt: 2,
-            })
-            expect(logger.warn).toHaveBeenCalledWith(EventBusLogEvent.DeliveryRetried, {
-                event: "probe.ping",
-                attempt: 2,
-                reason: "the database is down",
-            })
-        })
-
-        it("buries the delivery that ran out of attempts, naming the reason and the topic it came from", async () => {
-            const { runner, handle, transport, logger } = await build()
-            handle.mockRejectedValue("a text, not an error")
-
-            await runner.receive(message({ headers: { attempt: "5" } }))
-
-            expect(transport.send).toHaveBeenCalledWith([
-                {
-                    topic: "run-1.events.probe.dlq",
-                    key: "o-1",
-                    value: message().value,
-                    headers: { attempt: "5", reason: "a text, not an error", "origin-topic": "run-1.events.probe" },
-                },
-            ])
-            expect(logger.warn).toHaveBeenCalledWith(EventBusLogEvent.DeliveryBuried, {
-                event: "probe.ping",
-                attempts: 5,
-                reason: "a text, not an error",
-            })
-        })
-
-        it("waits for the backoff of a retry message before handing it over", async () => {
-            const { runner, handle, transport } = await build()
-            handle.mockResolvedValue(undefined)
-
-            await runner.receive(
-                message({
-                    topic: "run-1.events.probe.retry",
-                    headers: { attempt: "2", "not-before": String(NOW + 800) },
-                }),
-            )
-
-            expect(transport.wait).toHaveBeenCalledWith(800)
-            expect(handle).toHaveBeenCalledWith(expect.objectContaining({ attempt: 2 }))
-        })
-
-        it("does not wait for a retry message whose backoff has passed", async () => {
-            const { runner, handle, transport } = await build()
-            handle.mockResolvedValue(undefined)
-
-            await runner.receive(message({ headers: { attempt: "2", "not-before": String(NOW - 5) } }))
-
-            expect(transport.wait).not.toHaveBeenCalled()
-            expect(handle).toHaveBeenCalledTimes(1)
-        })
+        expect(transport.wait).not.toHaveBeenCalled()
+        expect(handle).toHaveBeenCalledTimes(1)
     })
 })

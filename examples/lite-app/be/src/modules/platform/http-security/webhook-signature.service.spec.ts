@@ -42,133 +42,127 @@ const refusalOf = (action: () => void): unknown => {
     return undefined
 }
 
-describe("WebhookSignatureService", () => {
-    describe("verify", () => {
-        it("accepts a delivery signed with the provider secret inside the replay window", async () => {
-            const service = await build()
-            const timestamp = String(Date.parse(NOW) - 60_000)
+describe("WebhookSignatureService verify", () => {
+    it("accepts a delivery signed with the provider secret inside the replay window", async () => {
+        const service = await build()
+        const timestamp = String(Date.parse(NOW) - 60_000)
 
-            const refusal = refusalOf(() =>
+        const refusal = refusalOf(() =>
+            service.verify({
+                provider: "calendar",
+                rawBody: BODY,
+                signature: sign(timestamp, BODY),
+                timestamp,
+            }),
+        )
+
+        expect(refusal).toBeUndefined()
+    })
+
+    it("refuses a body that differs from the one that was signed", async () => {
+        const service = await build()
+        const timestamp = String(Date.parse(NOW))
+
+        const refusal = refusalOf(() =>
+            service.verify({
+                provider: "calendar",
+                rawBody: Buffer.from("{}"),
+                signature: sign(timestamp, BODY),
+                timestamp,
+            }),
+        )
+
+        expect(refusal).toBe(HttpSecurityErrorCode.WebhookSignatureInvalid)
+    })
+
+    it("refuses a delivery signed with another secret", async () => {
+        const service = await build()
+        const timestamp = String(Date.parse(NOW))
+
+        const refusal = refusalOf(() =>
+            service.verify({
+                provider: "calendar",
+                rawBody: BODY,
+                signature: sign(timestamp, BODY, "other-secret"),
+                timestamp,
+            }),
+        )
+
+        expect(refusal).toBe(HttpSecurityErrorCode.WebhookSignatureInvalid)
+    })
+})
+
+describe("WebhookSignatureService signature format", () => {
+    it("refuses a signature without the sha256 prefix and a signature of the wrong length", async () => {
+        const service = await build()
+        const timestamp = String(Date.parse(NOW))
+        const bare = sign(timestamp, BODY).slice("sha256=".length)
+
+        expect(
+            refusalOf(() => service.verify({ provider: "calendar", rawBody: BODY, signature: bare, timestamp })),
+        ).toBe(HttpSecurityErrorCode.WebhookSignatureInvalid)
+        expect(
+            refusalOf(() => service.verify({ provider: "calendar", rawBody: BODY, signature: "sha256=ab", timestamp })),
+        ).toBe(HttpSecurityErrorCode.WebhookSignatureInvalid)
+    })
+
+    it("refuses a delivery that lacks the body, the signature, the timestamp or a numeric timestamp", async () => {
+        const service = await build()
+        const timestamp = String(Date.parse(NOW))
+        const signature = sign(timestamp, BODY)
+        const invalid = HttpSecurityErrorCode.WebhookSignatureInvalid
+
+        expect(
+            refusalOf(() => service.verify({ provider: "calendar", rawBody: undefined, signature, timestamp })),
+        ).toBe(invalid)
+        expect(
+            refusalOf(() => service.verify({ provider: "calendar", rawBody: BODY, signature: undefined, timestamp })),
+        ).toBe(invalid)
+        expect(
+            refusalOf(() => service.verify({ provider: "calendar", rawBody: BODY, signature, timestamp: undefined })),
+        ).toBe(invalid)
+        expect(
+            refusalOf(() => service.verify({ provider: "calendar", rawBody: BODY, signature, timestamp: "yesterday" })),
+        ).toBe(invalid)
+    })
+})
+
+describe("WebhookSignatureService replay window and provider", () => {
+    it("refuses a correctly signed delivery whose timestamp is older or newer than the replay window", async () => {
+        const service = await build()
+        const stale = String(Date.parse(NOW) - 300_001)
+        const early = String(Date.parse(NOW) + 300_001)
+
+        expect(
+            refusalOf(() =>
                 service.verify({
                     provider: "calendar",
                     rawBody: BODY,
-                    signature: sign(timestamp, BODY),
-                    timestamp,
+                    signature: sign(stale, BODY),
+                    timestamp: stale,
                 }),
-            )
-
-            expect(refusal).toBeUndefined()
-        })
-
-        it("refuses a body that differs from the one that was signed", async () => {
-            const service = await build()
-            const timestamp = String(Date.parse(NOW))
-
-            const refusal = refusalOf(() =>
-                service.verify({
-                    provider: "calendar",
-                    rawBody: Buffer.from("{}"),
-                    signature: sign(timestamp, BODY),
-                    timestamp,
-                }),
-            )
-
-            expect(refusal).toBe(HttpSecurityErrorCode.WebhookSignatureInvalid)
-        })
-
-        it("refuses a delivery signed with another secret", async () => {
-            const service = await build()
-            const timestamp = String(Date.parse(NOW))
-
-            const refusal = refusalOf(() =>
+            ),
+        ).toBe(HttpSecurityErrorCode.WebhookReplayed)
+        expect(
+            refusalOf(() =>
                 service.verify({
                     provider: "calendar",
                     rawBody: BODY,
-                    signature: sign(timestamp, BODY, "other-secret"),
-                    timestamp,
+                    signature: sign(early, BODY),
+                    timestamp: early,
                 }),
-            )
+            ),
+        ).toBe(HttpSecurityErrorCode.WebhookReplayed)
+    })
 
-            expect(refusal).toBe(HttpSecurityErrorCode.WebhookSignatureInvalid)
-        })
+    it("refuses a provider the app did not configure", async () => {
+        const service = await build()
+        const timestamp = String(Date.parse(NOW))
 
-        it("refuses a signature without the sha256 prefix and a signature of the wrong length", async () => {
-            const service = await build()
-            const timestamp = String(Date.parse(NOW))
-            const bare = sign(timestamp, BODY).slice("sha256=".length)
+        const refusal = refusalOf(() =>
+            service.verify({ provider: "unknown", rawBody: BODY, signature: sign(timestamp, BODY), timestamp }),
+        )
 
-            expect(
-                refusalOf(() => service.verify({ provider: "calendar", rawBody: BODY, signature: bare, timestamp })),
-            ).toBe(HttpSecurityErrorCode.WebhookSignatureInvalid)
-            expect(
-                refusalOf(() =>
-                    service.verify({ provider: "calendar", rawBody: BODY, signature: "sha256=ab", timestamp }),
-                ),
-            ).toBe(HttpSecurityErrorCode.WebhookSignatureInvalid)
-        })
-
-        it("refuses a delivery that lacks the body, the signature, the timestamp or a numeric timestamp", async () => {
-            const service = await build()
-            const timestamp = String(Date.parse(NOW))
-            const signature = sign(timestamp, BODY)
-            const invalid = HttpSecurityErrorCode.WebhookSignatureInvalid
-
-            expect(
-                refusalOf(() => service.verify({ provider: "calendar", rawBody: undefined, signature, timestamp })),
-            ).toBe(invalid)
-            expect(
-                refusalOf(() =>
-                    service.verify({ provider: "calendar", rawBody: BODY, signature: undefined, timestamp }),
-                ),
-            ).toBe(invalid)
-            expect(
-                refusalOf(() =>
-                    service.verify({ provider: "calendar", rawBody: BODY, signature, timestamp: undefined }),
-                ),
-            ).toBe(invalid)
-            expect(
-                refusalOf(() =>
-                    service.verify({ provider: "calendar", rawBody: BODY, signature, timestamp: "yesterday" }),
-                ),
-            ).toBe(invalid)
-        })
-
-        it("refuses a correctly signed delivery whose timestamp is older or newer than the replay window", async () => {
-            const service = await build()
-            const stale = String(Date.parse(NOW) - 300_001)
-            const early = String(Date.parse(NOW) + 300_001)
-
-            expect(
-                refusalOf(() =>
-                    service.verify({
-                        provider: "calendar",
-                        rawBody: BODY,
-                        signature: sign(stale, BODY),
-                        timestamp: stale,
-                    }),
-                ),
-            ).toBe(HttpSecurityErrorCode.WebhookReplayed)
-            expect(
-                refusalOf(() =>
-                    service.verify({
-                        provider: "calendar",
-                        rawBody: BODY,
-                        signature: sign(early, BODY),
-                        timestamp: early,
-                    }),
-                ),
-            ).toBe(HttpSecurityErrorCode.WebhookReplayed)
-        })
-
-        it("refuses a provider the app did not configure", async () => {
-            const service = await build()
-            const timestamp = String(Date.parse(NOW))
-
-            const refusal = refusalOf(() =>
-                service.verify({ provider: "unknown", rawBody: BODY, signature: sign(timestamp, BODY), timestamp }),
-            )
-
-            expect(refusal).toBe(HttpSecurityErrorCode.WebhookProviderUnknown)
-        })
+        expect(refusal).toBe(HttpSecurityErrorCode.WebhookProviderUnknown)
     })
 })

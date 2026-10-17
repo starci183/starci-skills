@@ -1,7 +1,8 @@
 import { IsIn, IsInt, IsOptional, IsString, Length, Max, Min } from "class-validator"
+import { SepayTransferMapper } from "@modules/integrations/sepay"
 
 /** The bank transfer notice the notifier POSTs: every field bounded and validated, unknown fields refused by the global pipe. */
-export class SepayTransferRequest {
+export class SepayTransferRequest extends SepayTransferMapper {
     /** The notifier's id of this transfer; the inbox key of the intake. */
     @IsInt()
     @Min(1)
@@ -64,9 +65,4 @@ export class SepayTransferRequest {
     @IsString()
     @Length(0, 512)
     description!: string
-
-    /** The inbox key of the delivery: the notifier id of the transfer as text. */
-    get eventId(): string {
-        return String(this.id)
-    }
 }

@@ -1,7 +1,13 @@
 import { createBrowserClient } from "@supabase/ssr"
 import type { Session, SupabaseClient } from "@supabase/supabase-js"
-import { supabaseAnonKey, supabaseUrl } from "@/modules/config"
+import { cookieSecure, supabaseAnonKey, supabaseUrl } from "@/modules/config"
 import type { AuthClient, AuthFailure, AuthSession } from "./contracts"
+
+/**
+ * Supabase's browser client reads the shared PKCE and session cookies to refresh tokens and sign GraphQL requests.
+ * Keep them script-readable, with the same explicit transport and cross-site policy on both clients.
+ */
+export const authCookieOptions = () => ({ httpOnly: false, secure: cookieSecure(), sameSite: "lax" }) as const
 
 let client: SupabaseClient | undefined
 
@@ -12,6 +18,7 @@ let client: SupabaseClient | undefined
  */
 const supabase = (): SupabaseClient =>
     (client ??= createBrowserClient(supabaseUrl(), supabaseAnonKey(), {
+        cookieOptions: authCookieOptions(),
         auth: { flowType: "pkce", detectSessionInUrl: false, persistSession: true, autoRefreshToken: true },
     }))
 

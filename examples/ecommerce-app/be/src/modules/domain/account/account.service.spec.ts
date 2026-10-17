@@ -37,7 +37,7 @@ const build = async (entityManager: MockEntityManager) => {
     return { accounts: moduleRef.get(AccountService), sessions, keycloak, keycloakAdmin, orderApi }
 }
 
-describe("AccountService", () => {
+const registerRegisterTests = (): void => {
     describe("register", () => {
         it("creates the shopper in the realm and records the person under the subject it was given", async () => {
             const em = mockEntityManager({ query: [INSERT_PERSON_IF_NEW, []] })
@@ -63,7 +63,9 @@ describe("AccountService", () => {
             expect(em.query).not.toHaveBeenCalled()
         })
     })
+}
 
+const registerSignInTests = (): void => {
     describe("signIn", () => {
         it("signs in with the realm's password grant, records the person and opens a session keeping the refresh token", async () => {
             const em = mockEntityManager({ query: [INSERT_PERSON_IF_NEW, []] })
@@ -99,7 +101,9 @@ describe("AccountService", () => {
             await expect(accounts.signIn(CREDENTIALS)).rejects.toThrow("bug")
         })
     })
+}
 
+const registerGetAccountTests = (): void => {
     describe("getAccount", () => {
         it("succeeds with the id and email", async () => {
             const em = mockEntityManager({
@@ -120,7 +124,9 @@ describe("AccountService", () => {
             expect(await accounts.getAccount({ personId: "kc-9" })).toBeRefused(AccountErrorCode.PersonUnknown)
         })
     })
+}
 
+const registerOverviewTests = (): void => {
     describe("overview", () => {
         it("fails with the order service error instead of answering hasOrders false", async () => {
             const em = mockEntityManager({ findOneBy: [PersonEntity, personRow({ id: "kc-1" })] })
@@ -156,4 +162,11 @@ describe("AccountService", () => {
             expect(orderApi.getBuyerStatus).not.toHaveBeenCalled()
         })
     })
+}
+
+describe("AccountService", () => {
+    registerRegisterTests()
+    registerSignInTests()
+    registerGetAccountTests()
+    registerOverviewTests()
 })

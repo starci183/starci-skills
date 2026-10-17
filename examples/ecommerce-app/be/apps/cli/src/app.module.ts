@@ -1,10 +1,11 @@
 import { Module } from "@nestjs/common"
 import type { DynamicModule } from "@nestjs/common"
 import { commandsModules } from "./compose/commands"
-import { databaseModules } from "./compose/database"
+import { databaseConnections, databaseModules } from "./compose/database"
 import { domainModules } from "./compose/domain"
 import { platformModules } from "./compose/platform"
 import type { CliAppOptions } from "./cli.options"
+import type { CliEnv } from "./cli.env"
 
 @Module({})
 /**
@@ -13,7 +14,7 @@ import type { CliAppOptions } from "./cli.options"
  */
 export class AppModule {
     /** Builds the cli from its parsed options. */
-    static register(options: CliAppOptions): DynamicModule {
+    static register(options: CliEnv): DynamicModule {
         return {
             module: AppModule,
             imports: [
@@ -25,3 +26,9 @@ export class AppModule {
         }
     }
 }
+
+/** Composes the same database registrations for the test world's migration runner. */
+export const createCliAppOptions = (databases: CliEnv): CliAppOptions => ({
+    orderExpiry: databases.orderExpiry,
+    connections: [...databaseConnections(databases)],
+})

@@ -3,8 +3,8 @@ import type { CanActivate, ExecutionContext } from "@nestjs/common"
 import type { Reflector } from "@nestjs/core"
 import { InjectReflector } from "@modules/platform/composition"
 import { requestOf } from "@modules/platform/http-security"
-import type { OperationRequest } from "@modules/platform/http-security"
-import type { CredentialAuthenticator, CredentialMetadata, CredentialPrincipal } from "./credential.contracts"
+import type { CredentialAuthenticator, CredentialMetadata } from "./credential.contracts"
+import type { CredentialRequest } from "./types/credential-request"
 import { IdentityError, IdentityErrorCode } from "./errors/identity.error"
 import { CREDENTIAL_KEY, InjectCredentialAuthenticator } from "./identity.decorators"
 
@@ -27,10 +27,7 @@ export class CredentialGuard implements CanActivate {
             context.getClass(),
         ])
         if (metadata === undefined) return true
-        const request: OperationRequest & {
-            credentialPrincipal?: CredentialPrincipal
-            readonly params?: { readonly id?: unknown }
-        } = requestOf(context)
+        const request: CredentialRequest = requestOf(context)
         request.credentialPrincipal = undefined
         const id: unknown = request.params?.id
         const principal = await this.authenticator.authenticate(

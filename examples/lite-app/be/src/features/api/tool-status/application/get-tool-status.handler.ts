@@ -3,12 +3,12 @@ import { LivenessService } from "@modules/domain/liveness"
 import { ICQRSHandler } from "@modules/platform/cqrs"
 import { InjectLogger } from "@modules/platform/logging"
 import type { Logger } from "@modules/platform/logging"
-import type { GetToolStatusResult } from "./get-tool-status.contracts"
+import type { LivenessReport } from "@modules/domain/liveness"
 import { GetToolStatusQuery } from "./get-tool-status.query"
 
 @QueryHandler(GetToolStatusQuery)
 /** Answers the tool's status query from process-local liveness without touching a dependency. */
-export class GetToolStatusHandler extends ICQRSHandler<GetToolStatusQuery, GetToolStatusResult> {
+export class GetToolStatusHandler extends ICQRSHandler<GetToolStatusQuery, LivenessReport> {
     constructor(
         @InjectLogger() logger: Logger,
         private readonly liveness: LivenessService,
@@ -16,7 +16,7 @@ export class GetToolStatusHandler extends ICQRSHandler<GetToolStatusQuery, GetTo
         super(logger)
     }
 
-    protected override process(): Promise<GetToolStatusResult> {
+    protected override process(): Promise<LivenessReport> {
         return this.liveness.check()
     }
 }

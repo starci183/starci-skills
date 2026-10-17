@@ -1,9 +1,11 @@
 import type { ExecutionContext } from "@nestjs/common"
 import { Reflector } from "@nestjs/core"
-import type { ThrottlerStorage } from "@nestjs/throttler"
+import { Test } from "@nestjs/testing"
+import { ThrottlerStorage } from "@nestjs/throttler"
 import { mock } from "@starci/jest-preset"
 import { HttpSecurityError, HttpSecurityErrorCode } from "./errors/http-security.error"
 import type { OperationRequest } from "./http-security.contracts"
+import { HTTP_SECURITY_OPTIONS } from "./http-security.decorators"
 import type { RateLimitOptions } from "./http-security.options"
 import { RateLimit, RateLimitGuard, RateTier, throttlerOptionsOf } from "./rate-limit.guard"
 
@@ -30,7 +32,15 @@ const contextOf = (handler = defaultHandler) => {
 const build = async () => {
     const storage = mock<ThrottlerStorage>()
     const reflector = mock<Reflector>()
-    const guard = new RateLimitGuard(throttlerOptionsOf(rateLimit), storage, reflector)
+    const moduleRef = await Test.createTestingModule({
+        providers: [
+            RateLimitGuard,
+            { provide: HTTP_SECURITY_OPTIONS, useValue: { allowedOrigins: [], rateLimit, webhooks: {} } },
+            { provide: ThrottlerStorage, useValue: storage },
+            { provide: Reflector, useValue: reflector },
+        ],
+    }).compile()
+    const guard = moduleRef.get(RateLimitGuard)
     await guard.onModuleInit()
     return { guard, storage }
 }
@@ -47,7 +57,7 @@ const configuredTiers = () => {
     return { options, defaultTier, strictTier }
 }
 
-describe("rate limiting", () => {
+describe("rate limiting configuration", () => {
     it("builds one isolated window for each rate tier and disables response headers", () => {
         const { options, defaultTier, strictTier } = configuredTiers()
 
@@ -87,7 +97,9 @@ describe("rate limiting", () => {
         expect(defaultTier.skipIf?.(context)).toBe(false)
         expect(strictTier.skipIf?.(context)).toBe(true)
     })
+})
 
+describe("RateLimitGuard", () => {
     it("counts the caller address and headers in the default tier", async () => {
         const { guard, storage } = await build()
         storage.increment.mockResolvedValue({
@@ -99,7 +111,13 @@ describe("rate limiting", () => {
 
         await expect(guard.canActivate(contextOf())).resolves.toBe(true)
 
-        expect(storage.increment).toHaveBeenCalledWith(expect.any(String), 60_000, 100, 60_000, RateTier.Default)
+        expect(storage.increment).toHaveBeenCalledWith(
+            "0b00b8b6c442506be1bada0d8f5696dadc90069be14e14294aacc2f1c125c3cd",
+            60_000,
+            100,
+            60_000,
+            RateTier.Default,
+        )
     })
 
     it("reports a blocked strict-tier caller as rate limited", async () => {
@@ -115,6 +133,12 @@ describe("rate limiting", () => {
             code: HttpSecurityErrorCode.RateLimited,
         })
 
-        expect(storage.increment).toHaveBeenCalledWith(expect.any(String), 60_000, 10, 60_000, RateTier.Strict)
+        expect(storage.increment).toHaveBeenCalledWith(
+            "6602faeeddb2889204203c4383ebd5c274b199ad11195b5f6ee65b8ddd99dc9e",
+            60_000,
+            10,
+            60_000,
+            RateTier.Strict,
+        )
     })
 })

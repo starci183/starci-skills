@@ -4,7 +4,7 @@ import type { MockEntityManager } from "@starci/jest-preset"
 import { PRIMARY_ENTITY_MANAGER } from "@modules/platform/database"
 import { LOGGER } from "@modules/platform/logging"
 import type { Logger } from "@modules/platform/logging"
-import { LivenessErrorCode } from "./errors/liveness.error"
+import { LivenessError, LivenessErrorCode } from "./errors/liveness.error"
 import { CHECK_READINESS_DATABASE, CHECK_READINESS_JOBS } from "./persistence/readiness.sql"
 import { LivenessLogEvent } from "./readiness.log-events"
 import { ReadinessService } from "./readiness.service"
@@ -57,9 +57,29 @@ describe("ReadinessService", () => {
         expect(logger.error).toHaveBeenCalledWith(LivenessLogEvent.CheckFailed, expect.any(Error), { check: "jobs" })
     })
 
+    it("fails closed when a probe throws before returning a promise", async () => {
+        const manager = mockEntityManager()
+        const failure = new LivenessError({ code: LivenessErrorCode.Unavailable })
+        manager.query.mockImplementation(() => {
+            throw failure
+        })
+        const { readiness, logger } = await build(manager)
+
+        await expect(readiness.check()).rejects.toMatchObject({ code: LivenessErrorCode.Unavailable })
+        expect(logger.error).toHaveBeenCalledWith(LivenessLogEvent.CheckFailed, failure, { check: "database" })
+        expect(logger.error).toHaveBeenCalledWith(LivenessLogEvent.CheckFailed, failure, { check: "jobs" })
+    })
+})
+
+describe("ReadinessService probe responses", () => {
+    afterEach(() => jest.useRealTimers())
+
     it.each([
         [[], [{ stats: {} }]],
         [[{ ready: 0 }], [{ stats: {} }]],
+        [[{ stats: {} }], [{ stats: {} }]],
+        [[{ ready: 1 }], [{ ready: 1 }]],
+        [[{ ready: 1 }], [{ stats: "invalid" }]],
         [[{ ready: 1 }], []],
         [[{ ready: 1 }], [{ stats: null }]],
     ])("fails closed when the required probe answer is absent or invalid", async (database, jobs) => {
@@ -85,7 +105,9 @@ describe("ReadinessService", () => {
         await jest.advanceTimersByTimeAsync(3000)
         await failed
 
-        expect(logger.error).toHaveBeenCalledWith(LivenessLogEvent.CheckFailed, expect.any(Error), { check: "database" })
+        expect(logger.error).toHaveBeenCalledWith(LivenessLogEvent.CheckFailed, expect.any(Error), {
+            check: "database",
+        })
         expect(logger.error).toHaveBeenCalledWith(LivenessLogEvent.CheckFailed, expect.any(Error), { check: "jobs" })
         expect(jest.getTimerCount()).toBe(0)
     })

@@ -62,12 +62,12 @@ export class ReadinessService {
                     ? row !== undefined && "ready" in row && row.ready === 1
                     : row !== undefined && "stats" in row && row.stats !== null && typeof row.stats === "object"
             if (!answered) throw new LivenessError({ code: LivenessErrorCode.Unavailable, params: { check } })
-            return "ok"
         } catch (cause) {
             this.logger.error(LivenessLogEvent.CheckFailed, cause, { check })
             throw cause
         } finally {
             clearTimeout(timer)
         }
+        return "ok"
     }
 }

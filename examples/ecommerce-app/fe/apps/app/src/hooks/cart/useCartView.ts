@@ -1,4 +1,4 @@
-import type { QueryCartResponse } from "@/modules/api/graphql/queries/types/cart"
+import type { QueryCartResponse } from "../swr"
 import { useSession } from "../session"
 import { useQueryCartSwr } from "../swr"
 

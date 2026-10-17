@@ -1,7 +1,8 @@
+import { Test } from "@nestjs/testing"
 import { fakeTransaction, mockEntityManager } from "@starci/jest-preset"
 import type { EntityManager } from "typeorm"
 import { sql } from "./database.sql"
-import { DatabaseErrorCode } from "./errors/database.error"
+import { DatabaseError, DatabaseErrorCode } from "./errors/database.error"
 import { recordWebhookDelivery } from "./webhook-inbox.client"
 
 const INSERT = sql`INSERT INTO public.spec_inbox (provider, delivery_id, payload) VALUES ($1, $2, $3::jsonb) RETURNING id`
@@ -13,14 +14,24 @@ const build = (claimed: ReadonlyArray<{ id: string }>) =>
         }),
     )
 
-const record = (manager: EntityManager, deliveryId: string | undefined) =>
-    recordWebhookDelivery({
+const record = async (manager: EntityManager, deliveryId: string | undefined) => {
+    const subject = await buildSubject()
+    return subject({
         manager,
         insert: INSERT,
         provider: "calendar",
         deliveryId,
         payload: { id: "calendar-1" },
     })
+}
+
+const SUBJECT: unique symbol = Symbol("database.webhook-inbox")
+const buildSubject = async () => {
+    const moduleRef = await Test.createTestingModule({
+        providers: [{ provide: SUBJECT, useFactory: () => recordWebhookDelivery }],
+    }).compile()
+    return moduleRef.get<typeof recordWebhookDelivery>(SUBJECT)
+}
 
 describe("recordWebhookDelivery", () => {
     it("returns the pending receipt without completing it or starting a transaction", async () => {
@@ -48,7 +59,7 @@ describe("recordWebhookDelivery", () => {
 
     it("lets the caller atomically roll a recorded receipt back with its handoff", async () => {
         const tx = build([{ id: "inbox-1" }])
-        const failure = new TypeError("handoff failed")
+        const failure = new DatabaseError({ code: DatabaseErrorCode.IdentifierRejected })
 
         await expect(
             tx.em.transaction(async (manager) => {

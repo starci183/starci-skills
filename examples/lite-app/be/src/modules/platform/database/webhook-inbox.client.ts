@@ -14,6 +14,9 @@ interface RecordWebhookDelivery {
     readonly payload: object
 }
 
+/** Receipt id when inserted, or undefined when the delivery was already recorded. */
+export type WebhookDeliveryResult = string | undefined
+
 /** Records a pending receipt in the caller's transaction; its consumer processes it after commit. */
 export const recordWebhookDelivery = async ({
     manager,
@@ -21,7 +24,7 @@ export const recordWebhookDelivery = async ({
     provider,
     deliveryId,
     payload,
-}: RecordWebhookDelivery): Promise<string | undefined> => {
+}: RecordWebhookDelivery): Promise<WebhookDeliveryResult> => {
     const normalizedDeliveryId = deliveryId?.trim()
     if (!normalizedDeliveryId) {
         throw new DatabaseError({ code: DatabaseErrorCode.WebhookDeliveryIdRequired })

@@ -18,6 +18,44 @@ type HandoffSendSession = {
     readonly shape: "form" | "confirm"
 }
 
+/** Resolves the copy for the handoff display. */
+const resolveHandoffLabels = (
+    t: ReturnType<typeof useTranslations<"sales.handoff">>,
+    slotLabels: ReturnType<typeof useSlotLabels>,
+) => {
+    return {
+        title: t("title"),
+        prepared: t("prepared"),
+        sent: t("sent"),
+        returned: t("returned"),
+        send: t("send"),
+        resend: t("resend"),
+        fingerprint: t("fingerprint"),
+        revision: t("revision"),
+        receipt: t("receipt"),
+        reason: t("reason"),
+        customer: t("customer"),
+        amount: t("amount"),
+        lines: t("lines"),
+        orderSlot: slotLabels(t("emptyOrder")),
+        handoffSlot: slotLabels(t("emptyHandoff")),
+    }
+}
+
+/** Resolves the copy for the send overlay. */
+const resolveSendLabels = (tSend: ReturnType<typeof useTranslations<"sales.send">>) => {
+    return {
+        title: tSend("title"),
+        fingerprint: tSend("fingerprint"),
+        revision: tSend("revision"),
+        note: tSend("note"),
+        review: tSend("review"),
+        confirmQuestion: tSend("confirmQuestion"),
+        back: tSend("back"),
+        confirm: tSend("confirm"),
+    }
+}
+
 /**
  * Connected half: HandoffBlockBase plus logic. Owns two independent apis, the send overlay's open
  * state and shape, picks the shape from data, resolves labels and formats the amount — every word
@@ -27,6 +65,8 @@ export const HandoffBlock = (props: HandoffBlockProps) => {
     const t = useTranslations("sales.handoff")
     const tSend = useTranslations("sales.send")
     const slotLabels = useSlotLabels()
+    const labels = resolveHandoffLabels(t, slotLabels)
+    const sendLabels = resolveSendLabels(tSend)
     const format = useFormatter()
     const order = useGetOrderSwr({ handoffId: props.handoffId })
     const handoff = useGetHandoffSwr({ handoffId: props.handoffId })
@@ -72,34 +112,9 @@ export const HandoffBlock = (props: HandoffBlockProps) => {
                     isOpen: activeSend !== undefined,
                     shape: activeSend?.shape ?? "form",
                     ...form.props,
-                    labels: {
-                        title: tSend("title"),
-                        fingerprint: tSend("fingerprint"),
-                        revision: tSend("revision"),
-                        note: tSend("note"),
-                        review: tSend("review"),
-                        confirmQuestion: tSend("confirmQuestion"),
-                        back: tSend("back"),
-                        confirm: tSend("confirm"),
-                    },
+                    labels: sendLabels,
                 },
-                labels: {
-                    title: t("title"),
-                    prepared: t("prepared"),
-                    sent: t("sent"),
-                    returned: t("returned"),
-                    send: t("send"),
-                    resend: t("resend"),
-                    fingerprint: t("fingerprint"),
-                    revision: t("revision"),
-                    receipt: t("receipt"),
-                    reason: t("reason"),
-                    customer: t("customer"),
-                    amount: t("amount"),
-                    lines: t("lines"),
-                    orderSlot: slotLabels(t("emptyOrder")),
-                    handoffSlot: slotLabels(t("emptyHandoff")),
-                },
+                labels,
             }}
             on={{
                 requestSend: (input) => {

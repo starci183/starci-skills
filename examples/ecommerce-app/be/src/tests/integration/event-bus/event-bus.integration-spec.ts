@@ -27,114 +27,136 @@ describe("event bus (integration)", () => {
     const bus = (): EventBus => world.resolve<EventBus>(EVENT_BUS)
     const eventId = (): string => `probe-${ids.next()}`
 
-    it("event-bus/atomic-with-transaction: the outbox row commits with the change and is gone with a rollback", async () => {
-        const kept = eventId()
-        const lost = eventId()
+    it("event-bus/atomic-with-transaction: the outbox row commits with the change and is gone with a rollback", () =>
+        commitsOutboxAtomically(world, bus, eventId))
 
-        await world.db.order.transaction((manager) =>
-            bus().publish(ProbePingEvent.create(kept, { note: "kept" }), manager),
-        )
-        await expect(
-            world.db.order.transaction(async (manager) => {
-                await bus().publish(ProbePingEvent.create(lost, { note: "lost" }), manager)
-                throw new OrderError({ code: OrderErrorCode.PlacementFailed })
-            }),
-        ).rejects.toThrow("ORDER_PLACEMENT_FAILED")
+    it("event-bus/relay-only-after-commit: nothing reaches the consumer while the transaction is open, everything once it commits", () =>
+        relaysAfterCommit(world, bus, eventId))
 
-        expect(await readRows(world.db.order, OUTBOX_OF_EVENT, [kept])).toEqual([
-            expect.objectContaining({ event_name: "probe.ping" }),
-        ])
-        expect(await readRows(world.db.order, OUTBOX_OF_EVENT, [lost])).toEqual([])
-        const sent = await world.waitFor("the relay marks the committed row sent", async () => {
-            const rows = await readRows(world.db.order, OUTBOX_OF_EVENT, [kept])
-            return rows.every((row) => row.sent) ? rows : null
-        })
-        expect(sent).toHaveLength(1)
+    it("event-bus/redelivery-then-dead-letter: a failing consumer is retried, then buried, and an operator requeue delivers it", () =>
+        requeuesDeadLetter(world, bus, eventId))
+
+    it("event-bus/duplicate-delivery-is-a-noop: an event sent twice runs its effect once", () =>
+        deduplicatesDelivery(world, bus, eventId))
+})
+
+async function commitsOutboxAtomically(
+    world: ReturnType<typeof useTestWorld>,
+    bus: () => EventBus,
+    eventId: () => string,
+): Promise<void> {
+    const kept = eventId()
+    const lost = eventId()
+
+    await world.db.order.transaction((manager) => bus().publish(ProbePingEvent.create(kept, { note: "kept" }), manager))
+    await expect(
+        world.db.order.transaction(async (manager) => {
+            await bus().publish(ProbePingEvent.create(lost, { note: "lost" }), manager)
+            throw new OrderError({ code: OrderErrorCode.PlacementFailed })
+        }),
+    ).rejects.toThrow("ORDER_PLACEMENT_FAILED")
+
+    expect(await readRows(world.db.order, OUTBOX_OF_EVENT, [kept])).toEqual([
+        expect.objectContaining({ event_name: "probe.ping" }),
+    ])
+    expect(await readRows(world.db.order, OUTBOX_OF_EVENT, [lost])).toEqual([])
+    const sent = await world.waitFor("the relay marks the committed row sent", async () => {
+        const rows = await readRows(world.db.order, OUTBOX_OF_EVENT, [kept])
+        return rows.every((row) => row.sent) ? rows : null
     })
+    expect(sent).toHaveLength(1)
+}
 
-    it("event-bus/relay-only-after-commit: nothing reaches the consumer while the transaction is open, everything once it commits", async () => {
-        const behavior = world.resolve(ProbeBehavior)
-        const id = eventId()
-        let commit: () => void = () => undefined
-        const gate = new Promise<void>((resolve) => {
-            commit = resolve
-        })
-        let polls = 0
+async function relaysAfterCommit(
+    world: ReturnType<typeof useTestWorld>,
+    bus: () => EventBus,
+    eventId: () => string,
+): Promise<void> {
+    const behavior = world.resolve(ProbeBehavior)
+    const id = eventId()
+    let commit: () => void = () => undefined
+    const gate = new Promise<void>((resolve) => {
+        commit = resolve
+    })
+    let polls = 0
 
-        const transaction = world.db.order.transaction(async (manager) => {
-            await bus().publish(ProbePingEvent.create(id, { note: "late" }), manager)
-            await world.waitUntil(
-                "the relay has had many passes while the transaction stays open",
-                () => {
-                    polls += 1
-                    return Promise.resolve(polls)
-                },
-                (observed) => observed >= QUIET_POLLS,
-            )
-            expect(behavior.effects).not.toContain("late")
-            await gate
-        })
+    const transaction = world.db.order.transaction(async (manager) => {
+        await bus().publish(ProbePingEvent.create(id, { note: "late" }), manager)
         await world.waitUntil(
-            "the publisher is waiting for its commit",
-            () => Promise.resolve(polls),
+            "the relay has had many passes while the transaction stays open",
+            () => {
+                polls += 1
+                return Promise.resolve(polls)
+            },
             (observed) => observed >= QUIET_POLLS,
         )
-        commit()
-        await transaction
-
-        await world.waitFor("the consumer receives the committed event", () =>
-            Promise.resolve(behavior.effects.includes("late") ? true : null),
-        )
+        expect(behavior.effects).not.toContain("late")
+        await gate
     })
+    await world.waitUntil(
+        "the publisher is waiting for its commit",
+        () => Promise.resolve(polls),
+        (observed) => observed >= QUIET_POLLS,
+    )
+    commit()
+    await transaction
 
-    it("event-bus/redelivery-then-dead-letter: a failing consumer is retried, then buried, and an operator requeue delivers it", async () => {
-        const behavior = world.resolve(ProbeBehavior)
-        behavior.failing = true
-        behavior.attempts.length = 0
-        const id = eventId()
+    await world.waitFor("the consumer receives the committed event", () =>
+        Promise.resolve(behavior.effects.includes("late") ? true : null),
+    )
+}
 
-        await world.db.order.transaction((manager) =>
-            bus().publish(ProbePingEvent.create(id, { note: "doomed" }), manager),
-        )
+async function requeuesDeadLetter(
+    world: ReturnType<typeof useTestWorld>,
+    bus: () => EventBus,
+    eventId: () => string,
+): Promise<void> {
+    const behavior = world.resolve(ProbeBehavior)
+    behavior.failing = true
+    behavior.attempts.length = 0
+    const id = eventId()
 
-        const letters = await world.waitFor("the event is in the dead letters", async () => {
-            const found = (await bus().deadLetters(ProbePingEvent)).filter((letter) => letter.eventId === id)
-            return found.length > 0 ? found : null
-        })
-        expect(behavior.attempts).toEqual([1, 2, 3, 4, 5])
-        expect(letters).toEqual([
-            expect.objectContaining({
-                eventName: "probe.ping",
-                eventId: id,
-                reason: "ORDER_PLACEMENT_FAILED",
-                attempts: 5,
-            }),
-        ])
+    await world.db.order.transaction((manager) => bus().publish(ProbePingEvent.create(id, { note: "doomed" }), manager))
 
-        behavior.failing = false
-        behavior.attempts.length = 0
-        await bus().requeue(letters[0]?.id ?? "")
-
-        await world.waitFor("the requeued event is delivered once more", () =>
-            Promise.resolve(behavior.effects.includes("doomed") ? true : null),
-        )
-        expect(behavior.attempts).toEqual([1])
-        expect((await bus().deadLetters(ProbePingEvent)).filter((letter) => letter.eventId === id)).toEqual([])
+    const letters = await world.waitFor("the event is in the dead letters", async () => {
+        const found = (await bus().deadLetters(ProbePingEvent)).filter((letter) => letter.eventId === id)
+        return found.length > 0 ? found : null
     })
+    expect(behavior.attempts).toEqual([1, 2, 3, 4, 5])
+    expect(letters).toEqual([
+        expect.objectContaining({
+            eventName: "probe.ping",
+            eventId: id,
+            reason: "ORDER_PLACEMENT_FAILED",
+            attempts: 5,
+        }),
+    ])
 
-    it("event-bus/duplicate-delivery-is-a-noop: an event sent twice runs its effect once", async () => {
-        const behavior = world.resolve(ProbeBehavior)
-        behavior.attempts.length = 0
-        const id = eventId()
-        await world.db.order.transaction((manager) =>
-            bus().publish(ProbePingEvent.create(id, { note: "twice" }), manager),
-        )
-        await world.db.order.query(DUPLICATE_OUTBOX_ROW, [id])
+    behavior.failing = false
+    behavior.attempts.length = 0
+    await bus().requeue(letters[0]?.id ?? "")
 
-        await world.waitFor("the consumer saw the event twice", () =>
-            Promise.resolve(behavior.attempts.length >= 2 ? true : null),
-        )
+    await world.waitFor("the requeued event is delivered once more", () =>
+        Promise.resolve(behavior.effects.includes("doomed") ? true : null),
+    )
+    expect(behavior.attempts).toEqual([1])
+    expect((await bus().deadLetters(ProbePingEvent)).filter((letter) => letter.eventId === id)).toEqual([])
+}
 
-        expect(behavior.effects.filter((note) => note === "twice")).toHaveLength(1)
-    })
-})
+async function deduplicatesDelivery(
+    world: ReturnType<typeof useTestWorld>,
+    bus: () => EventBus,
+    eventId: () => string,
+): Promise<void> {
+    const behavior = world.resolve(ProbeBehavior)
+    behavior.attempts.length = 0
+    const id = eventId()
+    await world.db.order.transaction((manager) => bus().publish(ProbePingEvent.create(id, { note: "twice" }), manager))
+    await world.db.order.query(DUPLICATE_OUTBOX_ROW, [id])
+
+    await world.waitFor("the consumer saw the event twice", () =>
+        Promise.resolve(behavior.attempts.length >= 2 ? true : null),
+    )
+
+    expect(behavior.effects.filter((note) => note === "twice")).toHaveLength(1)
+}

@@ -13,7 +13,42 @@ const bootstrap = async (): Promise<void> => {
     const app = await NestFactory.create(AppModule.register(options))
     const server = app.getHttpAdapter().getInstance()
     server.disable("x-powered-by")
-    server.set("trust proxy", options.httpSecurity.trustProxy ?? 0)
+    // Configuration validates the supported hop counts before the listener starts.
+    switch (options.httpSecurity.trustProxy ?? 0) {
+        case 0:
+            server.set("trust proxy", 0)
+            break
+        case 1:
+            server.set("trust proxy", 1)
+            break
+        case 2:
+            server.set("trust proxy", 2)
+            break
+        case 3:
+            server.set("trust proxy", 3)
+            break
+        case 4:
+            server.set("trust proxy", 4)
+            break
+        case 5:
+            server.set("trust proxy", 5)
+            break
+        case 6:
+            server.set("trust proxy", 6)
+            break
+        case 7:
+            server.set("trust proxy", 7)
+            break
+        case 8:
+            server.set("trust proxy", 8)
+            break
+        case 9:
+            server.set("trust proxy", 9)
+            break
+        case 10:
+            server.set("trust proxy", 10)
+            break
+    }
     app.use(securityHeaders)
     app.enableCors({ origin: [...options.httpSecurity.allowedOrigins] })
     app.enableShutdownHooks()

@@ -30,6 +30,7 @@ export type DuckMascotProps = {
 /**
  * The drawn mark itself: one inline SVG, sized by `size` and otherwise passing the glyph contract's
  * attributes straight onto the root element.
+ * @brand-mark
  */
 export const DuckMascot = (props: DuckMascotProps) => {
     const { size = 64, ...glyphProps } = props

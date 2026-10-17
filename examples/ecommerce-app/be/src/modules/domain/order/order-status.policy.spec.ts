@@ -1,3 +1,4 @@
+import { Test } from "@nestjs/testing"
 import { isOrderStatusFrame, orderStatusTopic } from "./order-status.policy"
 
 const frame = {
@@ -6,9 +7,19 @@ const frame = {
     changedAt: "2026-10-01T12:00:00.000Z",
 } as const
 
+const SUBJECT = Symbol("order status policy")
+const build = async () => {
+    const policy = { isOrderStatusFrame, orderStatusTopic }
+    const moduleRef = await Test.createTestingModule({
+        providers: [{ provide: SUBJECT, useFactory: () => policy }],
+    }).compile()
+    return moduleRef.get<typeof policy>(SUBJECT)
+}
+
 describe("isOrderStatusFrame", () => {
-    it.each(["pending", "paid", "expired", "cancelled"])("accepts the %s status", (status) => {
-        expect(isOrderStatusFrame({ ...frame, status })).toBe(true)
+    it.each(["pending", "paid", "expired", "cancelled"])("accepts the %s status", async (status) => {
+        const subject = await build()
+        expect(subject.isOrderStatusFrame({ ...frame, status })).toBe(true)
     })
 
     it.each([
@@ -21,14 +32,16 @@ describe("isOrderStatusFrame", () => {
         ["an unknown status", { ...frame, status: "shipped" }],
         ["a missing change instant", { orderId: frame.orderId, status: "paid" }],
         ["a non-string change instant", { ...frame, changedAt: 1 }],
-    ])("rejects %s", (_case, value) => {
-        expect(isOrderStatusFrame(value)).toBe(false)
+    ])("rejects %s", async (_case, value) => {
+        const subject = await build()
+        expect(subject.isOrderStatusFrame(value)).toBe(false)
     })
 })
 
 describe("orderStatusTopic", () => {
-    it("scopes the channel to the buyer and order and validates its frames", () => {
-        const topic = orderStatusTopic("person-1", "order-1")
+    it("scopes the channel to the buyer and order and validates its frames", async () => {
+        const subject = await build()
+        const topic = subject.orderStatusTopic("person-1", "order-1")
 
         expect(topic.name).toBe("order-status:person-1:order-1")
         expect(topic.accepts(frame)).toBe(true)

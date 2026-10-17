@@ -1,3 +1,5 @@
+import { Reflector } from "@nestjs/core"
+import { ThrottlerStorage } from "@nestjs/throttler"
 import { injector } from "@modules/platform/composition"
 import type { TypedParameterDecorator } from "@modules/platform/composition"
 import type { HttpSecurityOptions } from "./http-security.options"
@@ -16,3 +18,10 @@ export const InjectWebhookSignature = (): TypedParameterDecorator<WebhookSignatu
 /** Injects the options of the http-security capability. Parameter type: HttpSecurityOptions. */
 export const InjectHttpSecurityOptions = (): TypedParameterDecorator<HttpSecurityOptions> =>
     injector<HttpSecurityOptions>(HTTP_SECURITY_OPTIONS)
+
+/** Injects the throttler storage port. Parameter type: ThrottlerStorage. */
+export const InjectRateLimitStorage = (): TypedParameterDecorator<ThrottlerStorage> =>
+    injector<ThrottlerStorage>(ThrottlerStorage)
+
+/** Injects the metadata reader of the throttler. Parameter type: Reflector. */
+export const InjectRateLimitReflector = (): TypedParameterDecorator<Reflector> => injector<Reflector>(Reflector)

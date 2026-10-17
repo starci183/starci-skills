@@ -1,3 +1,4 @@
+import { Test } from "@nestjs/testing"
 import type { GraphQLRequestContext, GraphQLRequestContextWillSendResponse, GraphQLResponse } from "@apollo/server"
 import { mock } from "@starci/jest-preset"
 import type { GraphQLFormattedError } from "graphql"
@@ -38,27 +39,42 @@ const sendResponse = async (
     requestLocale: RequestLocale,
     context: GraphQLRequestContextWillSendResponse<GraphqlContext>,
 ): Promise<void> => {
-    const listener = await localizeErrorsPlugin(errors, requestLocale).requestDidStart?.(
-        mock<GraphQLRequestContext<GraphqlContext>>(),
-    )
+    const subject = await build()
+    const listener = await subject
+        .localizeErrorsPlugin(errors, requestLocale)
+        .requestDidStart?.(mock<GraphQLRequestContext<GraphqlContext>>())
     if (listener === undefined || listener === null || listener.willSendResponse === undefined) {
         throw new SpecError({ code: "SPEC_INVARIANT" })
     }
     await listener.willSendResponse(context)
 }
 
+const SUBJECT: unique symbol = Symbol("graphql/localize-errors.mapper")
+const subjectFunctions = () => ({ localizeError, localizeErrorsPlugin })
+
+const build = async () => {
+    const moduleRef = await Test.createTestingModule({
+        providers: [{ provide: SUBJECT, useFactory: subjectFunctions }],
+    }).compile()
+    return moduleRef.get<ReturnType<typeof subjectFunctions>>(SUBJECT)
+}
+
 describe("localizeError", () => {
     it.each<{ error: GraphQLFormattedError }>([
         { error: { message: "syntax error" } },
         { error: { message: "numeric code", extensions: { code: 7 } } },
-    ])("returns an error without a string code unchanged", ({ error }) => {
+    ])("returns an error without a string code unchanged", async ({ error }) => {
+        const subject = await build()
+
         const errors = mock<ErrorsService>()
 
-        expect(localizeError(errors, "en", error)).toBe(error)
+        expect(subject.localizeError(errors, "en", error)).toBe(error)
         expect(errors.text).not.toHaveBeenCalled()
     })
 
-    it("replaces a coded error's message with the catalog text and keeps its other fields", () => {
+    it("replaces a coded error's message with the catalog text and keeps its other fields", async () => {
+        const subject = await build()
+
         const errors = mock<ErrorsService>()
         errors.text.mockReturnValue("The order was not found")
         const error: GraphQLFormattedError = {
@@ -70,19 +86,21 @@ describe("localizeError", () => {
             },
         }
 
-        expect(localizeError(errors, "en", error)).toEqual({
+        expect(subject.localizeError(errors, "en", error)).toEqual({
             ...error,
             message: "The order was not found",
         })
         expect(errors.text).toHaveBeenCalledWith("ORDER_NOT_FOUND", { orderId: "o-1", retries: 2 }, "en")
     })
 
-    it("uses empty interpolation params when the extension params are not a record", () => {
+    it("uses empty interpolation params when the extension params are not a record", async () => {
+        const subject = await build()
+
         const errors = mock<ErrorsService>()
         errors.text.mockReturnValue("The order was not found")
 
         expect(
-            localizeError(errors, "vi", {
+            subject.localizeError(errors, "vi", {
                 message: "ORDER_NOT_FOUND",
                 extensions: { code: "ORDER_NOT_FOUND", params: "o-1" },
             }).message,

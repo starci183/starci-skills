@@ -3,7 +3,7 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { useLocale, useTranslations } from "next-intl"
 import { useForm, useWatch } from "react-hook-form"
 import { z } from "zod"
-import type { GraphQLFailure } from "@/modules/api"
+import type { GraphQLFailure } from "@ecommerce/api"
 import { authClient } from "@/modules/auth"
 import { SHOP_ROUTES } from "@/modules/routes"
 import { useGraphQLWithToast } from "@/modules/toast"
@@ -14,6 +14,21 @@ type FormState = "ready" | "refused" | "working"
 
 /** The two fields of the session form. */
 type SessionFormValues = { readonly email: string; readonly password: string }
+
+/** The translated labels and actions for the current session mode. */
+const sessionFormCopy = (mode: Mode, t: ReturnType<typeof useTranslations<"shop.account.auth">>) => {
+    return {
+        title: mode === "sign-in" ? t("signInTitle") : t("registerTitle"),
+        intro: mode === "sign-in" ? t("signInIntro") : t("registerIntro"),
+        emailLabel: t("email"),
+        passwordLabel: t("password"),
+        passwordHint: mode === "register" ? t("passwordHint") : null,
+        submit: mode === "sign-in" ? t("submitSignIn") : t("submitRegister"),
+        submitting: mode === "sign-in" ? t("submittingSignIn") : t("submittingRegister"),
+        switchMode: mode === "sign-in" ? t("switchToRegister") : t("switchToSignIn"),
+        backToBrowse: t("backToBrowse"),
+    }
+}
 
 /**
  * Owns the session form: the fields (react-hook-form with a zod schema whose messages are the catalogue's), the mode, the
@@ -27,6 +42,7 @@ export const useSessionForm = () => {
     const signIn = useMutateSignInSwr()
     const register = useMutateRegisterSwr()
     const [mode, setMode] = useState<Mode>("sign-in")
+    const copy = sessionFormCopy(mode, t)
     const [refusal, setRefusal] = useState<string | null>(null)
     const schema = useMemo(
         () => z.object({ email: z.email(t("invalid")), password: z.string().min(1, t("invalid")) }),
@@ -84,17 +100,7 @@ export const useSessionForm = () => {
             password,
             refusal,
             browseHref: `/${locale}${SHOP_ROUTES.browse}`,
-            copy: {
-                title: mode === "sign-in" ? t("signInTitle") : t("registerTitle"),
-                intro: mode === "sign-in" ? t("signInIntro") : t("registerIntro"),
-                emailLabel: t("email"),
-                passwordLabel: t("password"),
-                passwordHint: mode === "register" ? t("passwordHint") : null,
-                submit: mode === "sign-in" ? t("submitSignIn") : t("submitRegister"),
-                submitting: mode === "sign-in" ? t("submittingSignIn") : t("submittingRegister"),
-                switchMode: mode === "sign-in" ? t("switchToRegister") : t("switchToSignIn"),
-                backToBrowse: t("backToBrowse"),
-            },
+            copy,
         },
         on: {
             onEmailChange: (value: string) => form.setValue("email", value),

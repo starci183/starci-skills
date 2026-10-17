@@ -8,6 +8,7 @@ import { DATABASE_ERROR_KINDS, DATABASE_MESSAGES, DatabaseModule } from "@module
 import { ERRORS_MESSAGES, ErrorsModule } from "@modules/platform/errors"
 import { HTTP_SECURITY_ERROR_KINDS, HTTP_SECURITY_MESSAGES, HttpSecurityModule } from "@modules/platform/http-security"
 import { I18nModule } from "@modules/platform/i18n"
+import { HttpModule } from "@modules/platform/http"
 import { LoggingModule } from "@modules/platform/logging"
 import type { CoreOptions } from "../core.options"
 
@@ -18,6 +19,7 @@ import type { CoreOptions } from "../core.options"
  */
 export const platformModules = (options: CoreOptions): Array<DynamicModule> => [
     ClockModule.register({ isGlobal: true }),
+    HttpModule.register({ isGlobal: true }),
     LoggingModule.register({ isGlobal: true }),
     I18nModule.register({
         isGlobal: true,

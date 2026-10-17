@@ -1,3 +1,4 @@
+import type { TestCaller } from "@starci/test-world"
 import { productBuilder } from "../../fixtures/builders/catalog.builder"
 import { present } from "../../fixtures/present.mapper"
 import type { PlaceOrderData } from "../../fixtures/e2e-views.contracts"
@@ -51,76 +52,90 @@ describe("billing.invoice-rejected compensates order.placed", () => {
             return rows[0] ?? null
         })
 
-    it("cancels the order, restores the stock once, whatever the redeliveries", async () => {
-        const session = await world.signedInPerson("saga-flow")
-        const buyer = world.apps.order.api.bearing(session.sessionToken)
+    it("cancels the order, restores the stock once, whatever the redeliveries", () =>
+        compensatesOnce(world, placeYacht, cancelled))
 
-        const first = await placeYacht(buyer, "saga-flow-1")
-        expect(first).toMatchObject({ status: "pending", totalMinorUnits: 200_000, replayed: false })
-        expect(await readRows(world.db.order, PLACE_ORDER_SAGA_STATE, [first.orderId])).toHaveLength(1)
-
-        expect(await cancelled(first.orderId)).toEqual({ status: "cancelled", total_minor_units: 200_000 })
-        expect(await readRows(world.db.billing, INVOICES_OF_ORDER, [first.orderId])).toEqual([
-            { order_id: first.orderId, status: "rejected", total_minor_units: 200_000 },
-        ])
-        const settled = await world.waitFor("the saga run of the first order is compensated", async () => {
-            const rows = await readRows(world.db.order, PLACE_ORDER_SAGA_STATE, [first.orderId])
-            return rows.find((row) => row.status === "compensated") ?? null
-        })
-        expect(settled).toEqual({ status: "compensated", version: 3 })
-        expect(await readStock(world.db.order, "sku-yacht")).toBe(6)
-
-        await world.db.order.query(DUPLICATE_OUTBOX_ROW, [first.orderId])
-        await world.db.billing.query(DUPLICATE_OUTBOX_ROW, [first.orderId])
-        for (const database of [world.db.order, world.db.billing]) {
-            await world.waitUntil(
-                "the relay sends the duplicate",
-                () => readRows(database, OUTBOX_OF_EVENT, [first.orderId]),
-                (rows) => rows.length === 2 && rows.every((row) => row.sent),
-            )
-        }
-
-        const second = await placeYacht(buyer, "saga-flow-2")
-        await cancelled(second.orderId)
-
-        expect(await readStock(world.db.order, "sku-yacht")).toBe(6)
-        expect(await readRows(world.db.order, PLACE_ORDER_SAGA_STATE, [first.orderId])).toEqual([
-            { status: "compensated", version: 3 },
-        ])
-    })
-
-    it("resumes the compensation on the retry topic after the order database was down while the rejection arrived", async () => {
-        const session = await world.signedInPerson("saga-outage")
-        const buyer = world.apps.order.api.bearing(session.sessionToken)
-        const placed = await placeYacht(buyer, "saga-outage-1")
-        let polls = 0
-        await world.waitUntil(
-            "the order database relays order.placed before it goes down",
-            () => readRows(world.db.order, OUTBOX_OF_EVENT, [placed.orderId]),
-            (rows) => rows.length === 1 && rows.every((row) => row.sent),
-        )
-
-        await world.infra.postgresql.connection("order").during(async () => {
-            await world.waitFor("billing records the rejected invoice", async () => {
-                const rows = await readRows(world.db.billing, INVOICES_OF_ORDER, [placed.orderId])
-                return rows[0] ?? null
-            })
-            await world.waitUntil(
-                "the compensation retries against the dead database",
-                () => {
-                    polls += 1
-                    return Promise.resolve(polls)
-                },
-                (observed) => observed >= OUTAGE_POLLS,
-            )
-        })
-
-        expect(await cancelled(placed.orderId)).toEqual({ status: "cancelled", total_minor_units: 200_000 })
-        const settled = await world.waitFor("the saga run is compensated after the retry", async () => {
-            const rows = await readRows(world.db.order, PLACE_ORDER_SAGA_STATE, [placed.orderId])
-            return rows.find((row) => row.status === "compensated") ?? null
-        })
-        expect(settled.version).toBe(3)
-        expect(await readStock(world.db.order, "sku-yacht")).toBe(6)
-    })
+    it("resumes the compensation on the retry topic after the order database was down while the rejection arrived", () =>
+        retriesCompensation(world, placeYacht, cancelled))
 })
+
+async function compensatesOnce(
+    world: ReturnType<typeof useTestWorld>,
+    placeYacht: (buyer: TestCaller, key: string) => Promise<PlaceOrderData["placeOrder"]>,
+    cancelled: (orderId: string) => Promise<Awaited<ReturnType<typeof readRows>>[number]>,
+): Promise<void> {
+    const session = await world.signedInPerson("saga-flow")
+    const buyer = world.apps.order.api.bearing(session.sessionToken)
+
+    const first = await placeYacht(buyer, "saga-flow-1")
+    expect(first).toMatchObject({ status: "pending", totalMinorUnits: 200_000, replayed: false })
+    expect(await readRows(world.db.order, PLACE_ORDER_SAGA_STATE, [first.orderId])).toHaveLength(1)
+
+    expect(await cancelled(first.orderId)).toEqual({ status: "cancelled", total_minor_units: 200_000 })
+    expect(await readRows(world.db.billing, INVOICES_OF_ORDER, [first.orderId])).toEqual([
+        { order_id: first.orderId, status: "rejected", total_minor_units: 200_000 },
+    ])
+    const settled = await world.waitFor("the saga run of the first order is compensated", async () => {
+        const rows = await readRows(world.db.order, PLACE_ORDER_SAGA_STATE, [first.orderId])
+        return rows.find((row) => row.status === "compensated") ?? null
+    })
+    expect(settled).toEqual({ status: "compensated", version: 3 })
+    expect(await readStock(world.db.order, "sku-yacht")).toBe(6)
+
+    await world.db.order.query(DUPLICATE_OUTBOX_ROW, [first.orderId])
+    await world.db.billing.query(DUPLICATE_OUTBOX_ROW, [first.orderId])
+    for (const database of [world.db.order, world.db.billing]) {
+        await world.waitUntil(
+            "the relay sends the duplicate",
+            () => readRows(database, OUTBOX_OF_EVENT, [first.orderId]),
+            (rows) => rows.length === 2 && rows.every((row) => row.sent),
+        )
+    }
+
+    const second = await placeYacht(buyer, "saga-flow-2")
+    await cancelled(second.orderId)
+
+    expect(await readStock(world.db.order, "sku-yacht")).toBe(6)
+    expect(await readRows(world.db.order, PLACE_ORDER_SAGA_STATE, [first.orderId])).toEqual([
+        { status: "compensated", version: 3 },
+    ])
+}
+
+async function retriesCompensation(
+    world: ReturnType<typeof useTestWorld>,
+    placeYacht: (buyer: TestCaller, key: string) => Promise<PlaceOrderData["placeOrder"]>,
+    cancelled: (orderId: string) => Promise<Awaited<ReturnType<typeof readRows>>[number]>,
+): Promise<void> {
+    const session = await world.signedInPerson("saga-outage")
+    const buyer = world.apps.order.api.bearing(session.sessionToken)
+    const placed = await placeYacht(buyer, "saga-outage-1")
+    let polls = 0
+    await world.waitUntil(
+        "the order database relays order.placed before it goes down",
+        () => readRows(world.db.order, OUTBOX_OF_EVENT, [placed.orderId]),
+        (rows) => rows.length === 1 && rows.every((row) => row.sent),
+    )
+
+    await world.infra.postgresql.connection("order").during(async () => {
+        await world.waitFor("billing records the rejected invoice", async () => {
+            const rows = await readRows(world.db.billing, INVOICES_OF_ORDER, [placed.orderId])
+            return rows[0] ?? null
+        })
+        await world.waitUntil(
+            "the compensation retries against the dead database",
+            () => {
+                polls += 1
+                return Promise.resolve(polls)
+            },
+            (observed) => observed >= OUTAGE_POLLS,
+        )
+    })
+
+    expect(await cancelled(placed.orderId)).toEqual({ status: "cancelled", total_minor_units: 200_000 })
+    const settled = await world.waitFor("the saga run is compensated after the retry", async () => {
+        const rows = await readRows(world.db.order, PLACE_ORDER_SAGA_STATE, [placed.orderId])
+        return rows.find((row) => row.status === "compensated") ?? null
+    })
+    expect(settled.version).toBe(3)
+    expect(await readStock(world.db.order, "sku-yacht")).toBe(6)
+}

@@ -41,98 +41,98 @@ const build = async () => {
     }
 }
 
-describe("JobRunnerService", () => {
-    describe("add", () => {
-        it("subscribes the processor to its queue, and the handler runs a delivery through the fence", async () => {
-            const { runner, claims, queues, processor } = await build()
-            claims.claim.mockResolvedValue(job)
-            runner.add(processor)
-            const handler = queues.add.mock.calls[0]?.[0]
+describe("JobRunnerService add", () => {
+    it("subscribes the processor to its queue, and the handler runs a delivery through the fence", async () => {
+        const { runner, claims, queues, processor } = await build()
+        claims.claim.mockResolvedValue(job)
+        runner.add(processor)
+        const handler = queues.add.mock.calls[0]?.[0]
 
-            await handler?.handle(delivery)
+        await handler?.handle(delivery)
 
-            expect(handler?.queue).toBe("mail")
-            expect(processor.process).toHaveBeenCalledWith(job)
+        expect(handler?.queue).toBe("mail")
+        expect(processor.process).toHaveBeenCalledWith(job)
+    })
+})
+
+describe("JobRunnerService run claims and fencing", () => {
+    it("claims the delivery with the job key and the lease, processes it and completes it under the claimed token", async () => {
+        const { runner, claims, processor } = await build()
+        claims.claim.mockResolvedValue(job)
+
+        await runner.run(processor, delivery)
+
+        expect(claims.claim).toHaveBeenCalledWith({
+            kind: "mail",
+            jobKey: "k-1",
+            payload: { id: "m-1" },
+            workerId: "w-1",
+            leaseMs: 60000,
         })
+        expect(processor.process).toHaveBeenCalledWith(job)
+        expect(claims.complete).toHaveBeenCalledWith({ jobId: "j-1", expectedFencingToken: 2 })
+        expect(claims.fail).not.toHaveBeenCalled()
     })
 
-    describe("run", () => {
-        it("claims the delivery with the job key and the lease, processes it and completes it under the claimed token", async () => {
-            const { runner, claims, processor } = await build()
-            claims.claim.mockResolvedValue(job)
+    it("does nothing when the job is done or another worker holds a live claim", async () => {
+        const { runner, claims, processor } = await build()
+        claims.claim.mockResolvedValue(null)
 
-            await runner.run(processor, delivery)
+        await runner.run(processor, delivery)
 
-            expect(claims.claim).toHaveBeenCalledWith({
-                kind: "mail",
-                jobKey: "k-1",
-                payload: { id: "m-1" },
-                workerId: "w-1",
-                leaseMs: 60000,
-            })
-            expect(processor.process).toHaveBeenCalledWith(job)
-            expect(claims.complete).toHaveBeenCalledWith({ jobId: "j-1", expectedFencingToken: 2 })
-            expect(claims.fail).not.toHaveBeenCalled()
-        })
+        expect(processor.process).not.toHaveBeenCalled()
+        expect(claims.complete).not.toHaveBeenCalled()
+    })
 
-        it("does nothing when the job is done or another worker holds a live claim", async () => {
-            const { runner, claims, processor } = await build()
-            claims.claim.mockResolvedValue(null)
+    it("stops quietly when a write is fenced out: a newer worker owns the job and this one causes no further effect", async () => {
+        const { runner, claims, logger, processor } = await build()
+        claims.claim.mockResolvedValue(job)
+        claims.complete.mockRejectedValue(fenced())
 
-            await runner.run(processor, delivery)
+        await expect(runner.run(processor, delivery)).resolves.toBeUndefined()
 
-            expect(processor.process).not.toHaveBeenCalled()
-            expect(claims.complete).not.toHaveBeenCalled()
-        })
+        expect(logger.warn).toHaveBeenCalledWith(JobsLogEvent.FencedOut, { jobId: "j-1" })
+        expect(claims.fail).not.toHaveBeenCalled()
+    })
+})
 
-        it("stops quietly when a write is fenced out: a newer worker owns the job and this one causes no further effect", async () => {
-            const { runner, claims, logger, processor } = await build()
-            claims.claim.mockResolvedValue(job)
-            claims.complete.mockRejectedValue(fenced())
+describe("JobRunnerService run processor failures", () => {
+    it("marks the job failed under its token and rethrows when the processor throws, so BullMQ retries", async () => {
+        const { runner, claims, logger, processor } = await build()
+        claims.claim.mockResolvedValue(job)
+        const failure = new Error("provider down")
+        processor.process.mockRejectedValue(failure)
 
-            await expect(runner.run(processor, delivery)).resolves.toBeUndefined()
+        await expect(runner.run(processor, delivery)).rejects.toBe(failure)
 
-            expect(logger.warn).toHaveBeenCalledWith(JobsLogEvent.FencedOut, { jobId: "j-1" })
-            expect(claims.fail).not.toHaveBeenCalled()
-        })
+        expect(claims.fail).toHaveBeenCalledWith({ jobId: "j-1", expectedFencingToken: 2, reason: "provider down" })
+        expect(logger.error).toHaveBeenCalledWith(JobsLogEvent.DeliveryFailed, failure, { jobId: "j-1" })
+    })
 
-        it("marks the job failed under its token and rethrows when the processor throws, so BullMQ retries", async () => {
-            const { runner, claims, logger, processor } = await build()
-            claims.claim.mockResolvedValue(job)
-            const failure = new Error("provider down")
-            processor.process.mockRejectedValue(failure)
+    it("records a thrown value that is not an Error by its text", async () => {
+        const { runner, claims, processor } = await build()
+        claims.claim.mockResolvedValue(job)
+        processor.process.mockRejectedValue("plain text")
 
-            await expect(runner.run(processor, delivery)).rejects.toBe(failure)
+        await expect(runner.run(processor, delivery)).rejects.toBe("plain text")
 
-            expect(claims.fail).toHaveBeenCalledWith({ jobId: "j-1", expectedFencingToken: 2, reason: "provider down" })
-            expect(logger.error).toHaveBeenCalledWith(JobsLogEvent.DeliveryFailed, failure, { jobId: "j-1" })
-        })
+        expect(claims.fail).toHaveBeenCalledWith({ jobId: "j-1", expectedFencingToken: 2, reason: "plain text" })
+    })
 
-        it("records a thrown value that is not an Error by its text", async () => {
-            const { runner, claims, processor } = await build()
-            claims.claim.mockResolvedValue(job)
-            processor.process.mockRejectedValue("plain text")
+    it("still rethrows the original failure when recording it is fenced out, and logs when recording it fails otherwise", async () => {
+        const { runner, claims, logger, processor } = await build()
+        claims.claim.mockResolvedValue(job)
+        const failure = new Error("provider down")
+        processor.process.mockRejectedValue(failure)
+        claims.fail.mockRejectedValueOnce(fenced())
 
-            await expect(runner.run(processor, delivery)).rejects.toBe("plain text")
+        await expect(runner.run(processor, delivery)).rejects.toBe(failure)
+        expect(logger.warn).toHaveBeenCalledWith(JobsLogEvent.FencedOut, { jobId: "j-1" })
 
-            expect(claims.fail).toHaveBeenCalledWith({ jobId: "j-1", expectedFencingToken: 2, reason: "plain text" })
-        })
+        const storeDown = new Error("store down")
+        claims.fail.mockRejectedValueOnce(storeDown)
 
-        it("still rethrows the original failure when recording it is fenced out, and logs when recording it fails otherwise", async () => {
-            const { runner, claims, logger, processor } = await build()
-            claims.claim.mockResolvedValue(job)
-            const failure = new Error("provider down")
-            processor.process.mockRejectedValue(failure)
-            claims.fail.mockRejectedValueOnce(fenced())
-
-            await expect(runner.run(processor, delivery)).rejects.toBe(failure)
-            expect(logger.warn).toHaveBeenCalledWith(JobsLogEvent.FencedOut, { jobId: "j-1" })
-
-            const storeDown = new Error("store down")
-            claims.fail.mockRejectedValueOnce(storeDown)
-
-            await expect(runner.run(processor, delivery)).rejects.toBe(failure)
-            expect(logger.error).toHaveBeenCalledWith(JobsLogEvent.FailureNotRecorded, storeDown, { jobId: "j-1" })
-        })
+        await expect(runner.run(processor, delivery)).rejects.toBe(failure)
+        expect(logger.error).toHaveBeenCalledWith(JobsLogEvent.FailureNotRecorded, storeDown, { jobId: "j-1" })
     })
 })

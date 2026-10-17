@@ -9,6 +9,7 @@ RETURNING id`
 /** Locks a committed pending receipt while its deferred consumer processes it. */
 export const FIND_PENDING_CALENDAR_INBOX = sql`SELECT id, payload FROM public.calendar_inbox
 WHERE id = $1 AND processed_at IS NULL
+LIMIT 1
 FOR UPDATE`
 
 /** Marks the receipt complete in the deferred consumer's transaction. */

@@ -40,87 +40,85 @@ const build = async (manager: MockEntityManager) => {
     return { relay: moduleRef.get(QueueRelayService), transport, logger }
 }
 
-describe("QueueRelayService", () => {
-    describe("relay", () => {
-        it("sends the waiting rows to pgmq with the row id as the job id and marks them sent in the same transaction", async () => {
-            const tx = fakeTransaction(
-                mockEntityManager({
-                    query: [
-                        [SELECT_WAITING_ROWS, [row("1"), row("2")]],
-                        [MARK_ROWS_SENT, []],
-                    ],
-                }),
-            )
-            const { relay, transport } = await build(tx.em)
+describe("QueueRelayService relay", () => {
+    it("sends the waiting rows to pgmq with the row id as the job id and marks them sent in the same transaction", async () => {
+        const tx = fakeTransaction(
+            mockEntityManager({
+                query: [
+                    [SELECT_WAITING_ROWS, [row("1"), row("2")]],
+                    [MARK_ROWS_SENT, []],
+                ],
+            }),
+        )
+        const { relay, transport } = await build(tx.em)
 
-            await expect(relay.relay()).resolves.toBe(2)
+        await expect(relay.relay()).resolves.toBe(2)
 
-            expect(tx.em.query).toHaveBeenNthCalledWith(1, SELECT_WAITING_ROWS, [2])
-            expect(transport.add).toHaveBeenNthCalledWith(1, expect.any(Object), "mail", "1", { id: "m-1" })
-            expect(transport.add).toHaveBeenNthCalledWith(2, expect.any(Object), "mail", "2", { id: "m-2" })
-            expect(tx.em.query).toHaveBeenNthCalledWith(2, MARK_ROWS_SENT, [["1", "2"], new Date(AT)])
-            expect(tx.commits).toBe(1)
-        })
-
-        it("sends nothing and marks nothing when no row waits", async () => {
-            const tx = fakeTransaction(mockEntityManager({ query: [SELECT_WAITING_ROWS, []] }))
-            const { relay, transport } = await build(tx.em)
-
-            await expect(relay.relay()).resolves.toBe(0)
-
-            expect(transport.add).not.toHaveBeenCalled()
-            expect(tx.em.query).toHaveBeenCalledTimes(1)
-        })
-
-        it("leaves the rows unmarked when pgmq refuses, so the next pass sends them again", async () => {
-            const tx = fakeTransaction(mockEntityManager({ query: [SELECT_WAITING_ROWS, [row("1")]] }))
-            const { relay, transport } = await build(tx.em)
-            const failure = new Error("queue missing")
-            transport.add.mockRejectedValue(failure)
-
-            await expect(relay.relay()).rejects.toBe(failure)
-
-            expect(tx.rollbacks).toBe(1)
-            expect(tx.em.query).toHaveBeenCalledTimes(1)
-        })
+        expect(tx.em.query).toHaveBeenNthCalledWith(1, SELECT_WAITING_ROWS, [2])
+        expect(transport.add).toHaveBeenNthCalledWith(1, expect.any(Object), "mail", "1", { id: "m-1" })
+        expect(transport.add).toHaveBeenNthCalledWith(2, expect.any(Object), "mail", "2", { id: "m-2" })
+        expect(tx.em.query).toHaveBeenNthCalledWith(2, MARK_ROWS_SENT, [["1", "2"], new Date(AT)])
+        expect(tx.commits).toBe(1)
     })
 
-    describe("the loop", () => {
-        it("passes again at once after a pass that sent rows, pauses on an empty outbox, logs a failed pass and stops on shutdown", async () => {
-            const tx = fakeTransaction(
-                mockEntityManager({
-                    query: [
-                        [SELECT_WAITING_ROWS, [row("1")]],
-                        [MARK_ROWS_SENT, []],
-                        [SELECT_WAITING_ROWS, []],
-                    ],
-                }),
-            )
-            const { relay, transport, logger } = await build(tx.em)
-            const failure = new Error("outbox unreadable")
-            let waits = 0
-            let shutdown: Promise<void> = Promise.resolve()
-            let reachedSecondWait: () => void = () => undefined
-            const secondWait = new Promise<void>((resolve) => {
-                reachedSecondWait = resolve
-            })
-            transport.wait.mockImplementation(() => {
-                waits += 1
-                if (waits === 1) tx.em.query.mockRejectedValueOnce(failure)
-                else {
-                    shutdown = relay.onApplicationShutdown()
-                    reachedSecondWait()
-                }
-                return Promise.resolve()
-            })
+    it("sends nothing and marks nothing when no row waits", async () => {
+        const tx = fakeTransaction(mockEntityManager({ query: [SELECT_WAITING_ROWS, []] }))
+        const { relay, transport } = await build(tx.em)
 
-            relay.onApplicationBootstrap()
-            await secondWait
-            await shutdown
+        await expect(relay.relay()).resolves.toBe(0)
 
-            expect(transport.add).toHaveBeenCalledTimes(1)
-            expect(transport.wait).toHaveBeenCalledWith(100)
-            expect(logger.error).toHaveBeenCalledWith(OutboxLogEvent.RelayFailed, failure, { outbox: "queue" })
+        expect(transport.add).not.toHaveBeenCalled()
+        expect(tx.em.query).toHaveBeenCalledTimes(1)
+    })
+
+    it("leaves the rows unmarked when pgmq refuses, so the next pass sends them again", async () => {
+        const tx = fakeTransaction(mockEntityManager({ query: [SELECT_WAITING_ROWS, [row("1")]] }))
+        const { relay, transport } = await build(tx.em)
+        const failure = new Error("queue missing")
+        transport.add.mockRejectedValue(failure)
+
+        await expect(relay.relay()).rejects.toBe(failure)
+
+        expect(tx.rollbacks).toBe(1)
+        expect(tx.em.query).toHaveBeenCalledTimes(1)
+    })
+})
+
+describe("QueueRelayService the loop", () => {
+    it("passes again at once after a pass that sent rows, pauses on an empty outbox, logs a failed pass and stops on shutdown", async () => {
+        const tx = fakeTransaction(
+            mockEntityManager({
+                query: [
+                    [SELECT_WAITING_ROWS, [row("1")]],
+                    [MARK_ROWS_SENT, []],
+                    [SELECT_WAITING_ROWS, []],
+                ],
+            }),
+        )
+        const { relay, transport, logger } = await build(tx.em)
+        const failure = new Error("outbox unreadable")
+        let waits = 0
+        let shutdown: Promise<void> = Promise.resolve()
+        let reachedSecondWait: () => void = () => undefined
+        const secondWait = new Promise<void>((resolve) => {
+            reachedSecondWait = resolve
         })
+        transport.wait.mockImplementation(() => {
+            waits += 1
+            if (waits === 1) tx.em.query.mockRejectedValueOnce(failure)
+            else {
+                shutdown = relay.onApplicationShutdown()
+                reachedSecondWait()
+            }
+            return Promise.resolve()
+        })
+
+        relay.onApplicationBootstrap()
+        await secondWait
+        await shutdown
+
+        expect(transport.add).toHaveBeenCalledTimes(1)
+        expect(transport.wait).toHaveBeenCalledWith(100)
+        expect(logger.error).toHaveBeenCalledWith(OutboxLogEvent.RelayFailed, failure, { outbox: "queue" })
     })
 })

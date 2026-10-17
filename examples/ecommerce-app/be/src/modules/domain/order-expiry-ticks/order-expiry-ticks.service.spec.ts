@@ -1,7 +1,6 @@
 import { Test } from "@nestjs/testing"
-import { fakeTransaction, mockEntityManager, recordingQueueOutbox } from "@starci/jest-preset"
+import { fakeTransaction, mock, mockEntityManager, recordingQueueOutbox } from "@starci/jest-preset"
 import { ORDER_ENTITY_MANAGER } from "@modules/platform/database"
-import { QUEUE_OUTBOX } from "@modules/platform/queue"
 import { ORDER_EXPIRY_QUEUE, OrderExpiryQueue, orderExpirySchedulerOf } from "@modules/queues/order-expiry"
 import { ORDER_EXPIRY_TICKS_OPTIONS } from "./order-expiry-ticks.decorators"
 import { OrderExpiryTicksService } from "./order-expiry-ticks.service"
@@ -11,12 +10,15 @@ const PAYMENT_WINDOW_MS = 30_000
 const build = async () => {
     const tx = fakeTransaction(mockEntityManager())
     const outbox = recordingQueueOutbox()
+    const queue = mock<OrderExpiryQueue>()
+    queue.enqueueExpireOrders.mockImplementation((payload, manager) =>
+        outbox.write(manager, ORDER_EXPIRY_QUEUE, payload),
+    )
     const moduleRef = await Test.createTestingModule({
         providers: [
             OrderExpiryTicksService,
-            OrderExpiryQueue,
+            { provide: OrderExpiryQueue, useValue: queue },
             { provide: ORDER_ENTITY_MANAGER, useValue: tx.em },
-            { provide: QUEUE_OUTBOX, useValue: outbox },
             { provide: ORDER_EXPIRY_TICKS_OPTIONS, useValue: { olderThanMs: PAYMENT_WINDOW_MS } },
         ],
     }).compile()

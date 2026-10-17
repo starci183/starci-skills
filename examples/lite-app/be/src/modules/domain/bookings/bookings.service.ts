@@ -7,7 +7,13 @@ import { BookingReminderQueue, isBookingReminderPayload, isBookingReminderTick }
 import type { BookingResult, BookingStatusResult, CreateBookingParams } from "./bookings.contracts"
 import { BookingsError, BookingsErrorCode } from "./errors/bookings.error"
 import type { BookingsRow } from "./persistence/bookings.rows"
-import { CONFIRM_BOOKING, FIND_BOOKING_STATUS, INSERT_BOOKING, REMIND_BOOKING, REMIND_DUE_BOOKINGS } from "./persistence/bookings.sql"
+import {
+    CONFIRM_BOOKING,
+    FIND_BOOKING_STATUS,
+    INSERT_BOOKING,
+    REMIND_BOOKING,
+    REMIND_DUE_BOOKINGS,
+} from "./persistence/bookings.sql"
 
 /** The PostgreSQL code of an exclusion-constraint violation: the interval overlaps another booking of the resource. */
 const EXCLUSION_VIOLATION = "23P01"

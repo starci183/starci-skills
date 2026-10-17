@@ -9,16 +9,9 @@ import {
     INSERT_CALENDAR_INBOX,
 } from "./persistence/calendar-inbox.sql"
 
-interface CalendarDelivery {
-    readonly id: string
-}
+import type { CalendarDelivery, PendingCalendarReceipt } from "./types/calendar-delivery"
 
 type CalendarDeliveryId = string | undefined
-
-interface PendingCalendarReceipt {
-    readonly id: string
-    readonly payload: CalendarDelivery
-}
 
 @Injectable()
 /** Records each calendar delivery and its typed queue outbox message atomically; processing follows commit. */

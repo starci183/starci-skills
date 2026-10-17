@@ -6,6 +6,8 @@ const required = (name: string, value: string | undefined): string => {
 
 /** The public origin used for metadata. */
 export const siteUrl = (): string => required("NEXT_PUBLIC_SITE_URL", process.env.NEXT_PUBLIC_SITE_URL)
+/** Auth cookies follow the configured site's HTTPS transport, including local HTTP development. */
+export const cookieSecure = (): boolean => new URL(siteUrl()).protocol === "https:"
 /** The back end's GraphQL endpoint, the terminal link of modules/api. */
 export const graphqlUrl = (): string => required("NEXT_PUBLIC_GRAPHQL_URL", process.env.NEXT_PUBLIC_GRAPHQL_URL)
 /** The public Supabase project origin, read by modules/auth only. */

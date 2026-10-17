@@ -1,4 +1,4 @@
-import type { ModuleMetadata } from "@nestjs/common"
+import type { DynamicModule } from "@nestjs/common"
 import { BookingsGraphqlModule } from "@features/api/bookings"
 import { CalendarsGraphqlModule } from "@features/api/calendars"
 import { ResourcesGraphqlModule } from "@features/api/resources"
@@ -16,7 +16,7 @@ import { ResourcesModule } from "@modules/domain/resources"
  * GraphQL doors, the calendar webhook door and the confirm-booking queue. A composition group holds one area's module
  * list and nothing else; `app.module.ts` spreads it into its imports.
  */
-export const bookingsModules = (): NonNullable<ModuleMetadata["imports"]> => [
+export const bookingsModules = (): Array<DynamicModule> => [
     ResourcesGraphqlModule.register({}),
     CalendarsGraphqlModule.register({}),
     BookingsGraphqlModule.register({}),

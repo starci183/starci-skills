@@ -96,7 +96,7 @@ port map the front end reads. No port literal exists in the front end:
 
 - `scripts/serve.mjs` resolves the listener port and spawns `next dev`/`next start -p` per app:
   `node scripts/serve.mjs <landing|app> <dev|start>` from this directory.
-- `fe/packages/ecommerce-api/src/projection.ts` resolves the file for the landing's server-side shop link; the shop's
+- `fe/apps/landing/src/modules/config/index.ts` resolves the file for the landing's server-side shop link; the shop's
   browser reads its service base URLs from the `NEXT_PUBLIC_*` values `scripts/serve.mjs` fills from the projection (a deployment
   passes them as build arguments), and its `fe/apps/app/src/modules/config` fails a call whose value is missing.
 - Resolution order (same shape as the BE's `findMetadataFile`): `ECOMMERCE_APP_METADATA` names the file outright, else the

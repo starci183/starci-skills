@@ -9,11 +9,7 @@ import { DATABASE_ERROR_KINDS } from "@modules/platform/database"
 import { ERRORS_MESSAGES, ErrorsModule } from "@modules/platform/errors"
 import { EVENT_BUS_ERROR_KINDS, EVENT_BUS_MESSAGES } from "@modules/platform/event-bus"
 import { HTTP_ERROR_KINDS, HTTP_MESSAGES } from "@modules/platform/http"
-import {
-    HTTP_SECURITY_ERROR_KINDS,
-    HTTP_SECURITY_MESSAGES,
-    HttpSecurityModule,
-} from "@modules/platform/http-security"
+import { HTTP_SECURITY_ERROR_KINDS, HTTP_SECURITY_MESSAGES, HttpSecurityModule } from "@modules/platform/http-security"
 import { IdsModule } from "@modules/platform/ids"
 import { I18nModule } from "@modules/platform/i18n"
 import { LoggingModule } from "@modules/platform/logging"

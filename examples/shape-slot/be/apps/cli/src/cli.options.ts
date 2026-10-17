@@ -1,21 +1,12 @@
-import { noteEntities, noteMigrations } from "@modules/domain/note"
-import type { DatabaseConnectionConfig, DatabaseConnectionOptions } from "@modules/platform/database"
+import type { DatabaseConnectionConfig } from "@modules/platform/database"
 
-/** Everything the cli app needs from its environment: every connection with the entities and migrations of its owners. */
+/** The parsed database configuration handed to the cli composition root. */
 export interface CliAppOptions {
-    /** The connections the migrate and seed commands run on, in the order they run them. */
-    readonly connections: ReadonlyArray<DatabaseConnectionOptions>
+    /** The primary connection before its owners' entities and migrations are bound. */
+    readonly database: DatabaseConnectionConfig
 }
 
-/** The primary database: the notes. */
-export const primaryConnectionOf = (primary: DatabaseConnectionConfig): DatabaseConnectionOptions => ({
-    ...primary,
-    name: "primary",
-    entities: noteEntities,
-    migrations: noteMigrations,
-})
-
-/** Binds the parsed cli configuration to each connection's entities and migrations. */
+/** Passes the parsed primary connection to composition without adding registrations. */
 export const createCliAppOptions = (primary: DatabaseConnectionConfig): CliAppOptions => ({
-    connections: [primaryConnectionOf(primary)],
+    database: primary,
 })

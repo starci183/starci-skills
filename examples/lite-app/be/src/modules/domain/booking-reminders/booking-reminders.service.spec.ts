@@ -9,10 +9,7 @@ describe("BookingRemindersService", () => {
     it("sends the scheduled tick envelope to the reminder queue exactly once", async () => {
         const entityManager = mockEntityManager({ query: [ENQUEUE_REMINDER_TICK, [{ msg_id: 1 }]] })
         const moduleRef = await Test.createTestingModule({
-            providers: [
-                BookingRemindersService,
-                { provide: PRIMARY_ENTITY_MANAGER, useValue: entityManager },
-            ],
+            providers: [BookingRemindersService, { provide: PRIMARY_ENTITY_MANAGER, useValue: entityManager }],
         }).compile()
 
         await expect(moduleRef.get(BookingRemindersService).enqueueTick()).resolves.toBeUndefined()

@@ -22,115 +22,115 @@ const build = async () => {
     return { client: moduleRef.get(IdentityApiClient), http }
 }
 
-describe("IdentityApiClient", () => {
-    describe("verify", () => {
-        it("asks the identity GraphQL door and returns the verified session", async () => {
-            const { client, http } = await build()
-            http.request.mockResolvedValue({
-                status: 200,
-                body: { data: { verifySession: { personId: "person-1" } } },
-            })
-
-            await expect(client.verify("session-token")).resolves.toEqual({ personId: "person-1" })
-
-            expect(http.request).toHaveBeenCalledWith({
-                method: "POST",
-                url: "http://identity.test/graphql",
-                headers: undefined,
-                body: {
-                    query: IDENTITY_API_DOCUMENTS.verifySession,
-                    variables: { input: { sessionToken: "session-token" } },
-                },
-                timeoutMs: 3000,
-            })
+describe("verify", () => {
+    it("asks the identity GraphQL door and returns the verified session", async () => {
+        const { client, http } = await build()
+        http.request.mockResolvedValue({
+            status: 200,
+            body: { data: { verifySession: { personId: "person-1" } } },
         })
 
-        it("answers null when the service declares the session invalid", async () => {
-            const { client, http } = await build()
-            http.request.mockResolvedValue({
-                status: 200,
-                body: { errors: [{ extensions: { code: "SESSION_INVALID" } }] },
-            })
+        await expect(client.verify("session-token")).resolves.toEqual({ personId: "person-1" })
 
-            await expect(client.verify("expired-token")).resolves.toBeNull()
-        })
-
-        it("maps other GraphQL refusals to unavailable and keeps all codes as the reason", async () => {
-            const { client, http } = await build()
-            http.request.mockResolvedValue({
-                status: 200,
-                body: {
-                    errors: [{ extensions: { code: "INTERNAL" } }, { extensions: { code: "RATE_LIMITED" } }],
-                },
-            })
-
-            await expect(client.verify("session-token")).rejects.toMatchObject({
-                code: IdentityApiErrorCode.Unavailable,
-                params: { reason: "INTERNAL,RATE_LIMITED" },
-            })
-        })
-
-        it.each([
-            ["a non-GraphQL body", "not-json-object"],
-            ["missing data", {}],
-            ["a missing session", { data: {} }],
-            ["a non-object session", { data: { verifySession: "person-1" } }],
-            ["a non-string person id", { data: { verifySession: { personId: 1 } } }],
-        ])("reports contract mismatch for %s", async (_case, body) => {
-            const { client, http } = await build()
-            http.request.mockResolvedValue({ status: 200, body })
-
-            await expect(client.verify("session-token")).rejects.toMatchObject({
-                code: IdentityApiErrorCode.ContractMismatch,
-            })
-        })
-
-        it("maps a transport failure to unavailable", async () => {
-            const { client, http } = await build()
-            const failure = new Error("identity timed out")
-            http.request.mockRejectedValue(failure)
-
-            await expect(client.verify("session-token")).rejects.toMatchObject({
-                code: IdentityApiErrorCode.Unavailable,
-                cause: failure,
-            })
+        expect(http.request).toHaveBeenCalledWith({
+            method: "POST",
+            url: "http://identity.test/graphql",
+            headers: undefined,
+            body: {
+                query: IDENTITY_API_DOCUMENTS.verifySession,
+                variables: { input: { sessionToken: "session-token" } },
+            },
+            timeoutMs: 3000,
         })
     })
 
-    describe("check", () => {
-        it("reports the identity dependency name and accepts a healthy answer", async () => {
-            const { client, http } = await build()
-            http.request.mockResolvedValue({ status: 200, body: undefined })
-
-            await expect(client.check()).resolves.toBeUndefined()
-
-            expect(client.name).toBe("identity")
-            expect(http.request).toHaveBeenCalledWith({
-                method: "GET",
-                url: "http://identity.test/health",
-                timeoutMs: 3000,
-            })
+    it("answers null when the service declares the session invalid", async () => {
+        const { client, http } = await build()
+        http.request.mockResolvedValue({
+            status: 200,
+            body: { errors: [{ extensions: { code: "SESSION_INVALID" } }] },
         })
 
-        it("maps an unhealthy status to unavailable without replacing its details", async () => {
-            const { client, http } = await build()
-            http.request.mockResolvedValue({ status: 503, body: undefined })
+        await expect(client.verify("expired-token")).resolves.toBeNull()
+    })
+})
 
-            await expect(client.check()).rejects.toMatchObject({
-                code: IdentityApiErrorCode.Unavailable,
-                params: { status: 503 },
-            })
+describe("verify refusals and failures", () => {
+    it("maps other GraphQL refusals to unavailable and keeps all codes as the reason", async () => {
+        const { client, http } = await build()
+        http.request.mockResolvedValue({
+            status: 200,
+            body: {
+                errors: [{ extensions: { code: "INTERNAL" } }, { extensions: { code: "RATE_LIMITED" } }],
+            },
         })
 
-        it("maps a health transport failure to unavailable", async () => {
-            const { client, http } = await build()
-            const failure = new Error("connection refused")
-            http.request.mockRejectedValue(failure)
+        await expect(client.verify("session-token")).rejects.toMatchObject({
+            code: IdentityApiErrorCode.Unavailable,
+            params: { reason: "INTERNAL,RATE_LIMITED" },
+        })
+    })
 
-            await expect(client.check()).rejects.toMatchObject({
-                code: IdentityApiErrorCode.Unavailable,
-                cause: failure,
-            })
+    it.each([
+        ["a non-GraphQL body", "not-json-object"],
+        ["missing data", {}],
+        ["a missing session", { data: {} }],
+        ["a non-object session", { data: { verifySession: "person-1" } }],
+        ["a non-string person id", { data: { verifySession: { personId: 1 } } }],
+    ])("reports contract mismatch for %s", async (_case, body) => {
+        const { client, http } = await build()
+        http.request.mockResolvedValue({ status: 200, body })
+
+        await expect(client.verify("session-token")).rejects.toMatchObject({
+            code: IdentityApiErrorCode.ContractMismatch,
+        })
+    })
+
+    it("maps a transport failure to unavailable", async () => {
+        const { client, http } = await build()
+        const failure = new Error("identity timed out")
+        http.request.mockRejectedValue(failure)
+
+        await expect(client.verify("session-token")).rejects.toMatchObject({
+            code: IdentityApiErrorCode.Unavailable,
+            cause: failure,
+        })
+    })
+})
+
+describe("check", () => {
+    it("reports the identity dependency name and accepts a healthy answer", async () => {
+        const { client, http } = await build()
+        http.request.mockResolvedValue({ status: 200, body: undefined })
+
+        await expect(client.check()).resolves.toBeUndefined()
+
+        expect(client.name).toBe("identity")
+        expect(http.request).toHaveBeenCalledWith({
+            method: "GET",
+            url: "http://identity.test/health",
+            timeoutMs: 3000,
+        })
+    })
+
+    it("maps an unhealthy status to unavailable without replacing its details", async () => {
+        const { client, http } = await build()
+        http.request.mockResolvedValue({ status: 503, body: undefined })
+
+        await expect(client.check()).rejects.toMatchObject({
+            code: IdentityApiErrorCode.Unavailable,
+            params: { status: 503 },
+        })
+    })
+
+    it("maps a health transport failure to unavailable", async () => {
+        const { client, http } = await build()
+        const failure = new Error("connection refused")
+        http.request.mockRejectedValue(failure)
+
+        await expect(client.check()).rejects.toMatchObject({
+            code: IdentityApiErrorCode.Unavailable,
+            cause: failure,
         })
     })
 })

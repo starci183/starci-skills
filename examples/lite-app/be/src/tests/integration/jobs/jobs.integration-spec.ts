@@ -1,15 +1,15 @@
 import assert from "node:assert/strict"
-import { FakeClock, mock } from "@starci/jest-preset"
+import { FakeClock, fakeIds, mock } from "@starci/jest-preset"
 import type { ClaimedJob, FencedProcessor } from "@modules/platform/jobs"
 import { JobClaimService } from "@modules/platform/jobs/job-claim.service"
 import { JobRunnerService } from "@modules/platform/jobs/job-runner.service"
 import { JobsLogEvent } from "@modules/platform/jobs/jobs.log-events"
 import type { Logger } from "@modules/platform/logging"
 import type { QueueDelivery, QueueWorkerRegistry } from "@modules/platform/queue"
-import { JobsDatabaseFixture } from "../../fixtures/jobs.database.fixture"
+import { createJobsDatabaseWorld } from "../../world/jobs.database.builder"
 
 const LEASE_MS = 100
-const database = new JobsDatabaseFixture()
+const database = createJobsDatabaseWorld(fakeIds())
 
 const build = (scenario: string) => {
     const delivery: QueueDelivery = {
@@ -67,7 +67,7 @@ const registerClaimProof = () => {
 const registerZombieProof = () => {
     it("fenced-job/zombie-fenced-out: stale writes and runner settlement cannot overwrite the successor's progress", async () => {
         const { clock, claims, successorClaims, claim, runner, logger, delivery } = build("zombie")
-        const attempts: ClaimedJob[] = []
+        const attempts: Array<ClaimedJob> = []
         let release = () => {}
         const gate = new Promise<void>((resolve) => {
             release = resolve
@@ -121,8 +121,8 @@ const registerZombieProof = () => {
 const registerRedispatchProof = () => {
     it("fenced-job/redispatch-isolated: runner retries preserve progress while replacing the token and external run key", async () => {
         const { claims, runner, delivery } = build("redispatch")
-        const attempts: ClaimedJob[] = []
-        const keys: string[] = []
+        const attempts: Array<ClaimedJob> = []
+        const keys: Array<string> = []
         const providerDown = new Error("provider down")
         const processor: FencedProcessor = {
             queue: delivery.queue,

@@ -48,7 +48,7 @@ const build = async (entityManager: MockEntityManager) => {
     return { receipts: moduleRef.get(ReceiptService), storage }
 }
 
-describe("ReceiptService", () => {
+const registerPrepareReceiptTests = (): void => {
     describe("prepareReceipt", () => {
         it("builds the receipt document of a paid order under its stable key", async () => {
             const em = mockEntityManager({ findOneBy: [OrderEntity, ORDER], find: [OrderLineEntity, LINES] })
@@ -66,7 +66,9 @@ describe("ReceiptService", () => {
             expect(await receipts.prepareReceipt("o-9")).toBeNull()
         })
     })
+}
 
+const registerArchiveReceiptTests = (): void => {
     describe("archiveReceipt", () => {
         it("stores the receipt of the paid order under the run key and remembers the key it was stored under", async () => {
             const em = mockEntityManager({
@@ -105,7 +107,9 @@ describe("ReceiptService", () => {
             expect(em.update).not.toHaveBeenCalled()
         })
     })
+}
 
+const registerRecordArchivedTests = (): void => {
     describe("recordArchived", () => {
         it("remembers the key the receipt was stored under", async () => {
             const em = mockEntityManager({ update: [OrderEntity, {}] })
@@ -116,7 +120,9 @@ describe("ReceiptService", () => {
             expect(em.update).toHaveBeenCalledWith(OrderEntity, { id: "o-1" }, { receiptKey: KEY })
         })
     })
+}
 
+const registerLinkTests = (): void => {
     describe("link", () => {
         it("answers the link of an archived receipt of the buyer's own order", async () => {
             const em = mockEntityManager({ findOneBy: [OrderEntity, orderRow({ ...ORDER, receiptKey: KEY })] })
@@ -148,4 +154,11 @@ describe("ReceiptService", () => {
             expect(storage.linkOf).not.toHaveBeenCalled()
         })
     })
+}
+
+describe("ReceiptService", () => {
+    registerPrepareReceiptTests()
+    registerArchiveReceiptTests()
+    registerRecordArchivedTests()
+    registerLinkTests()
 })

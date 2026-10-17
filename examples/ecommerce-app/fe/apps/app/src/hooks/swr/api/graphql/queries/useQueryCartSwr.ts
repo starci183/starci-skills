@@ -4,6 +4,9 @@ import { queryCart } from "@/modules/api/graphql/queries/query-cart"
 import type { QueryCartResponse } from "@/modules/api/graphql/queries/types/cart"
 import { useAppSelector } from "@/redux"
 
+/** The cart snapshot consumed by presentation hooks. */
+export type { QueryCartResponse } from "@/modules/api/graphql/queries/types/cart"
+
 /** The SWR key of the cart query; the signed-in person is its identity. */
 const QUERY_CART_SWR_KEY = "QUERY_CART_SWR"
 

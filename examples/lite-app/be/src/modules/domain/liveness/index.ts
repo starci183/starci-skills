@@ -1,4 +1,4 @@
-export { LIVENESS_ERROR_KINDS, LivenessError, LivenessErrorCode } from "./errors/liveness.error"
+export { LIVENESS_ERROR_KINDS } from "./errors/liveness.error"
 export type { LivenessReport } from "./liveness.contracts"
 export { LivenessModule } from "./liveness.module"
 export { LivenessService } from "./liveness.service"

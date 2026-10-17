@@ -10,3 +10,4 @@ export {
     useQueryOrderReceiptSwr,
 } from "./api"
 export { SwrSideEffects } from "./SwrSideEffects"
+export type { QueryCartResponse } from "./api/graphql/queries/useQueryCartSwr"

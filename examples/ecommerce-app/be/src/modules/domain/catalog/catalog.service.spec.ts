@@ -14,7 +14,7 @@ const build = async (entityManager: MockEntityManager) => {
     return moduleRef.get(CatalogService)
 }
 
-describe("CatalogService", () => {
+const registerListTests = (): void => {
     describe("list", () => {
         it("returns every product by SKU, capped at the list maximum", async () => {
             const em = mockEntityManager({
@@ -34,7 +34,9 @@ describe("CatalogService", () => {
             expect(em.find).toHaveBeenCalledWith(ProductEntity, { order: { id: "ASC" }, take: LIST_ROWS_MAX })
         })
     })
+}
 
+const registerByIdsTests = (): void => {
     describe("byIds", () => {
         it("returns the products keyed by id and leaves an unknown id absent", async () => {
             const em = mockEntityManager({ find: [ProductEntity, [productRow({ id: "sku-1", stock: 3 })]] })
@@ -55,7 +57,9 @@ describe("CatalogService", () => {
             expect(await (await build(em)).byIds({ ids: [] })).toEqual({})
         })
     })
+}
 
+const registerReleaseStockTests = (): void => {
     describe("releaseStock", () => {
         it("gives the units back with an increment through the caller transaction manager", async () => {
             const manager = mockEntityManager({ increment: [ProductEntity, { affected: 1 }] })
@@ -65,7 +69,9 @@ describe("CatalogService", () => {
             expect(manager.increment).toHaveBeenCalledWith(ProductEntity, { id: "sku-1" }, "stock", 2)
         })
     })
+}
 
+const registerReserveStockTests = (): void => {
     describe("reserveStock", () => {
         it("takes the units with a guarded decrement and returns true when a row changed", async () => {
             const manager = mockEntityManager({ decrement: [ProductEntity, { affected: 1 }] })
@@ -103,4 +109,11 @@ describe("CatalogService", () => {
             ).toBe(false)
         })
     })
+}
+
+describe("CatalogService", () => {
+    registerListTests()
+    registerByIdsTests()
+    registerReleaseStockTests()
+    registerReserveStockTests()
 })

@@ -17,12 +17,7 @@ export const persistenceModules = (options: BillingAppOptions): Array<DynamicMod
                 ...options.database,
                 name: BILLING_CONNECTION,
                 entities: [...invoiceEntities, ...paymentEntities, ...inboxEntities, ...eventBusEntities],
-                migrations: [
-                    ...invoiceMigrations,
-                    ...paymentMigrations,
-                    ...inboxMigrations,
-                    ...eventBusMigrations,
-                ],
+                migrations: [...invoiceMigrations, ...paymentMigrations, ...inboxMigrations, ...eventBusMigrations],
             },
         ],
     }),

@@ -52,7 +52,7 @@ const build = async (authorization?: string, metadata: DoorMetadata = {}) => {
     return { guard: moduleRef.get(AuthGuard), context, reflector, verifier, request }
 }
 
-describe("AuthGuard", () => {
+const registerPublicDoorTests = (): void => {
     it.each(Object.values(PublicReason))(
         "opens a door with the public reason %s without authenticating",
         async (reason) => {
@@ -75,7 +75,9 @@ describe("AuthGuard", () => {
 
         expect(verifier.verify).not.toHaveBeenCalled()
     })
+}
 
+const registerSessionAuthenticationTests = (): void => {
     it.each([undefined, "Basic credentials", "Bearer   "])(
         "refuses an absent or malformed bearer credential (%s)",
         async (authorization) => {
@@ -109,7 +111,9 @@ describe("AuthGuard", () => {
         expect(reflector.getAllAndOverride).toHaveBeenCalledWith(ROLES_KEY, [handler, Door])
         expect(request.principal).toEqual({ id: "person-1", roles: ["member"] })
     })
+}
 
+const registerRoleAuthorizationTests = (): void => {
     it("accepts a door whose required roles the principal has", async () => {
         const { guard, context, verifier, request } = await build("Bearer session-token", { roles: ["member"] })
         verifier.verify.mockResolvedValue({ personId: "person-1" })
@@ -129,7 +133,9 @@ describe("AuthGuard", () => {
 
         expect(request.principal).toBeUndefined()
     })
+}
 
+const registerCredentialAuthorizationTests = (): void => {
     it("admits a credential door with a principal of the required kind without checking a session", async () => {
         const { guard, context, reflector, verifier, request } = await build("Bearer session-token", {
             credential: { kind: "api-key" },
@@ -177,4 +183,11 @@ describe("AuthGuard", () => {
 
         expect(verifier.verify).not.toHaveBeenCalled()
     })
+}
+
+describe("AuthGuard", () => {
+    registerPublicDoorTests()
+    registerSessionAuthenticationTests()
+    registerRoleAuthorizationTests()
+    registerCredentialAuthorizationTests()
 })

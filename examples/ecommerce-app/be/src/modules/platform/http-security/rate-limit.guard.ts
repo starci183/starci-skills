@@ -1,10 +1,12 @@
 import { Injectable, SetMetadata } from "@nestjs/common"
 import type { ExecutionContext } from "@nestjs/common"
+import type { Reflector } from "@nestjs/core"
 import { ThrottlerGuard } from "@nestjs/throttler"
-import type { ThrottlerModuleOptions } from "@nestjs/throttler"
+import type { ThrottlerModuleOptions, ThrottlerStorage } from "@nestjs/throttler"
 import { HttpSecurityError, HttpSecurityErrorCode } from "./errors/http-security.error"
 import { requestOf } from "./execution-request.mapper"
-import type { RateLimitOptions } from "./http-security.options"
+import { InjectHttpSecurityOptions, InjectRateLimitStorage, InjectRateLimitReflector } from "./http-security.decorators"
+import type { HttpSecurityOptions, RateLimitOptions } from "./http-security.options"
 
 /** The rate limit tiers of a door. */
 export enum RateTier {
@@ -59,6 +61,14 @@ export interface ThrottledExchange {
  * the caller from the HTTP request under either transport and answers an overrun with the RateLimited capability error.
  */
 export class RateLimitGuard extends ThrottlerGuard {
+    constructor(
+        @InjectHttpSecurityOptions() options: HttpSecurityOptions,
+        @InjectRateLimitStorage() storage: ThrottlerStorage,
+        @InjectRateLimitReflector() reflector: Reflector,
+    ) {
+        super(throttlerOptionsOf(options.rateLimit), storage, reflector)
+    }
+
     /** The two fields the throttler reads: the caller address and the headers of the HTTP request behind REST or GraphQL. */
     protected override getRequestResponse(context: ExecutionContext): ThrottledExchange {
         const request = requestOf(context)

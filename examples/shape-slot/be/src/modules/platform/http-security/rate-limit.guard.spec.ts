@@ -16,11 +16,11 @@ const options: HttpSecurityOptions = {
     rateLimit: { windowMs: 60_000, defaultLimit: 2, strictLimit: 1 },
 }
 
-const build = async (reflector: Reflector, clock: FakeClock) => {
+const build = async (clock: FakeClock) => {
     const moduleRef = await Test.createTestingModule({
         providers: [
             RateLimitGuard,
-            { provide: Reflector, useValue: reflector },
+            Reflector,
             { provide: CLOCK, useValue: clock },
             { provide: HTTP_SECURITY_OPTIONS, useValue: options },
         ],
@@ -46,7 +46,7 @@ describe("RateLimit", () => {
     it("marks a door with the tier it declares, and the guard counts it under that tier's limit", async () => {
         class Door {}
         RateLimit(RateTier.Strict)(Door)
-        const guard = await build(new Reflector(), new FakeClock(AT))
+        const guard = await build(new FakeClock(AT))
         const { context } = contextOf("127.0.0.1", () => undefined, Door)
 
         expect(guard.canActivate(context)).toBe(true)
@@ -56,7 +56,7 @@ describe("RateLimit", () => {
 
 describe("RateLimitGuard", () => {
     it("counts an unmarked door under the default limit", async () => {
-        const guard = await build(mock<Reflector>(), new FakeClock(AT))
+        const guard = await build(new FakeClock(AT))
         const { context } = contextOf("127.0.0.1")
 
         expect(guard.canActivate(context)).toBe(true)
@@ -66,7 +66,7 @@ describe("RateLimitGuard", () => {
 
     it("opens a fresh window for a caller whose bucket expired", async () => {
         const clock = new FakeClock(AT)
-        const guard = await build(mock<Reflector>(), clock)
+        const guard = await build(clock)
         const { context } = contextOf("127.0.0.1")
 
         guard.canActivate(context)
@@ -79,7 +79,7 @@ describe("RateLimitGuard", () => {
     })
 
     it("counts a request without an address under the unknown bucket", async () => {
-        const guard = await build(mock<Reflector>(), new FakeClock(AT))
+        const guard = await build(new FakeClock(AT))
         const { context } = contextOf(undefined)
 
         guard.canActivate(context)
@@ -89,7 +89,7 @@ describe("RateLimitGuard", () => {
 
     it("prunes the expired buckets when the map outgrows the bucket cap", async () => {
         const clock = new FakeClock(AT)
-        const guard = await build(mock<Reflector>(), clock)
+        const guard = await build(clock)
         const { context, setIp } = contextOf("0.0.0.0")
 
         for (let index = 0; index <= 10_000; index += 1) {

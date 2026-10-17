@@ -33,6 +33,8 @@ export const admit = (
             return ok(metadata.reason)
         case undefined:
             return principal === undefined ? refused(IdentityErrorCode.Unauthenticated) : ok(principal)
+        case PublicReason.AuthHandshake:
+        case PublicReason.CatalogRead:
         default:
             return refused(IdentityErrorCode.Unauthenticated)
     }

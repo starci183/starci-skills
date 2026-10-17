@@ -12,14 +12,14 @@ import { PgmqQueueTransportClient } from "./pgmq-queue-transport.client"
 import { PGMQ_ARCHIVE, PGMQ_READ, PGMQ_SEND, PGMQ_SET_VT } from "./persistence/queue.sql"
 import type { PgmqMessageRow } from "./persistence/queue.rows"
 
-const optionsOf = builder<QueueOptions>({
+const optionsOf: QueueOptions = {
     relayIntervalMs: 100,
     relayBatch: 50,
     concurrency: 4,
     pollIntervalMs: 250,
     visibilityTimeoutMs: 30_000,
     connections: [],
-})
+}
 
 const messageOf = builder<PgmqMessageRow>({
     msg_id: "1",
@@ -32,7 +32,7 @@ const build = async (manager: MockEntityManager = mockEntityManager()) => {
     const moduleRef = await Test.createTestingModule({
         providers: [
             PgmqQueueTransportClient,
-            { provide: QUEUE_OPTIONS, useValue: optionsOf() },
+            { provide: QUEUE_OPTIONS, useValue: builder<QueueOptions>(optionsOf)() },
             { provide: PRIMARY_ENTITY_MANAGER, useValue: manager },
             { provide: LOGGER, useValue: logger },
         ],
@@ -67,135 +67,133 @@ const runUntilFirstPause = async (client: PgmqQueueTransportClient, handler: Que
     return wait
 }
 
-describe("PgmqQueueTransportClient", () => {
-    describe("add", () => {
-        it("sends the message with the outbox row id on the connection of the caller's transaction", async () => {
-            const { client } = await build()
-            const tx = fakeTransaction(mockEntityManager({ query: [PGMQ_SEND, [{ msg_id: "9" }]] }))
+describe("PgmqQueueTransportClient add", () => {
+    it("sends the message with the outbox row id on the connection of the caller's transaction", async () => {
+        const { client } = await build()
+        const tx = fakeTransaction(mockEntityManager({ query: [PGMQ_SEND, [{ msg_id: "9" }]] }))
 
-            await tx.em.transaction((manager) =>
-                client.add(manager, "booking_confirmation", "row-1", { bookingId: "b-1" }),
-            )
+        await tx.em.transaction((manager) => client.add(manager, "booking_confirmation", "row-1", { bookingId: "b-1" }))
 
-            expect(tx.em.query).toHaveBeenCalledWith(PGMQ_SEND, [
-                "booking_confirmation",
-                JSON.stringify({ jobId: "row-1", payload: { bookingId: "b-1" } }),
-            ])
-            expect(tx.commits).toBe(1)
+        expect(tx.em.query).toHaveBeenCalledWith(PGMQ_SEND, [
+            "booking_confirmation",
+            JSON.stringify({ jobId: "row-1", payload: { bookingId: "b-1" } }),
+        ])
+        expect(tx.commits).toBe(1)
+    })
+})
+
+describe("PgmqQueueTransportClient work", () => {
+    it("runs a read batch together, archives completed jobs, retries failed ones with backoff and dead-letters the exhausted", async () => {
+        const done = messageOf()
+        const retried = messageOf({ msg_id: "2", read_ct: 2, message: { jobId: "row-2", payload: {} } })
+        const exhausted = messageOf({ msg_id: "3", read_ct: 5, message: { jobId: "row-3", payload: {} } })
+        const { client, manager, logger } = await build(
+            mockEntityManager({
+                query: [
+                    [PGMQ_READ, [done, retried, exhausted]],
+                    [PGMQ_ARCHIVE, [{ archived: true }]],
+                    [PGMQ_SET_VT, [{ msg_id: "2" }]],
+                    [PGMQ_ARCHIVE, [{ archived: true }]],
+                    [PGMQ_READ, []],
+                ],
+            }),
+        )
+        const handler = handlerOf(["row-2", "row-3"])
+
+        const wait = await runUntilFirstPause(client, handler)
+
+        expect(manager.query).toHaveBeenCalledWith(PGMQ_READ, ["booking_confirmation", 30, 3])
+        expect(handler.handle).toHaveBeenCalledWith({
+            id: "row-1",
+            queue: "booking_confirmation",
+            payload: { bookingId: "b-1" },
+            attempt: 1,
+        })
+        expect(manager.query).toHaveBeenCalledWith(PGMQ_ARCHIVE, ["booking_confirmation", "1"])
+        expect(manager.query).toHaveBeenCalledWith(PGMQ_SET_VT, ["booking_confirmation", "2", 2])
+        expect(manager.query).toHaveBeenCalledWith(PGMQ_ARCHIVE, ["booking_confirmation", "3"])
+        expect(logger.error).toHaveBeenCalledWith(QueueLogEvent.DeliveryFailed, expect.any(Error), {
+            queue: "booking_confirmation",
+            messageId: "2",
+            attempt: 2,
+        })
+        expect(logger.error).toHaveBeenCalledWith(QueueLogEvent.DeadLettered, expect.any(Error), {
+            queue: "booking_confirmation",
+            messageId: "3",
+            attempt: 5,
+        })
+        expect(wait).toHaveBeenCalledWith(250)
+    })
+})
+
+describe("PgmqQueueTransportClient work failures and shutdown", () => {
+    it("logs a read that failed and pauses before reading again", async () => {
+        const { client, manager, logger } = await build(mockEntityManager({ query: [PGMQ_READ, []] }))
+        const failure = new Error("pgmq unreachable")
+        manager.query.mockRejectedValueOnce(failure)
+
+        await runUntilFirstPause(client, handlerOf())
+
+        expect(logger.error).toHaveBeenCalledWith(QueueLogEvent.ReadFailed, failure, {
+            queue: "booking_confirmation",
         })
     })
 
-    describe("work", () => {
-        it("runs a read batch together, archives completed jobs, retries failed ones with backoff and dead-letters the exhausted", async () => {
-            const done = messageOf()
-            const retried = messageOf({ msg_id: "2", read_ct: 2, message: { jobId: "row-2", payload: {} } })
-            const exhausted = messageOf({ msg_id: "3", read_ct: 5, message: { jobId: "row-3", payload: {} } })
-            const { client, manager, logger } = await build(
-                mockEntityManager({
-                    query: [
-                        [PGMQ_READ, [done, retried, exhausted]],
-                        [PGMQ_ARCHIVE, [{ archived: true }]],
-                        [PGMQ_SET_VT, [{ msg_id: "2" }]],
-                        [PGMQ_ARCHIVE, [{ archived: true }]],
-                        [PGMQ_READ, []],
-                    ],
-                }),
-            )
-            const handler = handlerOf(["row-2", "row-3"])
-
-            const wait = await runUntilFirstPause(client, handler)
-
-            expect(manager.query).toHaveBeenCalledWith(PGMQ_READ, ["booking_confirmation", 30, 3])
-            expect(handler.handle).toHaveBeenCalledWith({
-                id: "row-1",
-                queue: "booking_confirmation",
-                payload: { bookingId: "b-1" },
-                attempt: 1,
-            })
-            expect(manager.query).toHaveBeenCalledWith(PGMQ_ARCHIVE, ["booking_confirmation", "1"])
-            expect(manager.query).toHaveBeenCalledWith(PGMQ_SET_VT, ["booking_confirmation", "2", 2])
-            expect(manager.query).toHaveBeenCalledWith(PGMQ_ARCHIVE, ["booking_confirmation", "3"])
-            expect(logger.error).toHaveBeenCalledWith(QueueLogEvent.DeliveryFailed, expect.any(Error), {
-                queue: "booking_confirmation",
-                messageId: "2",
-                attempt: 2,
-            })
-            expect(logger.error).toHaveBeenCalledWith(QueueLogEvent.DeadLettered, expect.any(Error), {
-                queue: "booking_confirmation",
-                messageId: "3",
-                attempt: 5,
-            })
-            expect(wait).toHaveBeenCalledWith(250)
+    it("logs a message it could not settle, leaving it to reappear after its visibility timeout", async () => {
+        const { client, manager, logger } = await build()
+        const failure = new Error("archive refused")
+        let reads = 0
+        manager.query.mockImplementation((statement: string) => {
+            if (statement === PGMQ_ARCHIVE) return Promise.reject(failure)
+            reads += 1
+            return Promise.resolve(reads === 1 ? [messageOf()] : [])
         })
 
-        it("logs a read that failed and pauses before reading again", async () => {
-            const { client, manager, logger } = await build(mockEntityManager({ query: [PGMQ_READ, []] }))
-            const failure = new Error("pgmq unreachable")
-            manager.query.mockRejectedValueOnce(failure)
+        await runUntilFirstPause(client, handlerOf())
 
-            await runUntilFirstPause(client, handlerOf())
-
-            expect(logger.error).toHaveBeenCalledWith(QueueLogEvent.ReadFailed, failure, {
-                queue: "booking_confirmation",
-            })
-        })
-
-        it("logs a message it could not settle, leaving it to reappear after its visibility timeout", async () => {
-            const { client, manager, logger } = await build()
-            const failure = new Error("archive refused")
-            let reads = 0
-            manager.query.mockImplementation((statement: string) => {
-                if (statement === PGMQ_ARCHIVE) return Promise.reject(failure)
-                reads += 1
-                return Promise.resolve(reads === 1 ? [messageOf()] : [])
-            })
-
-            await runUntilFirstPause(client, handlerOf())
-
-            expect(logger.error).toHaveBeenCalledWith(QueueLogEvent.SettleFailed, failure, {
-                queue: "booking_confirmation",
-                messageId: "1",
-            })
-        })
-
-        it("does not pause after an empty read once it is closing", async () => {
-            const { client, manager } = await build(mockEntityManager({ query: [PGMQ_READ, []] }))
-            const wait = jest.spyOn(client, "wait")
-            let stopped: Promise<void> = Promise.resolve()
-            manager.query.mockImplementation(() => {
-                stopped = client.close()
-                return Promise.resolve([])
-            })
-
-            await client.work(handlerOf(), 3)
-            await new Promise<void>((resolve) => setImmediate(resolve))
-            await stopped
-
-            expect(wait).not.toHaveBeenCalled()
+        expect(logger.error).toHaveBeenCalledWith(QueueLogEvent.SettleFailed, failure, {
+            queue: "booking_confirmation",
+            messageId: "1",
         })
     })
 
-    describe("wait", () => {
-        it("waits for the requested delay", async () => {
-            jest.useFakeTimers()
-            try {
-                const { client } = await build()
-
-                const waiting = client.wait(250)
-                await jest.advanceTimersByTimeAsync(250)
-
-                await expect(waiting).resolves.toBeUndefined()
-            } finally {
-                jest.useRealTimers()
-            }
+    it("does not pause after an empty read once it is closing", async () => {
+        const { client, manager } = await build(mockEntityManager({ query: [PGMQ_READ, []] }))
+        const wait = jest.spyOn(client, "wait")
+        let stopped: Promise<void> = Promise.resolve()
+        manager.query.mockImplementation(() => {
+            stopped = client.close()
+            return Promise.resolve([])
         })
-    })
 
-    describe("close", () => {
-        it("resolves at once when no worker runs", async () => {
+        await client.work(handlerOf(), 3)
+        await new Promise<void>((resolve) => setImmediate(resolve))
+        await stopped
+
+        expect(wait).not.toHaveBeenCalled()
+    })
+})
+
+describe("PgmqQueueTransportClient wait", () => {
+    it("waits for the requested delay", async () => {
+        jest.useFakeTimers()
+        try {
             const { client } = await build()
 
-            await expect(client.close()).resolves.toBeUndefined()
-        })
+            const waiting = client.wait(250)
+            await jest.advanceTimersByTimeAsync(250)
+
+            await expect(waiting).resolves.toBeUndefined()
+        } finally {
+            jest.useRealTimers()
+        }
+    })
+})
+
+describe("PgmqQueueTransportClient close", () => {
+    it("resolves at once when no worker runs", async () => {
+        const { client } = await build()
+
+        await expect(client.close()).resolves.toBeUndefined()
     })
 })

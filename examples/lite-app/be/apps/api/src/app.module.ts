@@ -1,21 +1,15 @@
 import { Module } from "@nestjs/common"
 import type { DynamicModule } from "@nestjs/common"
 import { APP_FILTER, APP_GUARD } from "@nestjs/core"
-import { SystemHealthHttpModule } from "@features/api/system-health"
-import { ToolStatusHttpModule } from "@features/api/tool-status"
-import { AuthGuard, CredentialGuard, IdentityModule } from "@modules/domain/identity"
-import {
-    SUPABASE_ACCESS_TOKEN_VERIFIER,
-    SUPABASE_ADMIN_CLIENT,
-    createSupabaseAccessTokenVerifier,
-    createSupabaseAdminClient,
-} from "@modules/integrations/supabase"
-import { LivenessModule } from "@modules/domain/liveness"
 import { ErrorsFilter } from "@modules/platform/errors"
 import { OriginGuard, RateLimitGuard } from "@modules/platform/http-security"
+import { createSupabaseAccessTokenVerifier } from "@modules/integrations/supabase"
+import { AuthGuard, CredentialGuard } from "@modules/domain/identity"
 import type { ApiOptions } from "./api.options"
 import { bookingsModules } from "./compose/bookings"
 import { platformModules } from "./compose/platform"
+import { identityModules, identityProviders } from "./compose/identity"
+import { healthModules } from "./compose/health"
 
 @Module({})
 /** Composition root of the API: it spreads the composition groups of `compose/`, and the four guards run in a fixed order. */
@@ -28,17 +22,11 @@ export class AppModule {
             imports: [
                 ...platformModules(options),
                 ...bookingsModules(),
-                IdentityModule.register({ isGlobal: true, verifyAccessToken }),
-                LivenessModule.register({ isGlobal: true }),
-                SystemHealthHttpModule.register({}),
-                ToolStatusHttpModule.register({}),
+                ...identityModules(verifyAccessToken),
+                ...healthModules(),
             ],
             providers: [
-                {
-                    provide: SUPABASE_ADMIN_CLIENT,
-                    useValue: createSupabaseAdminClient(options.supabase),
-                },
-                { provide: SUPABASE_ACCESS_TOKEN_VERIFIER, useValue: verifyAccessToken },
+                ...identityProviders(options.supabase, verifyAccessToken),
                 { provide: APP_FILTER, useClass: ErrorsFilter },
                 { provide: APP_GUARD, useClass: RateLimitGuard },
                 { provide: APP_GUARD, useClass: OriginGuard },

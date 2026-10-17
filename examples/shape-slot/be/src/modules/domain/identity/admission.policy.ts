@@ -32,6 +32,9 @@ export const admit = (
     switch (metadata?.reason) {
         case PublicReason.Health:
             return ok(metadata.reason)
+        case PublicReason.AuthHandshake:
+        case PublicReason.SignedWebhook:
+        case PublicReason.CatalogRead:
         case undefined:
         default:
             return refused(IdentityErrorCode.Unauthenticated)

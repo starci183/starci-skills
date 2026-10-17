@@ -35,7 +35,7 @@ const build = async () => {
     return { client: moduleRef.get(BullmqQueueTransportClient), queue, worker, factory }
 }
 
-describe("BullmqQueueTransportClient", () => {
+describe("BullmqQueueTransportClient jobs and schedulers", () => {
     it("adds idempotent jobs with the queue retry and retention policy", async () => {
         const { client, queue, factory } = await build()
         const payload = { orderId: "order-1" }
@@ -75,7 +75,9 @@ describe("BullmqQueueTransportClient", () => {
             { name: "billing", data: {}, opts: { attempts: ATTEMPTS } },
         )
     })
+})
 
+describe("BullmqQueueTransportClient worker deliveries", () => {
     it("starts a worker that translates BullMQ jobs into queue deliveries", async () => {
         const { client, factory } = await build()
         const handler = mock<QueueHandler>({ queue: "orders" })
@@ -105,7 +107,9 @@ describe("BullmqQueueTransportClient", () => {
             attempt: 1,
         })
     })
+})
 
+describe("BullmqQueueTransportClient wait and shutdown", () => {
     it("waits for the requested delay", async () => {
         jest.useFakeTimers()
         try {

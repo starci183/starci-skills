@@ -66,5 +66,13 @@ describe("QueueWorkerService", () => {
 
             expect(transport.close).toHaveBeenCalledTimes(1)
         })
+
+        it("propagates a transport shutdown failure", async () => {
+            const { workers, transport } = await build()
+            const failure = new Error("delivery could not finish")
+            transport.close.mockRejectedValue(failure)
+
+            await expect(workers.onApplicationShutdown()).rejects.toBe(failure)
+        })
     })
 })

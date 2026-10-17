@@ -35,7 +35,7 @@ const build = async (status: RedisDriver["status"] = "wait") => {
     return { client: moduleRef.get(RedisCacheClient), redis, factory }
 }
 
-describe("RedisCacheClient", () => {
+describe("RedisCacheClient reads", () => {
     it("opens a lazy Redis connection with the declared timeout", async () => {
         const { client, factory } = await build()
 
@@ -90,7 +90,9 @@ describe("RedisCacheClient", () => {
             cause: expect.any(SyntaxError),
         })
     })
+})
 
+describe("RedisCacheClient failures", () => {
     it("maps a connection failure to cache unavailable", async () => {
         const { client, redis } = await build()
         const { key } = cacheKey()
@@ -116,7 +118,9 @@ describe("RedisCacheClient", () => {
             cause: failure,
         })
     })
+})
 
+describe("RedisCacheClient writes and lifecycle", () => {
     it("stores JSON with the key's expiry", async () => {
         const { client, redis } = await build("ready")
         const { key } = cacheKey()

@@ -71,10 +71,10 @@ const orderPlaceholder: OrderView = {
 }
 const handoffPlaceholder: Handoff = { status: "prepared", fingerprint: "fp-0000", revision: 0 }
 
-/** Pure half: draws one of three shapes; each slot renders its own status through SlotView. */
-export const HandoffBlockBase = (props: HandoffBlockBaseProps) => {
+/** Draws the order slot and its disclosure from resolved atoms. */
+const HandoffOrder = (props: Omit<HandoffBlockBaseProps, "state">) => {
     const { labels } = props.props
-    const order = (
+    return (
         <SlotView
             slot={props.props.order}
             placeholder={orderPlaceholder}
@@ -98,51 +98,83 @@ export const HandoffBlockBase = (props: HandoffBlockBaseProps) => {
             )}
         </SlotView>
     )
-    const send = (value: Handoff, label: string, isSkeleton: boolean) => (
-        <Button
-            variant="primary"
-            isSkeleton={isSkeleton}
-            onPress={() => props.on.requestSend({ fingerprint: value.fingerprint, revision: value.revision })}
-        >
-            {label}
-        </Button>
+}
+
+/** Maps the block actions to the send overlay. */
+const HandoffSendOverlay = (props: Omit<HandoffBlockBaseProps, "state">) => (
+    <SendHandoffForm
+        state={props.props.send.shape}
+        props={props.props.send}
+        on={{
+            close: props.on.sendClose,
+            change: props.on.sendChange,
+            review: props.on.sendReview,
+            back: props.on.sendBack,
+            confirm: props.on.sendConfirm,
+        }}
+    />
+)
+
+/** Draws a send action for the current handoff value. */
+const handoffSendButton = (
+    value: Handoff,
+    label: string,
+    isSkeleton: boolean,
+    requestSend: HandoffBlockActions["requestSend"],
+) => (
+    <Button
+        variant="primary"
+        isSkeleton={isSkeleton}
+        onPress={() => requestSend({ fingerprint: value.fingerprint, revision: value.revision })}
+    >
+        {label}
+    </Button>
+)
+
+/** Draws the prepared handoff with its order and initial send action. */
+const HandoffPrepared = (props: Omit<HandoffBlockBaseProps, "state">) => {
+    const { labels } = props.props
+    return (
+        <>
+            <div className={handoffBlockHeaderClassName}>
+                <StatusChip label={labels.prepared} tone="neutral" />
+            </div>
+            <HandoffOrder {...props} />
+            <SlotView
+                slot={props.props.handoff}
+                placeholder={handoffPlaceholder}
+                labels={labels.handoffSlot}
+                onRetry={props.on.retryHandoff}
+            >
+                {(value, isSkeleton) => (
+                    <div className={handoffBlockActionsClassName}>
+                        <Text isSkeleton={isSkeleton}>
+                            {labels.fingerprint} {value.fingerprint} · {labels.revision} {value.revision}
+                        </Text>
+                        {handoffSendButton(value, labels.send, isSkeleton, props.on.requestSend)}
+                    </div>
+                )}
+            </SlotView>
+        </>
     )
+}
+
+/** Pure half: draws one of three shapes; each slot renders its own status through SlotView. */
+export const HandoffBlockBase = (props: HandoffBlockBaseProps) => {
+    const { labels } = props.props
 
     return (
         <>
             <SurfaceCard label={labels.title}>
                 <div className={handoffBlockBodyClassName}>
-                    {props.state === "prepared" ? (
-                        <>
-                            <div className={handoffBlockHeaderClassName}>
-                                <StatusChip label={labels.prepared} tone="neutral" />
-                            </div>
-                            {order}
-                            <SlotView
-                                slot={props.props.handoff}
-                                placeholder={handoffPlaceholder}
-                                labels={labels.handoffSlot}
-                                onRetry={props.on.retryHandoff}
-                            >
-                                {(value, isSkeleton) => (
-                                    <div className={handoffBlockActionsClassName}>
-                                        <Text isSkeleton={isSkeleton}>
-                                            {labels.fingerprint} {value.fingerprint} · {labels.revision}{" "}
-                                            {value.revision}
-                                        </Text>
-                                        {send(value, labels.send, isSkeleton)}
-                                    </div>
-                                )}
-                            </SlotView>
-                        </>
-                    ) : null}
+                    {props.state === "prepared" ? <HandoffPrepared {...props} /> : null}
 
                     {props.state === "sent" ? (
                         <>
                             <div className={handoffBlockHeaderClassName}>
                                 <StatusChip label={labels.sent} tone="success" />
                             </div>
-                            {order}
+                            <HandoffOrder {...props} />
                             <SlotView
                                 slot={props.props.handoff}
                                 placeholder={handoffPlaceholder}
@@ -174,26 +206,16 @@ export const HandoffBlockBase = (props: HandoffBlockBaseProps) => {
                                         <Text isSkeleton={isSkeleton}>
                                             {labels.reason}: {value.reason}
                                         </Text>
-                                        {send(value, labels.resend, isSkeleton)}
+                                        {handoffSendButton(value, labels.resend, isSkeleton, props.on.requestSend)}
                                     </div>
                                 )}
                             </SlotView>
-                            {order}
+                            <HandoffOrder {...props} />
                         </>
                     ) : null}
                 </div>
             </SurfaceCard>
-            <SendHandoffForm
-                state={props.props.send.shape}
-                props={props.props.send}
-                on={{
-                    close: props.on.sendClose,
-                    change: props.on.sendChange,
-                    review: props.on.sendReview,
-                    back: props.on.sendBack,
-                    confirm: props.on.sendConfirm,
-                }}
-            />
+            <HandoffSendOverlay {...props} />
         </>
     )
 }

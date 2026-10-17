@@ -1,10 +1,23 @@
+import { Test } from "@nestjs/testing"
 import type { INestApplication } from "@nestjs/common"
 import { mock } from "@starci/jest-preset"
 import type { Application, NextFunction, Request, Response } from "express"
 import { applySecurityHeaders } from "./security-headers.policy"
 
+const SUBJECT: unique symbol = Symbol("http-security/security-headers.policy")
+const subjectFunctions = () => ({ applySecurityHeaders })
+
+const build = async () => {
+    const moduleRef = await Test.createTestingModule({
+        providers: [{ provide: SUBJECT, useFactory: subjectFunctions }],
+    }).compile()
+    return moduleRef.get<ReturnType<typeof subjectFunctions>>(SUBJECT)
+}
+
 describe("applySecurityHeaders", () => {
-    it("removes the Express fingerprint and applies protective headers before continuing the request", () => {
+    it("removes the Express fingerprint and applies protective headers before continuing the request", async () => {
+        const subject = await build()
+
         const server = mock<Application>()
         const disabled = new Set<string>()
         server.disable.mockImplementation((name: string) => {
@@ -30,7 +43,7 @@ describe("applySecurityHeaders", () => {
             return app
         })
 
-        applySecurityHeaders(app)
+        subject.applySecurityHeaders(app)
 
         expect(disabled.has("x-powered-by")).toBe(true)
         expect(headers.get("Strict-Transport-Security")).toBe("max-age=31536000; includeSubDomains")

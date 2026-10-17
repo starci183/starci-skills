@@ -1,3 +1,4 @@
+import { Test } from "@nestjs/testing"
 import { mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -21,14 +22,24 @@ const file = (name: string, text: string): SeedFile => ({
     text: seedText(text),
 })
 
+const SUBJECT = Symbol("subject")
+const build = async () => {
+    const moduleRef = await Test.createTestingModule({
+        providers: [{ provide: SUBJECT, useValue: { readSeedFiles, seedConnections, seedDirectoryOf } }],
+    }).compile()
+    return moduleRef.get<typeof import("./seed-connections.client")>(SUBJECT)
+}
+
 describe("seedDirectoryOf", () => {
-    it("is the seeds folder of the environment under .starcistacks, relative to the app root", () => {
-        expect(seedDirectoryOf("dev")).toBe(join(".starcistacks", "dev", "seeds"))
+    it("is the seeds folder of the environment under .starcistacks, relative to the app root", async () => {
+        const subject = await build()
+        expect(subject.seedDirectoryOf("dev")).toBe(join(".starcistacks", "dev", "seeds"))
     })
 })
 
 describe("seedConnections", () => {
     it("runs the files of each connection in the given order and never opens a connection without a file", async () => {
+        const subject = await build()
         const primary = mock<ConnectionSource>()
         const archive = mock<ConnectionSource>()
         const sources = new Map([
@@ -40,7 +51,7 @@ describe("seedConnections", () => {
             (target: DatabaseConnectionOptions) => sources.get(target.name) ?? mock<ConnectionSource>(),
         )
 
-        const report = await seedConnections(
+        const report = await subject.seedConnections(
             [connection("primary"), connection("archive")],
             [file("primary-a.sql", "SELECT 1"), file("primary-b.sql", "SELECT 2")],
             opener,
@@ -57,9 +68,10 @@ describe("seedConnections", () => {
     })
 
     it("answers the files that name no connection as unmatched", async () => {
+        const subject = await build()
         const opener = mock<ConnectionOpener>()
 
-        const report = await seedConnections(
+        const report = await subject.seedConnections(
             [connection("primary")],
             [file("legacy-users.sql", "INSERT INTO users DEFAULT VALUES")],
             opener,
@@ -70,13 +82,14 @@ describe("seedConnections", () => {
     })
 
     it("destroys the data source of a connection whose seed fails, and fails", async () => {
+        const subject = await build()
         const failing = mock<ConnectionSource>()
         failing.query.mockRejectedValue(new TypeError("relation does not exist"))
         const opener = mock<ConnectionOpener>()
         opener.open.mockReturnValue(failing)
 
         await expect(
-            seedConnections([connection("primary")], [file("primary-a.sql", "SELECT 1")], opener),
+            subject.seedConnections([connection("primary")], [file("primary-a.sql", "SELECT 1")], opener),
         ).rejects.toThrow("relation does not exist")
         expect(failing.destroy).toHaveBeenCalledTimes(1)
     })
@@ -94,11 +107,12 @@ describe("readSeedFiles", () => {
     })
 
     it("answers every sql file of the directory sorted by name with its statements, and nothing else", async () => {
+        const subject = await build()
         await writeFile(join(directory, "primary-b.sql"), "SELECT 2")
         await writeFile(join(directory, "primary-a.sql"), "SELECT 1")
         await writeFile(join(directory, "README.md"), "not a seed")
 
-        const files = await readSeedFiles(directory)
+        const files = await subject.readSeedFiles(directory)
 
         expect(files).toEqual([
             { name: "primary-a.sql", text: "SELECT 1" },

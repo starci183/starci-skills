@@ -1,3 +1,4 @@
+import { Test } from "@nestjs/testing"
 import type { QueryRunner } from "typeorm"
 import { Secret } from "@modules/platform/config"
 import type { DatabaseConnectionOptions } from "./database.options"
@@ -15,8 +16,17 @@ class CreateNotes {
     }
 }
 
+const SUBJECT = Symbol("subject")
+const build = async () => {
+    const moduleRef = await Test.createTestingModule({
+        providers: [{ provide: SUBJECT, useValue: { openConnectionSource } }],
+    }).compile()
+    return moduleRef.get<typeof import("./connection-source.client")>(SUBJECT)
+}
+
 describe("openConnectionSource", () => {
-    it("opens an isolated PostgreSQL data source with the connection's entities and migrations", () => {
+    it("opens an isolated PostgreSQL data source with the connection's entities and migrations", async () => {
+        const subject = await build()
         const connection: DatabaseConnectionOptions = {
             name: "primary",
             url: new Secret("postgres://database.test:5432/primary"),
@@ -24,7 +34,7 @@ describe("openConnectionSource", () => {
             migrations: [CreateNotes],
         }
 
-        const source = openConnectionSource(connection)
+        const source = subject.openConnectionSource(connection)
 
         expect(source).toMatchObject({
             options: {

@@ -4,8 +4,8 @@ import { Reflector } from "@nestjs/core"
 import { mock } from "@starci/jest-preset"
 import type { Request } from "express"
 import type { Principal } from "@modules/platform/cqrs"
-import { ok, refused } from "@modules/platform/primitives"
 import type { Outcome } from "@modules/platform/primitives"
+import { ok, refused } from "@modules/platform/primitives"
 import { AuthGuard } from "./auth.guard"
 import type { CredentialMetadata, CredentialPrincipal } from "./credential.contracts"
 import { IdentityErrorCode } from "./errors/identity.error"
@@ -20,6 +20,10 @@ const handler = (): void => undefined
 const principal: Principal = { id: "person-1", role: "authenticated" }
 const credentialPrincipal: CredentialPrincipal = { kind: "api-key", subject: "key-1", workspaceId: "ws-1" }
 
+interface AccessTokenVerifier {
+    verify(token: string): Promise<Outcome<Principal, string>>
+}
+
 interface DoorMetadata {
     readonly credential?: CredentialMetadata
     readonly metadata?: PublicMetadata
@@ -31,7 +35,8 @@ const build = async (authorization?: string, door: DoorMetadata = {}) => {
     reflector.getAllAndOverride.mockImplementation((key: unknown) =>
         key === CREDENTIAL_KEY ? door.credential : key === PUBLIC_KEY ? door.metadata : undefined,
     )
-    const verify = jest.fn<Promise<Outcome<Principal, string>>, [token: string]>()
+    const verifier = mock<AccessTokenVerifier>()
+    const verify = verifier.verify
     const request = mock<Request>({
         headers: authorization === undefined ? {} : { authorization },
         principal: undefined,
@@ -100,7 +105,9 @@ describe("AuthGuard", () => {
 
         expect(verify).not.toHaveBeenCalled()
     })
+})
 
+describe("AuthGuard session authentication", () => {
     it.each([undefined, "Basic credentials", "Bearer", "Bearer  access-token", "Bearer access-token extra"])(
         "refuses an absent or malformed bearer credential (%s)",
         async (authorization) => {

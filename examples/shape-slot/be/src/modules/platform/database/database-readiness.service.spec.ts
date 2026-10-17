@@ -1,3 +1,6 @@
+import { DEADLINE_SCHEDULER, DeadlineSchedulerService } from "@modules/platform/http"
+import type { DeadlineScheduler } from "@modules/platform/http"
+import { mock } from "@starci/jest-preset"
 import { Test } from "@nestjs/testing"
 import { mockEntityManager } from "@starci/jest-preset"
 import { DatabaseReadinessService } from "./database-readiness.service"
@@ -6,8 +9,13 @@ import { PRIMARY_ENTITY_MANAGER } from "./primary.decorators"
 
 const build = async () => {
     const manager = mockEntityManager()
+    const deadlines = mock<DeadlineScheduler>({ schedule: new DeadlineSchedulerService().schedule })
     const moduleRef = await Test.createTestingModule({
-        providers: [DatabaseReadinessService, { provide: PRIMARY_ENTITY_MANAGER, useValue: manager }],
+        providers: [
+            DatabaseReadinessService,
+            { provide: PRIMARY_ENTITY_MANAGER, useValue: manager },
+            { provide: DEADLINE_SCHEDULER, useValue: deadlines },
+        ],
     }).compile()
     return { service: moduleRef.get(DatabaseReadinessService), manager }
 }

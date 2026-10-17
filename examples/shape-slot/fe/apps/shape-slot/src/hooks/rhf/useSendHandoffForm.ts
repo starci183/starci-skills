@@ -1,47 +1,32 @@
 import { useEffect, useLayoutEffect, useRef } from "react"
-import { useForm, useWatch } from "react-hook-form"
+import { useForm, useWatch, type UseFormReset } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useTranslations } from "next-intl"
 import type { SendInput } from "@/modules/types"
 import { z } from "zod"
 import { useGetHandoffSwr, useGetSendAttemptsSwr, usePostSendHandoffSwr } from "../swr"
 
-const revisionErrorMessage = "sales.send.errors.revisionMin"
-
-/**
- * The send form, validated at the edge. Error messages are message KEYS, never prose:
- * the connected half resolves them with next-intl before they reach the pure half.
- */
-const sendHandoffSchema = z.object({
-    fingerprint: z.string().trim().min(1, "sales.send.errors.fingerprintRequired"),
-    revision: z.number(revisionErrorMessage).int(revisionErrorMessage).min(1, revisionErrorMessage),
-    note: z.string().max(500, "sales.send.errors.noteTooLong"),
-})
-
-/** Values of the send form, inferred from the schema so the two never drift. */
-type SendHandoffFormValues = z.infer<typeof sendHandoffSchema>
-
-type SendHandoffErrorKey =
-    | "sales.send.errors.fingerprintRequired"
-    | "sales.send.errors.revisionMin"
-    | "sales.send.errors.noteTooLong"
-    | "errors.page.title"
-
-/** Resolve only the error keys owned by this form; unknown resolver messages are not UI copy. */
-const sendHandoffErrorMessage = (translate: (key: SendHandoffErrorKey) => string, key?: string) => {
-    switch (key) {
-        case "sales.send.errors.fingerprintRequired":
-            return translate("sales.send.errors.fingerprintRequired")
-        case "sales.send.errors.revisionMin":
-            return translate("sales.send.errors.revisionMin")
-        case "sales.send.errors.noteTooLong":
-            return translate("sales.send.errors.noteTooLong")
-        case "errors.page.title":
-            return translate("errors.page.title")
-        default:
-            return undefined
+/** Builds validation with catalogue copy and exposes only the errors owned by this form. */
+const useSendHandoffValidation = () => {
+    const t = useTranslations()
+    const fingerprintRequired = t("sales.send.errors.fingerprintRequired")
+    const revisionMin = t("sales.send.errors.revisionMin")
+    const noteTooLong = t("sales.send.errors.noteTooLong")
+    const serverError = t("errors.page.title")
+    const messages = [fingerprintRequired, revisionMin, noteTooLong, serverError]
+    return {
+        schema: z.object({
+            fingerprint: z.string().trim().min(1, fingerprintRequired),
+            revision: z.number(revisionMin).int(revisionMin).min(1, revisionMin),
+            note: z.string().max(500, noteTooLong),
+        }),
+        serverError,
+        errorOf: (message?: string) => (message !== undefined && messages.includes(message) ? message : undefined),
     }
 }
+
+/** Values of the send form, inferred from the schema so the two never drift. */
+type SendHandoffFormValues = z.infer<ReturnType<typeof useSendHandoffValidation>["schema"]>
 
 type UseSendHandoffFormParams = {
     readonly handoffId: string
@@ -52,21 +37,9 @@ type UseSendHandoffFormParams = {
     readonly onBack: () => void
 }
 
-/** Owns validation, command feedback and one submission per open send session. */
-export const useSendHandoffForm = (params: UseSendHandoffFormParams) => {
-    const tRoot = useTranslations()
-    const send = usePostSendHandoffSwr(params.handoffId)
-    const handoff = useGetHandoffSwr({ handoffId: params.handoffId })
-    const attempts = useGetSendAttemptsSwr({ handoffId: params.handoffId })
-    const inFlight = useRef(false)
+/** Resets the form and invalidates stale submissions whenever the send session changes. */
+const useSendSessionVersion = (params: UseSendHandoffFormParams, reset: UseFormReset<SendHandoffFormValues>) => {
     const sessionVersion = useRef(0)
-    const form = useForm<SendHandoffFormValues>({
-        resolver: zodResolver(sendHandoffSchema),
-        defaultValues: { fingerprint: "", revision: 0, note: "" },
-        mode: "onTouched",
-    })
-    const { reset } = form
-
     useLayoutEffect(() => {
         sessionVersion.current += 1
         return () => {
@@ -78,9 +51,27 @@ export const useSendHandoffForm = (params: UseSendHandoffFormParams) => {
         reset({ fingerprint: "", revision: 0, ...params.input, note: "" })
     }, [params.handoffId, params.input, reset])
 
+    return sessionVersion
+}
+
+/** Owns validation, command feedback and one submission per open send session. */
+export const useSendHandoffForm = (params: UseSendHandoffFormParams) => {
+    const { schema, serverError, errorOf } = useSendHandoffValidation()
+    const send = usePostSendHandoffSwr(params.handoffId)
+    const handoff = useGetHandoffSwr({ handoffId: params.handoffId })
+    const attempts = useGetSendAttemptsSwr({ handoffId: params.handoffId })
+    const inFlight = useRef(false)
+    const form = useForm<SendHandoffFormValues>({
+        resolver: zodResolver(schema),
+        defaultValues: { fingerprint: "", revision: 0, note: "" },
+        mode: "onTouched",
+    })
+    const { reset } = form
+
+    const sessionVersion = useSendSessionVersion(params, reset)
+
     const values = useWatch({ control: form.control })
     const errors = form.formState.errors
-    const errorOf = (key?: string) => sendHandoffErrorMessage(tRoot, key)
     const isBusy = () => inFlight.current || send.isMutating
     const submit = (action: "review" | "confirm") => {
         if (isBusy() || params.input === undefined) return
@@ -102,7 +93,7 @@ export const useSendHandoffForm = (params: UseSendHandoffFormParams) => {
             })()
             .catch(() => {
                 if (version === sessionVersion.current) {
-                    form.setError("root.send", { type: "server", message: "errors.page.title" })
+                    form.setError("root.send", { type: "server", message: serverError })
                 }
             })
             .finally(() => {

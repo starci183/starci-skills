@@ -10,10 +10,7 @@ import {
     INSERT_CALENDAR_INBOX,
 } from "./persistence/calendar-inbox.sql"
 
-interface PendingCalendarReceipt {
-    readonly id: string
-    readonly payload: { readonly id: string }
-}
+import type { PendingCalendarReceipt } from "./types/calendar-delivery"
 
 const build = async (
     claimed: ReadonlyArray<{ id: string }> = [],
@@ -48,8 +45,9 @@ describe("CalendarInboxService.acceptCalendarDelivery", () => {
     it("records the receipt and queues its identity together before committing", async () => {
         const { inbox, tx, calendars, queue } = await build([{ id: "inbox-1" }])
         let commitsAtEnqueue = -1
-        queue.enqueueDeliveryRecorded.mockImplementation(async () => {
+        queue.enqueueDeliveryRecorded.mockImplementation(() => {
             commitsAtEnqueue = tx.commits
+            return Promise.resolve()
         })
 
         await inbox.acceptCalendarDelivery("delivery-1", { id: "calendar-1" })

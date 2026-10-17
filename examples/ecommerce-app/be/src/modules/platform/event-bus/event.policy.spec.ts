@@ -1,3 +1,4 @@
+import { Test } from "@nestjs/testing"
 import {
     ATTEMPTS,
     ATTEMPT_HEADER,
@@ -13,6 +14,15 @@ import {
     serviceOf,
     topicOf,
 } from "./event.policy"
+
+const POLICY = Symbol("policy")
+const policyFunctions = { serviceOf, topicOf, retryTopicOf, deadLetterTopicOf, backoffMs }
+const build = async () => {
+    const moduleRef = await Test.createTestingModule({
+        providers: [{ provide: POLICY, useFactory: () => policyFunctions }],
+    }).compile()
+    return moduleRef.get<typeof policyFunctions>(POLICY)
+}
 
 describe("event policies", () => {
     it("declares the delivery and wire constants", () => {
@@ -41,27 +51,37 @@ describe("event policies", () => {
         ["order.created", "order"],
         ["order", "order"],
         ["", ""],
-    ])("reads the service of %s", (eventName, service) => {
-        expect(serviceOf(eventName)).toBe(service)
+    ])("reads the service of %s", async (eventName, service) => {
+        const policy = await build()
+
+        expect(policy.serviceOf(eventName)).toBe(service)
     })
 
-    it("builds the main topic from the prefix and event service", () => {
-        expect(topicOf("run-1.", "order.created")).toBe("run-1.events.order")
+    it("builds the main topic from the prefix and event service", async () => {
+        const policy = await build()
+
+        expect(policy.topicOf("run-1.", "order.created")).toBe("run-1.events.order")
     })
 
-    it("builds the retry topic from the main topic", () => {
-        expect(retryTopicOf("run-1.", "order.created")).toBe("run-1.events.order.retry")
+    it("builds the retry topic from the main topic", async () => {
+        const policy = await build()
+
+        expect(policy.retryTopicOf("run-1.", "order.created")).toBe("run-1.events.order.retry")
     })
 
-    it("builds the dead-letter topic from the main topic", () => {
-        expect(deadLetterTopicOf("run-1.", "order.created")).toBe("run-1.events.order.dlq")
+    it("builds the dead-letter topic from the main topic", async () => {
+        const policy = await build()
+
+        expect(policy.deadLetterTopicOf("run-1.", "order.created")).toBe("run-1.events.order.dlq")
     })
 
     it.each([
         [1, 500],
         [2, 1000],
         [4, 4000],
-    ])("doubles the backoff after delivery %i", (attempt, delay) => {
-        expect(backoffMs(attempt)).toBe(delay)
+    ])("doubles the backoff after delivery %i", async (attempt, delay) => {
+        const policy = await build()
+
+        expect(policy.backoffMs(attempt)).toBe(delay)
     })
 })

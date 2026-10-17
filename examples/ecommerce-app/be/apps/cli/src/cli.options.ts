@@ -1,22 +1,7 @@
-import { accountEntities, accountMigrations } from "@modules/domain/account"
-import { cartEntities, cartMigrations } from "@modules/domain/cart"
-import { catalogEntities, catalogMigrations } from "@modules/domain/catalog"
-import { invoiceEntities, invoiceMigrations } from "@modules/domain/invoice"
-import { loyaltyEntities, loyaltyMigrations } from "@modules/domain/loyalty"
-import { orderEntities, orderMigrations } from "@modules/domain/order"
 import type { OrderExpiryTicksOptions } from "@modules/domain/order-expiry-ticks"
-import { paymentEntities, paymentMigrations } from "@modules/domain/payment"
-import type { DatabaseConnectionConfig, DatabaseConnectionOptions } from "@modules/platform/database"
-import { BILLING_CONNECTION, IDENTITY_CONNECTION, ORDER_CONNECTION } from "@modules/platform/database"
-import { eventBusEntities, eventBusMigrations } from "@modules/platform/event-bus"
-import { inboxEntities, inboxMigrations } from "@modules/platform/inbox"
-import { jobsEntities, jobsMigrations } from "@modules/platform/jobs"
-import { queueEntities, queueMigrations } from "@modules/platform/queue"
-import { sagaEntities, sagaMigrations } from "@modules/platform/saga"
-import { orderSummaryEntities, orderSummaryMigrations } from "@modules/projections/order-summary"
-import type { CliEnv } from "./cli.env"
+import type { DatabaseConnectionOptions } from "@modules/platform/database"
 
-/** Everything the cli app needs from its environment: every connection with the entities and migrations of its owners. */
+/** The CLI's composed migration options, also used by the test world's migration runner. */
 export interface CliAppOptions {
     /** The connections the migrate command migrates, in the order it runs them. */
     readonly connections: ReadonlyArray<DatabaseConnectionOptions>
@@ -24,58 +9,5 @@ export interface CliAppOptions {
     readonly orderExpiry: OrderExpiryTicksOptions
 }
 
-/** The identity database: the accounts of the identity service. */
-export const identityConnectionOf = (identity: DatabaseConnectionConfig): DatabaseConnectionOptions => ({
-    ...identity,
-    name: IDENTITY_CONNECTION,
-    entities: accountEntities,
-    migrations: accountMigrations,
-})
-
-/** The order database: the catalog, the carts, the orders, loyalty, the order-summary projection and its inbox, the place-order saga, the order outbox, the queue outbox and the job table. */
-export const orderConnectionOf = (order: DatabaseConnectionConfig): DatabaseConnectionOptions => ({
-    ...order,
-    name: ORDER_CONNECTION,
-    entities: [
-        ...catalogEntities,
-        ...cartEntities,
-        ...orderEntities,
-        ...loyaltyEntities,
-        ...orderSummaryEntities,
-        ...inboxEntities,
-        ...sagaEntities,
-        ...eventBusEntities,
-        ...queueEntities,
-        ...jobsEntities,
-    ],
-    migrations: [
-        ...catalogMigrations,
-        ...cartMigrations,
-        ...orderMigrations,
-        ...loyaltyMigrations,
-        ...orderSummaryMigrations,
-        ...inboxMigrations,
-        ...sagaMigrations,
-        ...eventBusMigrations,
-        ...queueMigrations,
-        ...jobsMigrations,
-    ],
-})
-
-/** The billing database: the invoices, the payments, the billing inbox and the billing outbox. */
-export const billingConnectionOf = (billing: DatabaseConnectionConfig): DatabaseConnectionOptions => ({
-    ...billing,
-    name: BILLING_CONNECTION,
-    entities: [...invoiceEntities, ...paymentEntities, ...inboxEntities, ...eventBusEntities],
-    migrations: [...invoiceMigrations, ...paymentMigrations, ...inboxMigrations, ...eventBusMigrations],
-})
-
-/** Binds each parsed database configuration to its owners' entities and migrations. */
-export const createCliAppOptions = (databases: CliEnv): CliAppOptions => ({
-    orderExpiry: databases.orderExpiry,
-    connections: [
-        identityConnectionOf(databases.identity),
-        orderConnectionOf(databases.order),
-        billingConnectionOf(databases.billing),
-    ],
-})
+// Preserve the migration runner's public import while composition belongs to the app root.
+export { createCliAppOptions } from "./app.module"

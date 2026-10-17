@@ -10,11 +10,11 @@ const build = async (): Promise<FetchHttpClient> => {
 
 const responseOf = (status = 200) => mock<Response>({ status })
 
-describe("FetchHttpClient", () => {
-    afterEach(() => {
-        jest.restoreAllMocks()
-    })
+afterEach(() => {
+    jest.restoreAllMocks()
+})
 
+describe("FetchHttpClient JSON requests", () => {
     it("sends a JSON request and parses its JSON response", async () => {
         const client = await build()
         const response = responseOf(201)
@@ -54,7 +54,9 @@ describe("FetchHttpClient", () => {
             expect.objectContaining({ headers: {}, body: undefined }),
         )
     })
+})
 
+describe("FetchHttpClient form and byte requests", () => {
     it("encodes form fields and combines a caller cancellation signal with the deadline", async () => {
         const client = await build()
         const response = responseOf()
@@ -103,7 +105,9 @@ describe("FetchHttpClient", () => {
             expect.objectContaining({ headers: { "content-type": "application/octet-stream" }, body: bytes }),
         )
     })
+})
 
+describe("FetchHttpClient failures", () => {
     it("reports a response that is not JSON", async () => {
         const client = await build()
         const response = responseOf()

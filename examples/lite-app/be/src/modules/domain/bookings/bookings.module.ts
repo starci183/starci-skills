@@ -13,7 +13,11 @@ export class BookingsModule extends ConfigurableModuleClass {
         const base = super.register(options)
         return {
             ...base,
-            imports: [...(base.imports ?? []), BookingConfirmationModule.register({}), BookingReminderModule.register({})],
+            imports: [
+                ...(base.imports ?? []),
+                BookingConfirmationModule.register({}),
+                BookingReminderModule.register({}),
+            ],
             providers: [...(base.providers ?? []), BookingsService],
             exports: [BookingsService],
         }

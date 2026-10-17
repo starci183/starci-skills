@@ -31,111 +31,149 @@ describe("identity sign-up and sign-in journey", () => {
 
     const world = useTestWorld({ apps: ["identity", "order"] })
 
-    it("registers a person, issues and verifies a session, then revokes it", async () => {
-        const anonymous = world.apps.identity.api
-
-        const registered = await anonymous.mutate<RegisterData>("register", {
-            variables: { input: { email, password } },
-        })
-        expect(registered.errorCode).toBeNull()
-        const personId = present(registered.data, "register data").register.personId
-
-        const taken = await anonymous.mutate<RegisterData>("register", { variables: { input: { email, password } } })
-        expect(taken.errorCode).toBe("ACCOUNT_EMAIL_TAKEN")
-        expect(taken.errors?.[0]?.extensions).toMatchObject({ code: "ACCOUNT_EMAIL_TAKEN", kind: "conflict" })
-
-        // A weak password never reaches the account capability: the global validation pipe refuses it by field.
-        const weak = await anonymous.mutate<RegisterData>("register", {
-            variables: { input: { email: `weak-${email}`, password: "short" } },
-        })
-        expect(weak.errorCode).toBe("HTTP_SECURITY_REQUEST_INVALID")
-
-        // The refusal names neither half of the pair: a wrong password and an unknown email are the same answer.
-        const wrongPassword = await anonymous.mutate<SignInData>("signIn", {
-            variables: { input: { email, password: "not-the-password" } },
-        })
-        const unknownEmail = await anonymous.mutate<SignInData>("signIn", {
-            variables: { input: { email: `ghost-${email}`, password } },
-        })
-        expect(wrongPassword.errorCode).toBe("ACCOUNT_INVALID_CREDENTIALS")
-        expect(unknownEmail.errorCode).toBe(wrongPassword.errorCode)
-        expect(unknownEmail.errorMessage).toBe(wrongPassword.errorMessage)
-
-        const signedIn = await anonymous.mutate<SignInData>("signIn", { variables: { input: { email, password } } })
-        expect(signedIn.errorCode).toBeNull()
-        const session = present(signedIn.data, "signIn data").signIn
-        expect(session.personId).toBe(personId)
-
-        // The realm vouched for the pair: its LOGIN through the identity api's client belongs to the registered subject.
-        const login = await world.waitFor("keycloak records the LOGIN", async () =>
-            (await world.keycloak.events(personId)).find(
-                (event) => event.type === "LOGIN" && event.clientId === KEYCLOAK_SIGN_IN_CLIENT,
-            ),
-        )
-        expect(login.userId).toBe(personId)
-
-        // verifySession is the handshake the order service uses; it is anonymous by design (AuthHandshake).
-        const verified = await anonymous.read<VerifySessionData>("verifySession", {
-            variables: { input: { sessionToken: session.sessionToken } },
-        })
-        expect(verified.errorCode).toBeNull()
-        expect(verified.data?.verifySession.personId).toBe(personId)
-
-        // The account view is the cross-service proof: identity reads hasOrders live from order, forwarding the caller token.
-        const caller = world.apps.identity.api.bearing(session.sessionToken)
-        const account = await caller.read<AccountData>("account")
-        expect(account.errorCode).toBeNull()
-        expect(account.data?.account).toEqual({ personId, email, hasOrders: false })
-
-        // The account door is default-deny: without a live session it is refused.
-        const denied = await anonymous.read<AccountData>("account")
-        expect(denied.errorCode).toBe("IDENTITY_UNAUTHENTICATED")
-
-        // Out-of-band verification: the person persisted, and both databases carry their migrated tables.
-        expect(await readRows(world.db.identity, PERSON_BY_ID, [personId])).toEqual([{ id: personId, email }])
-        expect(await world.infra.redis.size()).toBeGreaterThan(0)
-        const identityTables = await readRows(world.db.identity, PUBLIC_TABLES, [])
-        const orderTables = await readRows(world.db.order, PUBLIC_TABLES, [])
-        expect([...identityTables, ...orderTables].map((row) => row.table_name)).toEqual(
-            expect.arrayContaining(["persons", "products", "orders"]),
-        )
-
-        const revoked = await caller.mutate<RevokeSessionData>("revokeSession", {
-            variables: { input: { sessionToken: session.sessionToken } },
-        })
-        expect(revoked.errorCode).toBeNull()
-        expect(revoked.data?.revokeSession.revoked).toBe(true)
-
-        const afterRevoke = await anonymous.read<VerifySessionData>("verifySession", {
-            variables: { input: { sessionToken: session.sessionToken } },
-        })
-        expect(afterRevoke.errorCode).toBe("SESSION_INVALID")
-        const accountAfter = await caller.read<AccountData>("account")
-        expect(accountAfter.errorCode).toBe("IDENTITY_UNAUTHENTICATED")
-
-        // The realm ended its session of the shopper too: a LOGOUT, and no live session through the identity api's client.
-        const ended = await world.waitUntil(
-            "keycloak ends the session of the shopper",
-            async () => ({
-                loggedOut: (await world.keycloak.events(personId)).some((event) => event.type === "LOGOUT"),
-                live: (await world.keycloak.sessions(personId)).some((live) =>
-                    live.clientIds.includes(KEYCLOAK_SIGN_IN_CLIENT),
-                ),
-            }),
-            (observed) => observed.loggedOut && !observed.live,
-        )
-        expect(ended).toEqual({ loggedOut: true, live: false })
-
-        // A realm that goes silent is a declared refusal for sign-in and register alike, and the doors recover with it.
-        await world.infra.keycloak.during(async () => {
-            const silent = await anonymous.mutate<SignInData>("signIn", { variables: { input: { email, password } } })
-            expect(silent.errorCode).toBe("ACCOUNT_PROVIDER_UNAVAILABLE")
-            const unregistered = await anonymous.mutate<RegisterData>("register", {
-                variables: { input: { email: `outage-${email}`, password } },
-            })
-            expect(unregistered.errorCode).toBe("ACCOUNT_PROVIDER_UNAVAILABLE")
-        })
-        const back = await anonymous.mutate<SignInData>("signIn", { variables: { input: { email, password } } })
-        expect(back.data?.signIn.personId).toBe(personId)
-    })
+    it("registers a person, issues and verifies a session, then revokes it", () =>
+        completesIdentityJourney(world, email, password))
 })
+
+async function completesIdentityJourney(
+    world: ReturnType<typeof useTestWorld>,
+    email: string,
+    password: string,
+): Promise<void> {
+    const anonymous = world.apps.identity.api
+
+    const registered = await anonymous.mutate<RegisterData>("register", {
+        variables: { input: { email, password } },
+    })
+    expect(registered.errorCode).toBeNull()
+    const personId = present(registered.data, "register data").register.personId
+
+    const taken = await anonymous.mutate<RegisterData>("register", { variables: { input: { email, password } } })
+    expect(taken.errorCode).toBe("ACCOUNT_EMAIL_TAKEN")
+    expect(taken.errors?.[0]?.extensions).toMatchObject({ code: "ACCOUNT_EMAIL_TAKEN", kind: "conflict" })
+
+    await verifyCredentialRefusals(world, email, password)
+
+    const signedIn = await anonymous.mutate<SignInData>("signIn", { variables: { input: { email, password } } })
+    expect(signedIn.errorCode).toBeNull()
+    const session = present(signedIn.data, "signIn data").signIn
+    expect(session.personId).toBe(personId)
+
+    // The realm vouched for the pair: its LOGIN through the identity api's client belongs to the registered subject.
+    const login = await world.waitFor("keycloak records the LOGIN", async () =>
+        (await world.keycloak.events(personId)).find(
+            (event) => event.type === "LOGIN" && event.clientId === KEYCLOAK_SIGN_IN_CLIENT,
+        ),
+    )
+    expect(login.userId).toBe(personId)
+
+    // verifySession is the handshake the order service uses; it is anonymous by design (AuthHandshake).
+    const verified = await anonymous.read<VerifySessionData>("verifySession", {
+        variables: { input: { sessionToken: session.sessionToken } },
+    })
+    expect(verified.errorCode).toBeNull()
+    expect(verified.data?.verifySession.personId).toBe(personId)
+
+    // The account view is the cross-service proof: identity reads hasOrders live from order, forwarding the caller token.
+    const caller = world.apps.identity.api.bearing(session.sessionToken)
+    const account = await caller.read<AccountData>("account")
+    expect(account.errorCode).toBeNull()
+    expect(account.data?.account).toEqual({ personId, email, hasOrders: false })
+
+    // The account door is default-deny: without a live session it is refused.
+    const denied = await anonymous.read<AccountData>("account")
+    expect(denied.errorCode).toBe("IDENTITY_UNAUTHENTICATED")
+
+    await verifyIdentityPersistence(world, personId, email)
+
+    const revoked = await caller.mutate<RevokeSessionData>("revokeSession", {
+        variables: { input: { sessionToken: session.sessionToken } },
+    })
+    expect(revoked.errorCode).toBeNull()
+    expect(revoked.data?.revokeSession.revoked).toBe(true)
+
+    const afterRevoke = await anonymous.read<VerifySessionData>("verifySession", {
+        variables: { input: { sessionToken: session.sessionToken } },
+    })
+    expect(afterRevoke.errorCode).toBe("SESSION_INVALID")
+    const accountAfter = await caller.read<AccountData>("account")
+    expect(accountAfter.errorCode).toBe("IDENTITY_UNAUTHENTICATED")
+
+    await verifyRealmLogout(world, personId)
+
+    await verifyProviderRecovery(world, email, password, personId)
+}
+
+async function verifyCredentialRefusals(
+    world: ReturnType<typeof useTestWorld>,
+    email: string,
+    password: string,
+): Promise<void> {
+    // A weak password never reaches the account capability: the global validation pipe refuses it by field.
+    const anonymous = world.apps.identity.api
+    const weak = await anonymous.mutate<RegisterData>("register", {
+        variables: { input: { email: `weak-${email}`, password: "short" } },
+    })
+    expect(weak.errorCode).toBe("HTTP_SECURITY_REQUEST_INVALID")
+
+    // The refusal names neither half of the pair: a wrong password and an unknown email are the same answer.
+    const wrongPassword = await anonymous.mutate<SignInData>("signIn", {
+        variables: { input: { email, password: "not-the-password" } },
+    })
+    const unknownEmail = await anonymous.mutate<SignInData>("signIn", {
+        variables: { input: { email: `ghost-${email}`, password } },
+    })
+    expect(wrongPassword.errorCode).toBe("ACCOUNT_INVALID_CREDENTIALS")
+    expect(unknownEmail.errorCode).toBe(wrongPassword.errorCode)
+    expect(unknownEmail.errorMessage).toBe(wrongPassword.errorMessage)
+}
+
+async function verifyIdentityPersistence(
+    world: ReturnType<typeof useTestWorld>,
+    personId: string,
+    email: string,
+): Promise<void> {
+    // Out-of-band verification: the person persisted, and both databases carry their migrated tables.
+    expect(await readRows(world.db.identity, PERSON_BY_ID, [personId])).toEqual([{ id: personId, email }])
+    expect(await world.infra.redis.size()).toBeGreaterThan(0)
+    const identityTables = await readRows(world.db.identity, PUBLIC_TABLES, [])
+    const orderTables = await readRows(world.db.order, PUBLIC_TABLES, [])
+    expect([...identityTables, ...orderTables].map((row) => row.table_name)).toEqual(
+        expect.arrayContaining(["persons", "products", "orders"]),
+    )
+}
+
+async function verifyProviderRecovery(
+    world: ReturnType<typeof useTestWorld>,
+    email: string,
+    password: string,
+    personId: string,
+): Promise<void> {
+    const anonymous = world.apps.identity.api
+    // A realm that goes silent is a declared refusal for sign-in and register alike, and the doors recover with it.
+    await world.infra.keycloak.during(async () => {
+        const silent = await anonymous.mutate<SignInData>("signIn", { variables: { input: { email, password } } })
+        expect(silent.errorCode).toBe("ACCOUNT_PROVIDER_UNAVAILABLE")
+        const unregistered = await anonymous.mutate<RegisterData>("register", {
+            variables: { input: { email: `outage-${email}`, password } },
+        })
+        expect(unregistered.errorCode).toBe("ACCOUNT_PROVIDER_UNAVAILABLE")
+    })
+    const back = await anonymous.mutate<SignInData>("signIn", { variables: { input: { email, password } } })
+    expect(back.data?.signIn.personId).toBe(personId)
+}
+
+async function verifyRealmLogout(world: ReturnType<typeof useTestWorld>, personId: string): Promise<void> {
+    // The realm ended its session of the shopper too: a LOGOUT, and no live session through the identity api's client.
+    const ended = await world.waitUntil(
+        "keycloak ends the session of the shopper",
+        async () => ({
+            loggedOut: (await world.keycloak.events(personId)).some((event) => event.type === "LOGOUT"),
+            live: (await world.keycloak.sessions(personId)).some((live) =>
+                live.clientIds.includes(KEYCLOAK_SIGN_IN_CLIENT),
+            ),
+        }),
+        (observed) => observed.loggedOut && !observed.live,
+    )
+    expect(ended).toEqual({ loggedOut: true, live: false })
+}

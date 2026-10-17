@@ -1,3 +1,4 @@
+import type { TestCaller } from "@starci/test-world"
 import { productBuilder } from "../../fixtures/builders/catalog.builder"
 import { present } from "../../fixtures/present.mapper"
 import type {
@@ -34,142 +35,178 @@ describe("order lifecycle: order history", () => {
             id,
         )
 
-    it("a buyer placing several orders builds a pending history both services can read", async () => {
-        const session = await world.signedInPerson("hist-a")
-        const { personId } = session
-        const buyer = world.apps.order.api.bearing(session.sessionToken)
-        const identity = world.apps.identity.api.bearing(session.sessionToken)
+    it("a buyer placing several orders builds a pending history both services can read", () =>
+        buildsPendingHistory(world, productOf))
 
-        // Baseline: not a buyer yet, on both sides of the contract.
-        expect((await buyer.read<BuyerStatusData>("buyerStatus")).data?.buyerStatus).toEqual({
-            personId,
-            hasOrders: false,
-        })
-        expect((await identity.read<AccountData>("account")).data?.account.hasOrders).toBe(false)
-
-        // The catalog snapshot the confirmations price against.
-        const browsed = await buyer.read<CartData>("cart")
-        const mug = productOf(browsed.data, "sku-mug")
-        const notebook = productOf(browsed.data, "sku-notebook")
-        const thermos = productOf(browsed.data, "sku-thermos")
-        const firstTotal = mug.priceMinorUnits * 2
-        const secondTotal = notebook.priceMinorUnits + thermos.priceMinorUnits
-
-        // Order 1: sku-mug x2.
-        await buyer.mutate("addCartItem", { variables: { input: { productId: "sku-mug", quantity: 2 } } })
-        const first = await buyer.mutate<PlaceOrderData>("placeOrder", {
-            variables: { input: { idempotencyKey: `${personId}-1` } },
-        })
-        expect(first.errorCode).toBeNull()
-        const firstOrder = present(first.data, "first order").placeOrder
-        expect(firstOrder).toMatchObject({
-            status: "pending",
-            totalMinorUnits: firstTotal,
-            currency: "USD",
-            replayed: false,
-        })
-
-        // The cart cleared itself at confirmation, so order 2 starts from a fresh fill.
-        expect((await buyer.read<CartData>("cart")).data?.cart.items).toEqual([])
-
-        // Order 2: sku-notebook x1 and sku-thermos x1.
-        await buyer.mutate("addCartItem", { variables: { input: { productId: "sku-notebook", quantity: 1 } } })
-        await buyer.mutate("addCartItem", { variables: { input: { productId: "sku-thermos", quantity: 1 } } })
-        const second = await buyer.mutate<PlaceOrderData>("placeOrder", {
-            variables: { input: { idempotencyKey: `${personId}-2` } },
-        })
-        expect(second.errorCode).toBeNull()
-        const secondOrder = present(second.data, "second order").placeOrder
-        expect(secondOrder).toMatchObject({ status: "pending", totalMinorUnits: secondTotal, replayed: false })
-        expect(secondOrder.orderId).not.toBe(firstOrder.orderId)
-
-        // list: two orders in creation order, each confirmed and priced as answered.
-        const orders = await readRows(world.db.order, ORDERS_OF_PERSON, [personId])
-        expect(orders).toHaveLength(2)
-        expect(orders[0]).toMatchObject({
-            id: firstOrder.orderId,
-            status: "pending",
-            total_minor_units: firstTotal,
-            currency: "USD",
-            idempotency_key: `${personId}-1`,
-        })
-        expect(orders[1]).toMatchObject({
-            id: secondOrder.orderId,
-            status: "pending",
-            total_minor_units: secondTotal,
-            idempotency_key: `${personId}-2`,
-        })
-
-        // detail: each order lines carry the catalog price snapshot taken at confirmation.
-        expect(await readRows(world.db.order, LINES_OF_ORDER, [firstOrder.orderId])).toEqual([
-            { product_id: "sku-mug", quantity: 2, unit_price_minor_units: mug.priceMinorUnits },
-        ])
-        expect(await readRows(world.db.order, LINES_OF_ORDER, [secondOrder.orderId])).toEqual([
-            { product_id: "sku-notebook", quantity: 1, unit_price_minor_units: notebook.priceMinorUnits },
-            { product_id: "sku-thermos", quantity: 1, unit_price_minor_units: thermos.priceMinorUnits },
-        ])
-
-        // The guarded stock moved by exactly the confirmed quantities, and the cart stayed empty.
-        const after = await buyer.read<CartData>("cart")
-        expect(productOf(after.data, "sku-mug").stock).toBe(mug.stock - 2)
-        expect(productOf(after.data, "sku-notebook").stock).toBe(notebook.stock - 1)
-        expect(productOf(after.data, "sku-thermos").stock).toBe(thermos.stock - 1)
-        expect(after.data?.cart.items).toEqual([])
-
-        // The cross-service read: identity can only know this by asking order over real GraphQL.
-        expect((await buyer.read<BuyerStatusData>("buyerStatus")).data?.buyerStatus).toEqual({
-            personId,
-            hasOrders: true,
-        })
-        expect((await identity.read<AccountData>("account")).data?.account).toMatchObject({
-            personId,
-            email: session.email,
-            hasOrders: true,
-        })
-    })
-
-    it("a refusal and an idempotent replay never append to order history", async () => {
-        const session = await world.signedInPerson("hist-b")
-        const { personId } = session
-        const buyer = world.apps.order.api.bearing(session.sessionToken)
-
-        // Refusal 1: an empty cart confirms nothing and records nothing.
-        const emptyRefusal = await buyer.mutate<PlaceOrderData>("placeOrder", { variables: { input: {} } })
-        expect(emptyRefusal.errorCode).toBe("ORDER_CART_EMPTY")
-        expect(await readCount(world.db.order, ORDER_COUNT, personId)).toBe(0)
-
-        // A real order, then the same key again: the key is checked before the (now empty) cart, so the replay returns
-        // the first answer rather than degenerating into an empty-cart refusal.
-        await buyer.mutate("addCartItem", { variables: { input: { productId: "sku-mug", quantity: 1 } } })
-        const key = `${personId}-replay`
-        const placed = await buyer.mutate<PlaceOrderData>("placeOrder", {
-            variables: { input: { idempotencyKey: key } },
-        })
-        expect(placed.errorCode).toBeNull()
-        const order = present(placed.data, "placed order").placeOrder
-        expect(order.replayed).toBe(false)
-
-        const replayed = await buyer.mutate<PlaceOrderData>("placeOrder", {
-            variables: { input: { idempotencyKey: key } },
-        })
-        expect(replayed.errorCode).toBeNull()
-        expect(replayed.data?.placeOrder).toMatchObject({
-            orderId: order.orderId,
-            replayed: true,
-        })
-        expect(await readCount(world.db.order, ORDER_COUNT, personId)).toBe(1)
-
-        // Refusal 2: beyond stock. Nothing changes: the order count stays 1, the cart keeps its line, the stock did not move.
-        const thermos = productOf((await buyer.read<CartData>("cart")).data, "sku-thermos")
-        await buyer.mutate("addCartItem", {
-            variables: { input: { productId: "sku-thermos", quantity: thermos.stock + 1 } },
-        })
-        const stockRefusal = await buyer.mutate<PlaceOrderData>("placeOrder", { variables: { input: {} } })
-        expect(stockRefusal.errorCode).toBe("ORDER_INSUFFICIENT_STOCK")
-        expect(stockRefusal.errors?.[0]?.extensions).toMatchObject({ params: { productId: "sku-thermos" } })
-        expect(await readCount(world.db.order, ORDER_COUNT, personId)).toBe(1)
-        const kept = await buyer.read<CartData>("cart")
-        expect(kept.data?.cart.items).toEqual([{ productId: "sku-thermos", quantity: thermos.stock + 1 }])
-        expect(productOf(kept.data, "sku-thermos").stock).toBe(thermos.stock)
-    })
+    it("a refusal and an idempotent replay never append to order history", () =>
+        keepsHistoryOnRefusalAndReplay(world, productOf))
 })
+
+async function buildsPendingHistory(
+    world: ReturnType<typeof useTestWorld>,
+    productOf: (data: CartData | null, id: string) => CatalogProductView,
+): Promise<void> {
+    const session = await world.signedInPerson("hist-a")
+    const { personId } = session
+    const buyer = world.apps.order.api.bearing(session.sessionToken)
+    const identity = world.apps.identity.api.bearing(session.sessionToken)
+
+    // Baseline: not a buyer yet, on both sides of the contract.
+    expect((await buyer.read<BuyerStatusData>("buyerStatus")).data?.buyerStatus).toEqual({
+        personId,
+        hasOrders: false,
+    })
+    expect((await identity.read<AccountData>("account")).data?.account.hasOrders).toBe(false)
+
+    // The catalog snapshot the confirmations price against.
+    const browsed = await buyer.read<CartData>("cart")
+    const mug = productOf(browsed.data, "sku-mug")
+    const notebook = productOf(browsed.data, "sku-notebook")
+    const thermos = productOf(browsed.data, "sku-thermos")
+    const firstTotal = mug.priceMinorUnits * 2
+    const secondTotal = notebook.priceMinorUnits + thermos.priceMinorUnits
+
+    const firstOrder = await placeFirstHistoryOrder(buyer, personId, firstTotal)
+
+    // The cart cleared itself at confirmation, so order 2 starts from a fresh fill.
+    expect((await buyer.read<CartData>("cart")).data?.cart.items).toEqual([])
+
+    // Order 2: sku-notebook x1 and sku-thermos x1.
+    await buyer.mutate("addCartItem", { variables: { input: { productId: "sku-notebook", quantity: 1 } } })
+    await buyer.mutate("addCartItem", { variables: { input: { productId: "sku-thermos", quantity: 1 } } })
+    const second = await buyer.mutate<PlaceOrderData>("placeOrder", {
+        variables: { input: { idempotencyKey: `${personId}-2` } },
+    })
+    expect(second.errorCode).toBeNull()
+    const secondOrder = present(second.data, "second order").placeOrder
+    expect(secondOrder).toMatchObject({ status: "pending", totalMinorUnits: secondTotal, replayed: false })
+    expect(secondOrder.orderId).not.toBe(firstOrder.orderId)
+
+    await verifyHistoryRows(world, personId, firstOrder, secondOrder, mug, notebook, thermos, firstTotal, secondTotal)
+
+    // The guarded stock moved by exactly the confirmed quantities, and the cart stayed empty.
+    const after = await buyer.read<CartData>("cart")
+    expect(productOf(after.data, "sku-mug").stock).toBe(mug.stock - 2)
+    expect(productOf(after.data, "sku-notebook").stock).toBe(notebook.stock - 1)
+    expect(productOf(after.data, "sku-thermos").stock).toBe(thermos.stock - 1)
+    expect(after.data?.cart.items).toEqual([])
+
+    // The cross-service read: identity can only know this by asking order over real GraphQL.
+    expect((await buyer.read<BuyerStatusData>("buyerStatus")).data?.buyerStatus).toEqual({
+        personId,
+        hasOrders: true,
+    })
+    expect((await identity.read<AccountData>("account")).data?.account).toMatchObject({
+        personId,
+        email: session.email,
+        hasOrders: true,
+    })
+}
+
+async function keepsHistoryOnRefusalAndReplay(
+    world: ReturnType<typeof useTestWorld>,
+    productOf: (data: CartData | null, id: string) => CatalogProductView,
+): Promise<void> {
+    const session = await world.signedInPerson("hist-b")
+    const { personId } = session
+    const buyer = world.apps.order.api.bearing(session.sessionToken)
+
+    // Refusal 1: an empty cart confirms nothing and records nothing.
+    const emptyRefusal = await buyer.mutate<PlaceOrderData>("placeOrder", { variables: { input: {} } })
+    expect(emptyRefusal.errorCode).toBe("ORDER_CART_EMPTY")
+    expect(await readCount(world.db.order, ORDER_COUNT, personId)).toBe(0)
+
+    // A real order, then the same key again: the key is checked before the (now empty) cart, so the replay returns
+    // the first answer rather than degenerating into an empty-cart refusal.
+    await buyer.mutate("addCartItem", { variables: { input: { productId: "sku-mug", quantity: 1 } } })
+    const key = `${personId}-replay`
+    const placed = await buyer.mutate<PlaceOrderData>("placeOrder", {
+        variables: { input: { idempotencyKey: key } },
+    })
+    expect(placed.errorCode).toBeNull()
+    const order = present(placed.data, "placed order").placeOrder
+    expect(order.replayed).toBe(false)
+
+    const replayed = await buyer.mutate<PlaceOrderData>("placeOrder", {
+        variables: { input: { idempotencyKey: key } },
+    })
+    expect(replayed.errorCode).toBeNull()
+    expect(replayed.data?.placeOrder).toMatchObject({
+        orderId: order.orderId,
+        replayed: true,
+    })
+    expect(await readCount(world.db.order, ORDER_COUNT, personId)).toBe(1)
+
+    // Refusal 2: beyond stock. Nothing changes: the order count stays 1, the cart keeps its line, the stock did not move.
+    const thermos = productOf((await buyer.read<CartData>("cart")).data, "sku-thermos")
+    await buyer.mutate("addCartItem", {
+        variables: { input: { productId: "sku-thermos", quantity: thermos.stock + 1 } },
+    })
+    const stockRefusal = await buyer.mutate<PlaceOrderData>("placeOrder", { variables: { input: {} } })
+    expect(stockRefusal.errorCode).toBe("ORDER_INSUFFICIENT_STOCK")
+    expect(stockRefusal.errors?.[0]?.extensions).toMatchObject({ params: { productId: "sku-thermos" } })
+    expect(await readCount(world.db.order, ORDER_COUNT, personId)).toBe(1)
+    const kept = await buyer.read<CartData>("cart")
+    expect(kept.data?.cart.items).toEqual([{ productId: "sku-thermos", quantity: thermos.stock + 1 }])
+    expect(productOf(kept.data, "sku-thermos").stock).toBe(thermos.stock)
+}
+
+async function verifyHistoryRows(
+    world: ReturnType<typeof useTestWorld>,
+    personId: string,
+    firstOrder: PlaceOrderData["placeOrder"],
+    secondOrder: PlaceOrderData["placeOrder"],
+    mug: CatalogProductView,
+    notebook: CatalogProductView,
+    thermos: CatalogProductView,
+    firstTotal: number,
+    secondTotal: number,
+): Promise<void> {
+    // list: two orders in creation order, each confirmed and priced as answered.
+    const orders = await readRows(world.db.order, ORDERS_OF_PERSON, [personId])
+    expect(orders).toHaveLength(2)
+    expect(orders[0]).toMatchObject({
+        id: firstOrder.orderId,
+        status: "pending",
+        total_minor_units: firstTotal,
+        currency: "USD",
+        idempotency_key: `${personId}-1`,
+    })
+    expect(orders[1]).toMatchObject({
+        id: secondOrder.orderId,
+        status: "pending",
+        total_minor_units: secondTotal,
+        idempotency_key: `${personId}-2`,
+    })
+
+    // detail: each order lines carry the catalog price snapshot taken at confirmation.
+    expect(await readRows(world.db.order, LINES_OF_ORDER, [firstOrder.orderId])).toEqual([
+        { product_id: "sku-mug", quantity: 2, unit_price_minor_units: mug.priceMinorUnits },
+    ])
+    expect(await readRows(world.db.order, LINES_OF_ORDER, [secondOrder.orderId])).toEqual([
+        { product_id: "sku-notebook", quantity: 1, unit_price_minor_units: notebook.priceMinorUnits },
+        { product_id: "sku-thermos", quantity: 1, unit_price_minor_units: thermos.priceMinorUnits },
+    ])
+}
+
+async function placeFirstHistoryOrder(
+    buyer: TestCaller,
+    personId: string,
+    firstTotal: number,
+): Promise<PlaceOrderData["placeOrder"]> {
+    // Order 1: sku-mug x2.
+    await buyer.mutate("addCartItem", { variables: { input: { productId: "sku-mug", quantity: 2 } } })
+    const first = await buyer.mutate<PlaceOrderData>("placeOrder", {
+        variables: { input: { idempotencyKey: `${personId}-1` } },
+    })
+    expect(first.errorCode).toBeNull()
+    const firstOrder = present(first.data, "first order").placeOrder
+    expect(firstOrder).toMatchObject({
+        status: "pending",
+        totalMinorUnits: firstTotal,
+        currency: "USD",
+        replayed: false,
+    })
+
+    return firstOrder
+}

@@ -1,9 +1,22 @@
+import { Test } from "@nestjs/testing"
 import { mock } from "@starci/jest-preset"
 import type { HttpClient } from "./http.port"
 import { callGraphql } from "./graphql-call.mapper"
 
+const SUBJECT: unique symbol = Symbol("http/graphql-call.mapper")
+const subjectFunctions = () => ({ callGraphql })
+
+const build = async () => {
+    const moduleRef = await Test.createTestingModule({
+        providers: [{ provide: SUBJECT, useFactory: subjectFunctions }],
+    }).compile()
+    return moduleRef.get<ReturnType<typeof subjectFunctions>>(SUBJECT)
+}
+
 describe("callGraphql", () => {
     it("sends the operation and reads its data and string error codes", async () => {
+        const subject = await build()
+
         const http = mock<HttpClient>()
         http.request.mockResolvedValue({
             status: 200,
@@ -19,7 +32,7 @@ describe("callGraphql", () => {
         })
 
         await expect(
-            callGraphql(http, {
+            subject.callGraphql(http, {
                 url: "https://order.test/graphql",
                 query: "query Order($id: ID!) { order(id: $id) { id } }",
                 variables: { id: "order-1" },
@@ -41,22 +54,30 @@ describe("callGraphql", () => {
     })
 
     it("returns an empty answer when data and errors do not have GraphQL shapes", async () => {
+        const subject = await build()
+
         const http = mock<HttpClient>()
         http.request.mockResolvedValue({ status: 200, body: { data: "malformed", errors: {} } })
 
         await expect(
-            callGraphql(http, { url: "https://order.test/graphql", query: "query Health { health }", timeoutMs: 1000 }),
+            subject.callGraphql(http, {
+                url: "https://order.test/graphql",
+                query: "query Health { health }",
+                timeoutMs: 1000,
+            }),
         ).resolves.toEqual({ data: undefined, errorCodes: [] })
     })
 
     it.each([undefined, null, "not a response"])(
         "returns null when the response body is not an object (%p)",
         async (body) => {
+            const subject = await build()
+
             const http = mock<HttpClient>()
             http.request.mockResolvedValue({ status: 502, body })
 
             await expect(
-                callGraphql(http, {
+                subject.callGraphql(http, {
                     url: "https://order.test/graphql",
                     query: "query Health { health }",
                     timeoutMs: 1000,
