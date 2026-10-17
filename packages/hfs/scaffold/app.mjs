@@ -222,7 +222,7 @@ const FE_PACKAGES = Object.freeze({
 const PACKAGE_WORKSPACE_SCRIPTS = Object.freeze({ build: 'tsc -p tsconfig.build.json', lint: WORKSPACE_LINT, typecheck: 'tsc --noEmit -p tsconfig.json' });
 
 /** The app hfs.json of a new app called `name`; full remains the byte-for-byte default declaration. */
-const starterDeclaration = (name, manifest = loadSlotManifest(), edition = 'full') => ({
+export const starterDeclaration = (name, manifest = loadSlotManifest(), edition = 'full') => ({
   hfs: manifest.major,
   kind: 'app',
   ...(edition === 'full' ? {} : { edition }),
@@ -493,7 +493,7 @@ export function scaffoldWorkSeeds(project) {
  * be side (once per product app of the fe side, coreFeApps), the be `apps/cli/` folder once when the cli app is declared, an fe `apps/<name>/` folder
  * once for the declared fe app <name> (none other), `__project__` in a path replaced by the project name.
  */
-function skeletonOf(scope, app, vars) {
+export function skeletonOf(scope, app, vars) {
   const files = app.edition === 'lite'
     ? [...skeletonDirectory(scope, 'skeleton', app, vars, rel => liteBaseFile(scope, rel)), ...skeletonDirectory(scope, 'skeleton-lite', app, vars, rel => liteOverlayFile(scope, rel))]
     : skeletonDirectory(scope, 'skeleton', app, vars);

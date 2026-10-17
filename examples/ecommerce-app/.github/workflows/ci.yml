@@ -200,7 +200,6 @@ jobs:
       - name: build fe
         run: npm run build:fe
 
-
   sonar:
     needs: [fast, test]
     timeout-minutes: 20

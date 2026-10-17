@@ -60,8 +60,6 @@ jobs:
 {{> app/ci-workflows/install-steps.yml}}
       - name: build be
         run: npm run build:be
-      - name: build fe
-        run: npm run build:fe
-{{ciBuildEnv}}
+{{ciBuildSteps}}
 
 {{sonarJob}}

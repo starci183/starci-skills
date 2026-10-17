@@ -161,6 +161,7 @@ ruleParams:
       - {id: examples-ci, run: scripts/checks/check-examples-ci.mjs}
       - {id: example-render, run: scripts/checks/check-example-render.mjs}
       - {id: readme-badges, run: scripts/checks/check-readme-badges.mjs}
+      - {id: rendered-prettier, run: scripts/checks/check-rendered-prettier.mjs}
       - {id: guidance-commands, run: scripts/checks/check-guidance-commands.mjs}
       - {id: port-once, run: scripts/checks/check-port-once.mjs}
       - {id: event-spill, run: scripts/checks/check-event-spill.mjs}

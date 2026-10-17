@@ -35,8 +35,8 @@ export function sonarHostLine(sonar) {
 
 /** Dependabot groups minor and patch updates while majors remain per package; security updates have their own immediate group. */
 export function dependabotUpdates(dependabot) {
-  if (!dependabot.ecosystems.length) return '  []';
-  return dependabot.ecosystems.map(ecosystem => [
+  if (!dependabot.ecosystems.length) return ' []';
+  return '\n' + dependabot.ecosystems.map(ecosystem => [
     `  - package-ecosystem: ${ecosystem}`,
     ...(ecosystem === 'docker' ? ['    directories:', '      - /be/apps/*', '      - /fe/apps/*'] : ['    directory: /']),
     '    schedule:',

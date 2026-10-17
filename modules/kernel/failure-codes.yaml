@@ -5258,6 +5258,16 @@ RT_GENERATED_DRIFT:
   owner: supervisor
   kind: check-finding
 
+RT_RENDERED_NOT_PRETTIER:
+  title: "Rendered managed file is not formatted by prettier"
+  title_vi: "Tep duoc tao chua dung dinh dang Prettier"
+  meaning_vi: "Ban render cua vi du, skeleton hoac to hop dich vu khong qua prettier.check voi cau hinh canon."
+  causes_vi:
+    - "Template hoac bien render tao khoang trang, dau nhay hoac thut le sai"
+  nextStep_vi: "Sua template hoac renderer, chay lai rendered-prettier va sync cac vi du."
+  owner: runtime-core
+  kind: check-finding
+
 RT_README_NOT_PRETTIER:
   title: "Runtime or example README is not formatted by prettier"
   title_vi: "README runtime hoặc ví dụ chưa đúng định dạng Prettier"

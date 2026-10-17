@@ -131,7 +131,7 @@ function sonarJob(sonar, lcovReport, lcovArtifact, nodeMajor) {
     .replaceAll('{{nodeMajor}}', nodeMajor)
     .replace('{{sonarJobHeader}}', () => header)
     .replace('{{sonarJobSteps}}', () => steps)
-    .trimEnd();
+    .trimEnd() + '\n';
 }
 
 /** The app source reader is be-relative; the authored manifest lives one directory above that side. */
@@ -158,18 +158,33 @@ function mergeBuildValues(values, entries) {
   }
 }
 
-/** CI builds render only plain values from the images.yml environment plus the explicit build-fe gate; sealed members stay unopened. */
-function buildEnv(source) {
+/** Image values own their keys; the build-fe gate supplies only missing keys, and sealed members stay unopened. */
+function imageBuildEnv(image, gates) {
+  const values = new Map();
+  mergeBuildValues(values, image?.buildArgs?.values);
+  const fallback = new Map();
+  for (const gate of gates.filter(entry => entry.name === 'build-fe')) mergeBuildValues(fallback, gate.env);
+  for (const [key, value] of fallback) if (!values.has(key)) values.set(key, value);
+  if (!values.size) return '';
+  return ['        env:', ...[...values.keys()].sort(byCodeUnit).map(key => '          ' + key + ': ' + JSON.stringify(values.get(key)))].join('\n');
+}
+
+/** Multiple deployed front ends build separately through the installed turbo (a run step has no node_modules/.bin on PATH), so each fe/apps/<app> and its dependencies see its own public values. */
+function frontendBuild(source, app) {
   const declaration = buildDeclaration(source);
   const environments = Object.keys(source?.stack?.imageEnvironments ?? {});
   const environment = environments.length > 1 ? 'production' : environments[0];
-  const images = declaration.environments?.[environment]?.deploy?.images ?? {};
-  const values = new Map();
-  for (const image of Object.values(images)) mergeBuildValues(values, image?.buildArgs?.values);
+  const images = Object.values(declaration.environments?.[environment]?.deploy?.images ?? {});
+  const frontend = images.filter(image => app?.sides.fe.apps.some(entry => entry.name === image.app));
   const gates = declaration.release?.gates ?? [];
-  for (const gate of gates.filter(entry => entry.name === 'build-fe')) mergeBuildValues(values, gate.env);
-  if (!values.size) return '';
-  return ['        env:', ...[...values.keys()].sort(byCodeUnit).map(key => '          ' + key + ': ' + JSON.stringify(values.get(key)))].join('\n');
+  const singleEnv = imageBuildEnv(frontend[0], gates);
+  if (frontend.length <= 1) return { env: singleEnv, steps: ['      - name: build fe', '        run: npm run build:fe', singleEnv].filter(Boolean).join('\n') };
+  const steps = frontend.map(image => [
+    '      - name: build fe ' + image.app,
+    '        run: npm run codegen --silent && npx --no-install turbo run build --filter=./fe/apps/' + image.app,
+    imageBuildEnv(image, gates),
+  ].filter(Boolean).join('\n')).join('\n');
+  return { env: singleEnv, steps };
 }
 
 /** Side lint reports join into the single Sonar artifact even when one side could not write its report. */
@@ -191,14 +206,16 @@ function sonarMergeSteps() {
 }
 
 /** An omitted quality declaration preserves hosted Sonar, required OIDC Codecov, and the high production dependency audit. */
-export function ciWorkflowCommands(source, lcovReport = 'be/coverage/lcov.info', quality = undefined, { nodeMajor = '22' } = {}) {
+export function ciWorkflowCommands(source, lcovReport = 'be/coverage/lcov.info', quality = undefined, { nodeMajor = '22', app } = {}) {
   const configuredSonar = quality === undefined ? { token: 'SONAR_TOKEN', hostVar: 'SONAR_HOST_URL' } : quality.sonar;
   const sonar = configuredSonar?.wiring === 'not-used' || configuredSonar?.mode === 'disabled' ? null : configuredSonar;
   const codecov = quality?.codecov ?? { enabled: true, auth: 'oidc' };
   const audit = quality?.audit ?? { level: 'high', omitDev: true };
   const lcovArtifact = 'coverage-lcov';
+  const build = frontendBuild(source, app);
   return {
-    ciBuildEnv: buildEnv(source),
+    ciBuildEnv: build.env,
+    ciBuildSteps: build.steps,
     ciLint: exampleCommand(source, 'npm run lint'),
     ciLintSonar: exampleCommand(source, 'npm run lint -- --sonar reports/lint.sonar.json'),
     ciCoverageProof: exampleCommand(source, 'npx starci app check --coverage-from ' + lcovReport),

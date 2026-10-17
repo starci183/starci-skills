@@ -60,14 +60,11 @@ jobs:
 {{> app/ci-workflows/install-steps.yml}}
       - name: build be
         run: npm run build:be
-      - name: build fe
-        run: npm run build:fe
-{{ciBuildEnv}}
+{{ciBuildSteps}}
       - name: database migration checks
         run: {{ciDatabaseLint}}
 
 {{sonarJob}}
-
   db-types:
     timeout-minutes: 30
     runs-on: ubuntu-latest

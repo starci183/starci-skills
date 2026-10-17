@@ -71,6 +71,11 @@ export function readDeclaredStack(root, { parseYaml = bundledParseYaml } = {}) {
   } catch {
     return { images: [], passEnv: [] };
   }
+  return declaredStack(declaration);
+}
+
+/** Parsed declarations share the exact image, environment and pass-env projection used by sync. */
+export function declaredStack(declaration) {
   return { images: declaredStackImages(declaration), passEnv: declaredPassEnv(declaration), imageEnvironments: imageEnvironments(declaration) };
 }
 

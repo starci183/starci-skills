@@ -128,11 +128,12 @@ function readBundled(name) {
 
 /**
  * Fill `{{name}}` from vars and expand `{{> partial}}` lines. A partial line may be written as a line comment (`// {{> partial}}`)
- * so a JavaScript template stays valid source before rendering. An unknown name is an error, never an empty string.
+ * so a JavaScript template stays valid source before rendering. Empty variable-only lines disappear; an unknown name is an error.
  */
 export function render(text, vars, readTemplate = readBundled) {
   const withPartials = text.replace(/^(?:\/\/ )?\{\{> ([\w./-]+)\}\}\n/gm, (_, name) => trailingNewline(render(readTemplate(name), vars, readTemplate)));
-  return withPartials.replace(/\{\{([A-Za-z]\w*)\}\}/g, (_, key) => {
+  const presentLines = withPartials.replace(/^[ \t]*\{\{([A-Za-z]\w*)\}\}[ \t]*(?:\n|$)/gm, (line, key) => vars[key] === '' ? '' : line);
+  return presentLines.replace(/\{\{([A-Za-z]\w*)\}\}/g, (_, key) => {
     if (!Object.hasOwn(vars, key)) throw new SyncError('HFS_SYNC_TEMPLATE_VARIABLE', `template names {{${key}}}, which sync does not provide`);
     return vars[key];
   });
@@ -323,7 +324,7 @@ export function variables(app, scope, presets, sonarKey, manifest = loadSlotMani
     sonarExclusions: [presets?.sonarExclusions, '**/.next/**', '**/node_modules/**', '**/src/messages/**', ...(lite ? ['supabase/types/**'] : [])].filter(Boolean).join(','),
     sonarSources: ['be/apps', 'be/src', 'fe/apps', ...(packages ? ['fe/packages'] : [])].join(','),
     lcovReport: LCOV_REPORT,
-    ...ciWorkflowCommands(source, LCOV_REPORT, source.qualityDeclared === false ? undefined : source.quality),
+    ...ciWorkflowCommands(source, LCOV_REPORT, source.qualityDeclared === false ? undefined : source.quality, { app }),
     // The coverage scope is the same in both editions: lite measures exactly what full measures (ruling:R212/case-1, amended by ruling:R212/case-4).
     jestCoverage: scope === 'be' ? jestCoverageSource(jestCoverage(manifest, providers)) : '',
     coverageExclusions: scope === APP_SCOPE ? sonarCoverageExclusions(manifest, providers).join(',') : '',
@@ -370,7 +371,7 @@ export function renderTargets(hfs, presets, { sonarKey, readTemplate = readBundl
       const template = target.path === 'codecov.yml' && source?.quality?.codecov.enabled === false
         ? '{{header}}\n# Codecov is disabled in the manifest.\ncodecov:\n  require_ci_to_pass: false\n'
         : readTemplate(target.template);
-      const body = render(template, vars, readTemplate);
+      const body = trailingNewline(render(template, vars, readTemplate));
       const where = onSide(scope, target.path);
       if (target.mode === 'scripts') {
         const scripts = parseScripts(body);
@@ -429,8 +430,8 @@ function insertAfterTitle(existing, content) {
   return `${heading}\n${content}${existing.slice(end)}`;
 }
 
-/** Rewrite the missing or drifted targets; returns the paths written. */
-function writtenContent(target, existing) {
+/** Apply exactly one target to its whole file while preserving content outside the managed block or scripts. */
+export function writtenContent(target, existing) {
   if (target.mode === 'scripts') {
     let pkg = {};
     if (existing) {
