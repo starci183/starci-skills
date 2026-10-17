@@ -4422,8 +4422,34 @@ requirements:
     rules: [R296, R297, R298]
   - id: A20-QUALITY-SERVICES
     source: docs/application-stacks.md#quality-services
-    sourceLine: 395
+    sourceLine: 438
     editions: [lite, full]
     statement: "The services block supplies Sonar, Codecov, Dependabot and audit renderer inputs, including cloud example and private app host settings."
     status: advisory
     reason: "The schema and stack gate validate service inputs and the sync renderer consumes them; R269 and R251 cover rendered supply-chain policy, not all service normalization branches."
+  - id: A20-APP-CI-COMMANDS
+    source: docs/application-stacks.md#starci-app-ci
+    sourceLine: 395
+    editions: [lite, full]
+    statement: "CI commands accept declared secrets through stdin only, enforce name and scope, set or sync declared public values and verify GitHub stores without mutation or value disclosure."
+    status: advisory
+    reason: "Runtime command behavior in packages/hfs/ci/{secret,vars,verify}.mjs; offline app-source custody and declaration rules remain R296-R298."
+  - id: A20-DB-BACKUP-RESET-COMMANDS
+    source: docs/application-stacks.md#database-backup-and-reset
+    sourceLine: 423
+    editions: [lite, full]
+    statement: "Database dump encrypts outside Git; linked reset requires explicit managed-data choices, an intact recent full backup receipt for the same project and explicit execution arming."
+    status: advisory
+    reason: "Runtime command behavior in packages/hfs/db/{dump,reset,backup-receipt}.mjs; backup receipt and arming refusals are checked by the commands rather than an app-source lint rule."
+  - id: A20-WORKFLOW-CONTEXTS
+    source: docs/application-stacks.md#r299
+    editions: [lite, full]
+    statement: "Every tracked workflow expression uses contexts available at its key; runner-dependent job environment values move to step env or shell RUNNER_TEMP."
+    status: enforced
+    rules: [R299]
+  - id: A20-FE-PUBLIC-BUILD-ARGS
+    source: docs/application-stacks.md#r300
+    editions: [lite, full]
+    statement: "Required front-end public build names have Dockerfile defaults or image buildArgs in every deploying environment; CI images use deployment build arguments."
+    status: enforced
+    rules: [R300]

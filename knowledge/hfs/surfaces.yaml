@@ -338,6 +338,8 @@ surfaces:
       - full
     sources:
       - A15-STANDARD/0.2/deploy-workflows-host
+      - docs/application-stacks.md#r299
+      - docs/application-stacks.md#r300
     owedRules:
       - R250
       - R251
@@ -349,6 +351,8 @@ surfaces:
         - R102
         - R103
         - R221
+        - R299
+        - R300
       slots:
         - app.ci
         - app.ci-images
@@ -373,6 +377,8 @@ surfaces:
         - R102
         - R103
         - R221
+        - R299
+        - R300
       slots:
         - app.ci
         - app.ci-images

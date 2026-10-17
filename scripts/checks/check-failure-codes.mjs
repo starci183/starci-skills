@@ -42,7 +42,7 @@ const SCAN_EXT = /\.(mjs|yaml)$/;
 const SKIP_FILES = new Set([CATALOG_FILE, 'scripts/checks/check-failure-codes.mjs']);
 
 /** UPPER_SNAKE literals that are not codes: environment variables, Node/SQLite error names, settings and key names. */
-const NOT_CODE_PREFIX = /^(ORCA|NODE|CODEX|CLAUDE|OPENAI|CLOUDFLARE|TELEGRAM|SONAR|ANTHROPIC|GITHUB|GIT|DEVIN|LOCALAPPDATA|APPDATA|USERPROFILE|HTTP|SQLITE|ERR)_/;
+const NOT_CODE_PREFIX = /^(?:(ORCA|NODE|CODEX|CLAUDE|OPENAI|CLOUDFLARE|TELEGRAM|ANTHROPIC|GITHUB|GIT|DEVIN|LOCALAPPDATA|APPDATA|USERPROFILE|HTTP|SQLITE|ERR)_|SONAR_(?!(?:TUNNEL_NOT_RUNNING|DB_PASSWORD_MISMATCH)$))/;
 const readNotCodes = (base) => new Set(readAllowlist('not-codes', base).map((entry) => entry.literal));
 
 const skipDir = (name) => name === 'node_modules' || name === '.git' || name === 'dist';
@@ -214,6 +214,31 @@ const entryProblems = (entry, ops) => {
   return bad;
 };
 
+/** Only a registered package enforcer file is read; its quoted upper-code literals are cached for this check. */
+function packageEnforcerLiterals(base, at, literals) {
+  if (typeof at !== 'string' || !at.startsWith('packages/') || !SCAN_EXT.test(at)) return new Set();
+  const file = path.join(base, at);
+  if (!fs.existsSync(file)) return new Set();
+  if (!literals.has(at)) literals.set(at, new Set([...fs.readFileSync(file, 'utf8').matchAll(UPPER_RE)].map((m) => m[2])));
+  return literals.get(at);
+}
+
+/** Only codes declared by this rule and present in its registered package enforcer are reported. */
+function addPackageRuleEmitters(base, rule, literals, reported) {
+  for (const enforcer of rule.enforcers ?? []) {
+    const codes = packageEnforcerLiterals(base, enforcer.at, literals);
+    for (const code of rule.failureCodes ?? []) if (codes.has(code)) reported.add(code);
+  }
+}
+
+/** A rule failure code has a package emitter only when its registered enforcer file contains that literal; unrelated package files and literals never expand discovery. */
+function packageRuleEmitters(base, rules) {
+  const reported = new Set();
+  const literals = new Map();
+  for (const rule of rules) addPackageRuleEmitters(base, rule, literals, reported);
+  return reported;
+}
+
 /** The catalog problems: {missing[], stale[], malformed[]}. */
 function catalogProblems(base = root) {
   const catalog = readCatalog(base);
@@ -223,7 +248,8 @@ function catalogProblems(base = root) {
   const stale = Object.keys(catalog).filter((code) => !emittedSet.has(code));
   const rules = parseYaml(fs.readFileSync(path.join(base, 'knowledge/hfs/rules.yaml'), 'utf8'))?.rules ?? [];
   const pluginReported = new Set(rules.filter((r) => (r.enforcers ?? []).some((e) => PLUGIN_ENFORCERS.includes(e.kind) && !e.status)).flatMap((r) => [r.code, ...(r.failureCodes ?? [])]));
-  const soleEmitter = emitted.filter((e) => e.kind === 'upper' && e.sites.every((site) => site.file === 'knowledge/hfs/rules.yaml') && !pluginReported.has(e.code));
+  const packageReported = packageRuleEmitters(base, rules);
+  const soleEmitter = emitted.filter((e) => e.kind === 'upper' && e.sites.every((site) => site.file === 'knowledge/hfs/rules.yaml') && !pluginReported.has(e.code) && !packageReported.has(e.code));
   const malformed = [];
   const ops = new Set(fs.readdirSync(path.join(base, 'modules/ops/ops')).filter((n) => n.endsWith('.yaml')).map((n) => n.slice(0, -5)));
   for (const [code, entry] of Object.entries(catalog)) {

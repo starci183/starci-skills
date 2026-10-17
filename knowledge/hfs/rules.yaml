@@ -4935,3 +4935,35 @@ rules:
       - {path: packages/hfs/templates/app/skeleton/.starcistacks/application-stacks.yaml, edition: full}
     specNa: "owner:no-runtime-specs (2026-10-17): the runtime has no specs of its own; this code is enforced by runtime code and its spec proof was a deleted runtime spec"
     witness: {status: unreachable, reason: "owner:no-runtime-specs (2026-10-17): the mutation witness was a deleted runtime spec or fixture", date: "2026-10-17"}
+  - id: R299
+    code: "HFS_WORKFLOW_CONTEXT"
+    law: "GitHub Actions expressions use only contexts available at their workflow key. Job env cannot read runner, job, steps or env; runner-local data paths belong to step env or shell RUNNER_TEMP. Every tracked workflow is checked in both app editions."
+    kinds: [check]
+    gates: [settle, land, ci]
+    failureCodes: ["HFS_WORKFLOW_CONTEXT"]
+    enforcers:
+      - {kind: hfs, id: workflow-contexts, at: scripts/hfs/rules/workflow-contexts.mjs}
+    editions: [lite, full]
+    docs:
+      - {path: docs/application-stacks.md#r299, editions: [lite, full]}
+    exemplifiedBy:
+      - {path: packages/hfs/templates/app/skeleton-lite/.starcistacks, edition: lite}
+      - {path: packages/hfs/templates/app/skeleton/.starcistacks, edition: full}
+    specNa: "owner:no-runtime-specs (2026-10-17): the runtime has no specs of its own; this code is enforced by runtime code and its spec proof was a deleted runtime spec"
+    witness: {status: unreachable, reason: "owner:no-runtime-specs (2026-10-17): no runtime spec retained", date: "2026-10-17"}
+  - id: R300
+    code: "FE_PUBLIC_BUILD_ARG_MISSING"
+    law: "Every front-end app with a Dockerfile supplies each required NEXT_PUBLIC_* source/config/schema name through a Dockerfile ARG default or through that image's buildArgs.values/buildArgs.sealed.keys in every environment deploying the image. Source reads with literal string ?? or || fallbacks are optional. The finding names missing keys and environments at the Dockerfile; sealed values are never opened. CI release images use the same starci app stack build-args verb and environment as deployment."
+    kinds: [check]
+    gates: [settle, land, ci]
+    failureCodes: ["FE_PUBLIC_BUILD_ARG_MISSING"]
+    enforcers:
+      - {kind: hfs, id: fe-build-args, at: scripts/hfs/rules/fe-build-args.mjs}
+    editions: [lite, full]
+    docs:
+      - {path: docs/application-stacks.md#r300, editions: [lite, full]}
+    exemplifiedBy:
+      - {path: packages/hfs/templates/app/skeleton-lite/.starcistacks, edition: lite}
+      - {path: packages/hfs/templates/app/skeleton/.starcistacks, edition: full}
+    specNa: "owner:no-runtime-specs (2026-10-17): the runtime has no specs of its own; this code is enforced by runtime code and its spec proof was a deleted runtime spec"
+    witness: {status: unreachable, reason: "owner:no-runtime-specs (2026-10-17): external smoke fixtures", date: "2026-10-17"}

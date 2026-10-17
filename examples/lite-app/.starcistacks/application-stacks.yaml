@@ -147,6 +147,9 @@ environments:
           buildArgs:
             values:
               NEXT_PUBLIC_SITE_URL: "https://lite-app.example"
+              NEXT_PUBLIC_GRAPHQL_URL: "https://api.lite-app.example/graphql"
+              NEXT_PUBLIC_SUPABASE_URL: "https://example-project.supabase.co"
+              NEXT_PUBLIC_SUPABASE_ANON_KEY: "sb_publishable_fake_example_lite_app_public_key"
       volumes:
         - lite-app-production-caddy-data
         - lite-app-production-caddy-config

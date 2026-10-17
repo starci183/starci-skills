@@ -9,12 +9,15 @@ until every S* row in `docs/goal.md` holds with fresh evidence, then `1.0.0` fre
 ## 1.0.0-alpha.20 (unreleased)
 
 ### Added
+- Examples CI runs digest-pinned actionlint over the rendered example workflows.
 - Secrets and config by consumer: app secrets remain sealed, public app config stays in the manifest, Actions secrets and vars use GitHub stores, and Dependabot has its own secrets. `starci app ci` sets declared names and verifies custody; R296-R298 refuse collisions and declaration drift.
 - Manifest services render Sonar, Codecov, Dependabot and audit files; the public examples use SonarCloud and Codecov OIDC with no secret file, while a scaffolded (private) app declares its own Sonar host. Dependabot groups minor/patch and security updates and ignores canon-managed @starci pins.
 - CI quality: audit in the app release gate, optional local Sonar, Codecov notices when coverage is absent, parallel fast/test/build jobs, dependent Sonar analysis, lockfile caches and immutable action pins. Release cut and app gate refuse red main CI; attributed CI overrides are owner-only.
 - Encrypted `starci app db dump` outside the repository and linked `starci app db reset` with a fresh backup, explicit auth/storage choices and mutation arming. DB type emission refuses stale migration history; CLI upgrades move the target canon's @starci pins.
 
 ### Fixed
+- Managed deploy workflows put runner-local paths in step env; R299 refuses expressions using contexts unavailable at their workflow key.
+- CI release images use the deployment environment and shared build-args command; R300 refuses missing required public front-end build values.
 - `starci gate sonar up --public` activates the public Compose profile and verifies tunnel readiness; database password mismatch and tunnel failures have scrubbed diagnostics.
 
 ### Removed
