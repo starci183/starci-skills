@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+## 3.4.1 - 2026-10-17
+
+- Changed: the bundled runtime copies follow the runtime of 1.0.0-alpha.19 (owner ruling no-runtime-specs, 2026-10-17): the failure codes, the slot manifest (`exampleNa`) and the rule catalog (`specNa`, `exampleNa`) carry the removal of the runtime's own specs; package behavior is unchanged.
 - Fixed (R263 `BE_WEBHOOK_SCOPE`, a18.1 NIVO requests G and J): a third-party OAuth redirect (a GET route with `PublicReason.AuthHandshake` on a path that is not a webhook or events path) is no longer judged as a webhook door (owner ruling `oauth-redirect-not-webhook`); a call on a domain receipt port (no base class, constructor of platform ports only, one of them the Inbox) inside the receipt transaction is the inbox record and not processing (owner ruling `webhook-receipt-port`); an intake that does process the delivery is now reported with its own `intake` finding instead of the signed-metadata text.
 - Known gaps (planned for alpha.19, Nest lifecycle conformance): no enforcer yet for exactly one validation pipe per app, for interceptors limited to logging, timeout and serialization and registered once, or for the absence of authentication middleware. Templates and examples conform today: one `APP_PIPE`, no interceptor, security-headers middleware only.
 - Added: `no-guard-injects-guard` (R41 `BE_DEFAULT_DENY`, a18 lifecycle conformance): a guard class (implements `CanActivate` or named `...Guard`) has no constructor parameter that is another guard (a `...Guard` or `CanActivate` type, `Type<CanActivate>`, or `@Inject(SomeGuard)`); the app registers `RateLimitGuard`, `OriginGuard`, `CredentialGuard` and `AuthGuard` as four global `APP_GUARD`s and `@Credential({ kind })` selects the credential behavior.

@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.4.1 - 2026-10-17
+- Changed: depends on @starci/hfs 4.4.1 and carries runtime 1.0.0-alpha.19; the catalog drops `starci test affected`, `starci test run`, `starci gate runtime-coverage` and `starci release env-test` and adds `starci release scaffold-e2e` (owner ruling no-runtime-specs, 2026-10-17).
+
 ## 1.3.0 - 2026-10-15
 - Changed: depends on @starci/hfs 4.3.0; `starci gate starcistacks` and `starci app check` validate the lite docker-swarm production stack (catalog regenerated), rebased onto alpha.13 (cli 1.2.17).
 

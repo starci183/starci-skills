@@ -6,6 +6,33 @@ until every S* row in `docs/goal.md` holds with fresh evidence, then `1.0.0` fre
 
 ## [Unreleased]
 
+## [1.0.0-alpha.19] — 2026-10-17
+
+This release supersedes the alpha.18 cut, which was never tagged: it carries everything listed under 1.0.0-alpha.18 below, plus the removal of the runtime's own specs.
+Owner ruling (2026-10-17, `owner:no-runtime-specs`): "Tests in packages/ and examples/ stay; the .claude runtime's own specs are removed entirely; delete codecov. Real tests (package clean-test + scaffold e2e) decide." Amended the same day: Codecov stays for packages/ and examples/; only the runtime coverage goes. Added the same day: no runtime tests in .claude.
+
+### Removed
+- `tests/` (1222 runtime specs, their helpers, fixtures and preloads). The scaffold e2e moved to `e2e/` (slot `runtime.e2e`, its files listed one by one).
+- The verbs that only served runtime specs: `starci test affected`, `starci test run` (the L1 to L4 ladder), `starci gate runtime-coverage`, `starci release env-test`; the spec cache, the affected-spec selection, `modules/supervisor/affected-tests.yaml`, `modules/kernel/spec-durations.yaml` with the `spec-budget` and `spec-cache-key` self-checks (rule R226 deleted), the replay specs and harness, `npm test`, `npm run test:coverage`, `npm run test:release-env`.
+- The runtime coverage: the root Codecov flag `runtime`, the CI runtime lcov upload and artifact chain, the Sonar job's coverage download (SonarCloud analyses the runtime source without a report). The example flags and uploads, the hfs template `codecov.yml` and its sync render are unchanged.
+- The release-host needs that served only the live Orca specs and settle smokes: an Orca terminal (`ORCA_TERMINAL_HANDLE`), a reachable Orca and fresh provider quota polls; `release cut` runs from a plain shell. The release-shell preparation (`terminal-create`) goes with them.
+- `starci git land --verified/--verified-log/--concurrency`, `starci supervisor land --specs/--reason/--full-by-push-git`, `starci supervisor lesson-actions --specs/--wrongly-blocked`, the `specs.harness` config switch.
+
+### Added
+- `starci release scaffold-e2e` (`npm run test:e2e`): the full and the lite scaffold installed, built, linted and run for real; a skipped test is red.
+- RT_SPEC_PLACEMENT (R118) is the enforced rule "no runtime tests in .claude": a spec or test file outside a package (beside its source), `examples/` and the declared `e2e/` files is refused. CONTRIBUTING.md states the rule.
+- `specNa` and `exampleNa` on a rule (and `exampleNa` on a slot): the coverage leg a deleted runtime spec or fixture used to prove is dropped for that row, citing `owner:no-runtime-specs`; package-proven rows keep their obligation.
+
+### Changed
+- `starci runtime verify` = the runtime check, `starci release clean-test --base <base>` (the packages the change touches) and the scaffold e2e on one exact commit, one receipt `starci/verify-receipt@2` (no budget, no partial). `starci git land` and `starci runtime deploy` read it; the land note line is `Tests: packages g/t, e2e p/t <base>..<tip>`; the deploy refusal code is `deploy-tests-red`.
+- Release cut root rows are `npm run test:packages`, `npm run test:e2e` and `npm run check` in both suite modes (the pre-push gate asks for the same rows); `suite: ci` delegates only `linux-parity`; the `affected tests` and `orca live smokes` rows and the Linux spec leg are gone; `statusPatterns` is `[sonar]`. `starci release check` proof C3 is `scaffold-e2e`.
+- CI (`.github/workflows/ci.yml`): check, package clean-test, app installs, scaffold e2e.
+- Exports whose only consumer was a runtime spec lost `export` (or were deleted when unused): RT_EXPORT_UNUSED stays green without specs.
+- A changed checker is never landed by the self-learning loop: no runtime spec can prove it wrongly blocked a correct example; it is proposed to the owner.
+
+### Release
+- Packages to publish (their bundled runtime copies changed): `@starci/hfs` 4.4.1, `@starci/cli` 1.4.1 (pins HFS 4.4.1, carries runtime 1.0.0-alpha.19), `@starci/eslint-canon-be` 3.4.1 and `@starci/eslint-canon-fe` 8.4.1 (with their alpha.18.1 patch rules). The canon pins, the code-pattern bindings and the example package.json pins are bound to them; the example lockfiles resolve them after the publish.
+
 ## [1.0.0-alpha.18] — 2026-10-16
 
 One release carries what was planned as alpha.15, alpha.16 and alpha.17 (owner ruling 2026-10-16): the HFS standard, the module-definition ruling, the stack-tooling fixes and the release-tooling fixes.

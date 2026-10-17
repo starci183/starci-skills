@@ -1,5 +1,8 @@
 # Changelog
 
+## 4.4.1 - 2026-10-17
+- Changed: the bundled runtime copies follow the runtime of 1.0.0-alpha.19 (owner ruling no-runtime-specs, 2026-10-17): the failure codes, the slot manifest (`exampleNa`) and the rule catalog (`specNa`, `exampleNa`) carry the removal of the runtime's own specs; package behavior is unchanged. The managed codecov.yml, the CI coverage upload and the hfs sync render stay (Codecov is kept for apps and examples); internal exports that only the deleted runtime specs read are no longer exported.
+
 ## 4.4.0 - 2026-10-15
 - Fixed: a swarm service on a shared external edge network no longer keeps the implicit short service name as an alias (`docker stack deploy` adds `api` for nivo_api on every network, so another tenant resolving `http://api` reached the wrong stack). `starci app stack deploy` and rollback reconcile the edge attachment to exactly the declared aliases right after `docker stack deploy` (`STACK_DEPLOY_EDGE_ALIAS` when they still differ), `stack verify` refuses an undeclared alias on an edge-attached service, and the deploy preflight and `stack doctor` extend `STACK_DEPLOY_ALIAS_SHARED` to a short name that another container or service of the edge network already resolves (`STACK_DEPLOY_EDGE_UNREADABLE` when the network cannot be inspected).
 - Added: R295 `BE_MODULE_DEFINITION_MISSING`: every Nest module has a module definition (owner ruling 2026-10-15 `owner:module-definition-everywhere`). The slot manifest allows `<x>.module-definition.ts` and `<x>.options.ts` beside every feature, transport, cli group, queue, reactor and job module; the generators of `starci app add` and `starci app new` write the three files and register the module as `X.register({})`.
