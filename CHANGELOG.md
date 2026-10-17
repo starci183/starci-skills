@@ -6,7 +6,7 @@ until every S* row in `docs/goal.md` holds with fresh evidence, then `1.0.0` fre
 
 ## [Unreleased]
 
-## 1.0.0-alpha.20 (unreleased)
+## [1.0.0-alpha.20] — 2026-10-17
 
 This release supersedes the alpha.19 cut, which was never tagged (its push secret-scan refused template false positives): it carries everything listed under 1.0.0-alpha.19 below, plus the changes here.
 
