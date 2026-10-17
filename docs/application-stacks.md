@@ -378,7 +378,7 @@ ci:
     secrets: [{name: NPM_TOKEN, purpose: Private package access}]
 ```
 
-Names match `^[A-Z][A-Z0-9_]*$`, never start with `GITHUB_`, and appear once across all three lists. Environment scope requires an environment name matching `^[a-z][a-z0-9-]*$`; repository scope omits it. Variables require a string value. Services reference names through `ci.token`, `ci.hostVar` and `ci.organizationVar`; each is a CI name, never a value. Legacy `services.*.ci.secrets/vars` remain readable for one release and produce `STACKS_CI_LEGACY_FORM` at suspect level. Examples declare no CI secrets except `SONAR_TOKEN`.
+Names match `^[A-Z][A-Z0-9_]*$`, never start with `GITHUB_`, and appear once across all three lists. Environment scope requires an environment name matching `^[a-z][a-z0-9-]*$`; repository scope omits it. Variables require a string value. Services reference names through `ci.token`, `ci.hostVar` and `ci.organizationVar`; each is a CI name, never a value. Legacy `services.*.ci.secrets/vars` remain readable for one release and produce `STACKS_CI_LEGACY_FORM` at suspect level. Examples using `runtimeSecrets` may declare CI secrets other than `SONAR_TOKEN` only with `optional: true`, documenting names their rendered workflows read without storing them; Codecov tokens, a SonarQube provider and custody credentials remain forbidden.
 
 ### r296
 

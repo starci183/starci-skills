@@ -70,7 +70,7 @@ properties:
     description: Release gates of the app (starci app release gate and push); packages/hfs/release/gate.mjs is the authority for the fields.
     type: object
   database:
-    description: Database cutover data (starci app db migrate and post-cutover); packages/hfs/db/migrate.mjs is the authority for the fields.
+    description: 'Database cutover data (starci app db migrate and post-cutover); packages/hfs/db/migrate.mjs is the authority for the fields. reset: optional mapping with only backupMaxAgeHours (finite positive number; default 24 hours).'
     type: object
   jobs:
     description: Application-owned schedules, bound to their back-end CLI commands.
@@ -307,6 +307,7 @@ $defs:
           scope: {const: repository}
           value: {type: string}
           purpose: {type: string}
+          optional: {type: boolean}
       - type: object
         additionalProperties: false
         required: [name, scope, value, environment]
@@ -316,6 +317,7 @@ $defs:
           environment: {type: string, pattern: '^[a-z][a-z0-9-]*$'}
           value: {type: string}
           purpose: {type: string}
+          optional: {type: boolean}
   serviceStack:
     description: >-
       Which stack defines a local service - either a project-owned .starcistacks stack

@@ -439,6 +439,10 @@ const checkDeclarationIgnore = (own, repo, shown, add) => {
     if (ignored?.status === 0) add('suspect', 'STACKS_DECLARATION_IGNORED', shown(own.file), `the ignore rules hide the declaration; re-include it (!${slash(path.relative(repo, own.file))}) so every machine reads the same services`);
   }
 };
+/** Examples may document optional workflow secret names, but never a Codecov token or a required extra secret. */
+function forbiddenExampleSecret(item) {
+  return item.name === 'CODECOV_TOKEN' || (item.name !== 'SONAR_TOKEN' && item.optional !== true);
+}
 /**
  * The whole check for one repository. `newRepo`: the leg creates this repository, so what it lacks is
  * refused under the current declaration and custody rules.
@@ -457,8 +461,8 @@ export function checkStarciStacks(repoRoot, { newRepo = false, examplesRoot = pa
       add('refuse', 'CI_DECLARATION_INVALID', `${declFile}#${issue.path}`, issue.message);
     const ci = readCiDeclaration(declaration.doc);
     for (const problem of ci.problems) add('refuse', problem.code, `${declFile}#${problem.at}`, problem.message);
-    if (kindOf(repo, examplesRoot) === 'example' && ci.secrets.some((item) => item.name !== 'SONAR_TOKEN'))
-      add('refuse', 'STACKS_EXAMPLE_FORM', `${declFile}#ci.secrets`, 'an example declares no CI secrets except SONAR_TOKEN');
+    if (kindOf(repo, examplesRoot) === 'example' && ci.secrets.some(forbiddenExampleSecret))
+      add('refuse', 'STACKS_EXAMPLE_FORM', `${declFile}#ci.secrets`, 'STACKS_EXAMPLE_FORM: an example declares CI secrets other than SONAR_TOKEN only with optional: true to document workflow names; no Codecov token or stored credentials');
   }
   // CI evidence: which services the workflows call, and which secret/variable names they read.
   const workflows = workflowTexts(repo);
