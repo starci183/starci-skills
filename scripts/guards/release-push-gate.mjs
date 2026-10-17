@@ -4,6 +4,8 @@
 // release, so those refs are judged against the release definition (scripts/guards/release-definition.mjs), the same code `starci release cut` runs:
 //   refs/heads/main   not deleted, a fast-forward of the remote main, and the pushed head is a release commit
 //   refs/tags/v*      annotated, named v<version> of the commit it points at, and that commit is a release commit
+//   refs/heads/release/candidate-*   allowed, force and delete included: the release candidate ref `starci release cut` pushes the release sha to and waits on
+//                     (scripts/supervisor/release-candidate.mjs, OWNER RULING candidate-ci 2026-10-18); its CI is the release verdict, so it must stay open
 //   any other ref     allowed (a lane branch, refs/backup/*, a tag that is not a release tag)
 // A refusal prints `RIGHTS_PUSH_NOT_RELEASE: <ref> is closed: <what is missing> (<command that produces it>)` per ref and exits 1.
 // There is no switch that opens it: a release is made by `starci release cut`, which pushes main and its tag together.
@@ -17,6 +19,8 @@ import { releaseFindings } from './release-definition.mjs';
 export const REFUSAL_CODE = 'RIGHTS_PUSH_NOT_RELEASE';
 const ZERO = /^0+$/;
 const RELEASE_TAG_REF = /^refs\/tags\/v\d/;
+/** The release candidate refs (modules/supervisor/release-cut.yaml candidate.refPrefix): named so a later narrowing of "any other ref" never closes them. */
+const CANDIDATE_REF = /^refs\/heads\/release\/candidate-[0-9A-Za-z][0-9A-Za-z.+-]*$/;
 
 const parseLines = (text) => String(text ?? '').split(/\r?\n/).map((line) => line.trim().split(/\s+/)).filter((parts) => parts.length === 4)
   .map(([localRef, localSha, remoteRef, remoteSha]) => ({ localRef, localSha, remoteRef, remoteSha }));
@@ -44,7 +48,8 @@ function tagRefusal(cwd, { remoteRef, localSha }) {
 function pushRefusals({ text, cwd = process.cwd() }) {
   return parseLines(text).flatMap((ref) => {
     let line = null;
-    if (ref.remoteRef === 'refs/heads/main') line = mainRefusal(cwd, ref);
+    if (CANDIDATE_REF.test(ref.remoteRef)) line = null;
+    else if (ref.remoteRef === 'refs/heads/main') line = mainRefusal(cwd, ref);
     else if (RELEASE_TAG_REF.test(ref.remoteRef)) line = tagRefusal(cwd, ref);
     return line ? [line] : [];
   });

@@ -3558,7 +3558,7 @@ rules:
       - {kind: hfs, id: lite-secret-custody, at: scripts/hfs/rules/supabase-secrets.mjs}
   - id: R221
     code: "CI_TRIGGERS_RELEASE_ONLY"
-    law: "The only workflow triggers are a push of release tags, a person dispatching it and, in the runtime's own workflows (`.github/workflows/` at the root), a push to `main`: every tracked workflow declares an `on` that holds only `push` filtered to `tags: ['v*']` (and, in the runtime's own workflows, `branches: [main]`; no paths or ignore filter beside them) and `workflow_dispatch`. The examples and the hfs app templates (so every scaffolded app inherits it) take the tag and the dispatch only: an app's CI runs once per release, on its tag. A push to any other branch, a pull_request, a schedule, a workflow_call or any other event refuses the workflow."
+    law: "The only workflow triggers are a push of release tags, a push of release candidate branches `release/candidate-*`, a person dispatching it and, in the runtime's own workflows (`.github/workflows/` at the root), a push to `main`: every tracked workflow declares an `on` that holds only `push` filtered to `tags: ['v*']` and/or `branches` naming only `release/candidate-*` (and, in the runtime's own workflows, `main`; no paths or ignore filter beside them) and `workflow_dispatch`. Every `ci.yml`, and the runtime's `examples.yml`, must name `release/candidate-*`: `starci release cut` and `starci app release push` push the exact release sha there and move main and the tag only when that run is green (owner ruling candidate-ci, 2026-10-18). A push to any other branch, a pull_request, a schedule, a workflow_call or any other event refuses the workflow."
     scope: runtime
     editions: [lite, full]
     docs: [docs/git-governance.md#r221]
@@ -4026,7 +4026,7 @@ rules:
       - {path: packages/hfs/templates/app/ci-workflows-lite/github/workflows/db-deploy.yml, edition: lite}
       - {path: packages/hfs/templates/app/ci-workflows/github/workflows/ci.yml, edition: full}
     witness: {status: unreachable, reason: "owner:no-runtime-specs (2026-10-17): the mutation witness was a deleted runtime spec or fixture", date: "2026-10-17"}
-    law: "In lite and full apps, deployment jobs declare a protected environment, explicit permissions and concurrency, materialize sealed secrets through SOPS_AGE_KEY or starci app secret materialize, and reference only the age key and transport SSH key/known_hosts secrets. They never embed a dotenv blob or write a dotenv file. Every remote workflow action uses a 40-hex commit SHA (local actions are allowed and container actions require a full sha256 digest); supply-chain reports each unpinned uses reference at its source line, including disabled jobs and steps; installed tools are checksum or digest verified, or supplied by a pinned action. App workflows start only on release tags [v*] or workflow_dispatch, never on a branch push."
+    law: "In lite and full apps, deployment jobs declare a protected environment, explicit permissions and concurrency, materialize sealed secrets through SOPS_AGE_KEY or starci app secret materialize, and reference only the age key and transport SSH key/known_hosts secrets. They never embed a dotenv blob or write a dotenv file. Every remote workflow action uses a 40-hex commit SHA (local actions are allowed and container actions require a full sha256 digest); supply-chain reports each unpinned uses reference at its source line, including disabled jobs and steps; installed tools are checksum or digest verified, or supplied by a pinned action. App workflows start only on release tags [v*], the release candidate branches release/candidate-* (required in ci.yml: starci app release push waits for that run, owner ruling candidate-ci 2026-10-18) or workflow_dispatch, never on another branch push."
     kinds: [check]
     gates: [settle, land, ci]
     failureCodes: ["HFS_DEPLOY_WORKFLOW", "HFS_WORKFLOW_PIN", "HFS_CI_TOOL_INSTALL", "HFS_APP_WORKFLOW_TRIGGER"]
@@ -4967,3 +4967,20 @@ rules:
       - {path: packages/hfs/templates/app/skeleton/.starcistacks, edition: full}
     specNa: "owner:no-runtime-specs (2026-10-17): the runtime has no specs of its own; this code is enforced by runtime code and its spec proof was a deleted runtime spec"
     witness: {status: unreachable, reason: "owner:no-runtime-specs (2026-10-17): external smoke fixtures", date: "2026-10-17"}
+  - id: R301
+    code: "CI_STANDARD"
+    law: "The managed app CI, the example apps (the reference) and the runtime repository's own workflows follow the ONE CI standard of knowledge/hfs/ci-standard.yaml (owner ruling ci-standard, 2026-10-18): the job shape fast/test/build(/sonar) with the unit run and the Codecov upload in test alone, full history with STARCI_BASE_REF written before the lint, NODE_OPTIONS --max-old-space-size=6144 on every heavy step, the Sonar lint per side, optional providers probed before they skip, a timeout on every job and every action pinned to a commit sha; the other items (candidate trigger R221, per-fe-app build env, prettier-stable renders, R299 contexts) are owned by the rules the standard names. Apps get the standard only through starci app sync."
+    kinds: [check]
+    gates: [settle, land, ci]
+    failureCodes: ["CI_STANDARD"]
+    enforcers:
+      - {kind: hfs, id: ci-standard, at: scripts/hfs/rules/ci-standard.mjs}
+      - {kind: runtime, id: ci-standard-runtime, at: scripts/hfs/runtime-rules/runtime-ci-standard.mjs}
+    editions: [lite, full]
+    docs:
+      - {path: docs/application-stacks.md#r301, editions: [lite, full]}
+    exemplifiedBy:
+      - {path: packages/hfs/templates/app/ci-workflows-lite/github/workflows/ci.yml, edition: lite}
+      - {path: packages/hfs/templates/app/ci-workflows/github/workflows/ci.yml, edition: full}
+    specNa: "owner:no-runtime-specs (2026-10-17): the runtime has no specs of its own; the scaffold e2e (e2e/hfs-scaffold-app.spec.mjs: a fresh scaffold has no finding) and the example apps prove it"
+    witness: {status: unreachable, reason: "owner:no-runtime-specs (2026-10-17): the runtime has no spec fixtures", date: "2026-10-18"}

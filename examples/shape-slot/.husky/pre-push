@@ -4,6 +4,8 @@
 #   refs/backup/*                  allowed: the coordinator backup namespace
 #   refs/heads/main, refs/tags/v*  allowed only when HEAD carries an annotated tag v[0-9]* and the release cut recorded the
 #                                  full suite of HEAD: <git common dir>/starci-release/<HEAD sha>.l4.json names that head and tag
+#   refs/heads/release/candidate-* the release candidate (starci app release push sends the release sha there first and moves main
+#                                  and the tag only when its ci.yml run is green): allowed under the same release gate, never deleted
 #   any other ref, a delete        refused
 common=$(git rev-parse --git-common-dir)
 case "$common" in /* | [A-Za-z]:*) ;; *) common="$(pwd)/$common" ;; esac
@@ -12,7 +14,7 @@ record="$common/starci-release/$head.l4.json"
 status=0
 gate=""
 refuse() {
-  echo "RIGHTS_PUSH_NOT_RELEASE: $1 - the allowed path is the release cut (main and v* tags) or refs/backup/* (backups)" >&2
+  echo "RIGHTS_PUSH_NOT_RELEASE: $1 - the allowed path is the release cut (main, v* tags and the release/candidate-* ref) or refs/backup/* (backups)" >&2
   status=1
 }
 # gate: the verdict of the release gate for HEAD, computed once: "ok" or the reason it is closed.
@@ -33,7 +35,7 @@ release_gate() {
 while read -r local_ref local_sha remote_ref remote_sha; do
   case "$remote_ref" in
     refs/backup/*) ;;
-    refs/heads/main | refs/tags/v*)
+    refs/heads/main | refs/tags/v* | refs/heads/release/candidate-*)
       case "$local_sha" in
         *[!0]*) ;;
         *) refuse "refusing to delete $remote_ref"; continue ;;

@@ -59,3 +59,17 @@ suite:
     # `starci release ci-status --wait`: how often the run is read and how long it is waited for (the workflow's own timeout is 150 minutes).
     pollSeconds: 30
     waitMinutes: 160
+
+# The candidate CI of a cut (scripts/supervisor/release-candidate.mjs; OWNER RULING candidate-ci, 2026-10-18: "never again have main receive a release whose CI is red,
+# with the owner confirming afterwards"). The release sha is pushed to <refPrefix><version> first; main and the tag move only when every workflow below has a green run
+# of that sha. The runtime's ci.yml (check + test) and examples.yml (every example's rendered CI shape) are the release proof on GitHub.
+candidate:
+  refPrefix: refs/heads/release/candidate-
+  workflows: [ci, examples]
+  # Check names read as part of the verdict (the Sonar quality gate where it reports on the sha).
+  statusPatterns: [sonar]
+  pollSeconds: 30
+  # A run that has not started after graceMinutes means a workflow does not trigger on the candidate ref: refused, not waited for.
+  graceMinutes: 10
+  # ci.yml's own job timeout is 150 minutes, examples.yml runs beside it.
+  waitMinutes: 170

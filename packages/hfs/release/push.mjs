@@ -1,11 +1,14 @@
 // push.mjs - `starci app release push`: sends the default branch and the release tag to the remote in ONE atomic push through the repository's own
 // pre-push hook (never --no-verify). It requires what the hook requires: an annotated release tag on HEAD and the L4 record of the gate for that
 // head and tag. `git push --dry-run --atomic` always runs first (the hook's verdict is the proof) and any failure refuses the push.
+// With --execute the exact sha first goes to its candidate ref refs/heads/release/candidate-<version> and the push waits for the ci.yml run of that sha
+// (candidate-ci.mjs, OWNER RULING candidate-ci 2026-10-18): only a green candidate (or the owner's sha-bound override record) moves the branch and the tag.
 import fs from 'node:fs';
 import path from 'node:path';
 import { firstLine } from '../stack/context.mjs';
 import { failure, refusal } from '../stack/errors.mjs';
 import { annotatedOnHead, git, refName, releaseDir } from './gate.mjs';
+import { candidateRef, candidateStep } from './candidate-ci.mjs';
 
 const VERDICT = /RIGHTS_PUSH_NOT_RELEASE|pre-push|failed to push|Everything up|->/u;
 
@@ -95,7 +98,9 @@ export async function releasePush(ctx, config, options = {}) {
   const red = [];
   const refs = [...branchRefs(ctx, { head, remote, branch }, red).refs, ...tagRefs(ctx, { remote, tag: gate.tag }, red)];
   data.refs = refs;
-  out.push(`plan           git push --atomic ${remote} ${refs.join(' ') || '(nothing)'}`);
+  const candidate = refs.length > 0 ? candidateRef(gate.tag, config.tagPrefix) : null;
+  if (candidate) out.push(`plan           git push ${remote} +${head.slice(0, 10)}:${candidate}, wait for its ci.yml run to be green, then git push --atomic ${remote} ${refs.join(' ')}`);
+  else out.push(`plan           git push --atomic ${remote} (nothing)`);
   if (refs.length === 0 && red.length === 0) return { ok: true, lines: [...out, `already pushed: ${remote}/${branch} holds HEAD and ${gate.tag} is on ${remote}. Nothing to do.`], data };
   if (refs.length > 0) {
     const hook = probe(ctx, remote, refs, red);
@@ -104,6 +109,10 @@ export async function releasePush(ctx, config, options = {}) {
   }
   if (red.length > 0) return refuse(out, red, data, options.execute === true ? 'nothing pushed.' : 'dry run: nothing pushed.');
   if (options.execute !== true) return { ok: true, lines: [...out, 'dry run: nothing pushed. ready; re-run with --execute.'], data };
+  const judged = await candidateStep(ctx, { head, tag: gate.tag, prefix: config.tagPrefix, remote, wait: options.candidateWait });
+  data.candidate = judged.data;
+  out.push(...judged.lines);
+  if (!judged.ok) return { ok: false, lines: [...out, `nothing pushed to ${branch} or ${gate.tag}.`], data };
   const run = git(ctx, ['push', '--atomic', remote, ...refs], { allowFail: true });
   if (run.code !== 0) return { ok: false, lines: [...out, `push failed: ${firstLine(run.stderr)}`], data };
   return { ok: true, lines: [...out, `pushed to ${remote}: ${refs.join(' ')}`], data: { ...data, pushed: true } };

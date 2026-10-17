@@ -173,7 +173,7 @@ complete -c starci -n '__starci_needs_verb reconciler' -a 'stop' -d 'stop the cu
 complete -c starci -n '__starci_needs_verb reconciler' -a 'up' -d 'bring the host services and seats up, or check them read-only, and print the checklist'
 complete -c starci -n '__starci_needs_verb release' -a 'app-installs' -d 'verify a scaffolded app against fresh registry installs'
 complete -c starci -n '__starci_needs_verb release' -a 'check' -d 'run the one read-only release readiness gate'
-complete -c starci -n '__starci_needs_verb release' -a 'ci-override' -d 'the owner accepts red CI for one SHA and records who and why'
+complete -c starci -n '__starci_needs_verb release' -a 'ci-override' -d 'the owner accepts a red candidate CI for one SHA (emergency path) and records who and why'
 complete -c starci -n '__starci_needs_verb release' -a 'ci-status' -d 'the verdict of the GitHub ci workflow, Codecov and Sonar for a release; red is recorded for Debug'
 complete -c starci -n '__starci_needs_verb release' -a 'clean-test' -d 'test published packages from fresh isolated installs'
 complete -c starci -n '__starci_needs_verb release' -a 'cut' -d 'cut the release, the only way the runtime'\''s remote main and a release tag move'

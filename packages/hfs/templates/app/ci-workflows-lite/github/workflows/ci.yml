@@ -1,8 +1,10 @@
 {{header}}
 name: ci
 
+# The release candidate ref first (starci app release push waits for this run of the release sha before the branch and the tag move), then the tag.
 on:
   push:
+    branches: ["release/candidate-*"]
     tags: ["v*"]
   workflow_dispatch:
 

@@ -62,7 +62,7 @@ rules:
   - id: REPO-TOOLING-7
     title: Workflows deploy a protected release with pinned tools
     kind: mandatory
-    hfsRules: [R251, R271, R298, R299]
+    hfsRules: [R251, R271, R298, R299, R301]
     requirement: |
       App workflows start only from v-prefixed release tags or workflow_dispatch. The semantic version in a release tag
       equals the root package version, the images workflow publishes that release tag, and database deployment refuses
@@ -90,6 +90,7 @@ rules:
         - HFS_DB_DEPLOY_UNGUARDED
         - CI_DECLARATION_DRIFT
         - HFS_WORKFLOW_CONTEXT
+        - CI_STANDARD
       manual: []
     relatedExamples: []
   - id: REPO-TOOLING-8

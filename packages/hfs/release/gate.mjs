@@ -10,7 +10,6 @@ import { isPlainObject as plain } from '../runtime/engine/plain-object.mjs';
 import { qualityServices } from '../runtime/scripts/hfs/ci-declaration.mjs';
 import { firstLine, lines, tool } from '../stack/context.mjs';
 import { failure, refusal } from '../stack/errors.mjs';
-import { latestDefaultBranchCi, requireGreenCi } from './ci-red.mjs';
 
 export const RELEASE_CODE = 'RELEASE_CONFIG_INVALID';
 const SONAR_UNREACHABLE = 'SONAR_UNREACHABLE';
@@ -346,14 +345,14 @@ function summaryOf(result) {
  */
 export async function releaseGate(ctx, config, options = {}) {
   if (options.sonar) config = { ...config, gates: [...config.gates.filter((gate) => gate.name !== 'sonar'), sonarGate(config.services, ctx.env)] };
-  const ci = latestDefaultBranchCi({ spawn: ctx.spawn, cwd: ctx.cwd, defaultBranch: config.defaultBranch });
-  const ciLines = requireGreenCi(ctx, ci);
+  // The CI verdict of a release is the candidate run of its own sha, judged by `starci app release push` (candidate-ci.mjs, OWNER RULING candidate-ci 2026-10-18):
+  // the gate no longer refuses over the latest default-branch run.
   const facts = inspect(ctx, config, options);
   const common = releaseDir(ctx);
   const recordPath = path.join(common, `${facts.head}.l4.json`);
   const dir = path.join(common, facts.head.slice(0, 12));
-  const plan = [...ciLines, ...facts.out, ...planLines(config, facts, dir, recordPath)];
-  const base = { head: facts.head, tag: facts.chosen.tag, record: recordPath, gates: config.gates.map((gate) => gate.name), ci: { state: ci.state, notices: ciLines } };
+  const plan = [...facts.out, ...planLines(config, facts, dir, recordPath)];
+  const base = { head: facts.head, tag: facts.chosen.tag, record: recordPath, gates: config.gates.map((gate) => gate.name) };
   if (facts.red.length > 0) return { ok: false, lines: [...plan, ...facts.red.map((item) => `RED: ${item}`), 'nothing was run.'], data: { ...base, red: facts.red, executed: false } };
   if (options.execute !== true) return { ok: true, lines: [...plan, '', 'dry run: no gate was run, nothing written. preconditions OK.'], data: { ...base, red: [], executed: false } };
   const results = await runAll(ctx, config, { dir, platform: options.platform ?? process.platform });

@@ -68,18 +68,27 @@ function hasAgeIdentity(job, doc) {
   return steps.some((step) => strings(step.with).some((value) => reference.test(value)) || (typeof step.run === 'string' && reference.test(executable(step.run))));
 }
 
-function triggerFindings(doc, refuse) {
+/** The release candidate branches (OWNER RULING candidate-ci, 2026-10-18): `starci app release push` waits for the ci.yml run of the release sha there. */
+const CANDIDATE_BRANCHES = 'release/candidate-*';
+const pushFilterValid = (options) => record(options) && Object.keys(options).length > 0 && Object.keys(options).every((key) => key === 'tags' || key === 'branches')
+  && (options.tags === undefined || (Array.isArray(options.tags) && options.tags.length === 1 && options.tags[0] === 'v*'))
+  && (options.branches === undefined || (Array.isArray(options.branches) && options.branches.length === 1 && options.branches[0] === CANDIDATE_BRANCHES));
+
+function triggerFindings(doc, refuse, file = '') {
   const on = workflowEventOptions(doc.on);
   if (!record(on) || !Object.keys(on).length) return [refuse(TRIGGER, 'declare release tags [v*] and/or workflow_dispatch')];
   const findings = [];
+  if (/(^|\/)ci\.ya?ml$/.test(file) && !(record(on.push) && Array.isArray(on.push.branches) && on.push.branches.includes(CANDIDATE_BRANCHES))) {
+    findings.push(refuse(TRIGGER, `the release CI must run on push of branches ['${CANDIDATE_BRANCHES}']: starci app release push waits for that run (starci app sync renders it)`));
+  }
   for (const [event, options] of Object.entries(on)) {
     if (event === 'workflow_dispatch') continue;
     if (event !== 'push') {
-      findings.push(refuse(TRIGGER, `trigger ${event} is forbidden; app CI starts only on release tags [v*] or workflow_dispatch`));
+      findings.push(refuse(TRIGGER, `trigger ${event} is forbidden; app CI starts only on release tags [v*], the release candidate branches or workflow_dispatch`));
       continue;
     }
-    if (!record(options) || !Array.isArray(options.tags) || options.tags.length !== 1 || options.tags[0] !== 'v*' || Object.keys(options).some((key) => key !== 'tags')) {
-      findings.push(refuse(TRIGGER, 'push must contain only tags: [v*]; branch and path filters are forbidden'));
+    if (!pushFilterValid(options)) {
+      findings.push(refuse(TRIGGER, `push may contain only tags: [v*] and branches: ['${CANDIDATE_BRANCHES}']; other branch and path filters are forbidden`));
     }
   }
   return findings;
@@ -197,7 +206,7 @@ function perWorkflow({ path: file, text }) {
   const refuse = (code, message) => found(code, file, `${code} ${file}: ${message}`);
   const doc = parseWorkflow(text);
   if (!record(doc)) return [refuse(TRIGGER, 'the workflow must be valid YAML with a release-only on block'), ...(deployName(file) ? [refuse(DEPLOY, 'the deploy workflow must be valid YAML')] : [])];
-  return [...triggerFindings(doc, refuse), ...deploymentFindings(doc, file, refuse), ...toolFindings(doc, refuse)];
+  return [...triggerFindings(doc, refuse, file), ...deploymentFindings(doc, file, refuse), ...toolFindings(doc, refuse)];
 }
 
 /** Synchronous R251 findings over the tracked workflows of a lite/full app. */

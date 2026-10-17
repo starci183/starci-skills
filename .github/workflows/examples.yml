@@ -5,6 +5,8 @@ name: examples
 # kind app (scripts/checks/check-examples-ci.mjs --matrix), and the `app` job runs once per entry. npm run check refuses a hand-written
 # list, a per-example root workflow and a root codecov.yml that lacks a flag for an app (scripts/checks/check-examples-ci.mjs).
 #
+# The release candidate: a push of release/candidate-<version> runs the same automatic steps as the tag push (no Codecov or Sonar upload), and
+# `starci release cut` waits for that run of the release sha before main and the tag move (OWNER RULING candidate-ci, 2026-10-18).
 # Two triggers, one workflow (owner ruling: e2e runs manually only; rule CI_TRIGGERS_RELEASE_ONLY: CI runs once per release):
 #   push of a v* tag      per app: install, typecheck (tsc over be, then turbo over the fe workspaces), starci app lint (with the Sonar import file),
 #                         the unit project with coverage (per-file 100 on the logic of be/src/modules/**; it writes be/coverage/lcov.info), the Codecov
@@ -26,6 +28,7 @@ name: examples
 
 on:
   push:
+    branches: ['release/candidate-*']
     tags: ['v*']
   workflow_dispatch:
     inputs:

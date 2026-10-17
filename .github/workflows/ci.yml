@@ -6,8 +6,10 @@ name: ci
 # line the engines field requires. The runtime has no specs of its own and measures no coverage of its own (owner ruling no-runtime-specs,
 # 2026-10-17: "Tests in packages/ and examples/ stay; the .claude runtime's own specs are removed entirely; delete codecov. Real tests
 # (package clean-test + scaffold e2e) decide."; Codecov stays for the examples, uploaded by examples.yml). It runs on every push to main,
-# on the push of a v* tag and when a person dispatches it, never on another branch or a pull request (docs/git-governance.md, rule
-# CI_TRIGGERS_RELEASE_ONLY): the release flow runs the same rows locally first.
+# on the push of a v* tag, on the push of a release candidate ref release/candidate-<version> and when a person dispatches it, never on
+# another branch or a pull request (docs/git-governance.md, rule CI_TRIGGERS_RELEASE_ONLY): the release flow runs the same rows locally first,
+# then `starci release cut` pushes the release sha to its candidate ref and moves main and the tag only when this run (and examples.yml) of that
+# sha is green (OWNER RULING candidate-ci, 2026-10-18). A candidate run is check + test only: Sonar stays on main, the GitHub Release on the tag.
 # Sonar (project starci-runtime, the root sonar-project.properties) analyses the runtime source in the runs of the branch main (a main push, or a
 # dispatch of main): SonarCloud names an analysis after the checked-out ref, so a tag run would open a branch named after the tag, and the commit of
 # a release tag was already scanned by the main push that carried it. The runtime is analysed on SonarCloud (https://sonarcloud.io, fixed in this
@@ -18,7 +20,7 @@ name: ci
 
 on:
   push:
-    branches: [main]
+    branches: [main, 'release/candidate-*']
     tags: ['v*']
   workflow_dispatch:
 

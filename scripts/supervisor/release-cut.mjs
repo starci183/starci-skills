@@ -10,7 +10,11 @@
 //      `--rows` re-runs named rows alone on the same commit, `--no-reuse` runs every row;
 //      every skipped test is reported with its reason, and a skip from missing infrastructure (or any skip but the declared browser ones) fails L4;
 //   5. main did not move meanwhile; the pushed range passes the secret scan;
-//   6. the ANNOTATED tag is created on HEAD with the CHANGELOG section as its message, and main and the tag are pushed together, atomically: both refs move or neither does.
+//   6. the CANDIDATE CI (scripts/supervisor/release-candidate.mjs, OWNER RULING candidate-ci 2026-10-18): HEAD is pushed to refs/heads/release/candidate-<version> and the cut waits for
+//      every required workflow run of that exact sha; red (the failing jobs named), timeout or unreadable refuses and nothing reaches main (the candidate ref stays for diagnosis;
+//      a re-cut force-moves only it). The owner's sha-bound ci-override record is the one documented emergency path, and the release record logs its use;
+//   7. only then the ANNOTATED tag is created on HEAD with the CHANGELOG section as its message (after the candidate, so a red candidate leaves no tag and the same version can be
+//      cut again on the fix), and main and the tag are pushed together, atomically: both refs move or neither does.
 // The push lock: a remote whose pushurl reads `DISABLED...` (the owner's lock while lands stay local) is pushed through its fetch url for this one push, without writing the config (pushLiftTarget).
 // Exported function only: the CLI exposes it as `starci release cut`. Git goes through the scripts/api/git call files the CLI's git verbs use. Never stashes, resets, deletes or moves a tag, never pushes anything but main and that tag.
 // The heavy part (the suite and the push) runs under the host lock (scripts/machine/host-lock.mjs, role release): a held lock refuses the cut and names its owner.
@@ -40,6 +44,7 @@ import { writeL4Record } from '../guards/release-record.mjs';
 import { suiteModeOf } from '../guards/release-suite-mode.mjs';
 import { writeCiRecord } from './release-ci-status.mjs';
 import { advanceLocalMain } from '../machine/local-main.mjs';
+import { candidateCi } from './release-candidate.mjs';
 
 /** A release tag: `v` and a version. Anything else is never pushed by the release flow. */
 const RELEASE_TAG = /^v\d[\w.+-]*$/;
@@ -151,15 +156,36 @@ async function releaseSuite({ repo, deps, out, refuse, lock, selection, tag }) {
   return { steps };
 }
 
-/** The result of a release that moved: leaves the pending CI record of the commit and names the command that reads CI's verdict (the suite itself under `suite: ci`). */
-function pushedResult({ out, repo, head, tag, branch, remote, mode, deps }) {
-  (deps.writeCi ?? writeCiRecord)({ repo, head, tag, suite: mode, state: 'pending' });
+/** The result of a release that moved: leaves the CI record of the commit (green: its candidate CI judged this very sha before main moved) and names the command that reads the tag run. */
+function pushedResult({ out, repo, head, tag, branch, remote, mode, deps, candidate }) {
+  const state = candidate?.verdict === 'candidate-green' ? 'green' : 'pending';
+  (deps.writeCi ?? writeCiRecord)({ repo, head, tag, suite: mode, state, runs: (candidate?.workflows ?? []).map((w) => ({ id: w.run?.databaseId ?? null, status: w.run?.status ?? null, conclusion: w.run?.conclusion ?? null, event: w.run?.event ?? null, url: w.run?.url ?? null })) });
   const watch = `starci release ci-status --tag ${tag} --wait`;
-  const judged = mode === 'ci' ? `; the full suite now runs only on GitHub (suite: ci) - watch it: ${watch}` : `; CI runs next - ${watch}`;
+  const judged = `; the candidate CI of this sha was ${candidate?.verdict === 'candidate-green' ? 'green' : 'red under the owner override'} on ${candidate?.ref} before main moved - the tag run: ${watch}`;
   // The pushed commit is on origin/main now: a local main left behind (a shared repository, another checkout) is fast-forwarded to it when that is safe.
   const mainAdvance = (deps.advanceMain ?? advanceLocalMain)({ root: repo, to: head, branch, remote });
   const moved = mainAdvance.moved ? '; ' + mainAdvance.why : '';
   return { ...out, ok: true, verdict: 'pushed', why: `${branch} and ${tag} pushed to ${remote} in one atomic push${judged}${moved}`, pushed: true, ciWatch: watch, mainAdvance };
+}
+
+/** The checkout did not move: HEAD is still `head` and no tracked file changed. */
+const unmoved = (run, cwd, head) => run(['rev-parse', 'HEAD'], { cwd }).stdout === head && !run(['status', '--porcelain', '--untracked-files=no'], { cwd }).stdout;
+
+/**
+ * What must hold after the suite and before the tag: the checkout did not move, the pushed range passes the secret scan, and the CANDIDATE CI of the exact sha is green
+ * (scripts/supervisor/release-candidate.mjs, OWNER RULING candidate-ci 2026-10-18). {refusal} or {lifted, candidate}; out.candidate records the verdict.
+ */
+async function candidateGate({ repo, run, cwd, head, remote, branch, tag, deps, out, refuse }) {
+  if (!unmoved(run, cwd, head)) return { refusal: refuse('main-moved', 'the checkout changed while the suite ran: start over') };
+  const scan = (deps.scan ?? scanRange)({ cwd, from: `${remote}/${branch}`, to: branch });
+  if (!scan.ok) return { refusal: refuse('secret-scan', scan.error ?? `${scan.findings.length} finding(s) in the pushed range`, { findings: scan.findings }) };
+  const lifted = pushLiftTarget({ pushUrl: configGet(cwd, `remote.${remote}.pushurl`).stdout, fetchUrl: configGet(cwd, `remote.${remote}.url`).stdout });
+  // Not under the host lock: the wait runs nothing heavy here, and other heavy runs on this host must not queue behind GitHub for up to waitMinutes.
+  const candidate = await (deps.candidate ?? candidateCi)({ repo, remote, pushTarget: lifted, head, tag, deps: deps.candidateDeps ?? {} });
+  out.candidate = { ref: candidate.ref ?? null, verdict: candidate.verdict, workflows: candidate.workflows ?? [], failing: candidate.failing ?? [], override: candidate.override ?? null };
+  if (!candidate.ok) return { refusal: refuse(candidate.verdict, candidate.why) };
+  if (!unmoved(run, cwd, head)) return { refusal: refuse('main-moved', 'the checkout changed while the candidate CI ran: start over') };
+  return { lifted, candidate };
 }
 
 /**
@@ -194,9 +220,9 @@ export async function cutRelease({ repo, remote = 'origin', branch = 'main', tag
   if (suiteResult.refusal) return suiteResult.refusal;
   const { steps } = suiteResult;
 
-  if (run(['rev-parse', 'HEAD'], { cwd }).stdout !== head || run(['status', '--porcelain', '--untracked-files=no'], { cwd }).stdout) return refuse('main-moved', 'the checkout changed while the suite ran: start over');
-  const scan = (deps.scan ?? scanRange)({ cwd, from: `${remote}/${branch}`, to: branch });
-  if (!scan.ok) return refuse('secret-scan', scan.error ?? `${scan.findings.length} finding(s) in the pushed range`, { findings: scan.findings });
+  const judged = await candidateGate({ repo, run, cwd, head, remote, branch, tag, deps, out, refuse });
+  if (judged.refusal) return judged.refusal;
+  const { lifted, candidate } = judged;
 
   if (!local) {
     const made = run(['tag', '-a', tag, '--cleanup=verbatim', '-F', '-'], { cwd, input: changelogSection(changelog, tag.slice(1)).body });
@@ -206,13 +232,12 @@ export async function cutRelease({ repo, remote = 'origin', branch = 'main', tag
   const refs = [branch, `refs/tags/${tag}`];
   const refusal = pushRefusal({ refs });
   if (refusal) return refuse('push-refused', refusal);
-  const recorded = (deps.recordL4 ?? writeL4Record)({ repo, head, tag, logs: steps.filter((s) => !s.absent), suite: mode, delegated: selection.plan.delegated });
+  const recorded = (deps.recordL4 ?? writeL4Record)({ repo, head, tag, logs: steps.filter((s) => !s.absent), suite: mode, delegated: selection.plan.delegated, candidate: out.candidate });
   if (!recorded.ok) return refuse('l4-record', `the L4 record of ${head.slice(0, 9)} could not be written (${recorded.reason}): the pre-push gate would refuse the push`);
   out.l4Record = recorded.file ?? null;
-  const lifted = pushLiftTarget({ pushUrl: configGet(cwd, `remote.${remote}.pushurl`).stdout, fetchUrl: configGet(cwd, `remote.${remote}.url`).stdout });
   const pushed = await lock(() => (deps.push ?? push)(['--atomic', lifted ?? remote, ...refs], { cwd, timeout: 600_000 }));
   if (heldBy(pushed)) return refuse('host-lock-held', heldWhy(heldBy(pushed)));
   if (pushed.status !== 0) return refuse('push-refused', `the atomic push of ${refs.join(' and ')} to ${remote} failed (the local tag stays, nothing moved on the remote): ${String(pushed.stderr ?? '').trim().slice(0, 300)}`);
   if (lifted) updateRef(cwd, `refs/remotes/${remote}/${branch}`, head, { message: `release push of ${tag}` });
-  return pushedResult({ out, repo, head, tag, branch, remote, mode, deps });
+  return pushedResult({ out, repo, head, tag, branch, remote, mode, deps, candidate });
 }

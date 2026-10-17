@@ -33,6 +33,7 @@ import { apiShapeFindings } from './runtime-rules/api-shape.mjs';
 import { basePureFindings } from './runtime-rules/base-pure.mjs';
 import { ciUploadFindings } from './runtime-rules/ci-upload.mjs';
 import { gitTriggerFindings } from './runtime-rules/git-triggers.mjs';
+import { runtimeCiStandardFindings } from './runtime-rules/runtime-ci-standard.mjs';
 import { releaseNotesRepoFindings } from './runtime-rules/release-notes.mjs';
 import { controlCharFindings } from './runtime-rules/control-chars.mjs';
 import { prosePathFindings } from './runtime-rules/prose-path.mjs';
@@ -145,6 +146,7 @@ export function runtimeCheck({ repoRoot = skillRoot, root = skillRoot, files, tr
     ...proseRestateFindings(ctx),
     ...ciUploadFindings(ctx),
     ...gitTriggerFindings(ctx),
+    ...runtimeCiStandardFindings(ctx),
     ...releaseNotesRepoFindings(ctx),
     ...hookShapeFindings(ctx),
     ...rightsPolicyFindings(ctx),

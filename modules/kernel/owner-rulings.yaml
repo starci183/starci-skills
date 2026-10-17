@@ -578,6 +578,34 @@ rulings:
     supersedes: []
     enforcedBy: [packages/hfs/sync/ci-commands.mjs, packages/hfs/release/gate.mjs]
 
+  - id: candidate-ci
+    date: '2026-10-18'
+    source: "the owner in chat to main, relayed to the a22 lead"
+    ruling: >-
+      Fix the root cause, and never again have main receive a release whose CI is red, with the owner confirming afterwards. `release cut` (canon) and
+      `app release push` (apps) first push the exact release sha to a candidate ref (refs/heads/release/candidate-<version>, allowed by the pre-push policy),
+      wait for the full GitHub CI on THAT sha to be green (polling via gh, with a timeout), and only then move main and the tag atomically to the same sha.
+      Red or timeout means nothing reaches main; report the failing jobs. The "latest main CI red" refusal becomes: is the candidate CI for this sha green.
+      ci-override stays only as a documented emergency path (a sha-bound owner record, never written by agents, logged in the release record). The rendered
+      app ci.yml triggers on the candidate branch pattern. alpha.22 itself is released through the candidate flow. Main's rulings (2026-10-18): the alpha.21
+      ci-override step is dropped (the alpha.22 cut is judged by its own candidate CI); the app gate's default-branch CI refusal is dropped; a red candidate
+      keeps its ref for diagnosis, a re-cut of the same version force-moves only the candidate ref, never main; after a cut the candidate ref is left, documented.
+    supersedes: []
+    enforcedBy: [scripts/supervisor/release-candidate.mjs, scripts/supervisor/release-cut.mjs, scripts/supervisor/release-cut-plan.mjs, scripts/guards/release-push-gate.mjs, scripts/hfs/runtime-rules/git-triggers.mjs, packages/hfs/release/candidate-ci.mjs, packages/hfs/release/push.mjs, packages/hfs/templates/app/hooks/husky/pre-push]
+
+  - id: ci-standard
+    date: '2026-10-18'
+    source: "the owner in chat to main, relayed to the a22 lead"
+    ruling: >-
+      .claude defines ONE standard CI ruleset, its own CI and the examples follow it, and apps (NIVO) inherit it. The standard is written as canon rules in one
+      place (knowledge and the rule catalog): the job shape fast/test/build/sonar, full history with STARCI_BASE_REF, a heap per heavy step, the per-fe-app build env,
+      optional providers with probe and skip, timeouts, sha-pinned actions, prettier-stable renders, R299 context validity and the candidate-branch trigger.
+      The runtime's own workflows satisfy the same rules (rendered from the same source or checked by the same rule set); the examples are the reference and
+      each example's rendered CI runs green on GitHub through the candidate flow as part of the release proof; apps get it only via starci app sync, and app
+      check refuses drift.
+    supersedes: []
+    enforcedBy: [knowledge/hfs/ci-standard.yaml, scripts/hfs/runtime-rules/runtime-ci-standard.mjs]
+
 supersedes:
   'ruling:R212/case-2': ['ruling:R212/case-1']
   'ruling:R212/case-4': ['ruling:R212/case-1', 'ruling:R212/case-2']

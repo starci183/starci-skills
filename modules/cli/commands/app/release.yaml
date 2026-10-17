@@ -19,14 +19,15 @@ conventions:
   - "declared release.gates gets audit appended if missing"
   - "--sonar appends @sonar/scan@4.3.0 against services.sonar.host (host.public for a host mapping), plus organization for sonarcloud;"
   - "disabled or unavailable Sonar or an unset token refuses RELEASE_SONAR_UNAVAILABLE"
-  - "gate checks the newest completed ci.yml run on the default branch, including reachable push/tag runs;"
-  - "failure, cancelled or timed_out refuses RELEASE_CI_RED with its URL and SHA;"
-  - "unreadable GitHub or no run warns RELEASE_CI_UNKNOWN and continues"
-  - "only the owner's starci release ci-override --sha <sha> --reason <text> record can override red CI; there is no --no-ci-check flag"
+  - "OWNER RULING candidate-ci (2026-10-18): the gate no longer reads the default-branch CI; the verdict is the candidate run of the sha"
+  - "push --execute sends HEAD to refs/heads/release/candidate-<version> first and waits for its ci.yml run (it triggers on release/candidate-*)"
+  - "green moves the branch and the tag in one atomic push; red refuses RELEASE_CANDIDATE_CI_RED naming the failing jobs"
+  - "no run, or no end in time, refuses RELEASE_CANDIDATE_CI_TIMEOUT; unreadable GitHub refuses RELEASE_CI_UNKNOWN; nothing reaches the branch"
+  - "only the owner's starci release ci-override --sha <sha> --reason <text> record lets a red candidate through; there is no --no-ci-check flag"
   - "gate refuses a dirty tree, HEAD other than --source, a moved HEAD and a tree dirtied by the gates; record and tag only when all gates are green"
   - "a gate with summary jest is red on failed tests and on a coverage threshold miss even when the process exits 0"
   - "push needs the annotated tag and L4 record of HEAD, runs git push --dry-run --atomic first and never uses --no-verify"
-exit: {"0": gate green or push done or nothing to do, "1": a gate is red or the push was refused by the hook, "2": "refusal or bad usage including RELEASE_CI_RED and RELEASE_SONAR_UNAVAILABLE"}
+exit: {"0": gate green or push done or nothing to do, "1": "a gate is red, the candidate CI of the sha is not green, or the push was refused by the hook", "2": "refusal or bad usage including RELEASE_SONAR_UNAVAILABLE"}
 json: flag
 examples:
   - starci app release gate

@@ -1,4 +1,5 @@
 // release-cut-plan.mjs - the two read-only looks of the release cut at what a release needs, before any suite runs:
+//   ciPreflight         the workflows the candidate CI step waits for are readable on GitHub (the verdict is the candidate run of the sha, release-candidate.mjs).
 //   definitionRefusal   the release definition (scripts/guards/release-definition.mjs) as far as it can hold before the cut has run anything:
 //                       the version moved past the remote main's, the dated CHANGELOG section. The tag and the L4 record come from the cut itself.
 //   sonarCloudRefusal    SonarCloud as far as the Sonar proofs need it (scripts/supervisor/release-sonarcloud.mjs): refused in seconds, before a 40-minute suite, when SONAR_TOKEN or SONAR_ORGANIZATION is absent, the token is rejected or the API is unreachable.
@@ -13,22 +14,24 @@ import { buildPlan, planSummary } from '../gates/release-plan.mjs';
 import { npmRegistry } from '../gates/release-registry.mjs';
 import { leftoversRefusal } from '../gates/release-leftovers.mjs';
 import { workflowRuns } from '../api/gh/workflow-runs.mjs';
-import { ciPolicy } from './release-ci-rows.mjs';
-import { readCiOverride } from './release-ci-override.mjs';
+import { candidatePolicy } from './release-candidate.mjs';
 
-/** A cut requires the newest completed main CI run to succeed, or both owner override proofs for that run's SHA; unreadable CI never permits a cut. */
+/**
+ * The CI the cut will wait for must be readable before an hour-long suite: every workflow the candidate step requires (modules/supervisor/release-cut.yaml candidate.workflows)
+ * answers `gh run list`. The verdict itself is the candidate CI of the exact sha being cut (scripts/supervisor/release-candidate.mjs, OWNER RULING candidate-ci 2026-10-18), no longer
+ * the latest run on main: a red main no longer needs an owner override before the next release, and a red candidate never reaches main.
+ */
 function ciPreflight({ repo, deps = {} }) {
-  try {
-    const reply = (deps.workflowRuns ?? workflowRuns)({ workflow: ciPolicy().workflow, branch: 'main', status: 'completed', limit: 1 }, { cwd: repo });
-    const runs = reply.status === 0 ? JSON.parse(reply.stdout) : null;
-    const run = Array.isArray(runs) ? runs[0] : null;
-    if (!run || run.status !== 'completed' || !/^[a-f0-9]{40}$/.test(run.headSha) || !run.url || !run.conclusion) throw new Error('no readable completed CI run on main');
-    if (run.conclusion === 'success') return null;
-    if (readCiOverride({ repo, sha: run.headSha, commonDir: deps.commonDir, requireRuling: true })) return null;
-    return { verdict: 'RELEASE_CI_RED', why: `RELEASE_CI_RED: latest completed main CI is ${run.conclusion}: ${run.url} headSha ${run.headSha}; the owner may use starci release ci-override`, findings: [] };
-  } catch {
-    return { verdict: 'RELEASE_CI_UNKNOWN', why: 'RELEASE_CI_UNKNOWN: cannot read the latest completed main CI run; a cut must not proceed blind', findings: [] };
+  const unknown = (why) => ({ verdict: 'RELEASE_CI_UNKNOWN', why: `RELEASE_CI_UNKNOWN: ${why}; a cut must not proceed blind`, findings: [] });
+  for (const workflow of (deps.candidatePolicy ?? candidatePolicy)().workflows) {
+    try {
+      const reply = (deps.workflowRuns ?? workflowRuns)({ workflow, limit: 1 }, { cwd: repo });
+      if (reply.status !== 0 || !Array.isArray(JSON.parse(reply.stdout))) return unknown(`cannot read the runs of the ${workflow} workflow the candidate CI waits for`);
+    } catch {
+      return unknown(`cannot read the runs of the ${workflow} workflow the candidate CI waits for`);
+    }
   }
+  return null;
 }
 
 /** The head the remote main points at ('' for a remote with no main), or null when the remote cannot be read. */
@@ -62,7 +65,7 @@ export function publishPlanRefusal({ repo, deps = {} }) {
   return { verdict: 'publish-plan', why: `the publish plan (starci release check) is not clean: ${findings.join('; ')}`, findings };
 }
 
-/** The refusal of a cut before any suite runs: latest completed main CI, leftovers in the checkout, the release definition, the publish plan, then SonarCloud (only when a Sonar proof will run); null when none refuses. */
+/** The refusal of a cut before any suite runs: the candidate CI readable, leftovers in the checkout, the release definition, the publish plan, then SonarCloud (only when a Sonar proof will run); null when none refuses. */
 export async function preSuiteRefusal({ repo, run, cwd, head, remote, branch, tag, deps = {}, sonar = true }) {
   return ciPreflight({ repo, deps }) ?? leftoversRefusal({ repo, deps }) ?? definitionRefusal({ run, cwd, head, remote, branch, tag, deps }) ?? publishPlanRefusal({ repo, deps }) ?? (sonar ? await sonarCloudRefusal({ repo, deps }) : null);
 }
@@ -76,5 +79,5 @@ export function planOf({ head, tag, remote, branch, out, selection }) {
   const named = delegated.map((row) => [row.name, row.why].join(': ')).join('; ');
   const suite = l4.mode === 'ci' ? `suite: ci - delegated to CI (${named}); the record lists them as delegated, never green. ` : 'suite: local. ';
   return { ...out, ok: true, verdict: 'plan', head, tag, suiteMode: l4.mode, steps: selection.names, rows, notPlanned: l4.notPlanned, receiptSteps: [...RECEIPT_STEPS],
-    why: `${suite}would run ${running.length} of ${rows.length - delegated.length} row(s) on ${head.slice(0, 9)} under the host lock (${rows.length - delegated.length - running.length} stand in from green runs, listed in rows), write the release record of that commit (rows RUN on it, never reused: ${RECEIPT_STEPS.join(', ')}), create the annotated tag ${tag}, and push ${branch} with it to ${remote} in one atomic push; nothing was run, tagged or pushed` };
+    why: `${suite}would run ${running.length} of ${rows.length - delegated.length} row(s) on ${head.slice(0, 9)} under the host lock (${rows.length - delegated.length - running.length} stand in from green runs, listed in rows), write the release record of that commit (rows RUN on it, never reused: ${RECEIPT_STEPS.join(', ')}), push ${head.slice(0, 9)} to the candidate ref of ${tag} and wait for its CI (${candidatePolicy().workflows.join(', ')}) to be green, then create the annotated tag ${tag} and push ${branch} with it to ${remote} in one atomic push; nothing was run, tagged or pushed` };
 }

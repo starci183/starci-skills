@@ -8,7 +8,7 @@ runtime's one git layer, and `starci release cut`); this page shows no raw git c
 
 | Rule | Code | What it refuses |
 |---|---|---|
-| R221 | `CI_TRIGGERS_RELEASE_ONLY` | a workflow trigger other than a push of release tags `v*`, a person dispatching it and, in the runtime's own workflows, a push to `main`; an example or an app template takes the tag and the dispatch only |
+| R221 | `CI_TRIGGERS_RELEASE_ONLY` | a workflow trigger other than a push of release tags `v*`, of release candidate branches `release/candidate-*`, a person dispatching it and, in the runtime's own workflows, a push to `main`; an example or an app template takes the tag, the candidate and the dispatch only; a `ci.yml` without the candidate trigger |
 | R222 | `RELEASE_NOTES` | a release tag on HEAD whose CHANGELOG section is missing or still holds TODO, PENDING or TBD |
 
 The release flow is `scripts/supervisor/release-cut.mjs` (`cutRelease`), exposed by the CLI as `starci release cut --tag v<version>`. It is the only way the remote main of the runtime and a release tag move (the pre-push hook of the runtime repository refuses every other push of them), and
@@ -23,12 +23,15 @@ it uses the same git call files as the CLI's git verbs, never a git process of i
    2. One release commit: the version bump and the CHANGELOG section (generated from the land merge commits, finished by a person).
    3. Publish the packages from that commit, re-pin the examples, commit.
    4. `starci release cut --tag v<version>` (`--plan` first: it reports what the cut would run and require, and runs, tags and pushes nothing): it checks the notes (R222) and the release definition as far as it holds before the rows, runs L4 once (the full row of the [test ladder](source-process.md): the packages suites, the scaffold e2e, lint, checks, tsc, the
-      example installs, proofs and images, and the Linux-parity step: the light CI jobs run once in a Linux container on this host before the push, so the first GitHub run is not the first Linux run; each step to a recorded log; a skip caused by missing infrastructure fails it), makes sure main did not move, scans the pushed range, creates the
-      ANNOTATED tag on the release commit with the CHANGELOG section as its message, and pushes main and the tag atomically.
+      example installs, proofs and images, and the Linux-parity step: the light CI jobs run once in a Linux container on this host before the push, so the first GitHub run is not the first Linux run; each step to a recorded log; a skip caused by missing infrastructure fails it), makes sure main did not move, scans the pushed range, pushes the release commit to its CANDIDATE ref
+      `refs/heads/release/candidate-<version>` and waits for the `ci` and `examples` workflow runs of that exact sha (OWNER RULING candidate-ci, 2026-10-18: never again does main
+      receive a release whose CI is red), and only when they are green creates the ANNOTATED tag on the release commit with the CHANGELOG section as its message and pushes main
+      and the tag atomically. A red candidate names its failing jobs and keeps its ref for diagnosis; a re-cut of the same version force-moves only the candidate ref, never main.
+      The owner's sha-bound `starci release ci-override` record is the one documented emergency path; the release record logs its use. After a cut the candidate ref is left on the remote.
    5. Linux parity before the push: the CI jobs run locally on Linux, because every local gate runs on the author's machine and CI does not.
    6. CI runs on the release push of main and on the tag; the `github-release` job of `ci.yml` makes the GitHub Release from the CHANGELOG section (`starci release notes --tag <v*>`), marked a pre-release when the version has a pre-release part.
-4. **CI triggers** of the runtime are a push to `main`, a push of `v*` tags and `workflow_dispatch`, nothing else (R221): no other branch, no pull request. One concurrency group per ref; a newer
-   push to main cancels the older main run, a tag run is never cancelled. Codecov takes the coverage of every run; Sonar scans the runs of `main` (a main push or a dispatch of main), since the commit of a release tag is the commit the main push already scanned. The hfs app CI templates (the CI and images workflows; the e2e workflow stays manual) take a push of `v*` tags and `workflow_dispatch` only, so every scaffolded app runs CI once per release.
+4. **CI triggers** of the runtime are a push to `main`, a push of a release candidate ref `release/candidate-*`, a push of `v*` tags and `workflow_dispatch`, nothing else (R221): no other branch, no pull request; every `ci.yml` (and the runtime's `examples.yml`) must run on the candidate refs. One concurrency group per ref; a newer
+   push to main cancels the older main run, a tag run is never cancelled. Codecov takes the coverage of every run; Sonar scans the runs of `main` (a main push or a dispatch of main), since the commit of a release tag is the commit the main push already scanned. The hfs app CI templates (the CI and images workflows; the e2e workflow stays manual) take a push of `v*` tags and `workflow_dispatch`, and the CI workflow also a push of `release/candidate-*`: `starci app release push` sends the release sha there first and moves the branch and the tag only when that run is green.
 5. **Tags** on the remote are release tags only, annotated, and never moved or deleted. A housekeeping mark (a pre-rebase backup, a merge marker, a salvage
    snapshot) is a ref under `refs/backup/` or `refs/salvage/`, never a tag, and is never pushed as one.
 6. **Release notes** are the CHANGELOG section of the tag: Added, Changed, Removed, Fixed, Known limitations, and Evidence (land shas, the L4 logs, the CI run, the
@@ -53,6 +56,7 @@ Every commit message is `type(scope): summary` with one of the types `feat`, `fi
 - an L4 step is red or absent, or a test executed in no leg: every test must have passed on the host run or in the Linux container run, a skip that passed in the other leg is listed with the leg
   where it passed, and a skip nothing covered (missing infrastructure, a platform no leg has, any undeclared skip) fails L4, except the declared browser-conditional ones, which are listed by name;
 - main moved while L4 ran, or the pushed range holds a secret;
+- the candidate CI of the release sha is red (`RELEASE_CANDIDATE_CI_RED`, with the failing jobs and steps), did not start or end in time (`RELEASE_CANDIDATE_CI_TIMEOUT`), or GitHub cannot be read (`RELEASE_CI_UNKNOWN`);
 - the remote refuses either ref (the push is atomic).
 
 A parked remote is not a refusal: the owner may park the remote's push url (a `pushurl` that reads `DISABLED-<reason>`) so that nothing but the release can push. The release cut pushes through the remote's fetch url for its one push, moves the remote-tracking ref itself and never writes the configuration; any other push url is the owner's choice and is used as set.
@@ -69,7 +73,7 @@ bisection over them cheap, and a red found after the push is fixed forward with 
 
 ## R221
 
-`CI_TRIGGERS_RELEASE_ONLY` checks the tracked workflow trigger declarations in both editions. App workflows and the managed CI templates accept release tags `v*` and manual dispatch; a branch trigger or a schedule produces the finding. Only the runtime repository's root workflows may also declare a push to `main`. The edition-specific proof exercises refused app triggers and an accepted release-tag workflow through the runtime checker.
+`CI_TRIGGERS_RELEASE_ONLY` checks the tracked workflow trigger declarations in both editions. App workflows and the managed CI templates accept release tags `v*`, the release candidate branches `release/candidate-*` and manual dispatch; another branch trigger or a schedule produces the finding. Only the runtime repository's root workflows may also declare a push to `main`. Every `ci.yml`, and the runtime's `examples.yml`, must name `release/candidate-*`: the release flows wait for that run of the release sha. The edition-specific proof exercises refused app triggers and an accepted release-tag workflow through the runtime checker.
 
 ## R222
 

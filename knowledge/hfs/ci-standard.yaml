@@ -1,0 +1,80 @@
+schema: starci/ci-standard@1
+id: ci-standard
+title: The one StarCi CI standard
+
+# OWNER RULING ci-standard (2026-10-18, modules/kernel/owner-rulings.yaml): ".claude defines ONE standard CI ruleset, its own CI and the examples follow it, and apps
+# inherit it." This file is the one place that standard is written. Each item names what it requires, the workflows it covers and what enforces it:
+#   app-ci         the managed .github/workflows/ci.yml of an app (rendered by `starci app sync` from packages/hfs/templates/app/ci-workflows*; the examples are the
+#                  reference, and their rendered CI runs green on GitHub through the candidate flow as part of every release proof: the runtime's examples.yml)
+#   runtime        the runtime repository's own workflows (.github/workflows/*.yml), checked by the same rules, not rendered
+# Enforcers: rule R301 CI_STANDARD (scripts/hfs/rules/ci-standard.mjs over app-ci in the app check and the example apps, scripts/hfs/runtime-rules/runtime-ci-standard.mjs
+# over the runtime's own workflows) checks every item marked `check: ci-standard`; the other items are owned by the rule or render named in `by`.
+# Apps get the standard only through `starci app sync`: the managed CI files are sync targets, and `starci app sync --check` / the app check refuse drift.
+
+# The jobs of the managed app CI (job ids, in this order), per edition; `sonar` exists when the Sonar service is enabled.
+jobs:
+  full: {required: [fast, test, build], optional: [sonar]}
+  lite: {required: [fast, test, build], optional: [db-types, sonar]}
+
+# The steps that need a raised Node heap on the GitHub runner, matched on their `run` text, and the least heap they must declare in NODE_OPTIONS.
+heap:
+  minMiB: 6144
+  steps: ['npm run lint', 'app lint', 'app check --coverage-from']
+
+items:
+  - id: candidate-trigger
+    title: the release CI runs on the release candidate ref
+    requires: "ci.yml runs on push of branches ['release/candidate-*'] and tags ['v*'] (and workflow_dispatch); the release flows wait for the run of the release sha there"
+    covers: [app-ci, runtime]
+    by: [R221 CI_TRIGGERS_RELEASE_ONLY, R251 HFS_APP_WORKFLOW_TRIGGER]
+  - id: job-shape
+    title: the job shape fast / test / build / sonar
+    requires: "the managed CI holds exactly the jobs of `jobs` for its edition; the unit run and the coverage upload are steps of `test`, and only `test` holds the OIDC id-token"
+    covers: [app-ci]
+    check: ci-standard
+  - id: full-history-base-ref
+    title: full history and the lint base STARCI_BASE_REF
+    requires: "every actions/checkout of the managed CI fetches the full history (fetch-depth: 0), and the fast job writes STARCI_BASE_REF to GITHUB_ENV before it lints"
+    covers: [app-ci]
+    check: ci-standard
+  - id: heap-per-step
+    title: a raised heap on every heavy step
+    requires: "every step whose run matches heap.steps declares NODE_OPTIONS with --max-old-space-size of at least heap.minMiB, on the step itself"
+    covers: [app-ci, runtime]
+    check: ci-standard
+  - id: sonar-lint-per-side
+    title: the Sonar lint runs per side
+    requires: "a lint with a Sonar import (--sonar) names its side (--side be|fe); the reports are merged into reports/lint.sonar.json afterwards; no combined lint with Sonar"
+    covers: [app-ci, runtime]
+    check: ci-standard
+  - id: fe-build-env
+    title: each fe app builds with its own env
+    requires: "the build job builds every fe app with that app's own public build values (static NEXT_PUBLIC_* from the declaration), never a shared env"
+    covers: [app-ci]
+    by: [render packages/hfs/sync/ci-commands.mjs, R300 FE_PUBLIC_BUILD_ARG_MISSING]
+  - id: optional-providers
+    title: optional providers probe, then skip with a notice
+    requires: "an optional Codecov or Sonar step (continue-on-error) is preceded in its job by its availability probe (id codecov-availability / sonar-availability); a strict provider fails the job"
+    covers: [app-ci]
+    check: ci-standard
+  - id: timeouts
+    title: a timeout on every job
+    requires: "every job declares timeout-minutes"
+    covers: [app-ci, runtime]
+    check: ci-standard
+  - id: sha-pinned-actions
+    title: every action pinned to a commit sha
+    requires: "every remote `uses:` is pinned to a 40-hex commit sha (a docker:// action to a sha256 digest); a local ./ action is allowed"
+    covers: [app-ci, runtime]
+    check: ci-standard
+    by: [R251 HFS_DEPLOY_WORKFLOW (app workflows)]
+  - id: prettier-stable
+    title: the rendered CI is prettier's output
+    requires: "every rendered managed workflow is byte-identical to prettier's output with the canon config"
+    covers: [app-ci]
+    by: [self-check rendered-prettier, render packages/hfs/sync]
+  - id: context-validity
+    title: expressions use only the contexts available at their key
+    requires: "GitHub Actions expressions read only contexts available at their workflow key"
+    covers: [app-ci, runtime]
+    by: [R299 HFS_WORKFLOW_CONTEXT]

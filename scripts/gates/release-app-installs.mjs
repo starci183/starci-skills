@@ -28,6 +28,8 @@ import { artifactHoldReason } from '../machine/artifact-hold.mjs';
 import { scaffoldInvocation } from './release-proof.mjs';
 import { main as hfsMain } from '../../packages/hfs/src/main.mjs';
 import { startSourceCanonRegistry } from '../../e2e/helpers/source-canon-registry.mjs';
+import { createRequire } from 'node:module';
+import { prepareE2e } from './scaffold-e2e.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const keep = process.argv.includes('--keep');
@@ -56,11 +58,14 @@ const step = (label, run, args, opts = {}) => {
   }
 };
 
+/** The presets the scaffold loads from the installed jest preset, here this checkout's packages/jest-preset (the copy the packed tarball carries). */
+const sourcePresets = () => ({ sonarExclusions: createRequire(import.meta.url)('../../packages/jest-preset/index.cjs').sonarExclusions() });
+
 /** Scaffold with this checkout's hfs and lock the app against the packed @starci tarballs; the install then reads the same registry for the @starci scope. */
 async function sourceScaffold(registry) {
   console.log('release-app-installs: starci app scaffold release-app (this checkout, @starci from the packed tarballs)');
   let out = '';
-  const code = await hfsMain(['scaffold', 'release-app', '--into', into], { cwd: into, stdout: (text) => { out += text; }, stderr: (text) => { out += text; }, lock: registry.lock });
+  const code = await hfsMain(['scaffold', 'release-app', '--into', into], { cwd: into, stdout: (text) => { out += text; }, stderr: (text) => { out += text; }, lock: registry.lock, presets: sourcePresets() });
   process.stdout.write(out);
   if (code !== 0) {
     console.error(`release-app-installs: FAILED at the source scaffold (exit ${code})`);
@@ -72,6 +77,10 @@ let exit = 1;
 let registry = null;
 try {
   if (source) {
+    // The packed tarballs carry built output (the grammar and heroicons dist, test-world): prepared exactly as release scaffold-e2e prepares it.
+    const prepared = prepareE2e({ root });
+    for (const line of prepared.lines) console.log(`release-app-installs: ${line}`);
+    if (!prepared.ok) throw new StepFailed(1);
     registry = await startSourceCanonRegistry({ root });
     await sourceScaffold(registry);
   } else {

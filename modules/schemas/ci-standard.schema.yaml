@@ -1,0 +1,58 @@
+schema: starci/schema@1
+id: starci/ci-standard@1
+title: The StarCi CI standard
+description: >-
+  The one CI standard of every StarCi workflow (owner ruling ci-standard, 2026-10-18): the jobs of the managed app CI per edition, the heavy steps that need
+  a raised Node heap, and the standard's items, each with what it requires, the workflows it covers (app-ci, runtime) and what enforces it: R301 CI_STANDARD
+  for the items marked `check: ci-standard`, the rules or renders named in `by` for the others.
+type: object
+additionalProperties: false
+required: [schema, id, title, jobs, heap, items]
+properties:
+  schema:
+    const: starci/ci-standard@1
+  id:
+    const: ci-standard
+  title:
+    type: string
+    minLength: 1
+  jobs:
+    type: object
+    additionalProperties: false
+    required: [full, lite]
+    properties:
+      full: {$ref: '#/$defs/jobShape'}
+      lite: {$ref: '#/$defs/jobShape'}
+  heap:
+    type: object
+    additionalProperties: false
+    required: [minMiB, steps]
+    properties:
+      minMiB: {type: integer, minimum: 1024}
+      steps: {type: array, minItems: 1, items: {type: string, minLength: 1}}
+  items:
+    type: array
+    minItems: 1
+    items: {$ref: '#/$defs/item'}
+$defs:
+  jobId:
+    type: string
+    pattern: "^[a-z][a-z0-9-]*$"
+  jobShape:
+    type: object
+    additionalProperties: false
+    required: [required, optional]
+    properties:
+      required: {type: array, minItems: 1, items: {$ref: '#/$defs/jobId'}}
+      optional: {type: array, items: {$ref: '#/$defs/jobId'}}
+  item:
+    type: object
+    additionalProperties: false
+    required: [id, title, requires, covers]
+    properties:
+      id: {type: string, pattern: "^[a-z][a-z0-9-]*$"}
+      title: {type: string, minLength: 1}
+      requires: {type: string, minLength: 1}
+      covers: {type: array, minItems: 1, items: {enum: [app-ci, runtime]}}
+      check: {const: ci-standard}
+      by: {type: array, minItems: 1, items: {type: string, minLength: 1}}

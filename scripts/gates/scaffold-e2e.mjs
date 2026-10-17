@@ -95,7 +95,7 @@ function prepareTestWorld(root, env = process.env, deps = {}) {
 }
 
 /** The built output and test-world dependencies prepared before the run: {ok, lines}. `deps` replaces each preparation step. */
-function prepareE2e({ root = runtimeRoot, env = process.env, deps = {} } = {}) {
+export function prepareE2e({ root = runtimeRoot, env = process.env, deps = {} } = {}) {
   const steps = [(deps.grammar ?? prepareGrammar)(root, env), (deps.heroicons ?? prepareHeroicons)(root, env), (deps.testWorld ?? prepareTestWorld)(root, env)];
   return { ok: steps.every((step) => step.ok), lines: steps.map((step) => step.detail) };
 }

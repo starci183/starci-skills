@@ -252,15 +252,16 @@ Conventions:
 - declared release.gates gets audit appended if missing
 - --sonar appends @sonar/scan@4.3.0 against services.sonar.host (host.public for a host mapping), plus organization for sonarcloud;
 - disabled or unavailable Sonar or an unset token refuses RELEASE_SONAR_UNAVAILABLE
-- gate checks the newest completed ci.yml run on the default branch, including reachable push/tag runs;
-- failure, cancelled or timed_out refuses RELEASE_CI_RED with its URL and SHA;
-- unreadable GitHub or no run warns RELEASE_CI_UNKNOWN and continues
-- only the owner's starci release ci-override --sha <sha> --reason <text> record can override red CI; there is no --no-ci-check flag
+- OWNER RULING candidate-ci (2026-10-18): the gate no longer reads the default-branch CI; the verdict is the candidate run of the sha
+- push --execute sends HEAD to refs/heads/release/candidate-<version> first and waits for its ci.yml run (it triggers on release/candidate-*)
+- green moves the branch and the tag in one atomic push; red refuses RELEASE_CANDIDATE_CI_RED naming the failing jobs
+- no run, or no end in time, refuses RELEASE_CANDIDATE_CI_TIMEOUT; unreadable GitHub refuses RELEASE_CI_UNKNOWN; nothing reaches the branch
+- only the owner's starci release ci-override --sha <sha> --reason <text> record lets a red candidate through; there is no --no-ci-check flag
 - gate refuses a dirty tree, HEAD other than --source, a moved HEAD and a tree dirtied by the gates; record and tag only when all gates are green
 - a gate with summary jest is red on failed tests and on a coverage threshold miss even when the process exits 0
 - push needs the annotated tag and L4 record of HEAD, runs git push --dry-run --atomic first and never uses --no-verify
 
-exit: 0 gate green or push done or nothing to do; 1 a gate is red or the push was refused by the hook; 2 refusal or bad usage including RELEASE_CI_RED and RELEASE_SONAR_UNAVAILABLE
+exit: 0 gate green or push done or nothing to do; 1 a gate is red, the candidate CI of the sha is not green, or the push was refused by the hook; 2 refusal or bad usage including RELEASE_SONAR_UNAVAILABLE
 
 json: flag
 
@@ -3122,7 +3123,7 @@ starci release check --only publish-plan,canon-pins
 
 ### starci release ci-override
 
-the owner accepts red CI for one SHA and records who and why
+the owner accepts a red candidate CI for one SHA (emergency path) and records who and why
 
 | flag | type | |
 | --- | --- | --- |
@@ -3132,14 +3133,17 @@ the owner accepts red CI for one SHA and records who and why
 
 Conventions:
 
-- OWNER RULING 2026-10-17 (chat to main, relayed): alpha.20 "cut refuses when the latest CI on main is red, with a documented owner override verb";
-- the override is owner-only, records who and why in the owner rulings, and agents cannot run it.
+- OWNER RULING candidate-ci (2026-10-18): a release reaches main only when the candidate CI of its own sha is green;
+- this verb is the one documented EMERGENCY path for a red candidate.
+- The override is owner-only, records who and why, and agents cannot run it (OWNER RULING alpha20-ci-override-owner-only).
 - Every bound role is refused by the command guard and by this script. The owner must use a terminal and type the first 12 SHA characters exactly.
 - Writes <git-common-dir>/starci-release/<sha>.ci-override.json, schema starci/ci-override@1,
 - with sha, reason, by (git user.name and OS user), at, and runUrl (empty if GitHub is unavailable).
-- For the runtime, appends ci-override-<sha12> under rulings before the top-level supersedes key in modules/kernel/owner-rulings.yaml.
-- Commit that entry into the tree being cut. App repositories receive only the record.
-- An override applies only to its exact SHA. It does not permit a cut when CI is unknown. Existing ruling IDs with another reason refuse.
+- release cut and app release push read that record for the exact candidate sha only; the release record logs its use.
+- For the runtime it also appends ci-override-<sha12> under rulings in modules/kernel/owner-rulings.yaml as the audit trail.
+- App repositories receive only the record.
+- An override applies only to its exact SHA. It never permits a release whose CI is unknown or timed out.
+- Existing ruling IDs with another reason refuse.
 
 exit: 0 the override record and runtime owner ruling were written; 2 RIGHTS_OWNER_ONLY (a bound role or non-TTY stdin), bad usage, confirmation mismatch, or write failure
 
@@ -3209,16 +3213,20 @@ cut the release, the only way the runtime's remote main and a release tag move
 
 Conventions:
 
-- OWNER RULING 2026-10-17 (chat to main, relayed): alpha.20 "cut refuses when the latest CI on main is red, with a documented owner override verb";
-- the override is owner-only, records who and why in the owner rulings, and agents cannot run it.
-- Before the suite, including --plan, read the newest completed CI workflow run on main.
-- Only success continues; every other conclusion refuses RELEASE_CI_RED and names the run URL and headSha.
-- Unreadable GitHub or no completed run refuses RELEASE_CI_UNKNOWN: a cut must not proceed blind, including under suite ci.
-- The owner may run starci release ci-override --sha <headSha> --reason <text>.
-- A red run requires both starci-release/<headSha>.ci-override.json in the git common dir and ci-override-<sha12>
-- in modules/kernel/owner-rulings.yaml of the tree being cut. Commit the ruling before cutting.
+- OWNER RULING candidate-ci (2026-10-18): never again have main receive a release whose CI is red, with the owner confirming afterwards.
+- Before the suite, including --plan, the workflows the candidate CI waits for (release-cut.yaml candidate.workflows) must be readable,
+- else RELEASE_CI_UNKNOWN. The latest run on main is no longer read: a red main needs no owner override before the next release.
+- After the suite and the secret scan the exact HEAD is pushed to refs/heads/release/candidate-<version>;
+- a re-cut of the same version force-moves only that ref, never main.
+- The cut waits for every required workflow run of that sha (pollSeconds, graceMinutes, waitMinutes in release-cut.yaml).
+- Red refuses RELEASE_CANDIDATE_CI_RED with the run URLs and the failing jobs and steps; nothing reaches main.
+- No run within the grace, or no end within the wait, refuses RELEASE_CANDIDATE_CI_TIMEOUT.
+- A red candidate keeps its ref for diagnosis; after a cut the candidate ref is left on the remote, naming the released sha.
+- Only on green is the annotated tag created and main plus the tag pushed atomically; the release record logs the candidate verdict.
+- Emergency path, owner-only: starci release ci-override --sha <HEAD> --reason <text> lets a red candidate through.
+- The release record logs its use.
 
-exit: 0 the release was cut and main plus its tag were pushed atomically, or --plan found nothing missing; 1 refused (RELEASE_CI_RED, RELEASE_CI_UNKNOWN, dirty tree, no or wrong tag, release notes incomplete, version not moved past the remote main, suite red, main moved, secret scan) and nothing was pushed; 2 bad usage
+exit: 0 the candidate CI of the release sha was green, then main plus its tag were pushed atomically, or --plan found nothing missing; 1 refused (RELEASE_CANDIDATE_CI_RED, RELEASE_CANDIDATE_CI_TIMEOUT, RELEASE_CI_UNKNOWN, dirty tree, no or wrong tag, release notes incomplete, version not moved past the remote main, suite red, main moved, secret scan) and nothing was pushed; 2 bad usage
 
 json: flag
 

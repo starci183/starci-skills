@@ -14,12 +14,12 @@ import { proofFileOf, proofFilesOf, readProofFile, writeProofFile } from '../gat
 import { sleep } from '../lib/sleep.mjs';
 import { RELEASE_DEFAULTS } from '../../engine/release-config.mjs';
 import { ciPolicy } from './release-ci-rows.mjs';
+import { jsonReply as json } from '../lib/json-reply.mjs';
 
 const CI_SCHEMA = 'starci/release-ci@1';
 const RED_RUN = new Set(['failure', 'timed_out', 'startup_failure', 'action_required']);
 const RED_CHECK = new Set(['failure', 'error', 'timed_out', 'action_required']);
 
-const json = (r) => { try { return r.status === 0 ? JSON.parse(r.stdout) : null; } catch { return null; } };
 /** Why a gh call gave nothing: gh itself missing, or its exit status and the first words of stderr. */
 function failure(what, r) {
   const stderr = String(r.stderr ?? '').trim().slice(0, 200);

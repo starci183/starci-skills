@@ -303,6 +303,8 @@ function assertCoverageContract(app) {
   const workflow = parseYaml(fs.readFileSync(path.join(app, '.github', 'workflows', 'ci.yml'), 'utf8'));
   // The managed CI runs as the jobs fast, test, build and sonar: the unit run and the Codecov upload are steps of the test job, which alone holds the
   // OIDC identity token the upload authenticates with.
+  // The release candidate (owner ruling candidate-ci): `starci app release push` waits for this workflow's run on release/candidate-<version>.
+  assert.deepEqual(workflow.on.push, { branches: ['release/candidate-*'], tags: ['v*'] }, 'the managed CI runs on the release candidate ref and the release tag');
   const jobs = workflow.jobs ?? {};
   const isUpload = (step) => String(step.uses ?? '').startsWith('codecov/codecov-action@');
   const unitJobs = Object.keys(jobs).filter((id) => (jobs[id].steps ?? []).some((step) => step.name === 'unit'));

@@ -715,6 +715,19 @@ schemas:
       whenNot: Not a version list (canon-pins.yaml) and not a slot manifest (slots.yaml); it names libraries and points at both.
       selectedBy: starci app check (scripts/hfs/rules/fe-stack.mjs) and the canon eslint rule fe-stack-import read it.
 
+  - id: starci/ci-standard@1
+    file: modules/schemas/ci-standard.schema.yaml
+    dialect: json-schema
+    subsystem: gate
+    governs: "The one StarCi CI standard - the managed app CI job shape per edition, the heavy steps that need a raised heap, and every item with what it requires, what it covers and what enforces it."
+    binds: knowledge/hfs/ci-standard.yaml
+    usedBy: [scripts/hfs/rules/ci-standard.mjs, scripts/hfs/runtime-rules/runtime-ci-standard.mjs]
+    business:
+      question: "What must every StarCi CI workflow (an app's, an example's, the runtime's own) hold, and what checks it?"
+      whenNeeded: Changing the rendered app CI, the runtime's workflows, or judging a workflow for CI_STANDARD (R301).
+      whenNot: Not the workflow templates themselves (packages/hfs/templates/app/ci-workflows*) and not the trigger rule (R221); it names them.
+      selectedBy: starci app check and starci runtime check (R301) read it.
+
   - id: starci/protected-installations@1
     file: modules/schemas/protected-installations.schema.yaml
     dialect: json-schema
@@ -857,6 +870,7 @@ moduleLocalDocumentKinds:
       - modules/schemas/allowlist.schema.yaml
       - modules/schemas/application-stacks.schema.yaml
       - modules/schemas/canon-pins.schema.yaml
+      - modules/schemas/ci-standard.schema.yaml
       - modules/schemas/fe-stack.schema.yaml
       - modules/schemas/hfs-peer-integrations.schema.yaml
       - modules/schemas/goal-plan.yaml

@@ -13,19 +13,23 @@ flags:
   - {name: rows, type: string, summary: "re-run only these rows (comma separated, names as --plan lists them) on the SAME commit and complete the record when every other row is already green on it; a row that is not green there refuses the cut"}
   - {name: no-reuse, type: boolean, summary: run every row; stand in for none from an earlier commit or an earlier cut of this one}
 exit:
-  "0": the release was cut and main plus its tag were pushed atomically, or --plan found nothing missing
-  "1": refused (RELEASE_CI_RED, RELEASE_CI_UNKNOWN, dirty tree, no or wrong tag, release notes incomplete, version not moved past the remote main, suite red, main moved, secret scan) and nothing was pushed
+  "0": the candidate CI of the release sha was green, then main plus its tag were pushed atomically, or --plan found nothing missing
+  "1": refused (RELEASE_CANDIDATE_CI_RED, RELEASE_CANDIDATE_CI_TIMEOUT, RELEASE_CI_UNKNOWN, dirty tree, no or wrong tag, release notes incomplete, version not moved past the remote main, suite red, main moved, secret scan) and nothing was pushed
   "2": bad usage
 json: flag
 conventions:
-  - "OWNER RULING 2026-10-17 (chat to main, relayed): alpha.20 \"cut refuses when the latest CI on main is red, with a documented owner override verb\";"
-  - "the override is owner-only, records who and why in the owner rulings, and agents cannot run it."
-  - "Before the suite, including --plan, read the newest completed CI workflow run on main."
-  - "Only success continues; every other conclusion refuses RELEASE_CI_RED and names the run URL and headSha."
-  - "Unreadable GitHub or no completed run refuses RELEASE_CI_UNKNOWN: a cut must not proceed blind, including under suite ci."
-  - "The owner may run starci release ci-override --sha <headSha> --reason <text>."
-  - "A red run requires both starci-release/<headSha>.ci-override.json in the git common dir and ci-override-<sha12>"
-  - "in modules/kernel/owner-rulings.yaml of the tree being cut. Commit the ruling before cutting."
+  - "OWNER RULING candidate-ci (2026-10-18): never again have main receive a release whose CI is red, with the owner confirming afterwards."
+  - "Before the suite, including --plan, the workflows the candidate CI waits for (release-cut.yaml candidate.workflows) must be readable,"
+  - "else RELEASE_CI_UNKNOWN. The latest run on main is no longer read: a red main needs no owner override before the next release."
+  - "After the suite and the secret scan the exact HEAD is pushed to refs/heads/release/candidate-<version>;"
+  - "a re-cut of the same version force-moves only that ref, never main."
+  - "The cut waits for every required workflow run of that sha (pollSeconds, graceMinutes, waitMinutes in release-cut.yaml)."
+  - "Red refuses RELEASE_CANDIDATE_CI_RED with the run URLs and the failing jobs and steps; nothing reaches main."
+  - "No run within the grace, or no end within the wait, refuses RELEASE_CANDIDATE_CI_TIMEOUT."
+  - "A red candidate keeps its ref for diagnosis; after a cut the candidate ref is left on the remote, naming the released sha."
+  - "Only on green is the annotated tag created and main plus the tag pushed atomically; the release record logs the candidate verdict."
+  - "Emergency path, owner-only: starci release ci-override --sha <HEAD> --reason <text> lets a red candidate through."
+  - "The release record logs its use."
 examples:
   - starci release cut
   - starci release cut --plan --tag v1.0.0-alpha.9

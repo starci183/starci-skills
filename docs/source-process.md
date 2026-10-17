@@ -88,7 +88,7 @@ Every tracked JavaScript file must parse (rule R227, `RT_SYNTAX_INVALID`): a spe
 
 Shipped, as checks and code:
 
-- R221 `CI_TRIGGERS_RELEASE_ONLY`: the workflows of `.claude` start on a push to main, on a release tag or by hand; its examples and the hfs app templates (so every scaffolded app inherits it) start only on a release tag or by hand.
+- R221 `CI_TRIGGERS_RELEASE_ONLY`: the workflows of `.claude` start on a push to main, on a release candidate ref `release/candidate-*` (required in every ci.yml), on a release tag or by hand; its examples and the hfs app templates (so every scaffolded app inherits it) start only on a release tag or by hand.
 - R222 `RELEASE_NOTES`: a release tag needs its finished CHANGELOG section.
 - The release flow (`starci release cut`, `scripts/supervisor/release-cut.mjs`) is the only path that pushes a release tag, behind one lock function; it pushes main with a new
   annotated `v*` tag, refuses a non-release tag and a dirty tree, and runs L4 once. The pre-push hook of the runtime repository refuses every push of main or of a `v*` tag whose commit is not a release commit ([git governance](git-governance.md), rule 2): a push of the runtime main is a release.

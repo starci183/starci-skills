@@ -15754,23 +15754,33 @@ RELEASE_CI_OVERRIDE_WRITE:
   owner: owner
   kind: verb-refusal
 
-RELEASE_CI_RED:
-  title: "Default branch CI blocks release"
-  title_vi: "CI nhánh mặc định chặn phát hành"
-  meaning_vi: "Lần CI hoàn tất mới nhất có kết luận không thành công và không có miễn trừ hợp lệ cho SHA."
+RELEASE_CANDIDATE_CI_RED:
+  title: "Candidate CI of the release sha is red"
+  title_vi: "CI ứng viên của SHA phát hành bị đỏ"
+  meaning_vi: "Lần chạy CI trên nhánh release/candidate-<phiên bản> của đúng SHA phát hành có job thất bại; main và tag không được đẩy."
   causes_vi:
-    - "Lần CI hoàn tất mới nhất có kết luận không thành công và không có miễn trừ hợp lệ cho SHA."
-  nextStep_vi: "Sửa CI và chạy lại; chỉ chủ sở hữu được tạo miễn trừ theo SHA kèm danh tính và lý do."
+    - "Lần chạy CI trên nhánh release/candidate-<phiên bản> của đúng SHA phát hành có job thất bại; main và tag không được đẩy."
+  nextStep_vi: "Đọc các job và bước thất bại được nêu tên, sửa, commit và cut lại (chỉ nhánh ứng viên được ghi đè, không bao giờ main); lối khẩn cấp duy nhất là bản ghi ci-override của chủ sở hữu cho đúng SHA."
+  owner: op-retry
+  kind: verb-refusal
+
+RELEASE_CANDIDATE_CI_TIMEOUT:
+  title: "Candidate CI did not start or end in time"
+  title_vi: "CI ứng viên không bắt đầu hoặc không kết thúc kịp"
+  meaning_vi: "Không có lần chạy CI nào cho SHA ứng viên trong thời gian chờ ban đầu, hoặc lần chạy không kết thúc trong thời gian chờ; main và tag không được đẩy."
+  causes_vi:
+    - "Workflow ci.yml (hoặc examples.yml của runtime) không kích hoạt trên release/candidate-*, hoặc lần chạy quá lâu."
+  nextStep_vi: "Kiểm tra trigger release/candidate-* (starci app sync cho app), xem lần chạy trên GitHub, rồi cut lại."
   owner: op-retry
   kind: verb-refusal
 
 RELEASE_CI_UNKNOWN:
-  title: "Default branch CI verdict is unavailable"
-  title_vi: "Chưa đọc được kết quả CI nhánh mặc định"
-  meaning_vi: "Không đọc được gh, nhánh hoặc lần chạy CI phù hợp; cut từ chối, app gate cảnh báo."
+  title: "Release CI verdict is unavailable"
+  title_vi: "Chưa đọc được kết quả CI phát hành"
+  meaning_vi: "Không đọc được gh hoặc các workflow mà CI ứng viên chờ; cut và app release push từ chối, không bao giờ phát hành khi không thấy kết quả."
   causes_vi:
-    - "Không đọc được gh, nhánh hoặc lần chạy CI phù hợp; cut từ chối, app gate cảnh báo."
-  nextStep_vi: "Khôi phục quyền đọc GitHub và xác minh CI nhánh mặc định trước khi phát hành."
+    - "Không đọc được gh hoặc các workflow mà CI ứng viên chờ; cut và app release push từ chối, không bao giờ phát hành khi không thấy kết quả."
+  nextStep_vi: "Khôi phục quyền đọc GitHub (gh auth status) rồi chạy lại."
   owner: op-retry
   kind: verb-refusal
 
@@ -19528,6 +19538,16 @@ FE_PUBLIC_BUILD_ARG_MISSING:
   causes_vi:
     - "Vi phạm R300: mã nguồn, cấu hình hoặc schema yêu cầu giá trị công khai nhưng ảnh triển khai không cung cấp tên đó."
   nextStep_vi: "Thêm giá trị mặc định ARG trong Dockerfile hoặc buildArgs.values hay buildArgs.sealed.keys cho ảnh trong mọi môi trường triển khai; chỉ kiểm tra tên, không mở giá trị mã hóa."
+  owner: op-retry
+  kind: check-finding
+
+CI_STANDARD:
+  title: "A workflow breaks the StarCi CI standard"
+  title_vi: "Workflow vi phạm chuẩn CI của StarCi"
+  meaning_vi: "Workflow CI (của app, của ví dụ hoặc của runtime) không đáp ứng một mục của knowledge/hfs/ci-standard.yaml; mục bị vi phạm được nêu trong ngoặc vuông."
+  causes_vi:
+    - "Vi phạm R301: job shape, lịch sử đầy đủ và STARCI_BASE_REF, heap cho bước nặng, lint Sonar theo từng phía, probe nhà cung cấp tùy chọn, timeout hoặc ghim action theo sha."
+  nextStep_vi: "App: chạy starci app sync --write để render lại CI chuẩn (không sửa tay); runtime: sửa workflow theo mục được nêu."
   owner: op-retry
   kind: check-finding
 

@@ -32,7 +32,7 @@ const l4RecordPath = ({ commonDir, head }) => proofFileOf({ commonDir, sha: head
  * Write the L4 record of `head` for release tag `tag`. {ok, file} or {ok:false, reason}: a head that is not a full sha, a tag
  * that is not v<version>, a failed suite step or an unreadable common dir writes nothing.
  */
-export function writeL4Record({ repo, head, tag, logs = [], suite = RELEASE_DEFAULTS.suite, delegated = [], commonDir = null, now = () => new Date(), run = revParseQuery } = {}) {
+export function writeL4Record({ repo, head, tag, logs = [], suite = RELEASE_DEFAULTS.suite, delegated = [], candidate = null, commonDir = null, now = () => new Date(), run = revParseQuery } = {}) {
   if (!SHA.test(String(head))) return { ok: false, reason: 'the head is not a full sha' };
   if (!RELEASE_TAG.test(String(tag))) return { ok: false, reason: 'the tag is not a release tag v<version>' };
   if (logs.some((step) => step?.ok !== true)) return { ok: false, reason: 'a suite step is not green' };
@@ -42,7 +42,8 @@ export function writeL4Record({ repo, head, tag, logs = [], suite = RELEASE_DEFA
   const dir = commonDir ?? gitCommonDir(repo, { run });
   if (!dir) return { ok: false, reason: 'the repository has no git common dir' };
   const file = l4RecordPath({ commonDir: dir, head });
-  writeProofFile(file, { schema: L4_SCHEMA, head, tag, suite, delegated, logs, at: now().toISOString() });
+  // candidate: the candidate CI verdict of this sha (scripts/supervisor/release-candidate.mjs), with the owner's override when the emergency path was used.
+  writeProofFile(file, { schema: L4_SCHEMA, head, tag, suite, delegated, logs, ...(candidate ? { candidate } : {}), at: now().toISOString() });
   return { ok: true, file };
 }
 
