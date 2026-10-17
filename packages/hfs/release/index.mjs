@@ -1,12 +1,13 @@
 // index.mjs - `starci app release <gate|push>` and the plumbing the release and database verbs share: the context built from the app's IO, strict flag
 // parsing, the optional `release:` / `database:` blocks of .starcistacks/application-stacks.yaml, text and --json output and the exit-code mapping.
-//   starci app release gate [--execute] [--source <ref>] [--tag-prefix <prefix>] [--json]
+//   starci app release gate [--execute] [--sonar] [--source <ref>] [--tag-prefix <prefix>] [--json]
 //   starci app release push [--execute] [--remote <name>] [--json]
 // Every action is a dry run unless --execute is given. A refusal is a StackError (exit 2); a failed step returns ok false (exit 1).
 import fs from 'node:fs';
 import path from 'node:path';
 import { isPlainObject as plain } from '../runtime/engine/plain-object.mjs';
 import { parseYaml } from '../runtime/engine/yaml.mjs';
+import { isRuntimeExampleApp } from '../runtime/scripts/lib/runtime-example.mjs';
 import { STACKS_DIR, STACKS_FILE } from '../stack/config.mjs';
 import { stackContext } from '../stack/context.mjs';
 import { EXIT, StackError, refusal } from '../stack/errors.mjs';
@@ -56,7 +57,8 @@ function readPackage(root) {
 function loadReleaseConfig(root) {
   const pkg = readPackage(root);
   if (typeof pkg.version !== 'string' || !VERSION.test(pkg.version)) throw refusal(RELEASE_CODE, 'package.json needs a version like 1.2.3 (the release tag derives from it)');
-  const { config, problems } = normalizeRelease(readDeclaration(root).release, pkg.scripts);
+  const declaration = readDeclaration(root);
+  const { config, problems } = normalizeRelease(declaration.release, pkg.scripts, declaration.services, { example: isRuntimeExampleApp(root) });
   if (!config) throw refusal(RELEASE_CODE, `${problems.length} problem(s) in release: ${problems.slice(0, 6).join('; ')}`);
   return { root, version: pkg.version, ...config };
 }
@@ -83,8 +85,8 @@ export async function runVerb({ label, name, io, argv, spec, run, code = 'RELEAS
 
 const ACTIONS = {
   gate: {
-    spec: { boolean: ['--execute', '--json'], value: ['--source', '--tag-prefix'] },
-    run: (ctx, flags) => releaseGate(ctx, loadReleaseConfig(ctx.cwd), { execute: flags.execute === true, source: flags.source, tagPrefix: flags['tag-prefix'] }),
+    spec: { boolean: ['--execute', '--json', '--sonar'], value: ['--source', '--tag-prefix'] },
+    run: (ctx, flags) => releaseGate(ctx, loadReleaseConfig(ctx.cwd), { execute: flags.execute === true, sonar: flags.sonar === true, source: flags.source, tagPrefix: flags['tag-prefix'] }),
   },
   push: {
     spec: { boolean: ['--execute', '--json'], value: ['--remote'] },

@@ -7,8 +7,10 @@ import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { isPlainObject as plain } from '../runtime/engine/plain-object.mjs';
+import { qualityServices } from '../runtime/scripts/hfs/ci-declaration.mjs';
 import { firstLine, lines, tool } from '../stack/context.mjs';
 import { failure, refusal } from '../stack/errors.mjs';
+import { latestDefaultBranchCi, requireGreenCi } from './ci-red.mjs';
 
 export const RELEASE_CODE = 'RELEASE_CONFIG_INVALID';
 
@@ -35,10 +37,40 @@ const scriptGate = (script) => ({
   env: {},
 });
 
-/** The gates derived from the managed package scripts: the app check first, then every script the sync renders that the app has. */
-function defaultGates(scripts) {
+/** Default gates run app-check, the enabled audit, then every managed script present in the app. */
+function defaultGates(scripts, audit) {
   const present = SCRIPT_GATES.filter((script) => typeof scripts?.[script] === 'string');
-  return [{ name: 'app-check', command: ['npx', 'starci', 'app', 'check'], summary: null, env: {} }, ...present.map(scriptGate)];
+  return [{ name: 'app-check', command: ['npx', 'starci', 'app', 'check'], summary: null, env: {} }, ...(audit ? [audit] : []), ...present.map(scriptGate)];
+}
+
+/** Shared quality settings retain the release reader's audit validation, disabled mode and legacy string host compatibility. */
+function releaseServices(services, options) {
+  const audit = services?.audit ?? {};
+  if (!plain(audit) || (audit.in !== undefined && (!Array.isArray(audit.in) || !audit.in.every((scope) => typeof scope === 'string'))) || (audit.omitDev !== undefined && typeof audit.omitDev !== 'boolean')) throw refusal(RELEASE_CODE, 'services.audit must be a mapping with a string-list in and boolean omitDev');
+  const sonar = services?.sonar;
+  const compatible = typeof sonar?.host === 'string' ? { ...sonar, host: { public: sonar.host } } : sonar;
+  const quality = qualityServices({ services: { ...services, sonar: compatible } }, options);
+  if (audit.mode === 'disabled') quality.audit = null;
+  return quality;
+}
+
+/** The shared audit settings preserve release scope, level and development-dependency selection. */
+function auditGate(audit) {
+  if (!audit || !audit.in.includes('release-gate')) return null;
+  if (!['info', 'low', 'moderate', 'high', 'critical'].includes(audit.level)) throw refusal(RELEASE_CODE, 'services.audit.level must be an npm audit level');
+  return { name: 'audit', command: ['npm', 'audit', ...(audit.omitDev ? ['--omit=dev'] : []), `--audit-level=${audit.level}`], summary: null, env: {} };
+}
+
+/** A requested local Sonar scan uses only the declared host and token variable; the token never enters argv. */
+function sonarGate(services, env) {
+  const sonar = services?.sonar;
+  const tokenName = sonar?.token;
+  if (!sonar?.host || !ENV_KEY.test(tokenName) || !env[tokenName]) throw refusal('RELEASE_SONAR_UNAVAILABLE', 'declare an enabled services.sonar host and set its ci.token environment variable');
+  const command = ['npx', '--yes', '@sonar/scan@4.3.0', `-Dsonar.host.url=${sonar.host}`];
+  const organization = sonar.organization ?? (sonar.organizationVar ? env[sonar.organizationVar] : null);
+  if (organization) command.push(`-Dsonar.organization=${organization}`);
+  if (!command.every((word) => TOKEN.test(word))) throw refusal('RELEASE_SONAR_UNAVAILABLE', 'Sonar host and organization must be plain command arguments');
+  return { name: 'sonar', command, summary: null, env: { SONAR_TOKEN: env[tokenName] } };
 }
 
 function gateProblems(entry, at, seen) {
@@ -74,7 +106,7 @@ function gatesOf(list, problems) {
 }
 
 /** Judges the optional `release:` block. Absence is fine (defaults). Returns { config } or { problems }. */
-export function normalizeRelease(block, scripts = {}) {
+export function normalizeRelease(block, scripts = {}, services = {}, options = {}) {
   const raw = block ?? {};
   if (!plain(raw)) return { problems: ['release: must be a mapping'] };
   const problems = Object.keys(raw).filter((key) => !FIELDS.has(key)).map((key) => `release.${key}: is not a field of the release block`);
@@ -84,8 +116,11 @@ export function normalizeRelease(block, scripts = {}) {
   if (typeof tagPrefix !== 'string' || !PREFIX.test(tagPrefix)) problems.push(`release.tagPrefix: must match ${PREFIX}`);
   if (!refName(defaultBranch)) problems.push(`release.defaultBranch: must match ${REF_NAME}`);
   if (typeof tagMatchesVersion !== 'boolean') problems.push('release.tagMatchesVersion: must be true or false');
-  const gates = raw.gates === undefined ? defaultGates(scripts) : gatesOf(raw.gates, problems);
-  return problems.length === 0 ? { config: { gates, tagPrefix, defaultBranch, tagMatchesVersion } } : { problems };
+  const quality = releaseServices(services, options);
+  const audit = auditGate(quality.audit);
+  const gates = raw.gates === undefined ? defaultGates(scripts, audit) : gatesOf(raw.gates, problems);
+  if (raw.gates !== undefined && audit && !gates.some((gate) => gate.name === 'audit')) gates.push(audit);
+  return problems.length === 0 ? { config: { gates, tagPrefix, defaultBranch, tagMatchesVersion, services: quality } } : { problems };
 }
 
 /* ---- git through the seam */
@@ -179,9 +214,11 @@ function runGate(ctx, gate, { dir, platform }) {
   const started = ctx.now();
   const [command, args] = launch(gate.command, platform);
   const run = tool(ctx, command, args, { cwd: ctx.cwd, env: { ...ctx.env, ...gate.env } });
-  const text = `${run.stdout ?? ''}${run.stderr ?? ''}`;
+  const output = `${run.stdout ?? ''}${run.stderr ?? ''}`;
+  const text = gate.name === 'sonar' && gate.env.SONAR_TOKEN ? output.replaceAll(gate.env.SONAR_TOKEN, '[REDACTED]') : output;
   fs.writeFileSync(log, text);
   const verdict = judgeVerdict(run, gate, text);
+  if (gate.name === 'sonar' && gate.env.SONAR_TOKEN) verdict.detail = verdict.detail.replaceAll(gate.env.SONAR_TOKEN, '[REDACTED]');
   const seconds = Math.round((ctx.now() - started) / 1000);
   return {
     name: gate.name, command: gate.command.join(' '), pass: verdict.pass, detail: verdict.detail, seconds,
@@ -274,15 +311,18 @@ const summaryOf = (result) => `${result.pass ? 'PASS' : 'FAIL'} ${result.name} (
 
 /**
  * `starci app release gate`: dry run prints the preconditions, the gate list, the head and the tag; --execute runs every gate and, only if all are green,
- * writes the L4 record and creates the annotated tag. options: { execute, source, tagPrefix, platform }.
+ * writes the L4 record and creates the annotated tag. options: { execute, sonar, source, tagPrefix, platform }.
  */
 export async function releaseGate(ctx, config, options = {}) {
+  if (options.sonar) config = { ...config, gates: [...config.gates.filter((gate) => gate.name !== 'sonar'), sonarGate(config.services, ctx.env)] };
+  const ci = latestDefaultBranchCi({ spawn: ctx.spawn, cwd: ctx.cwd, defaultBranch: config.defaultBranch });
+  const ciLines = requireGreenCi(ctx, ci);
   const facts = inspect(ctx, config, options);
   const common = releaseDir(ctx);
   const recordPath = path.join(common, `${facts.head}.l4.json`);
   const dir = path.join(common, facts.head.slice(0, 12));
-  const plan = [...facts.out, ...planLines(config, facts, dir, recordPath)];
-  const base = { head: facts.head, tag: facts.chosen.tag, record: recordPath, gates: config.gates.map((gate) => gate.name) };
+  const plan = [...ciLines, ...facts.out, ...planLines(config, facts, dir, recordPath)];
+  const base = { head: facts.head, tag: facts.chosen.tag, record: recordPath, gates: config.gates.map((gate) => gate.name), ci: { state: ci.state, notices: ciLines } };
   if (facts.red.length > 0) return { ok: false, lines: [...plan, ...facts.red.map((item) => `RED: ${item}`), 'nothing was run.'], data: { ...base, red: facts.red, executed: false } };
   if (options.execute !== true) return { ok: true, lines: [...plan, '', 'dry run: no gate was run, nothing written. preconditions OK.'], data: { ...base, red: [], executed: false } };
   const results = runAll(ctx, config, { dir, platform: options.platform ?? process.platform });
