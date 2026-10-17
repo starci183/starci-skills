@@ -43,6 +43,9 @@
 //   starci app secret materialize <env> | list <env> | verify <env>
 //                                            dotenv custody in .starcistacks, public age rule initialization, private KEY files outside Git;
 //                                            values reach stdout only when get explicitly receives --reveal.
+//   starci app ci secret set <NAME> [--env E | --dependabot] [--repo owner/name]  reads the value from stdin only.
+//   starci app ci var set <NAME> [--env E] [--value v] | var sync [--execute] | verify [--json]
+//                                            declared GitHub CI custody; verify compares names, scopes and public values.
 //   starci app db baseline | restamp --map <restamp.yaml> | plan
 //                                            preview the database cutover or compare its state with the repo; baseline and restamp mutate only with --apply.
 //   starci app add <api|webhook|realtime|saga|job|reactor|queue|projection> <name> [--event <event> --from <service> --service <Class>=<module>] [--owner <service> --failed <event> --done <event>] [--connection <name>] [--cwd <dir>]
@@ -83,9 +86,11 @@ import { ACTIONS as STACK_ACTIONS, stackMain as deployStackMain } from '../stack
 import { releaseMain } from '../release/index.mjs';
 import { dbMigrateMain } from '../db/migrate.mjs';
 import { dbPostCutoverMain } from '../db/post-cutover.mjs';
+import { dbDumpMain } from '../db/dump.mjs';
+import { dbResetMain } from '../db/reset.mjs';
 
-export const VERBS = Object.freeze(['scaffold', 'add', 'lint', 'sync', 'check', 'upgrade', 'stack', 'release', 'explain', 'emit', 'new', 'secret', 'db', 'hygiene']);
-const DATABASE_VERBS = new Map([['baseline', dbBaselineMain], ['restamp', dbRestampMain], ['plan', dbPlanMain], ['migrate', dbMigrateMain], ['post-cutover', dbPostCutoverMain]]);
+export const VERBS = Object.freeze(['scaffold', 'add', 'lint', 'sync', 'check', 'upgrade', 'stack', 'release', 'explain', 'emit', 'new', 'secret', 'ci', 'db', 'hygiene']);
+const DATABASE_VERBS = new Map([['baseline', dbBaselineMain], ['restamp', dbRestampMain], ['plan', dbPlanMain], ['migrate', dbMigrateMain], ['post-cutover', dbPostCutoverMain], ['dump', dbDumpMain], ['reset', dbResetMain]]);
 
 const USAGE = `starci app scaffold <name> [--into <dir>] [--edition full|lite] [--registry-visibility public|private] [--cwd <dir>]
 starci app add <api|webhook|realtime|saga|job|reactor|queue|projection|cli|table|app> <name> [options] [--cwd <dir>]
@@ -95,6 +100,8 @@ starci app check [--cwd <dir>] [--json] [--fast] [--base <ref>] [--edition full]
 starci app db baseline [--stamp <version>] [--local] [--apply] [--cwd <dir>]
 starci app db restamp --map <restamp.yaml> [--local] [--apply] [--cwd <dir>]
 starci app db plan [--local] [--json] [--cwd <dir>]
+starci app db dump (--linked | --local | --url-env <NAME>) --out <dir> [--schema-only] [--json] [--cwd <dir>]
+starci app db reset --linked --auth keep|drop --storage keep|drop --backup <receipt.json> [--execute] [--json] [--cwd <dir>]
 starci app db migrate [--execute] [--linked | --url-env <NAME>] [--json] [--cwd <dir>]
 starci app db post-cutover [--execute] [--green-at <ISO> | --owner-confirms-old-app-gone] [--linked | --url-env <NAME>] [--json] [--cwd <dir>]
 starci app release gate [--execute] [--source <ref>] [--tag-prefix <prefix>] [--json] [--cwd <dir>]
@@ -116,6 +123,10 @@ starci app secret remove <env> <slug> [--execute] [--force-nonempty] [--cwd <dir
 starci app secret materialize <env> [--cwd <dir>]
 starci app secret list <env> [--cwd <dir>]
 starci app secret verify <env> [--cwd <dir>]
+starci app ci secret set <NAME> [--env E | --dependabot] [--repo owner/name] [--cwd <dir>]
+starci app ci var set <NAME> [--env E] [--value v] [--repo owner/name] [--cwd <dir>]
+starci app ci var sync [--execute] [--repo owner/name] [--cwd <dir>]
+starci app ci verify [--json] [--repo owner/name] [--cwd <dir>]
 starci app hygiene [--cwd <dir>]
 `;
 const PER_CODE_LIMIT = 25;
@@ -318,7 +329,7 @@ async function installedStackMain(cwd) {
 function databaseMain(argv, io) {
   const [verb, ...rest] = argv;
   const dispatch = DATABASE_VERBS.get(verb);
-  if (!dispatch) throw new Error('starci app db takes baseline, restamp, plan, migrate or post-cutover');
+  if (!dispatch) throw new Error('starci app db takes baseline, restamp, plan, migrate, post-cutover, dump or reset');
   return dispatch(rest, io);
 }
 
@@ -408,7 +419,7 @@ async function stackAppMain(argv, { cwd, edition, stackMain, stdout: out, stderr
   return run(argv, { cwd, out, err });
 }
 
-const DIRECT_VERBS = new Map([['lint', lintMain], ['secret', secretMain], ['db', databaseMain], ['upgrade', upgradeAppMain], ['stack', stackAppMain], ['release', releaseMain]]);
+const DIRECT_VERBS = new Map([['ci', async (argv, io) => (await import('../ci/cli.mjs')).ciMain(argv, io)], ['lint', lintMain], ['secret', secretMain], ['db', databaseMain], ['upgrade', upgradeAppMain], ['stack', stackAppMain], ['release', releaseMain]]);
 const PARSED_VERBS = new Map([['check', checkMain], ['emit', emitMain], ['new', newMain], ['add', addMain], ['scaffold', scaffoldMain], ['explain', explainMain]]);
 
 function dispatchMain(verb, argv, io) {

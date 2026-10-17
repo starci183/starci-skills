@@ -21,6 +21,7 @@
     "stack/**",
     "release/**",
     "db/**",
+    "ci/**",
     "lint/**",
     "scaffold/**",
     "report/**",

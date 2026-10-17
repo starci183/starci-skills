@@ -1,0 +1,27 @@
+group: app
+verb: ci
+owner: "@starci/hfs"
+summary: set declared GitHub CI secrets and variables and verify their custody
+impl: null
+positional:
+  - {name: action, enum: [secret, var, verify], required: true, variadic: false}
+  - {name: operation, enum: [set, sync], required: false, variadic: false}
+  - {name: name, required: false, variadic: false}
+flags:
+  - {name: env, type: string, summary: select the declared GitHub environment}
+  - {name: dependabot, type: boolean, summary: select the Dependabot secret store}
+  - {name: repo, type: string, summary: override the app repository with owner/name}
+  - {name: value, type: string, summary: public variable value that must agree with the manifest}
+  - {name: execute, type: boolean, summary: apply the variable sync plan}
+  - {name: json, type: boolean, summary: print verification findings as JSON}
+exit: {"0": action completed or verification clean, "1": verification findings, "2": refusal or bad usage}
+json: flag
+examples:
+  - starci app ci secret set SONAR_TOKEN
+  - starci app ci secret set VPS_SSH_KEY --env production
+  - starci app ci secret set NPM_TOKEN --dependabot
+  - starci app ci var set SONAR_HOST_URL
+  - starci app ci var sync
+  - starci app ci var sync --execute
+  - starci app ci verify --json
+editions: [full, lite]
