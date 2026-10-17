@@ -157,6 +157,7 @@ rulings:
   - id: release-suite-ci
     date: '2026-10-09'
     ruling: "The owner's words: add to config.yaml a setting 'full test: none' so the full test is never applied locally and it is pushed to git, letting Codecov handle it, to save time; locally it still runs PARTIAL tests, the tests related to the commit. Recorded as release.suite (local or ci, shipped default local; the value is ci because the suite moves to CI, it does not vanish). Under ci the release cut plans no root suite and no Linux parity row, the pre-push gate accepts a release record without a local npm test row only when the record says suite ci and the checked-out config says ci, and a red CI is fixed forward with the next pre-release. The trade the owner accepts, that a release can reach GitHub and its tag before the suite has run, is stated in docs/releasing.md."
+    amendedBy: [no-runtime-specs]
     enforcedBy: [scripts/guards/release-definition.mjs, scripts/guards/release-suite-mode.mjs, scripts/supervisor/release-ci-rows.mjs, engine/release-config.mjs]
   - id: acceptance-trace-report-mode
     date: '2026-10-09'
@@ -441,7 +442,7 @@ rulings:
   # Earlier kernel and drawing decisions cited by the specs retain stable owner ids.
   - id: handover-owner-approval
     date: '2026-09-23'
-    source: tests/kernel/handover.spec.mjs; modules/ops/ops/handover.review.yaml proofs.owner-approval
+    source: modules/ops/ops/handover.review.yaml proofs.owner-approval
     ruling: A workflow finishes only after the owner's approve receipt for its latest handover review; feedback and questions do not approve it.
     supersedes: []
     enforcedBy: [scripts/kernel/handover.mjs]
@@ -455,21 +456,21 @@ rulings:
 
   - id: owner-language-logs
     date: '2026-09-23'
-    source: tests/repo/owner-language-rule.spec.mjs; modules/kernel/driver-loop.yaml boundary.language
+    source: modules/kernel/driver-loop.yaml boundary.language
     ruling: Code and identifiers are English; kernel and op logs and owner-facing narration use the language configured in config.yaml.
     supersedes: []
     enforcedBy: [modules/kernel/driver-loop.yaml]
 
   - id: drawing-owner-parts
     date: '2026-09-24'
-    source: tests/work/direction-part.spec.mjs; modules/ops/ops/interface.draw.yaml proofs.owner-sees-parts
+    source: modules/ops/ops/interface.draw.yaml proofs.owner-sees-parts
     ruling: The owner reviews each drawn part; composites remain implementation and audit evidence, and owner-facing images select the part even when an older record names its composite.
     supersedes: []
     enforcedBy: [scripts/work/direction-part.mjs, scripts/kernel/ask-images.mjs, scripts/connectors/telegram-media.mjs]
 
   - id: drawing-light-device-matrix
     date: '2026-09-24'
-    source: tests/work-ui/shell-conformance.spec.mjs; modules/ops/ops/interface.draw.yaml proofs.shell-conformance
+    source: modules/ops/ops/interface.draw.yaml proofs.shell-conformance
     ruling: Every drawing set covers desktop and mobile in the light theme for each drawn state; dark-theme drawings are optional.
     supersedes: []
     enforcedBy: [scripts/work/ui/shell-conformance.mjs]
@@ -534,6 +535,20 @@ rulings:
     ruling: A call on a domain receipt port inside the receipt transaction of a webhook intake is the inbox record and not processing. A receipt port is a domain class with no base class whose constructor takes only platform ports and TypeORM, one of them the platform Inbox. A call on another domain service, a bus or a process callback inside the transaction is still processing, and BE_WEBHOOK_SCOPE now says so in its own finding. Owner words "Theo y tro" (the owner delegated the decision to main, 2026-10-17).
     supersedes: []
     enforcedBy: [packages/eslint/be/lib/webhook-handoff-intake.mjs]
+  - id: no-runtime-specs
+    date: '2026-10-17'
+    source: "the owner (thay) in chat, relayed by the main coordinator to the a19 drop-runtime-specs lead"
+    ruling: "The owner's words: \"Tests in packages/ and examples/ stay; the .claude runtime's own specs are removed entirely; delete codecov. Real tests (package clean-test + scaffold e2e) decide.\" Amended the same day: codecov stays for packages/ and examples/ (the example flags, the hfs template codecov.yml, the example uploads); only the runtime coverage goes (the runtime flag and the runtime lcov chain). Added the same day: no runtime tests in .claude contributions - a spec that exercises the runtime's own code (scripts/, modules/, the kernel, supervisor and work graph, checks, gates, CLI internals) outside packages/ and examples/ is refused; the scaffold e2e (e2e/) is the one exception. Recorded as: tests/ deleted; starci runtime verify, git land, runtime deploy, the release cut and release check prove a commit by the runtime check, the package clean-test and the scaffold e2e; a rule whose spec proof was a runtime spec carries specNa citing this ruling; RT_SPEC_PLACEMENT refuses a runtime test."
+    supersedes: []
+    enforcedBy: [scripts/hfs/runtime-rules/test-layout.mjs, scripts/reconciler/runtime-verify.mjs, scripts/gates/runtime-tests.mjs, scripts/gates/scaffold-e2e.mjs, scripts/checks/lib/coverage-rules.mjs, scripts/guards/release-definition.mjs]
+  - id: gate-loosening-e0b604204f6a
+    date: '2026-10-17'
+    ruling: "The a19 gates commit removes from the protected zone test-policy the paths of the deleted runtime specs and their selection (scripts/lib/spec-deps.mjs, tests/guards/**, tests/machine/host-lock.spec.mjs, tests/setup/**) and protects the real tests instead (scripts/gates/runtime-tests.mjs, scripts/gates/scaffold-e2e.mjs, e2e/**), under the owner ruling no-runtime-specs; the owner approved it in chat to the main coordinator (\"tests in packages and examples stay; runtime specs removed; delete codecov; no runtime tests in contribution\"), relayed to the a19 lead with the instruction to record these approvals."
+    enforcedBy: [modules/kernel/protected-zone.yaml]
+  - id: gate-loosening-64f16c52431a
+    date: '2026-10-17'
+    ruling: "The a19 checks commit removes rule R226 and its spec-budget enforcer, the runtime.tests, runtime.tests-proof-settle and runtime.brand-sources-replay slots, the spec-budget and spec-cache-key self-checks, and every runtime-spec entry of the rule catalog's proves, exemplifiedBy and witness lists (the rows they proved carry specNa, exampleNa or an unreachable witness citing owner:no-runtime-specs), under the owner ruling no-runtime-specs; the owner approved it in chat to the main coordinator (\"tests in packages and examples stay; runtime specs removed; delete codecov; no runtime tests in contribution\"), relayed to the a19 lead with the instruction to record these approvals."
+    enforcedBy: [knowledge/hfs/rules.yaml, knowledge/hfs/runtime-slots.yaml]
 
 supersedes:
   'ruling:R212/case-2': ['ruling:R212/case-1']
