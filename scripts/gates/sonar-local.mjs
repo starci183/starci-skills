@@ -26,7 +26,8 @@ import { acceptFirst, readPages, readWithTokens, syncConditions } from './sonar-
 import {text} from '../lib/stack-declaration.mjs';
 import {readCustody} from './sonar-ext-custody.mjs';
 import {ADMIN_TOKEN_ENV,environmentReference} from './sonar-host-secrets.mjs';
-import {stackStop,stackUp} from './sonar-stack.mjs';
+import {runProgram} from '../api/process/run-program.mjs';
+import {stackUp,stackStop} from './sonar-stack.mjs';
 import {inspectOwnerConfig,specsSettings} from '../../engine/config.mjs';
 import {createRequire} from 'node:module';
 import { isSpecRun } from '../lib/env.mjs';
@@ -239,7 +240,7 @@ export function resolveConfig(options={},env=process.env){
     stackSecret:options.stackSecret??null,
     record:options.record??null,
     adminToken:environmentReference(ADMIN_TOKEN_ENV),
-    stackRun:{extRoot:options.extRoot??path.join(skillRoot,'ext','sonar'),composeRunner:options.composeRunner??null},
+    stackRun:{extRoot:options.extRoot??path.join(skillRoot,'ext','sonar'),composeRunner:options.composeRunner??null,spawn:options.spawn??runProgram,tunnelWaitMs:options.tunnelWaitMs??30000},
     analysisToken:options.analysisToken??decl?.analysis??`runtime/files/${ANALYSIS_TOKEN}`,
     declaredQualityGate:decl?.qualityGate??null,
     declaredKey:project?.key??null,
@@ -1044,7 +1045,7 @@ const runSonarCommand=async(args,cfg,key,env,put)=>{
   const command=args._[0];
   if(command==='status')return {report:await status(cfg)};
   if(command==='ensure-project')return {report:await ensureProjectReport(cfg,args,key)};
-  if(command==='up'||command==='stop')return {report:{schema:SCHEMA,...(command==='up'?stackUp:stackStop)(cfg,{env:sonarAnalysisEnvironment(cfg),publicTunnel:args.publicTunnel===true,scrub,remember})}};
+  if(command==='up'||command==='stop')return {report:{schema:SCHEMA,...await (command==='up'?stackUp:stackStop)(cfg,{env:sonarAnalysisEnvironment(cfg),publicTunnel:args.publicTunnel===true,scrub,remember})}};
   if(command==='token')return tokenCommandResult(cfg,args,key,env);
   if(command==='scan'){
     const report=await scan(cfg,{cwd:args.cwd,key:args.key,wait:args.wait,out:args.out,log:args.log,blob:args.blob,put,tokenRef:args.tokenRef,ensure:args.ensure,timeoutSec:args.timeout,waitSec:args.waitTimeout,

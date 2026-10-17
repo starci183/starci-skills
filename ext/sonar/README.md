@@ -43,9 +43,21 @@ starci gate sonar stop [--public] # stop the containers; the data is kept
 ```
 
 `up` builds the child environment from `secret.env` (plus `STARCI_PORT_SONARQUBE` from the declared host), hands it to
-`docker compose up -d` and prints a report with the file names and the outcome only: a value is never on argv, in a file or in the
-report. A container's environment is readable by whoever can `docker inspect` it on this host. Never `down -v`: the named volumes hold
+`docker compose up -d` and prints a report with the file names and outcome. With `--public`, both `up` and `stop` pass
+`--profile public`; `up` checks that `<STARCI_CONTAINER_PREFIX or starci->cloudflared-sonarqube` is running, retrying for up to
+30 seconds before refusing. A secret value is never on argv, in a file or in the report. A container's environment is readable by whoever can `docker inspect` it on this host. Never `down -v`: the named volumes hold
 the server data and projects.
+
+### Start refusals
+
+- `SONAR_TUNNEL_NOT_RUNNING`: the public tunnel did not reach running state. The report includes the container name, its
+  last observed state and its last 20 log lines, with known secrets scrubbed. Fix the tunnel configuration and retry
+  `starci gate sonar up --public`.
+- `SONAR_DB_PASSWORD_MISMATCH`: SonarQube or Postgres logs report password authentication failure. The existing
+  `starci-sonarqube-postgres-data` volume was initialised with a different password from `SONARQUBE_DB_PASSWORD` in
+  `secret.env`, which Compose supplies as both `SONAR_JDBC_PASSWORD` and `POSTGRES_PASSWORD`. Restore the old password
+  in `secret.env`, or export a backup of the server data and projects before deliberately recreating the volume.
+  Changing the environment variable alone does not change the password stored in an existing Postgres volume.
 
 ## Moving off the old sealed members
 
