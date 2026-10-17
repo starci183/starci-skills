@@ -61,7 +61,7 @@ const insidePath = (child, parent) => isInside(path.resolve(parent), path.resolv
  * the `orca` argv that creates it (worktree create, issued through scripts/api/orca/worktree-create.mjs); the Kernel's
  * own worker-start then takes `--worktree <path>` (opWorktreeArgs gives the same to every op).
  */
-export function workflowWorktreeSpec({ workflowId, appRepo }) {
+function workflowWorktreeSpec({ workflowId, appRepo }) {
   const name = `wf-${workflowId}`;
   return { name, baseBranch: 'main', branch: name,
     args: ['worktree', 'create', '--repo', `path:${posix(path.resolve(appRepo))}`, '--name', name, '--base-branch', 'main', '--setup', 'run', '--no-parent'] };

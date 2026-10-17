@@ -26,7 +26,7 @@ import { ciPlan, ciSettings } from './release-ci-rows.mjs';
 
 /** The only skips a release may keep: tests that need a browser the host may lack, matched by name. */
 const BROWSER_SKIPS = Object.freeze(['draw-render', 'draw-rationale', 'draw-layer']);
-const INFRASTRUCTURE = /\b(?:docker|postgres(?:ql)?|supabase|kafka|redis|minio|keycloak|compose|stack|orca|port|socket|network|database|infrastructure|unavailable|not installed|not reachable)\b/i;
+const INFRASTRUCTURE = /\b(?:docker|postgres(?:ql)?|supabase|kafka|redis|minio|keycloak|compose|stack|port|socket|network|database|infrastructure|unavailable|not installed|not reachable)\b/i;
 const EXAMPLE_SCRIPTS = Object.freeze(['codegen', 'typecheck', 'typecheck:tests', 'lint', 'format:check', 'test', 'test:contract', 'test:integration', 'test:e2e', 'build:be', 'build:fe', 'docker:build']);
 /** A lite app has the unit run and optional integration specs but no e2e or contract world (owner ruling 2026-10-12): its row is the full row without those two scripts. */
 const LITE_NO_SCRIPTS = Object.freeze(['test:contract', 'test:e2e']);

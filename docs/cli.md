@@ -3142,30 +3142,6 @@ starci release images --app <app-root>
 starci release images --app <app-root> --sides be --remove-images --json
 ```
 
-### starci release launch-smoke
-
-prove live nested-agent launch paths on an Orca host
-
-| flag | type | |
-| --- | --- | --- |
-| `--app-repo` | string |  |
-| `--entry` | string |  |
-| `--timeout-ms` | number |  |
-| `--out` | string |  |
-| `--as` | enum supervisor|worker|kernel|op|opFe|opFail|critic |  |
-
-Positionals: action?
-
-exit: 0 smoke or role action passed; 1 smoke or role action failed; 2 bad usage or no entry terminal
-
-json: always
-
-```sh
-starci release launch-smoke --app-repo <scratch-app>
-starci release launch-smoke stage --as kernel
-starci release launch-smoke mark --as op
-```
-
 ### starci release notes
 
 print or write the release notes of a tag, its CHANGELOG section

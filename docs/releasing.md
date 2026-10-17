@@ -63,7 +63,7 @@ A cut that resumes. Each cut leaves a ledger beside the L4 record (`<git common 
 
 Input sets (`reuse.classes` in the yaml): an example app's rows and its Sonar proof depend on `examples/<app>/`, the example index, the root manifest and lockfile and the two helpers the row scripts call; `test:packages`, `test:e2e` and `check` on the whole tree minus `examples/` and `docs/`; the Linux parity on the whole tree. The installs and the test-world build always run. **The three rows the pre-push gate requires (`npm run test:packages`, `npm run test:e2e`, `npm run check`) are never reused from another commit**, even when their input set is identical: the gate (`scripts/guards/release-definition.mjs`) counts a required row only when the record shows it RAN on the exact pushed commit, and a row marked `reusedFrom` does not count. So a re-cut after a fix always re-runs the root rows and the Linux container, and reuses the example apps that the fix did not touch.
 
-`starci release cut --no-reuse` runs every row. `starci release cut --tag <v*> --rows "<row>,<row>"` is for an env-only red row (a live-Orca smoke refused for stale quota, SonarCloud unreachable): it re-runs the named rows alone on the SAME commit and completes the record when every other row is green there; it refuses before running anything (`rows-unknown`, `rows-incomplete`) when a name is not a row of the plan or another row is not green on this commit. Names are the ones `--plan` lists.
+`starci release cut --no-reuse` runs every row. `starci release cut --tag <v*> --rows "<row>,<row>"` is for an env-only red row (SonarCloud unreachable): it re-runs the named rows alone on the SAME commit and completes the record when every other row is green there; it refuses before running anything (`rows-unknown`, `rows-incomplete`) when a name is not a row of the plan or another row is not green on this commit. Names are the ones `--plan` lists.
 
 ## Where the suite runs
 
@@ -90,13 +90,7 @@ The runtime's own `dashboard` gate is not used: it holds a per-file coverage of 
 
 ## Pre-workflow readiness
 
-Before the owner runs a workflow on a new runtime release, run the launch smoke once on the live host, from a plain Orca shell (or the owner's chat), never from an agent:
-
-```sh
-starci release launch-smoke --app-repo <scratch app main checkout> --out <launch-smoke-output>/launch-smoke.json
-```
-
-It starts seven no-op agents on the cheapest model `modules/models/runtimes.yaml` pins, all through `orchestration worker-start`, and proves the depth Orca reports for each nesting path: `[Supervisor]` (1) -> `[Worker]` (2), and `[Kernel]` (1) -> `[Op]` (2) -> draw critic (3). It also proves the workflow worktree on the scratch app: the Kernel's worktree in `orca worktree list`, a be op and an fe op in parallel in it, a failing op preserved and reset to its checkpoint, and a finish that fast-forwards main and marks the worktree release-pending, after which the host-side controller removes it, with main byte-identical but for the two green files. Run it with the reconciler running, since its controller removes the worktree. The scratch app must be registered in Orca, and its main receives those two files and is pushed. It always stops and releases every agent it started and prints one `starci/launch-smoke@2` JSON result; exit 0 means all three paths are `ok`. Orca's Settings -> Orchestration -> Nested worker depth must be at least 3. No check or spec runs it: it starts real agents. See [host contract](host-contract.md#pre-workflow-launch-smoke) and the contract change `launch-smoke`.
+Owner ruling (2026-10-17): Orca is open-source and tested upstream, so the runtime keeps no Orca test and no Orca release dependency; it keeps its Orca integration code. A release cut needs no Orca terminal, no reachable Orca and no fresh provider quota, and no launch smoke runs before a workflow.
 
 ## Make an archive
 

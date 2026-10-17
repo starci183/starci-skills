@@ -136,8 +136,8 @@ calls:
     receipt: [result.task.id]
     note: >-
       Never issued for an operation Task: the op's own worker_done (after starci kernel report) settles its Task and
-      Dispatch, and Orca refuses a task-update after that (orca-deep-map smoke E3). Issued only by
-      scripts/kernel/launch-smoke.mjs for a smoke worker that never reported, and by the draw critic.
+      Dispatch, and Orca refuses a task-update after that. Issued only
+      by the draw critic.
   worker-start:
     command: orchestration worker-start
     kind: mutation
@@ -363,12 +363,6 @@ calls:
     flags: [worktree, force]
     required: [worktree]
     receipt: [result.removed]
-  worktree-list:
-    command: worktree list
-    kind: read
-    flags: [repo, limit]
-    receipt: [result.worktrees]
-    note: Every worktree Orca knows (of one repository with --repo), each with its id (<repo-id>::<path>), path, branch ref and displayName; the launch smoke (scripts/kernel/launch-smoke.mjs) to prove the workflow worktree is listed while the workflow runs and gone after the host-side release.
   worktree-ps:
     command: worktree ps
     kind: read

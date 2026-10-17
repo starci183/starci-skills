@@ -15,7 +15,7 @@ internal:
   - {path: scripts/api/orca/send.mjs, why: "Internal Orca API wrapper", usedBy: [scripts/kernel/cli.mjs]}
   - {path: scripts/api/orca/status.mjs, why: "Internal Orca API wrapper", usedBy: [scripts/reconciler/services.mjs]}
   - {path: scripts/api/orca/task-list.mjs, why: "Internal Orca API wrapper", usedBy: [scripts/kernel/cli.mjs]}
-  - {path: scripts/api/orca/task-update.mjs, why: "Internal Orca API wrapper", usedBy: [scripts/kernel/launch-smoke.mjs]}
+  - {path: scripts/api/orca/task-update.mjs, why: "Internal Orca API wrapper", usedBy: [scripts/work/draw-critic.mjs]}
   - {path: scripts/api/orca/terminal-close.mjs, why: "Internal Orca API wrapper", usedBy: [scripts/kernel/close-op-terminal.mjs]}
   - {path: scripts/api/orca/terminal-list.mjs, why: "Internal Orca API wrapper", usedBy: [scripts/checks/check-orca-tree.mjs]}
   - {path: scripts/api/orca/terminal-rename.mjs, why: "Internal Orca API wrapper", usedBy: [scripts/agent/lib.mjs]}
@@ -28,7 +28,6 @@ internal:
   - {path: scripts/api/orca/worker-start.mjs, why: "Internal Orca API wrapper", usedBy: [scripts/agent/lib.mjs]}
   - {path: scripts/api/orca/worker-stop.mjs, why: "Internal Orca API wrapper", usedBy: [scripts/agent/lib.mjs]}
   - {path: scripts/api/orca/worktree-create.mjs, why: "Internal Orca API wrapper", usedBy: [scripts/machine/worktree-orca.mjs]}
-  - {path: scripts/api/orca/worktree-list.mjs, why: "Internal Orca API wrapper", usedBy: [scripts/kernel/launch-smoke.mjs]}
   - {path: scripts/api/orca/worktree-ps.mjs, why: "Internal Orca API wrapper", usedBy: [scripts/machine/worktree-orca.mjs]}
   - {path: scripts/api/orca/worktree-rm.mjs, why: "Internal Orca API wrapper", usedBy: [scripts/machine/worktree-orca.mjs]}
   - {path: scripts/api/windsurf/seat-quota.mjs, why: "Windsurf seat-quota probe child", usedBy: [scripts/agent/quota/devin.mjs]}

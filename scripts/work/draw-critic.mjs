@@ -236,7 +236,7 @@ export function criticWorkspace({ repoRoot = gitRootOf(process.cwd()), context =
 }
 
 /** Remove the critic's placement through Orca (scripts/machine/worktree-orca.mjs removeOrcaWorktree, its branch with it). {ok, ...}. */
-export function removeCriticWorkspace({ dir, repoRoot, orcaId, branch = null, env = process.env, orca = undefined }) {
+function removeCriticWorkspace({ dir, repoRoot, orcaId, branch = null, env = process.env, orca = undefined }) {
   return removeOrcaWorktree({ repoRoot, orcaId, dir, branch, deleteBranch: branch ? 'force' : null, env, ...(orca ? { orca } : {}) });
 }
 
@@ -246,7 +246,7 @@ export function removeCriticWorkspace({ dir, repoRoot, orcaId, branch = null, en
  * worker-start --spec --agent --model --effort, worker-show attestation). `orca` replaces the Orca client
  * (clientOf). The launch receipt of scripts/agent/lib.mjs startAgent.
  */
-export function launchCriticWorker({ critic, dir, prompt, entry = null, parentDispatch = null, orca = null, context = null, subject = DRAW_SUBJECT }) {
+function launchCriticWorker({ critic, dir, prompt, entry = null, parentDispatch = null, orca = null, context = null, subject = DRAW_SUBJECT }) {
   // The Critic directory holds only the product it judges. The Task file the runtime writes for a prompt too long to paste lives in the state root's dispatch-prompts and is the one
   // file outside the directory the guard lets the Critic read (reach.taskFile); prompt-file.mjs owns its cleanup.
   const specFile = promptFileOf(`critic:${path.basename(dir)}`);

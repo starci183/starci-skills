@@ -1,5 +1,5 @@
 // start-worker.mjs — start one [Worker] agent from a worker route: the Supervisor's job launch
-// (scripts/supervisor/workers.mjs spawnWorkers) and the launch smoke's supervisor-worker tree (scripts/kernel/launch-smoke.mjs).
+// (scripts/supervisor/workers.mjs spawnWorkers).
 
 /**
  * Start one [Worker] agent: a worker of its own Run, which the Supervisor's terminal `entry` creates and coordinates

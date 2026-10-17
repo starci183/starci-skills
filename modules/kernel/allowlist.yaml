@@ -599,8 +599,6 @@ dead-script-entries:
     reason: "CLI of the example work standard (scripts/work/validate/check-example-work.mjs); a spec reads it"
   - path: scripts/gates/repo-presentation.mjs
     reason: "gate CLI that a product repository runs (docs/repo-presentation.md); no spec"
-  - path: scripts/kernel/launch-smoke.mjs
-    reason: "release smoke run by the owner (docs/releasing.md); specs read it"
   - path: scripts/route/route-op.mjs
     reason: "routing CLI named by the op prompts (docs/ops.md); no spec"
   - path: scripts/uat/assisted-runner.mjs

@@ -113,7 +113,7 @@ is), so such a worker reads unverified, never dead.
 | D2 | One Task per op attempt; the `worker_done` settlement closes the Task. |
 
 ### Known limits
-- `worker-release` alone does NOT end every agent: live smoke E1 proved it for claude, codex and devin, never for cursor, and a released cursor worker kept its
+- `worker-release` alone does NOT end every agent: observed for claude, codex and devin, never for cursor, and a released cursor worker kept its
   `cursor-agent` process running (about 11,200 CPU seconds, 2026-10-02 19:25 to 23:27). Every worker close therefore goes through `scripts/machine/worker-close.mjs`: release, terminal close, and a
   bounded proof that no process of that terminal's shell tree remains (membership is proven by the `ORCA_TERMINAL_HANDLE` the process inherited, never by name); a survivor is stopped only on that
   proof and raises the host-hygiene finding `worker-process-survived`, which never changes the worker's outcome. The Kernel's own close, the GC's leftover sweep and the host controller's
