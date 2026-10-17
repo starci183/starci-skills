@@ -60,12 +60,46 @@ starci app check --wiring
 starci app check --coverage-from coverage/lcov.info
 ```
 
-### starci app db
+### starci app ci
 
-preview or apply a migration baseline, restamp, history migration or post-cutover step
+set declared GitHub CI secrets and variables and verify their custody
 
 | flag | type | |
 | --- | --- | --- |
+| `--env` | string |  |
+| `--dependabot` | boolean |  |
+| `--repo` | string |  |
+| `--value` | string |  |
+| `--execute` | boolean |  |
+| `--json` | boolean |  |
+
+Positionals: action, operation?, name?
+
+exit: 0 action completed or verification clean; 1 verification findings; 2 refusal or bad usage
+
+json: flag
+
+```sh
+starci app ci secret set SONAR_TOKEN
+starci app ci secret set VPS_SSH_KEY --env production
+starci app ci secret set NPM_TOKEN --dependabot
+starci app ci var set SONAR_HOST_URL
+starci app ci var sync
+starci app ci var sync --execute
+starci app ci verify --json
+```
+
+### starci app db
+
+preview or apply database migrations, encrypted backups and guarded linked resets
+
+| flag | type | |
+| --- | --- | --- |
+| `--out` | string |  |
+| `--schema-only` | boolean |  |
+| `--auth` | string |  |
+| `--storage` | string |  |
+| `--backup` | string |  |
 | `--stamp` | string |  |
 | `--map` | string |  |
 | `--apply` | boolean |  |
@@ -81,17 +115,30 @@ Positionals: action
 
 Conventions:
 
+- Owner ruling 2026-10-17 alpha.20: "add a canon DB reset/backup verb design ...
+- at least starci app db dump (encrypted, outside repo) and starci app db reset --linked with explicit auth/storage behaviour flags"
+- Owner ruling main 2026-10-17: reset "must require --backup <receipt> pointing at an existing encrypted dump made in the last N hours,
+- and must refuse without explicit --auth/--storage choices"
+- dump requires exactly one target; archives roles, schema, auth/storage schema, data and rowcounts;
+- age encrypts to .sops.yaml recipients and deletes plaintext even on failure
+- dump verifies age archive header, size and sha256; owner identity is required for a separate decryption proof
+- reset is linked only, dry run by default, and requires STARCI_DB_ARMED=1 with --execute; local reset stays npm run db:reset
+- reset keep encrypts auth/storage data before reset, proves identity access, restores transactionally and verifies fingerprints and migration head;
+- requires Supabase db query --file and SOPS_AGE_KEY or SOPS_AGE_KEY_FILE
+- reset keeps encrypted temporary recovery parts after a reset/restore failure and reports their directory; plaintext is always deleted
 - baseline accepts --stamp; restamp requires --map; both preview without --apply
 - plan is always read-only and supports --json; it compares migrations, cron, queues and Vault names
 - migrate and post-cutover read the optional database block of application-stacks.yaml; both are dry runs without --execute
 - migrate is idempotent: baseline plus forward on the remote prints nothing to do; held-back migrations are never applied by it
 - post-cutover applies held-back migrations after the read-only pg_proc preflight, an open time gate and STARCI_DB_ARMED=1
 
-exit: 0 preview or action completed with no drift; 1 database plan drift; 2 refusal or bad usage
+exit: 0 preview or action completed with no drift; 1 database plan drift or failed tool/verification; 2 refusal or bad usage; 3 database mutation is not armed
 
 json: flag
 
 ```sh
+starci app db dump --linked --out /var/backups/my-app
+starci app db reset --linked --auth keep --storage keep --backup /var/backups/my-app/backup.receipt.json
 starci app db baseline
 starci app db baseline --stamp 20261014000000 --apply
 starci app db restamp --map restamp.yaml
@@ -190,6 +237,7 @@ run the release gates and write the L4 record and tag, or push branch and tag at
 | `--execute` | boolean |  |
 | `--source` | string |  |
 | `--tag-prefix` | string |  |
+| `--sonar` | boolean |  |
 | `--remote` | string |  |
 | `--json` | boolean |  |
 
@@ -197,18 +245,28 @@ Positionals: action
 
 Conventions:
 
-- the gate list is release.gates of application-stacks.yaml (argument arrays), else the app check plus the managed package scripts
+- the gate list is release.gates of application-stacks.yaml (argument arrays), else app-check, audit, then the managed package scripts
+- audit runs npm audit --omit=dev --audit-level=high by default; services.audit.level and omitDev configure it,
+- and an explicit audit.in without release-gate omits it;
+- declared release.gates gets audit appended if missing
+- --sonar appends @sonar/scan@4.3.0 against services.sonar.host (host.public for a host mapping), plus organization for sonarcloud;
+- disabled or unavailable Sonar or an unset token refuses RELEASE_SONAR_UNAVAILABLE
+- gate checks the newest completed ci.yml run on the default branch, including reachable push/tag runs;
+- failure, cancelled or timed_out refuses RELEASE_CI_RED with its URL and SHA;
+- unreadable GitHub or no run warns RELEASE_CI_UNKNOWN and continues
+- only the owner's starci release ci-override --sha <sha> --reason <text> record can override red CI; there is no --no-ci-check flag
 - gate refuses a dirty tree, HEAD other than --source, a moved HEAD and a tree dirtied by the gates; record and tag only when all gates are green
 - a gate with summary jest is red on failed tests and on a coverage threshold miss even when the process exits 0
 - push needs the annotated tag and L4 record of HEAD, runs git push --dry-run --atomic first and never uses --no-verify
 
-exit: 0 gate green or push done or nothing to do; 1 a gate is red or the push was refused by the hook; 2 refusal or bad usage
+exit: 0 gate green or push done or nothing to do; 1 a gate is red or the push was refused by the hook; 2 refusal or bad usage including RELEASE_CI_RED and RELEASE_SONAR_UNAVAILABLE
 
 json: flag
 
 ```sh
 starci app release gate
 starci app release gate --execute
+starci app release gate --sonar --execute
 starci app release push --remote origin
 starci app release push --execute
 ```
@@ -917,6 +975,13 @@ inspect, provision, run and start the local Sonar quality gate
 | `--public` | boolean |  |
 
 Positionals: command, arguments?
+
+Conventions:
+
+- up --public retries the tunnel running check for up to 30 seconds; SONAR_TUNNEL_NOT_RUNNING refuses with container state and the last 20 scrubbed log lines
+- SONAR_DB_PASSWORD_MISMATCH: the starci-sonarqube-postgres-data volume has another password than SONARQUBE_DB_PASSWORD in secret.env
+- (Compose supplies SONAR_JDBC_PASSWORD and POSTGRES_PASSWORD);
+- restore the old password or export a backup before recreating the volume
 
 exit: 0 requested inspection or gate passed; 1 gate failed or scan was refused; 2 command was blocked or usage was invalid
 
@@ -2817,13 +2882,14 @@ starci npm ci --workspace packages/cli
 
 ### starci npm install
 
-add exact dependencies from canon pins under the host lock
+install exact dependencies and move StarCi pins with the target CLI
 
 | flag | type | |
 | --- | --- | --- |
 | `--dev` | boolean |  |
+| `--canon` | boolean |  |
 
-Positionals: package
+Positionals: package?
 
 Effect: host
 
@@ -2832,16 +2898,23 @@ Roles: lead, owner
 Conventions:
 
 - bare package names resolve only from knowledge/hfs/canon-pins.yaml and never through a registry lookup
-- explicit versions use exact x.y.z form and must agree with the canon pin when one exists
+- explicit versions use exact x.y.z form and must agree with the canon pin when one exists, except the target CLI version on a canon upgrade
+- naming @starci/cli or passing --canon installs the exact target CLI first,
+- then reads its installed HFS runtime canon-pins.yaml and installs every pinned @starci package in the same host lock
+- --canon without a CLI positional uses the running runtime's exact CLI pin as the target
+- target pins never fall back to the running runtime when the target pin file is missing or inconsistent
+- each target StarCi pin is reported as moved or refused with a reason; a failed canon phase exits nonzero even when the first CLI install succeeded
 - installs always use --save-exact and report the package.json and package-lock.json diff stat
 
-exit: 0 exact dependencies were installed; 1 npm, Git or the host lock failed; 2 the package or worktree was refused
+exit: 0 exact dependencies and any requested canon pins were installed; 1 npm, Git, target canon loading or the host lock failed; 2 the package, target pin or worktree was refused
 
 json: starci/npm-install@1
 
 ```sh
 starci npm install typescript
 starci npm install left-pad@1.3.0 --dev
+starci npm install @starci/cli@1.4.1 --dev
+starci npm install --canon --dev
 ```
 
 ## starci orca
@@ -3042,6 +3115,36 @@ starci release check --final --json
 starci release check --only publish-plan,canon-pins
 ```
 
+### starci release ci-override
+
+the owner accepts red CI for one SHA and records who and why
+
+| flag | type | |
+| --- | --- | --- |
+| `--sha` | string |  |
+| `--reason` | string |  |
+| `--repo` | string |  |
+
+Conventions:
+
+- OWNER RULING 2026-10-17 (chat to main, relayed): alpha.20 "cut refuses when the latest CI on main is red, with a documented owner override verb";
+- the override is owner-only, records who and why in the owner rulings, and agents cannot run it.
+- Every bound role is refused by the command guard and by this script. The owner must use a terminal and type the first 12 SHA characters exactly.
+- Writes <git-common-dir>/starci-release/<sha>.ci-override.json, schema starci/ci-override@1,
+- with sha, reason, by (git user.name and OS user), at, and runUrl (empty if GitHub is unavailable).
+- For the runtime, appends ci-override-<sha12> under rulings before the top-level supersedes key in modules/kernel/owner-rulings.yaml.
+- Commit that entry into the tree being cut. App repositories receive only the record.
+- An override applies only to its exact SHA. It does not permit a cut when CI is unknown. Existing ruling IDs with another reason refuse.
+
+exit: 0 the override record and runtime owner ruling were written; 2 RIGHTS_OWNER_ONLY (a bound role or non-TTY stdin), bad usage, confirmation mismatch, or write failure
+
+json: none
+
+```sh
+starci release ci-override --sha 0123456789abcdef0123456789abcdef01234567 --reason "Owner accepts this CI failure for the release"
+starci release ci-override --repo D:/apps/example --sha 0123456789abcdef0123456789abcdef01234567 --reason "Owner accepts the failed run"
+```
+
 ### starci release ci-status
 
 the verdict of the GitHub ci workflow, Codecov and Sonar for a release; red is recorded for Debug
@@ -3099,7 +3202,18 @@ cut the release, the only way the runtime's remote main and a release tag move
 | `--rows` | string |  |
 | `--no-reuse` | boolean |  |
 
-exit: 0 the release was cut and main plus its tag were pushed atomically, or --plan found nothing missing; 1 refused (dirty tree, no or wrong tag, release notes incomplete, version not moved past the remote main, suite red, main moved, secret scan) and nothing was pushed; 2 bad usage
+Conventions:
+
+- OWNER RULING 2026-10-17 (chat to main, relayed): alpha.20 "cut refuses when the latest CI on main is red, with a documented owner override verb";
+- the override is owner-only, records who and why in the owner rulings, and agents cannot run it.
+- Before the suite, including --plan, read the newest completed CI workflow run on main.
+- Only success continues; every other conclusion refuses RELEASE_CI_RED and names the run URL and headSha.
+- Unreadable GitHub or no completed run refuses RELEASE_CI_UNKNOWN: a cut must not proceed blind, including under suite ci.
+- The owner may run starci release ci-override --sha <headSha> --reason <text>.
+- A red run requires both starci-release/<headSha>.ci-override.json in the git common dir and ci-override-<sha12>
+- in modules/kernel/owner-rulings.yaml of the tree being cut. Commit the ruling before cutting.
+
+exit: 0 the release was cut and main plus its tag were pushed atomically, or --plan found nothing missing; 1 refused (RELEASE_CI_RED, RELEASE_CI_UNKNOWN, dirty tree, no or wrong tag, release notes incomplete, version not moved past the remote main, suite red, main moved, secret scan) and nothing was pushed; 2 bad usage
 
 json: flag
 

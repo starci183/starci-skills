@@ -231,12 +231,12 @@ It does not invoke Docker or host processes, execute a runbook, authenticate the
 These requirements apply to lite and full; the rule catalog and its enforcers provide the implementation and proof for each requirement.
 
 - <a id="r250-deploy-scan"></a> R250 `HFS_DEPLOY_SCAN`: refuse host cron, production Compose, host scheduler loops and business logic in deploy scripts (`HFS_HOST_CRON`, `HFS_DEPLOY_NO_LOGIC`, `HFS_DEPLOY_COMPOSE_ON_VPS`, `HFS_DEPLOY_SCHEDULER`).
-- <a id="r251-deploy-workflow"></a> R251 `HFS_DEPLOY_WORKFLOW`: require protected deployment environments, permissions, concurrency and allowlisted credentials, full-SHA action pins, pinned tool installs and release-tag/manual app triggers (`HFS_DEPLOY_WORKFLOW`, `HFS_WORKFLOW_PIN`, `HFS_CI_TOOL_INSTALL`, `HFS_APP_WORKFLOW_TRIGGER`).
+- <a id="r251-deploy-workflow"></a> R251 `HFS_DEPLOY_WORKFLOW`: require protected deployment environments, permissions, concurrency and allowlisted credentials, pinned tool installs and release-tag/manual app triggers (`HFS_DEPLOY_WORKFLOW`, `HFS_WORKFLOW_PIN`, `HFS_CI_TOOL_INSTALL`, `HFS_APP_WORKFLOW_TRIGGER`). `scripts/hfs/rules/supply-chain.mjs` reports a line-specific `HFS_WORKFLOW_PIN` refusal for every remote `uses:` reference without a 40-hex commit SHA, including disabled jobs and steps. Local actions are allowed; container actions require a full `sha256` digest.
 - <a id="r252-script-hygiene"></a> R252 `HFS_SCRIPT_HYGIENE`: delivery scripts and workflow commands load sealed custody through the app secret CLI rather than reading plaintext secret files (`HFS_SCRIPT_PLAINTEXT_LOAD`), never enable shell xtrace or request revealed values (`HFS_SCRIPT_XTRACE`), and keep service-role references inside the back-end Supabase integration and its configuration (`HFS_SERVICE_ROLE_SCOPE`).
 - <a id="r266"></a>R266 `STACKS_SWARM_HARDENING`: `STACKS_SECRET_NOT_EXTERNAL` requires external Swarm secrets, `STACKS_SECRET_UNVERSIONED` requires immutable declared versions, and `STACKS_SECRET_ENV_LITERAL` refuses secret environment literals. `STACKS_PORT_PUBLISHED` confines published ports to the ingress and `STACKS_SECOND_INGRESS` refuses a second ingress. `STACKS_DNS_UNDECLARED`, `STACKS_HOST_UNROUTED` and `STACKS_TLS_UNDECLARED` require DNS ownership, host routes and TLS evidence. `STACKS_PLACEMENT_MISSING`, `STACKS_HEALTHCHECK_MISSING` and `STACKS_UPDATE_POLICY_MISSING` require stateful placement, real healthchecks and update, rollback and restart policies. `STACKS_REALTIME_SCALED` confines a lite realtime API to one replica.
 - <a id="r267"></a>R267 `STACKS_RELEASE_BACKUP`: declare immutable releases and backup ownership, target, retention and restore proof, and supply the rendered model (`STACKS_RELEASE_UNDECLARED`, `BACKUP_UNDECLARED`, `BACKUP_PROOF_MISSING`, `STACKS_MODEL_UNAVAILABLE`).
 - <a id="r268"></a>R268 `HFS_SCHEDULE_DECLARED`: declare each app scheduler, pg_cron tick or replicated-job schedule with its app-owned command (`HFS_SCHEDULE_UNDECLARED`).
-- <a id="r269"></a>R269 `HFS_SUPPLY_CHAIN`: require Dependabot, a production dependency audit step and an image SBOM (`HFS_DEPENDABOT_MISSING`, `HFS_AUDIT_STEP_MISSING`, `HFS_SBOM_MISSING`).
+- <a id="r269"></a>R269 `HFS_SUPPLY_CHAIN`: require scheduled npm, GitHub Actions and Docker updates through Dependabot, a production dependency audit step and an image SBOM (`HFS_DEPENDABOT_MISSING`, `HFS_AUDIT_STEP_MISSING`, `HFS_SBOM_MISSING`). `starci app sync` renders `.github/dependabot.yml` from `services.dependabot`. Every npm entry has a minor+patch version group and a `security-updates` group; every group explicitly sets `update-types: [minor, patch]`, leaving majors one PR per package. npm entries ignore `@starci/*` without version or update-type restrictions; canon pins move through `starci upgrade`. The security group applies immediately.
 - <a id="r271"></a>R271 `HFS_RELEASE_PROVENANCE`: bind the release tag to the package version and image tags, and guard database deployment to that release (`HFS_RELEASE_TAG_MISMATCH`, `HFS_DB_DEPLOY_UNGUARDED`).
 - <a id="r275"></a>R275 `STACKS_INGRESS_DECLARED`: `STACKS_INGRESS_UNDECLARED` requires one declared ingress and its hosts; `STACKS_INGRESS_UNKNOWN` refuses an unknown component, wrong role or unsupported image. Both digest-pinned Traefik and Caddy are accepted. An app whose ingress is a shared stack outside its own declares `ingress: {external: {stack: <name>}, hosts: [...]}` instead of `component`: its stack then renders no ingress (a second one raises `STACKS_SECOND_INGRESS`) and publishes no port, the shared ingress routes the hosts from its dynamic files (`starci app stack ingress publish`), and DNS and TLS stay declared.
 - <a id="r276"></a>R276 `STACKS_LITE_BACKING`: `STACKS_LITE_SELFHOSTED_DB` refuses self-hosted backing databases in lite; `STACKS_SIDECAR_VOLUME_UNDECLARED` requires a declared and mounted persistent volume for a SQLite sidecar; `STACKS_SIDECAR_DB_UNSUPPORTED` refuses a sidecar's non-SQLite database requirement. Full keeps its declared backing topology.
@@ -391,6 +391,49 @@ R297 `APP_SECRET_IN_CI`: refuse a sealed member key handed to an app container b
 ### r298
 
 R298 `CI_DECLARATION_DRIFT`: refuse a workflow reference to `secrets.X` or `vars.X` absent from its declared CI class (`GITHUB_TOKEN` is exempt), a non-optional declared name no workflow reads, or a `services.*.ci.token` absent from `ci.secrets`. The online counterpart is `starci app ci verify`.
+
+## starci app ci
+
+Run at the application root with GitHub CLI access to the repository. `starci app ci secret set <NAME>` reads its value from stdin only and passes it to `gh secret set` through stdin; values never belong in argv, shell history, chat or logs. Pipe directly from an owner-controlled secret source. The name must be declared in `ci.secrets`, or in `ci.dependabot.secrets` with `--dependabot`, and cannot be a sealed app secret key. Use `--env <environment>` for a declared environment secret; omit it for repository scope.
+
+```sh
+starci app ci var set SONAR_HOST_URL
+starci app ci var set VPS_HOST --env production
+starci app ci var sync
+starci app ci var sync --execute
+starci app ci verify --json
+```
+
+`var set <NAME>` uses the public manifest value; an optional `--value <value>` must agree with it. `var sync` previews all declared variables without GitHub access; `--execute` writes them in their declared scopes. `--repo <owner/name>` selects a repository explicitly for these commands, secret set and verify.
+
+`verify` is read-only: it lists repository secrets/variables, each declared environment's secrets/variables and Dependabot secrets, then compares them with the declaration. `packages/hfs/ci/verify.mjs` reports these findings with names and scopes only, without values:
+
+| Finding | Meaning |
+| --- | --- |
+| `CI_SECRET_MISSING` | A required declared secret is absent; optional secrets may be absent. |
+| `CI_VAR_MISSING` | A declared variable is absent. |
+| `CI_VAR_DRIFT` | A GitHub variable differs from its declared public value. |
+| `CI_SCOPE_MISMATCH` | A declared name exists in the wrong scope or secret store. |
+| `CI_SECRET_UNDECLARED` | A GitHub secret name has no declaration in the secret classes. |
+| `CI_VAR_UNDECLARED` | A GitHub variable name has no variable declaration. |
+| `APP_SECRET_IN_CI` | A sealed app secret key name appears in a GitHub secret store. |
+
+`--json` returns `{ok, findings}`. Exit 0 means clean verification or a completed action; exit 1 means verification findings; exit 2 means refusal or bad usage.
+
+## Database backup and reset
+
+Run at the application root. `starci app db dump` requires exactly one of `--linked`, `--local` or `--url-env <NAME>` and an `--out <directory>` outside the app and every Git worktree. A URL target reads the connection string from the named environment variable. The dump archives roles, schema, auth/storage schema, data and rowcounts, then age-encrypts to the root `.sops.yaml` recipients. Plaintext temporary parts are deleted even on failure. `--schema-only` omits data and cannot authorize reset. Both dump and reset support `--json`.
+
+```sh
+starci app db dump --linked --out /var/backups/my-app
+starci app db reset --linked --auth keep --storage keep --backup "/var/backups/my-app/<dump>/<dump>.receipt.json"
+```
+
+Use the receipt path printed by dump. Its schema is `starci/db-backup@1`; it records the project, target/ref, timestamp, encrypted archive filename, byte count, SHA-256, parts and rowcounts. Header, size and hash checks establish archive integrity; proving decryption requires the owner's identity separately.
+
+Reset requires `--linked`, an explicit `--auth keep|drop`, an explicit `--storage keep|drop` and `--backup <receipt>`, including for its default dry run. The receipt must identify a full linked backup for the same project ref, with its encrypted archive present and matching its header, bytes and hash. It cannot be future-dated or older than `database.reset.backupMaxAgeHours` in `.starcistacks/application-stacks.yaml` (default 24 hours; must be positive). Add `--execute` and set `STARCI_DB_ARMED=1` in the environment to apply the reset. Local reset remains `npm run db:reset`.
+
+`--auth keep` encrypts auth data before reset, restores it transactionally and verifies it; `drop` deletes users and identities. `--storage keep` preserves and verifies buckets and objects metadata; `drop` empties `storage.objects` metadata without deleting backend files. Keeping either class requires a Supabase CLI with `db query --file` and an owner identity through `SOPS_AGE_KEY` or `SOPS_AGE_KEY_FILE`. Reset verifies the complete migration version set afterward. On reset/restore failure, encrypted recovery parts remain at the reported directory; plaintext is always deleted.
 
 ## Quality services
 

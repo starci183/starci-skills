@@ -22,12 +22,16 @@ flags:
   - {name: owner-confirms-old-app-gone, type: boolean, summary: "post-cutover: the owner confirms the old app is gone (opens the time gate)"}
   - {name: json, type: boolean, summary: "plan, migrate, post-cutover, dump, reset: print the result as JSON"}
 conventions:
-  - 'Owner ruling 2026-10-17 alpha.20: "add a canon DB reset/backup verb design ... at least starci app db dump (encrypted, outside repo) and starci app db reset --linked with explicit auth/storage behaviour flags"'
-  - 'Owner ruling main 2026-10-17: reset "must require --backup <receipt> pointing at an existing encrypted dump made in the last N hours, and must refuse without explicit --auth/--storage choices"'
-  - "dump requires exactly one target; archives roles, schema, auth/storage schema, data and rowcounts; age encrypts to .sops.yaml recipients and deletes plaintext even on failure"
+  - "Owner ruling 2026-10-17 alpha.20: \"add a canon DB reset/backup verb design ..."
+  - "at least starci app db dump (encrypted, outside repo) and starci app db reset --linked with explicit auth/storage behaviour flags\""
+  - "Owner ruling main 2026-10-17: reset \"must require --backup <receipt> pointing at an existing encrypted dump made in the last N hours,"
+  - "and must refuse without explicit --auth/--storage choices\""
+  - "dump requires exactly one target; archives roles, schema, auth/storage schema, data and rowcounts;"
+  - "age encrypts to .sops.yaml recipients and deletes plaintext even on failure"
   - "dump verifies age archive header, size and sha256; owner identity is required for a separate decryption proof"
   - "reset is linked only, dry run by default, and requires STARCI_DB_ARMED=1 with --execute; local reset stays npm run db:reset"
-  - "reset keep encrypts auth/storage data before reset, proves identity access, restores transactionally and verifies fingerprints and migration head; requires Supabase db query --file and SOPS_AGE_KEY or SOPS_AGE_KEY_FILE"
+  - "reset keep encrypts auth/storage data before reset, proves identity access, restores transactionally and verifies fingerprints and migration head;"
+  - "requires Supabase db query --file and SOPS_AGE_KEY or SOPS_AGE_KEY_FILE"
   - "reset keeps encrypted temporary recovery parts after a reset/restore failure and reports their directory; plaintext is always deleted"
   - baseline accepts --stamp; restamp requires --map; both preview without --apply
   - plan is always read-only and supports --json; it compares migrations, cron, queues and Vault names

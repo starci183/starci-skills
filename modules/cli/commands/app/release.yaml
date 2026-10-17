@@ -14,9 +14,14 @@ flags:
   - {name: json, type: boolean, summary: print the result as JSON}
 conventions:
   - "the gate list is release.gates of application-stacks.yaml (argument arrays), else app-check, audit, then the managed package scripts"
-  - "audit runs npm audit --omit=dev --audit-level=high by default; services.audit.level and omitDev configure it, and an explicit audit.in without release-gate omits it; declared release.gates gets audit appended if missing"
-  - "--sonar appends @sonar/scan@4.3.0 against services.sonar.host (host.public for a host mapping), plus organization for sonarcloud; disabled or unavailable Sonar or an unset token refuses RELEASE_SONAR_UNAVAILABLE"
-  - "gate checks the newest completed ci.yml run on the default branch, including reachable push/tag runs; failure, cancelled or timed_out refuses RELEASE_CI_RED with its URL and SHA; unreadable GitHub or no run warns RELEASE_CI_UNKNOWN and continues"
+  - "audit runs npm audit --omit=dev --audit-level=high by default; services.audit.level and omitDev configure it,"
+  - "and an explicit audit.in without release-gate omits it;"
+  - "declared release.gates gets audit appended if missing"
+  - "--sonar appends @sonar/scan@4.3.0 against services.sonar.host (host.public for a host mapping), plus organization for sonarcloud;"
+  - "disabled or unavailable Sonar or an unset token refuses RELEASE_SONAR_UNAVAILABLE"
+  - "gate checks the newest completed ci.yml run on the default branch, including reachable push/tag runs;"
+  - "failure, cancelled or timed_out refuses RELEASE_CI_RED with its URL and SHA;"
+  - "unreadable GitHub or no run warns RELEASE_CI_UNKNOWN and continues"
   - "only the owner's starci release ci-override --sha <sha> --reason <text> record can override red CI; there is no --no-ci-check flag"
   - "gate refuses a dirty tree, HEAD other than --source, a moved HEAD and a tree dirtied by the gates; record and tag only when all gates are green"
   - "a gate with summary jest is red on failed tests and on a coverage threshold miss even when the process exits 0"

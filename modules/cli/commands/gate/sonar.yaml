@@ -30,7 +30,9 @@ flags:
   - {name: public, type: boolean, summary: "up or stop: activate profile public; up verifies the tunnel is running (needs CLOUDFLARE_TUNNEL_TOKEN)"}
 conventions:
   - "up --public retries the tunnel running check for up to 30 seconds; SONAR_TUNNEL_NOT_RUNNING refuses with container state and the last 20 scrubbed log lines"
-  - "SONAR_DB_PASSWORD_MISMATCH: the starci-sonarqube-postgres-data volume has another password than SONARQUBE_DB_PASSWORD in secret.env (Compose supplies SONAR_JDBC_PASSWORD and POSTGRES_PASSWORD); restore the old password or export a backup before recreating the volume"
+  - "SONAR_DB_PASSWORD_MISMATCH: the starci-sonarqube-postgres-data volume has another password than SONARQUBE_DB_PASSWORD in secret.env"
+  - "(Compose supplies SONAR_JDBC_PASSWORD and POSTGRES_PASSWORD);"
+  - "restore the old password or export a backup before recreating the volume"
 exit:
   "0": requested inspection or gate passed
   "1": gate failed or scan was refused

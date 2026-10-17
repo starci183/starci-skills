@@ -8,7 +8,8 @@ roles: [lead, owner]
 conventions:
   - bare package names resolve only from knowledge/hfs/canon-pins.yaml and never through a registry lookup
   - explicit versions use exact x.y.z form and must agree with the canon pin when one exists, except the target CLI version on a canon upgrade
-  - naming @starci/cli or passing --canon installs the exact target CLI first, then reads its installed HFS runtime canon-pins.yaml and installs every pinned @starci package in the same host lock
+  - "naming @starci/cli or passing --canon installs the exact target CLI first,"
+  - "then reads its installed HFS runtime canon-pins.yaml and installs every pinned @starci package in the same host lock"
   - --canon without a CLI positional uses the running runtime's exact CLI pin as the target
   - target pins never fall back to the running runtime when the target pin file is missing or inconsistent
   - each target StarCi pin is reported as moved or refused with a reason; a failed canon phase exits nonzero even when the first CLI install succeeded

@@ -18,10 +18,14 @@ exit:
   "2": bad usage
 json: flag
 conventions:
-  - 'OWNER RULING 2026-10-17 (chat to main, relayed): alpha.20 "cut refuses when the latest CI on main is red, with a documented owner override verb"; the override is owner-only, records who and why in the owner rulings, and agents cannot run it.'
-  - "Before the suite, including --plan, read the newest completed CI workflow run on main. Only success continues; every other conclusion refuses RELEASE_CI_RED and names the run URL and headSha."
+  - "OWNER RULING 2026-10-17 (chat to main, relayed): alpha.20 \"cut refuses when the latest CI on main is red, with a documented owner override verb\";"
+  - "the override is owner-only, records who and why in the owner rulings, and agents cannot run it."
+  - "Before the suite, including --plan, read the newest completed CI workflow run on main."
+  - "Only success continues; every other conclusion refuses RELEASE_CI_RED and names the run URL and headSha."
   - "Unreadable GitHub or no completed run refuses RELEASE_CI_UNKNOWN: a cut must not proceed blind, including under suite ci."
-  - "The owner may run starci release ci-override --sha <headSha> --reason <text>. A red run requires both starci-release/<headSha>.ci-override.json in the git common dir and ci-override-<sha12> in modules/kernel/owner-rulings.yaml of the tree being cut. Commit the ruling before cutting."
+  - "The owner may run starci release ci-override --sha <headSha> --reason <text>."
+  - "A red run requires both starci-release/<headSha>.ci-override.json in the git common dir and ci-override-<sha12>"
+  - "in modules/kernel/owner-rulings.yaml of the tree being cut. Commit the ruling before cutting."
 examples:
   - starci release cut
   - starci release cut --plan --tag v1.0.0-alpha.9
