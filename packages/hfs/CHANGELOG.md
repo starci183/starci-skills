@@ -1,5 +1,8 @@
 # Changelog
 
+## 4.5.1 - 2026-10-18
+- Fixed: managed CI base refs, public build values, caching and timeouts; optional quality service handling, README formatting and Supabase migration-history parsing.
+
 ## 4.5.0 - 2026-10-17
 - Added: consumer-class CI declarations, `app ci` custody verbs and R296-R298; manifest-driven quality files and split cached CI with immutable action pins.
 - Added: release audit/local Sonar and main-CI protection; encrypted outside-repository DB dump and armed linked reset with backup/auth/storage validation.

@@ -1,5 +1,8 @@
 # Changelog
 
+## 8.4.3 - 2026-10-18
+- Changed: bundled runtime copies include the refreshed canon pins for the alpha.20 patch set; canon rules are unchanged.
+
 ## 8.4.2 - 2026-10-17
 
 - Changed: bundled runtime copies follow runtime 1.0.0-alpha.20, including the canon pins and shared architecture checks.

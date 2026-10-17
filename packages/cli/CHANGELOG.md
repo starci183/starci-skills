@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.5.1 - 2026-10-18
+- Changed: pins @starci/hfs 4.5.1 and carries runtime 1.0.0-alpha.20 with the refreshed release catalog.
+
 ## 1.5.0 - 2026-10-17
 - Added: `app ci` and owner-only `release ci-override`; regenerated command docs and shell completions.
 - Changed: catalog documents DB dump/reset, app release audit/Sonar and CI checks, cut CI protection, npm install target canon pins and verified public Sonar startup.

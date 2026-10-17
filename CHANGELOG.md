@@ -29,13 +29,14 @@ This release supersedes the alpha.19 cut, which was never tagged (its push secre
 - The managed README badge block is prettier-stable (a blank line inside its markers); the `readme-badges` self-check refuses a runtime or example README the canon prettier config would reformat (RT_README_NOT_PRETTIER). The alpha.20 cut on hfs 4.5.0 was refused on this (HFS_FORMAT in every example's lint, format:check and sonar rows).
 - Rendered app CI (from NIVO's v0.2.2 tag run): every lint job checks out full history and sets STARCI_BASE_REF per event (pull request base, previous tag, push before, else the default branch), so file-size-growth has its base; the build fe step gets the manifest's plain public build values (deploy.images.*.buildArgs.values and release.gates[build-fe].env) as static env, never a secret or an environment; the unit step runs with --forceExit and a cached `.jest-cache`; every rendered job has timeout-minutes.
 - `@starci/jest-preset`: the unit project transpiles each file on its own (isolatedModules), so a 2-vCPU runner no longer builds a type program per test file (type checks stay the typecheck gate); only the compiler-emitted `design:paramtypes` metadata guard injected by the transform is kept out of coverage, never app source.
+- Optional quality services (owner ruling 2026-10-17, `owner:quality-services-optional`): `services.sonar.optional` and `services.codecov.optional` (defaults: self-hosted SonarQube true, SonarCloud and Codecov false). When optional and the provider is unreachable, the rendered CI step and `starci app release gate --sonar` skip with a notice (an honest SKIPPED row) instead of failing; strict stays strict (SONAR_UNREACHABLE).
 - Scaffolded apps declare their public front-end build values (R300) as manifest placeholders; DB type emission reads the Supabase CLI's JSON migration history.
 
 ### Removed
 - The alpha.19 one-release bootstrap accepting a legacy 0/0 affected receipt; verification requires the current package and scaffold proof.
 
 ### Release
-- Packages to publish: `@starci/hfs` 4.5.0, `@starci/cli` 1.5.0 (new verbs, pins HFS 4.5.0, carries runtime 1.0.0-alpha.20), `@starci/eslint-canon-be` 3.4.2 and `@starci/eslint-canon-fe` 8.4.2 (only their bundled runtime copies changed). The canon pins, the code-pattern bindings and the example package.json pins are bound to them; the example lockfiles resolve them after the publish.
+- Packages to publish: `@starci/hfs` 4.5.1, `@starci/cli` 1.5.1 (pins HFS 4.5.1, carries runtime 1.0.0-alpha.20), `@starci/jest-preset` 2.3.1, `@starci/eslint-canon-be` 3.4.3 and `@starci/eslint-canon-fe` 8.4.3 (refreshed bundled runtime pins). HFS 4.5.0, CLI 1.5.0 and the ESLint canons 3.4.2/8.4.2 were published first; this patch set supersedes them. Canon pins, code-pattern bindings and example package.json pins are bound to the patch set; example lockfiles resolve it after publication.
 
 ## [1.0.0-alpha.19] — 2026-10-17
 

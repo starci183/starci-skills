@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 2.3.1 - 2026-10-18
 
 - Fixed: coverage excludes only compiler-emitted constructor `design:paramtypes` metadata guards injected by the preset transform; application source is never excluded, and the generated anchor is omitted from LCOV.
 - Changed: unit transforms use isolated transpilation instead of a per-file type program. A bundled ts-jest after-transformer preserves constructor metadata guards while mapping only those generated calls to a dedicated generated-metadata coverage anchor, keeping per-file 100 coverage reachable without hiding source branches. `importHelpers` stays enabled; type checking remains a separate gate. The bundled LCOV reporter gives repeated callback names unique identities so the app coverage gate can verify function totals.
