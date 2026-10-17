@@ -4,14 +4,14 @@
 // Rule ids are unique names, not a counted run: a gap between two ids is fine.
 //   RT_RULE_ID_UNKNOWN  an id no rule has.
 //   RT_RULE_UNCITED     a rule no pattern topic cites and that is not marked `scope: runtime`: product law exists to be taught.
-// History paths (isHistoryPath: changelogs, benchmark findings, .starciwork records) record the rules of their day, so a deleted rule keeps its id there; specs (tests/**) and generated copies are not read. Pure apart from ctx.read.
+// History paths (isHistoryPath: changelogs, benchmark findings, .starciwork records) record the rules of their day, so a deleted rule keeps its id there; generated copies are not read. Pure apart from ctx.read.
 import { isHistoryPath } from '../../lib/check-scan.mjs';
 import { loadRuleCatalog } from '../slots.mjs';
 
 export const UNKNOWN = 'RT_RULE_ID_UNKNOWN';
 const UNCITED = 'RT_RULE_UNCITED';
 const READ = /\.(?:mjs|cjs|js|ts|tsx|md|ya?ml|json)$/;
-const SKIPPED = /(?:^|\/)(?:package-lock\.json|npm-shrinkwrap\.json)$|^tests\//;
+const SKIPPED = /(?:^|\/)(?:package-lock\.json|npm-shrinkwrap\.json)$/;
 const RULE_ID = /\bR\d{2,3}\b/g;
 const PATTERN_FILE = /^knowledge\/patterns\/.*\.yaml$/;
 const HFS_RULES = /hfsRules:\s*\[([^\]]*)\]/g;

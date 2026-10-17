@@ -31,7 +31,7 @@ export const SCRIPT_ROOTS = Object.freeze(['scripts', 'engine', 'modules', 'bin'
  * Directories the runtime loads by listing them, never by naming a file. The loader is named so a removed loader makes the
  * directory dead again (the spec asserts each loader still lists its directory).
  */
-export const DYNAMIC_ROOTS = Object.freeze({
+const DYNAMIC_ROOTS = Object.freeze({
   'scripts/kernel/verbs/': 'scripts/kernel/cli.mjs lists the verb files',
   'scripts/kernel/status/': 'scripts/kernel/api-extensions.mjs lists the status views',
   'scripts/reconciler/controllers/': 'scripts/reconciler/engine.mjs loads each controller of modules/reconciler/reconciler.yaml by name',
@@ -39,7 +39,7 @@ export const DYNAMIC_ROOTS = Object.freeze({
 const CODE = /\.(mjs|cjs|js|ts|tsx|ps1|sh|cmd)$/;
 const HOOK = /(^|\/)(?:\.husky|hooks\/husky)\/[^/]+$/;
 const GENERATED = /^packages\/[^/]+\/runtime\/|^packages\/eslint\/[^/]+\/runtime\//;
-const isTest = (rel) => rel.startsWith('tests/') || /\.(test|spec)\.mjs$/.test(rel);
+const isTest = (rel) => rel.startsWith('e2e/') || /\.(test|spec)\.mjs$/.test(rel);
 const HISTORY = 'modules/kernel/owner-rulings.yaml';
 const COMMENT_LINE = /^\s*(\/\/|\/\*|\*|#)/;
 const EXEC_POSITION = /\b(run|check|script|executable|entry|command|exec|cmd|handler)\s*:/;
@@ -87,7 +87,7 @@ const scriptFinding = (rel, entries, reader) => {
  * The dead scripts of a tree: [{code, path, message}].
  * files: {tracked: [rel], read: (rel) => text}.
  */
-export function deadScriptFindings({ tracked, read }) {
+function deadScriptFindings({ tracked, read }) {
   const scripts = tracked.filter((rel) => rel.endsWith('.mjs') && SCRIPT_ROOTS.some((r) => rel.startsWith(`${r}/`)) && !isTest(rel));
   const entries = parseEntries(tracked.includes(ALLOWLIST_FILE) ? read(ALLOWLIST_FILE) : '');
   const readers = tracked.filter((rel) => !isTest(rel) && !GENERATED.test(rel) && !rel.startsWith(HISTORY));
@@ -118,6 +118,6 @@ export function deadScriptFindings({ tracked, read }) {
 }
 
 /** Run the check on the runtime at `root`. */
-export const checkDeadScripts = (root = skillRoot) => deadScriptFindings(workingTreeFiles(root, lsFiles));
+const checkDeadScripts = (root = skillRoot) => deadScriptFindings(workingTreeFiles(root, lsFiles));
 
 if (isMain(import.meta.url)) process.exit(printFindings(checkDeadScripts(), "OK: every runtime script has an executable reader or a declared entry."));

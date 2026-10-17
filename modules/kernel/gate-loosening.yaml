@@ -30,7 +30,8 @@ thresholds:
 # Product code: a deleted or weakened spec counts only together with a change to one of these.
 productPrefixes: [scripts/, engine/, modules/, knowledge/, packages/, ui/, init/]
 
-# Specs, and the markers that skip one.
-specPattern: 'tests/**/*.spec.mjs'
+# Specs judged here: the scaffold e2e and the example apps' tests (the runtime has no specs of its own, owner ruling no-runtime-specs; the package
+# specs were never judged here: an eslint RuleTester spec spells skip markers inside its code fixtures), and the markers that skip one.
+specRoots: [e2e/, examples/]
 skipMarkers: ['.skip(', 'skip: true', 'todo: true', '.todo(']
 assertionMarkers: ['assert.', 'expect(']

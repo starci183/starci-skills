@@ -565,6 +565,7 @@ $defs:
         description: 'the editions the slot exists in (default: the manifest editions); a slot outside the declared edition owns no path'
       editionWhy: {type: string, minLength: 1, pattern: '\S', description: 'the ruling that explains why the slot differs between editions'}
       templateNa: {type: string, minLength: 1, pattern: '\S', description: 'why this product-owned or generated slot has no scaffolded template'}
+      exampleNa: {type: string, minLength: 1, pattern: '\S', description: 'why no example app exercises this slot in an edition, citing owner:no-runtime-specs (its only example was a deleted runtime fixture)'}
       exemplifiedBy:
         type: array
         minItems: 1

@@ -26,7 +26,7 @@ export const SCRIPT_ROOTS = Object.freeze(['scripts', 'engine', 'modules', 'bin'
 const MIN_TOKENS = 8;
 
 const isLib = (rel) => /^(scripts\/lib|engine)\/[^/]+\.mjs$/.test(rel) || /^scripts\/api\/[^/]+\/lib\.mjs$/.test(rel) || rel === 'scripts/lib/walk.mjs';
-const isTest = (rel) => rel.startsWith('tests/') || /\.(test|spec)\.mjs$/.test(rel);
+const isTest = (rel) => rel.startsWith('e2e/') || /\.(test|spec)\.mjs$/.test(rel);
 const GENERATED = /^packages\/[^/]+\/runtime\//;
 
 const parse = (text) => acorn.parse(text, { ecmaVersion: 'latest', sourceType: 'module', allowHashBang: true, allowReturnOutsideFunction: true });
@@ -155,7 +155,7 @@ const libTable = (parsed) => {
   return { table, byName };
 };
 
-export function helperOnceFindings({ tracked, read }) {
+function helperOnceFindings({ tracked, read }) {
   const scripts = tracked.filter((rel) => rel.endsWith('.mjs') && SCRIPT_ROOTS.some((r) => rel.startsWith(`${r}/`)) && !isTest(rel) && !GENERATED.test(rel));
   const parsed = scripts.map((rel) => {
     const source = read(rel);
@@ -274,6 +274,6 @@ function nearCopyFindings(parsed, reported) {
 }
 
 /** Run the check on the runtime at `root`. */
-export const checkHelperOnce = (root = skillRoot) => helperOnceFindings(workingTreeFiles(root, lsFiles));
+const checkHelperOnce = (root = skillRoot) => helperOnceFindings(workingTreeFiles(root, lsFiles));
 
 if (isMain(import.meta.url)) runCheckCli(checkHelperOnce(), 'OK: every shared helper has one home.');

@@ -13,7 +13,7 @@
 // `orca worktree rm` only by scripts/machine/worktree-orca.mjs, which hands Orca a tree without a link. A land gate tree check (scripts/supervisor/land.mjs
 // TREE_CHECKS) and part of `npm run check`.
 //
-// It scans every tracked script outside tests/ (.mjs .js .cjs .ts .ps1 .sh; node_modules and the packages' copied
+// It scans every tracked script outside e2e/ (.mjs .js .cjs .ts .ps1 .sh; node_modules and the packages' copied
 // runtime/ excluded) for an invocation of `worktree add`:
 //   argv form    'worktree', 'add'   (any quote, any spacing: a git runner's argument list)
 //   shell form   git [-C <dir>] worktree add   at the start of a string, a command, or after && ; || - any line of a
@@ -67,7 +67,7 @@ function functionSpan(text, name) {
  * The stray invocations in one file's text: [{line, text}]. `file` decides whether a bare shell line counts; `allowed`
  * is a [first, last] line span where an invocation is the one home (WORKTREE_ADD_HOME in WORKTREE_API). Pure.
  */
-export function strayLines(text, file = 'x.mjs', { allowed = null } = {}) {
+function strayLines(text, file = 'x.mjs', { allowed = null } = {}) {
   const out = [];
   const script = SHELL_SCRIPT.test(file);
   String(text).split(/\r?\n/).forEach((line, i) => {
@@ -89,10 +89,10 @@ function describeHit(h) {
   return `${where}git worktree add outside ${WORKTREE_API} ${WORKTREE_ADD_HOME} (an agent workspace is created by Orca, a runtime scratch tree by scripts/machine/worktree-git.mjs createScratchWorktree): ${h.text}`;
 }
 
-const scanned = (rel) => EXTENSIONS.test(rel) && !rel.startsWith('tests/') && !rel.includes('node_modules/') && !/^packages\/[^/]+(?:\/[^/]+)?\/runtime\//.test(rel);
+const scanned = (rel) => EXTENSIONS.test(rel) && !rel.startsWith('e2e/') && !rel.includes('node_modules/') && !/^packages\/[^/]+(?:\/[^/]+)?\/runtime\//.test(rel);
 
 /** {ok, hits: [{file, line, text}], files} over the tracked tree at `root`. */
-export function scanWorktreeAdd(root, { files = null } = {}) {
+function scanWorktreeAdd(root, { files = null } = {}) {
   const listed = files ?? (() => { const r = lsFiles([], { cwd: root, maxBuffer: 64 * 1024 * 1024 }); return r.status === 0 ? r.stdout.split('\n').filter(Boolean) : []; })();
   const hits = [];
   let count = 0;

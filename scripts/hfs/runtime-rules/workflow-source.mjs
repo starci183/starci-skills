@@ -4,8 +4,8 @@ import { parseYaml } from '../../../engine/yaml.mjs';
 
 const WORKFLOW = /(?:^|\/)\.?(?:github\/)?workflows\/[^/]+\.ya?ml$/;
 
-/** The tracked workflow files of the runtime, its examples and the hfs templates (never a spec fixture under tests/). */
-const workflowFiles = (files) => files.filter((file) => WORKFLOW.test(file) && !file.startsWith('tests/'));
+/** The tracked workflow files of the runtime, its examples and the hfs templates. */
+const workflowFiles = (files) => files.filter((file) => WORKFLOW.test(file));
 
 /** The parsed workflow, or null when the text is not YAML (the other checks name that). */
 export function parseWorkflow(text) {

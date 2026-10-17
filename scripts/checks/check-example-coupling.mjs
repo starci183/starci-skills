@@ -53,7 +53,7 @@ const TEMPLATES_ROOT = 'packages/hfs/templates/';
 /** The one file that declares the reads the runtime makes of its own examples/ tree (R206). */
 const DECLARED_REFS = 'scripts/lib/example-refs.mjs';
 /** This check and its spec name the tokens they enforce. */
-const SELF_FILES = new Set(['scripts/checks/check-example-coupling.mjs', 'tests/checks/example-coupling.spec.mjs', DECLARED_REFS]);
+const SELF_FILES = new Set(['scripts/checks/check-example-coupling.mjs', DECLARED_REFS]);
 /** Out of scope: a spec or test file, a tests/fixtures segment, the generated runtime copies, a changelog. */
 const OUT_OF_SCOPE = (rel) =>
   rel !== undefined && (/(?:^|\/)runtime\//.test(rel) || /(?:^|\/)(?:tests?|fixtures?|__tests__|__fixtures__|node_modules)(?:\/|$)/.test(rel)
@@ -87,7 +87,7 @@ const incidentTokens = function* (body) {
 
 
 /** The live tracked source files of `root` under SCAN_ROOTS (git ls-files, or the filesystem of a spec fixture tree). */
-export function exampleCouplingScan(root = DEFAULT_ROOT) {
+function exampleCouplingScan(root = DEFAULT_ROOT) {
   const scoped = (rel) =>
     SCAN_ROOTS.some((dir) => rel === dir || rel.startsWith(`${dir}/`))
     && !SELF_FILES.has(rel)
@@ -124,7 +124,7 @@ function spanHits(rel, text, body, at) {
 }
 
 /** The coupling hits of `text` in file `rel`: [{file, line, code, token, why}]. */
-export function couplingHits(rel, text) {
+function couplingHits(rel, text) {
   if (!SOURCE.test(rel)) return spanHits(rel, text, text, 0).sort((a, b) => a.line - b.line || a.code.localeCompare(b.code));
   const t = ts();
   let kind = t.ScriptKind.JS;
@@ -148,7 +148,7 @@ export function couplingHits(rel, text) {
 }
 
 /** The coupling report of the runtime sources under `root`: {ok, filesScanned, hits}. */
-export function checkExampleCoupling(root = DEFAULT_ROOT) {
+function checkExampleCoupling(root = DEFAULT_ROOT) {
   const files = exampleCouplingScan(root);
   const hits = [];
   for (const rel of files) {
@@ -159,15 +159,8 @@ export function checkExampleCoupling(root = DEFAULT_ROOT) {
   return { schema: 'starci/example-coupling@1', ok: hits.length === 0, filesScanned: files.length, hits };
 }
 
-/** The findings (RT_EXAMPLE_COUPLING, RT_PRODUCT_NAME_IN_SOURCE, RT_HOST_PATH_IN_TEMPLATE) under `root`. */
-function exampleCouplingFindings(root = DEFAULT_ROOT) {
-  return checkExampleCoupling(root).hits.map((h) => ({
-    code: h.code, level: 'error', path: h.file, line: h.line,
-    message: `${h.file}:${h.line} names ${h.token}: ${h.why}`,
-  }));
-}
 
-export const checkExampleCouplingMain = (argv) => runReportMain(argv, {
+const checkExampleCouplingMain = (argv) => runReportMain(argv, {
   name: 'check-example-coupling', help: HELP, root: DEFAULT_ROOT, scan: checkExampleCoupling,
   describe: (report) => ({
     okText: `check-example-coupling: no example or product name in ${report.filesScanned} source files`,

@@ -13,7 +13,7 @@
 // TypeScript, which this check does not read.
 //
 // Source is English too (HFS_SOURCE_NOT_ENGLISH): every comment, string and SQL comment of scripts/, engine/, bin/, ui/,
-// packages/ and tests/ (`.mjs .cjs .js .ts .tsx .sql .ps1 .sh .html .css`). Text the owner must read in Vietnamese lives in a
+// packages/ and e2e/ (`.mjs .cjs .js .ts .tsx .sql .ps1 .sh .html .css`). Text the owner must read in Vietnamese lives in a
 // DECLARED catalog instead, keyed from its English source: scripts/lib/i18n.mjs reads modules/i18n/messages/*.yaml and generates
 // the UI's ignored browser map. Phrase data a matcher applies to owner or product text lives in
 // modules/goal/source-phrases.yaml (source-phrases.mjs). A new undeclared Vietnamese line fails.
@@ -28,7 +28,7 @@ import { lsFiles } from '../api/git/ls-files.mjs';
 import { gitResultOf } from '../lib/git.mjs';
 
 /** The runtime folders whose documents are read; the repository root's own Markdown is read too. */
-export const RUNTIME_DOCUMENT_ROOTS = Object.freeze(['knowledge', 'docs', 'modules', 'packages', 'examples', 'skills', 'ui']);
+const RUNTIME_DOCUMENT_ROOTS = Object.freeze(['knowledge', 'docs', 'modules', 'packages', 'examples', 'skills', 'ui']);
 const SKIPPED_DIRECTORIES = new Set(['node_modules', '.git', 'dist', '.next', 'coverage']);
 
 /** The document files of a runtime checkout (repository-relative POSIX paths). */
@@ -54,10 +54,10 @@ function runtimeDocuments(root = skillRoot) {
 }
 
 /** The source folders whose code files are read, and the file kinds. */
-const RUNTIME_SOURCE_ROOTS = Object.freeze(['scripts', 'engine', 'bin', 'ui', 'packages', 'tests']);
+const RUNTIME_SOURCE_ROOTS = Object.freeze(['scripts', 'engine', 'bin', 'ui', 'packages', 'e2e']);
 export const SOURCE_EXTENSIONS = Object.freeze(['.mjs', '.cjs', '.js', '.ts', '.tsx', '.sql', '.ps1', '.sh', '.html', '.css']);
 /** Source that IS declared Vietnamese: the Vietnamese-letter detector itself. UI source is English; its generated map is ignored. */
-export const DECLARED_SOURCE_CATALOGS = Object.freeze(['scripts/lib/language.mjs']);
+const DECLARED_SOURCE_CATALOGS = Object.freeze(['scripts/lib/language.mjs']);
 /**
  * Functional Vietnamese: source that MATCHES owner text (a phrase or mark the owner types) and so cannot be translated. One
  * entry per file with the reason; the file is exempt from HFS_SOURCE_NOT_ENGLISH, nothing else is.
@@ -88,7 +88,7 @@ function runtimeSourceFiles(root = skillRoot) {
 /**
  * The source-language findings: HFS_SOURCE_NOT_ENGLISH for a file with a Vietnamese letter that is not a declared catalog.
  */
-export function sourceLanguageFindings(root = skillRoot) {
+function sourceLanguageFindings(root = skillRoot) {
   const findings = [];
   for (const rel of runtimeSourceFiles(root)) {
     if (DECLARED_SOURCE_CATALOGS.some((prefix) => rel.startsWith(prefix)) || Object.hasOwn(FUNCTIONAL_VIETNAMESE, rel)) continue;
@@ -99,7 +99,7 @@ export function sourceLanguageFindings(root = skillRoot) {
 }
 
 /** Every Vietnamese hit of the runtime's documents: `[{ path, line, column }]`. */
-export function docLanguageFindings(root = skillRoot) {
+function docLanguageFindings(root = skillRoot) {
   return runtimeDocuments(root).flatMap((rel) => documentLanguageHits(rel, fs.readFileSync(path.join(root, ...rel.split('/')), 'utf8')).map((hit) => ({ code: 'HFS_DOC_NOT_ENGLISH', path: rel, ...hit })));
 }
 

@@ -2,7 +2,7 @@
 // check-specs.mjs - a spec asserts behaviour, and a skipped test says why (smell S10-01 and S10-03; part of `npm run check`).
 //   starci runtime check --only specs [--json]
 //
-// Every tracked `.spec.mjs` / `.test.mjs` of the runtime (tests/, packages/*, no generated runtime copies) is parsed with the
+// Every tracked `.spec.mjs` / `.test.mjs` of the runtime (packages/*, the scaffold e2e under e2e/, no generated runtime copies) is parsed with the
 // TypeScript compiler and judged:
 //   RT_SPEC_ASSERTS_SOURCE_TEXT  the spec reads the text of a runtime production source (a `.mjs`/`.js`/`.ts` file under
 //                                scripts/, engine/, modules/, bin/, ext/ or ui/ of THIS repository, named through
@@ -41,7 +41,7 @@ function literalsOf(node) {
 }
 
 /** The facts of one spec: {sourceReads: [{line, path}], skips: [{line, explained}]}. */
-export function specFacts(text, rel = 'x.spec.mjs') {
+function specFacts(text, rel = 'x.spec.mjs') {
   const t = ts();
   const source = parseSource(text, rel);
   // top-level const bindings: name -> initializer

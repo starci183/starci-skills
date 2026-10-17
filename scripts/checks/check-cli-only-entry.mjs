@@ -21,16 +21,6 @@ import { loadInternalRegistry } from './check-cli-parity.mjs';
 import { rawCommandFindingsInText, rawUseCounts } from './lib/raw-command-scan.mjs';
 
 export const CODE = 'CLI_ONLY_ENTRY';
-export const EXEMPTIONS = Object.freeze({
-  dispatcher: Object.freeze(['packages/cli/src/**', 'scripts/cli/main.mjs']),
-  testSpawnHelpers: Object.freeze(['tests/**/*.spec.mjs', 'tests/helpers/**']),
-  catalogDeclarations: Object.freeze(['modules/cli/commands/_internal.yaml']),
-  history: Object.freeze(['CHANGELOG*.md']),
-  generatedRuntimeCopies: 'packages/*/runtime/**',
-  generatedLockfiles: '**/package-lock.json',
-  variableScriptPaths: 'node spawns whose script path is held only in a variable',
-  retirementSentences: 'sentences saying an invocation was removed, retired, or replaced',
-});
 
 const DEFAULT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const RETIREMENT_WORD = /\b(?:removed|retired|replaced)\b/i;
@@ -159,7 +149,7 @@ const packageScriptMap = (root, files, read, baseContext) => {
 };
 
 /** Render command builders through deterministic seams so generated hooks/tasks are scanned too. */
-export function generatedEntrySources() {
+function generatedEntrySources() {
   return [
     { file: 'scripts/guards/hook-install.mjs', text: historyHookBody({ branches: [], root: '.', nodePath: 'node', terminals: '.starci/guards/terminals' }) },
     { file: 'scripts/guards/hook-install.mjs', text: workHookCheck({ root: '.', nodePath: 'node' }) },
@@ -171,7 +161,7 @@ export function generatedEntrySources() {
 }
 
 /** Scan every tracked text file and the rendered command builders. */
-export function scanCliOnlyEntry(root = DEFAULT_ROOT, { files = null, read = null, catalog = null, internal = null, generated = null, policy = undefined } = {}) {
+function scanCliOnlyEntry(root = DEFAULT_ROOT, { files = null, read = null, catalog = null, internal = null, generated = null, policy = undefined } = {}) {
   let parsedCatalog;
   let parsedInternal;
   try {

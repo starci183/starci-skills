@@ -64,7 +64,7 @@ function isRawGuidanceFile(file) {
 function isRawGuidanceExempt(file) {
   const rel = posix(file);
   const base = rel.slice(rel.lastIndexOf('/') + 1);
-  return rel.startsWith('tests/')
+  return rel.startsWith('e2e/')
     || HISTORY.test(base)
     || rel === 'modules/kernel/command-policy.yaml'
     || /^packages\/[^/]+\/runtime\//.test(rel);

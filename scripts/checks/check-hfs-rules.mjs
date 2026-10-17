@@ -20,7 +20,7 @@
 //                                                                                             HFS_RULE_UNCATALOGUED
 //   - an existing enforcer without a proof: an eslint rule whose law test file has no `.run("<id>"` block with both
 //     `valid:` and `invalid:` cases, or a machine / hfs enforcer none of whose codes is named by two `test(` blocks of
-//     one tests/*.spec.mjs (a violating and a passing tree)                                    HFS_RULE_UNTESTED
+//     one package or e2e spec (a violating and a passing tree), unless the rule's specNa cites owner:no-runtime-specs   HFS_RULE_UNTESTED
 //   - a failure code with no entry in modules/kernel/failure-codes.yaml, or an entry lacking a Vietnamese
 //     title_vi, meaning_vi or nextStep_vi                                                     HFS_RULE_CODE_UNCATALOGUED
 //   - one obligation, one rule system (RED20): an `HFS_*`, `BE_*`, `FE_*` or `ARCH_*` code that a knowledge file
@@ -54,10 +54,10 @@ const EMITTER_ROOTS = Object.freeze({
   machine: ['scripts/hfs/architecture.mjs', 'scripts/hfs/architecture'],
   hfs: ['scripts/hfs/check.mjs', 'scripts/hfs/rules', 'scripts/hfs/slots.mjs', 'packages/hfs/src', 'packages/hfs/sync'],
   'work-validate': ['scripts/work/validate/work-validate.mjs', 'scripts/work/validate/check-example-work.mjs', 'scripts/work/validate/check-work-artifacts.mjs'],
-  runtime: ['scripts/hfs/runtime-check.mjs', 'scripts/hfs/runtime-rules', 'scripts/checks/check-contract-cites.mjs', 'scripts/checks/check-example-coupling.mjs', 'scripts/checks/check-spec-budget.mjs', 'scripts/checks/check-doc-owner.mjs', 'scripts/checks/check-port-once.mjs', 'scripts/checks/check-held-surfacing.mjs', 'scripts/checks/check-event-spill.mjs', 'scripts/checks/check-root-adhoc.mjs', 'scripts/checks/check-storage-convention.mjs', 'scripts/checks/check-default-once.mjs', 'scripts/checks/check-version-pin-once.mjs', 'scripts/checks/check-slot-id-shape.mjs', 'scripts/checks/check-undeclared-identifiers.mjs', 'scripts/checks/check-removed-vocabulary.mjs', 'scripts/checks/check-prose-commands.mjs', 'scripts/checks/check-documented-defaults.mjs', 'scripts/checks/check-roles-contract.mjs', 'scripts/checks/check-edge-case-registry.mjs', 'scripts/checks/check-gate-loosening.mjs', 'scripts/checks/check-revision-scope.mjs', 'scripts/hfs/sync-runtime.mjs', 'scripts/checks/check-cli-parity.mjs', 'scripts/checks/check-cli-only-entry.mjs', 'scripts/cli/gen-catalog.mjs', 'scripts/checks/check-op-judge.mjs', 'scripts/checks/check-hfs-coverage.mjs', 'scripts/checks/check-ruling-cites.mjs', 'scripts/checks/lib/coverage-cites.mjs', 'scripts/checks/lib/coverage-gates.mjs', 'scripts/checks/lib/coverage-inventory.mjs', 'scripts/checks/lib/coverage-ledgers.mjs', 'scripts/checks/lib/coverage-rules.mjs', 'scripts/checks/lib/coverage-witness.mjs', 'scripts/checks/lib/ruling-cites.mjs'],
+  runtime: ['scripts/hfs/runtime-check.mjs', 'scripts/hfs/runtime-rules', 'scripts/checks/check-contract-cites.mjs', 'scripts/checks/check-example-coupling.mjs', 'scripts/checks/check-doc-owner.mjs', 'scripts/checks/check-port-once.mjs', 'scripts/checks/check-held-surfacing.mjs', 'scripts/checks/check-event-spill.mjs', 'scripts/checks/check-root-adhoc.mjs', 'scripts/checks/check-storage-convention.mjs', 'scripts/checks/check-default-once.mjs', 'scripts/checks/check-version-pin-once.mjs', 'scripts/checks/check-slot-id-shape.mjs', 'scripts/checks/check-undeclared-identifiers.mjs', 'scripts/checks/check-removed-vocabulary.mjs', 'scripts/checks/check-prose-commands.mjs', 'scripts/checks/check-documented-defaults.mjs', 'scripts/checks/check-roles-contract.mjs', 'scripts/checks/check-edge-case-registry.mjs', 'scripts/checks/check-gate-loosening.mjs', 'scripts/checks/check-revision-scope.mjs', 'scripts/hfs/sync-runtime.mjs', 'scripts/checks/check-cli-parity.mjs', 'scripts/checks/check-cli-only-entry.mjs', 'scripts/cli/gen-catalog.mjs', 'scripts/checks/check-op-judge.mjs', 'scripts/checks/check-hfs-coverage.mjs', 'scripts/checks/check-ruling-cites.mjs', 'scripts/checks/lib/coverage-cites.mjs', 'scripts/checks/lib/coverage-gates.mjs', 'scripts/checks/lib/coverage-inventory.mjs', 'scripts/checks/lib/coverage-ledgers.mjs', 'scripts/checks/lib/coverage-rules.mjs', 'scripts/checks/lib/coverage-witness.mjs', 'scripts/checks/lib/ruling-cites.mjs'],
 });
 /** The knowledge files whose rule codes must belong to the one catalog (a directory is read recursively; a missing entry is skipped). */
-export const KNOWLEDGE_CODE_ROOTS = Object.freeze(['knowledge/patterns', 'knowledge/architecture-rules.yaml', 'modules/models/code-patterns.yaml']);
+const KNOWLEDGE_CODE_ROOTS = Object.freeze(['knowledge/patterns', 'knowledge/architecture-rules.yaml', 'modules/models/code-patterns.yaml']);
 const RULE_CODE = /\b(?:HFS|BE|FE|ARCH)_[A-Z0-9]+(?:_[A-Z0-9]+)*\b/g;
 export const PLUGIN_ENTRY = Object.freeze({ 'eslint-be': 'packages/eslint/be/index.mjs', 'eslint-fe': 'packages/eslint/fe/index.mjs', stylelint: 'packages/stylelint/index.mjs' });
 /** The stylelint canon's "why" map: the finding code of each rule. */
@@ -86,8 +86,9 @@ function readEmitters(root) {
 /** The test sources that prove the enforcers: {'eslint-be': text, 'eslint-fe': text, stylelint: [text], specs: [text]}. */
 function readTests(root) {
   const texts = (dir, re) => (fs.existsSync(path.join(root, dir)) ? fs.readdirSync(path.join(root, dir)).filter((f) => re.test(f)).sort().map((f) => fs.readFileSync(path.join(root, dir, f), 'utf8')) : []);
-  // Runtime specs are read at any depth: tests/<area>/<module>.spec.mjs is their layout (RT_SPEC_PLACEMENT).
-  const specs = walkFiles(path.join(root, 'tests'), { sorted: true, filter: (name) => name.endsWith('.spec.mjs'), exclude: (name) => name === 'node_modules' || name === 'fixtures' }).map((file) => fs.readFileSync(file, 'utf8'));
+  // The specs that can prove a check family: the package specs (beside their source) and the scaffold e2e. The runtime has no specs of its own (owner ruling no-runtime-specs).
+  const specs = ['packages', 'e2e'].filter((dir) => fs.existsSync(path.join(root, dir))).flatMap((dir) => walkFiles(path.join(root, dir), { sorted: true, filter: (name) => name.endsWith('.spec.mjs'),
+    exclude: (name) => name === 'node_modules' || name === 'runtime' || name === 'dist' })).map((file) => fs.readFileSync(file, 'utf8'));
   return { 'eslint-be': texts('packages/eslint/be', /\.spec\.mjs$/).join('\n'), 'eslint-fe': texts('packages/eslint/fe', /\.spec\.mjs$/).join('\n'), stylelint: texts('packages/stylelint', /\.spec\.mjs$/), specs };
 }
 
@@ -129,7 +130,7 @@ const specProven = (specs, code) => specs.some((text) => {
 });
 
 /** The knowledge files under `root` that may name a rule code, as [{rel, text}] (YAML only). */
-export function readKnowledgeFiles(root) {
+function readKnowledgeFiles(root) {
   const walk = (rel) => {
     const abs = path.join(root, rel);
     if (!fs.existsSync(abs)) return [];
@@ -148,7 +149,7 @@ const STYLELINT_RULE_LINE_START = String.raw`(?<=^|[\n\r\u2028\u2029])`;
 const STYLELINT_RULE_ID = '[a-z0-9-]+';
 const STYLELINT_RULE_PATTERN = String.raw`${STYLELINT_RULE_LINE_START}[^\S\n]*"(${STYLELINT_RULE_ID})"\s*:`;
 
-export function stylelintRuleIds(root) {
+function stylelintRuleIds(root) {
   try {
     const source = fs.readFileSync(path.join(root, PLUGIN_ENTRY.stylelint), 'utf8');
     const body = /export const rules = \{([\s\S]*?)\n\}/.exec(source)?.[1];
@@ -293,8 +294,8 @@ const testedFindings = (rule, tests, add) => {
       if (!stylelintProven(tests.stylelint ?? [], e.id)) add('HFS_RULE_UNTESTED', rule.id, `${e.kind}:${e.id} has no packages/stylelint/*.spec.mjs that lints it (lintRule("${e.id}") with a test asserting no warning and a test asserting one`, `${e.kind}:${e.id}`);
     } else if (LINT_FAMILY.includes(e.kind)) {
       if (!lintProven(tests[e.kind], e.id)) add('HFS_RULE_UNTESTED', rule.id, `${e.kind}:${e.id} has no RuleTester run with both valid and invalid cases in packages/eslint/${e.kind.slice(7)}/*.spec.mjs`, `${e.kind}:${e.id}`);
-    } else if (CHECK_FAMILY.includes(e.kind) && !rule.failureCodes.some((code) => specProven(tests.specs, code))) {
-      add('HFS_RULE_UNTESTED', rule.id, `${e.kind}:${e.id} has no tests/*.spec.mjs naming one of ${rule.failureCodes.join(', ')} in a violating and a passing test`, `${e.kind}:${e.id}`);
+    } else if (CHECK_FAMILY.includes(e.kind) && !rule.specNa && !rule.failureCodes.some((code) => specProven(tests.specs, code))) {
+      add('HFS_RULE_UNTESTED', rule.id, `${e.kind}:${e.id} has no package or e2e spec naming one of ${rule.failureCodes.join(', ')} in a violating and a passing test`, `${e.kind}:${e.id}`);
     }
   }
 };
@@ -398,7 +399,7 @@ const knowledgeFindings = (catalog, failureCodes, knowledge, add) => {
   }
 };
 
-export function hfsRulesFindings({ catalog, plugins, failureCodes, files, emitters, tests, knowledge, codes, infrastructure }) {
+function hfsRulesFindings({ catalog, plugins, failureCodes, files, emitters, tests, knowledge, codes, infrastructure }) {
   const findings = [];
   const add = (code, rule, message, enforcer) => findings.push({ code, rule, ...(enforcer ? { enforcer } : {}), message });
   const context = { rules: catalog.rules, plugins, files, emitters, tests, failureCodes };
@@ -411,7 +412,7 @@ export function hfsRulesFindings({ catalog, plugins, failureCodes, files, emitte
 }
 
 /** Run the whole check against the runtime at `root`: {catalog, findings} or {refusal} when the catalog is refused. */
-export async function checkHfsRules(root = skillRoot) {
+async function checkHfsRules(root = skillRoot) {
   let catalog;
   try { catalog = loadRuleCatalog({ root, manifest: loadSlotManifest({ root }) }); } catch (error) {
     if (error instanceof HfsSlotsError) return { refusal: { code: error.code, message: error.message } };

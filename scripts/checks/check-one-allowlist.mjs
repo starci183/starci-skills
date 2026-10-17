@@ -20,8 +20,8 @@ import { lsFiles } from '../api/git/ls-files.mjs';
 import { readTrackedTextFiles } from '../lib/tracked-text-scan.mjs';
 import { ALLOWLIST_FILE } from '../lib/allowlist.mjs';
 
-export const ALLOWLIST_SCHEMA_FILE = 'modules/schemas/allowlist.schema.yaml';
-const CHECK_FILES = Object.freeze(['scripts/checks/check-one-allowlist.mjs', 'tests/checks/check-one-allowlist.spec.mjs', 'scripts/lib/allowlist.mjs']);
+const ALLOWLIST_SCHEMA_FILE = 'modules/schemas/allowlist.schema.yaml';
+const CHECK_FILES = Object.freeze(['scripts/checks/check-one-allowlist.mjs', 'scripts/lib/allowlist.mjs']);
 const CHECKS_DIR = 'scripts/checks/';
 
 /** The file-name forms of a stray allowlist, baseline or pending list, matched against the base name. */
@@ -43,7 +43,7 @@ function sprawlReason(rel) {
 }
 
 /** The sprawl findings of a tracked-file list: [{code, path, message}]. */
-export function allowlistSprawlFindings(tracked) {
+function allowlistSprawlFindings(tracked) {
   const exempt = new Set([ALLOWLIST_FILE, ALLOWLIST_SCHEMA_FILE, ...CHECK_FILES]);
   const findings = [];
   for (const rel of tracked) {
@@ -55,7 +55,7 @@ export function allowlistSprawlFindings(tracked) {
 }
 
 /** Run the check on the runtime at `root`. */
-export function checkOneAllowlist(root = skillRoot, { listFiles = lsFiles } = {}) {
+function checkOneAllowlist(root = skillRoot, { listFiles = lsFiles } = {}) {
   const tracked = readTrackedTextFiles(root, { listFiles, workingTree: true });
   return allowlistSprawlFindings(tracked);
 }

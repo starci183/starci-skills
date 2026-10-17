@@ -14,7 +14,7 @@ import { trackedSources } from './lib/tracked-sources.mjs';
 
 export const CODE = 'RT_EVENT_SPILL_BYPASS';
 export const OWNER_FILES = Object.freeze(['engine/db/ledger.mjs', 'engine/db/event-compact.mjs']);
-export const SELF_FILES = Object.freeze(['scripts/checks/check-event-spill.mjs', 'tests/checks/check-event-spill.spec.mjs']);
+export const SELF_FILES = Object.freeze(['scripts/checks/check-event-spill.mjs']);
 const inScope = scopeFilter({ scope: /^(?:scripts|engine|ui|ext)\//, ext: /\.(?:mjs|cjs|js)$/, out: /node_modules\/|\/dist\/|^packages\/|\.spec\./, exclude: [...OWNER_FILES, ...SELF_FILES] });
 const BYPASS = [
   { re: /\bpayloadSha\s*[:,)}]/, what: 'passes payloadSha to a write' },
@@ -24,12 +24,12 @@ const BYPASS = [
 ];
 
 /** The findings over `files` ({relativePath: text}). Pure. */
-export function eventSpillFindings(files) {
+function eventSpillFindings(files) {
   return Object.entries(files).filter(([rel]) => inScope(rel)).flatMap(([rel, text]) => BYPASS.filter((rule) => rule.re.test(text))
     .map((rule) => ({ code: CODE, path: rel, message: `${rel} ${rule.what}: a ledger event payload spills to the blob store only inside appendEvent (engine/db/event-compact.mjs eventPayloadRecord)` })));
 }
 
 /** Run the check on the runtime at `root`. */
-export const checkEventSpill = (root = skillRoot) => eventSpillFindings(trackedSources(root, inScope));
+const checkEventSpill = (root = skillRoot) => eventSpillFindings(trackedSources(root, inScope));
 
 if (isMain(import.meta.url)) process.exit(printFindings(checkEventSpill(), 'OK: every ledger event payload spills through appendEvent only.'));

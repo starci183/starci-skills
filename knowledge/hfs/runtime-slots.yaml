@@ -22,7 +22,7 @@ testValues: [unit-beside, e2e, none]
 profiles: [runtime]
 
 # Tiers and the direction matrix (owner granularity; dynamic imports count; no owner cycles). Importing inside the same
-# owner is always allowed. tests/** takes no part (tier none).
+# owner is always allowed. The scaffold e2e harness (e2e/**) takes no part (tier none).
 tiers:
   runtime:
     entry:      {mayImport: [checks, reconciler, supervisor, kernel, domain, gates, machine, hfs, api, db, base]}
@@ -167,8 +167,6 @@ ruleParams:
       - {id: storage-convention, run: scripts/checks/check-storage-convention.mjs}
       - {id: held-surfacing, run: scripts/checks/check-held-surfacing.mjs}
       - {id: op-judge, run: scripts/checks/check-op-judge.mjs}
-      - {id: spec-budget, run: scripts/checks/check-spec-budget.mjs}
-      - {id: spec-cache-key, run: scripts/checks/check-spec-cache-key.mjs}
       - {id: default-once, run: scripts/checks/check-default-once.mjs}
       - {id: version-pin-once, run: scripts/checks/check-version-pin-once.mjs}
       - {id: slot-id-shape, run: scripts/checks/check-slot-id-shape.mjs}
@@ -514,14 +512,6 @@ slots:
     tier: kernel
     tests: none
     coverage: required
-  - id: runtime.brand-sources-replay
-    profiles: [runtime]
-    path: tests/replay/brand-sources-gate.spec.mjs
-    presence: required
-    tracked: tracked
-    tier: none
-    tests: none
-    coverage: none
   - id: runtime.kernel-verbs
     profiles: [runtime]
     # One file per modules/cli/commands/kernel/<verb>.yaml (check-cli-parity).
@@ -708,28 +698,20 @@ slots:
     tests: none
     coverage: none
 
-  # ----- tests ----------------------------------------------------------------------------------------------
-  - id: runtime.tests
+  # ----- scaffold e2e ---------------------------------------------------------------------------------------
+  - id: runtime.e2e
     profiles: [runtime]
-    # Specs at tests/<area>/<module>[.<topic>].spec.mjs, shared spec code in tests/helpers/, data in tests/fixtures/,
-    # --import preloads in tests/setup/; RT_SPEC_PLACEMENT judges the layout inside.
-    path: "tests/"
+    # The scaffold e2e, the only specs of the runtime outside packages/ and examples/ (owner ruling no-runtime-specs, 2026-10-17: the runtime has no
+    # runtime tests; the package clean-test and the scaffold e2e decide). The files are listed one by one so e2e/ never becomes a second tests/:
+    # `starci release scaffold-e2e` runs the two .e2e.spec.mjs files, `starci release app-installs` the registry-install proof; helpers/ is their shared
+    # code and setup/ their --import preloads. RT_SPEC_PLACEMENT refuses a spec anywhere else.
+    path: "e2e/{hfs-scaffold-app.e2e.spec.mjs,hfs-scaffold-lite.e2e.spec.mjs,hfs-scaffold-app.spec.mjs,helpers/hfs-app-install.mjs,helpers/hfs-hfs-scaffold-app-e2e-fixture.mjs,helpers/scaffold-app-baseline.mjs,helpers/scaffold-bins.mjs,helpers/source-canon-registry.mjs,helpers/supabase-project-stack.mjs,helpers/tmpdir.mjs,setup/file-watchdog.mjs,setup/isolated-registry.mjs,setup/isolated-temp.mjs,setup/low-priority.mjs,setup/repo-root-guard.mjs,setup/runtime-copies.mjs}"
     presence: required
     tracked: tracked
     tier: none
     tests: none
     coverage: none
     rules: [RT_SPEC_PLACEMENT]
-
-  - id: runtime.tests-proof-settle
-    profiles: [runtime]
-    path: tests/helpers/mechanism-proof-settle.mjs
-    presence: required
-    tracked: tracked
-    tier: inherit
-    tests: none
-    coverage: none
-    why: the shared private workflow and native READ fixture for mechanism-proof settlement specs
 
   # ----- packages, generated copies -----------------------------------------------------------------------------
   - id: runtime.packages-meta

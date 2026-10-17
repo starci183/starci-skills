@@ -26,7 +26,7 @@ export const rulingCiteInScope = (rel) =>
     ROOT_DOC.test(rel) ||
     SURFACE.test(rel) ||
     EXAMPLE_README.test(rel) ||
-    (rel.startsWith('tests/') && SPEC.test(rel)));
+    (rel.startsWith('e2e/') && SPEC.test(rel)));
 
 const list = (value) => {
   if (value == null) return [];
@@ -116,7 +116,7 @@ function liveSuccessors(records, key, visiting = new Set()) {
 }
 
 /** Build successor edges from both catalogs, including owner-registry cross-catalog supersedes links. */
-export function buildRulingIndex({ rules = {}, ownerRulings = {} } = {}) {
+function buildRulingIndex({ rules = {}, ownerRulings = {} } = {}) {
   const records = catalogRecords(rules, ownerRulings);
   const supersedes = ownerRulings.supersedes ?? {};
   addExternalRules(records, supersedes);

@@ -116,24 +116,25 @@ function thresholdsLowered(entry, rules) {
   });
 }
 
-const isSpec = (file) => file.startsWith('tests/') && file.endsWith('.spec.mjs');
+const SPEC_NAME = /\.spec\.[cm]?[jt]sx?$/;
+const isSpec = (file, rules) => rules.specRoots.some((root) => file.startsWith(root)) && SPEC_NAME.test(file);
 const countOf = (lines, markers) => lines.filter((line) => markers.some((marker) => line.includes(marker))).length;
 
 const baseName = (file) => file.slice(file.lastIndexOf('/') + 1);
 
 /** Whether a spec of the same name is written elsewhere in the change: a moved spec is not a deleted one. */
-const movedSpec = (entry, files) => files.some((other) => other !== entry && !other.deleted && isSpec(other.file) && baseName(other.file) === baseName(entry.file));
+const movedSpec = (entry, files, rules) => files.some((other) => other !== entry && !other.deleted && isSpec(other.file, rules) && baseName(other.file) === baseName(entry.file));
 
 /** The spec findings of one file of a change that also changes product code. */
 function specFindings(entry, files, rules) {
-  if (entry.deleted) return movedSpec(entry, files) ? [] : [{ kind: 'spec-deleted', file: entry.file, detail: 'deleted' }];
+  if (entry.deleted) return movedSpec(entry, files, rules) ? [] : [{ kind: 'spec-deleted', file: entry.file, detail: 'deleted' }];
   const weaker = countOf(entry.removed, rules.assertionMarkers) - countOf(entry.added, rules.assertionMarkers);
   const skipped = countOf(entry.added, rules.skipMarkers) - countOf(entry.removed, rules.skipMarkers);
   return [...(weaker > 0 ? [{ kind: 'assertion-weakened', file: entry.file, detail: `${weaker} assertion(s) fewer` }] : []),
     ...(skipped > 0 ? [{ kind: 'spec-skipped', file: entry.file, detail: `${skipped} skip marker(s) added` }] : [])];
 }
 
-const changesProduct = (files, rules) => files.some((entry) => !isSpec(entry.file) && !entry.file.startsWith('tests/') && rules.productPrefixes.some((prefix) => entry.file.startsWith(prefix)));
+const changesProduct = (files, rules) => files.some((entry) => !isSpec(entry.file, rules) && rules.productPrefixes.some((prefix) => entry.file.startsWith(prefix)));
 
 /** Every loosening of the change `diffText`, sorted: [{id, kind, file, detail}]. `rules` is modules/kernel/gate-loosening.yaml. */
 export function looseningsOf(diffText, rules) {
@@ -142,7 +143,7 @@ export function looseningsOf(diffText, rules) {
   const found = files.flatMap((entry) => [
     ...(rules.gateFiles.includes(entry.file) ? [...checksRemoved(entry), ...thresholdsLowered(entry, rules)] : []),
     ...(rules.allowlistFiles.includes(entry.file) ? entry.added.filter((value) => LIST_ITEM.test(value)).map((value) => ({ kind: 'allowlist-added', file: entry.file, detail: clip(trimmed(value)) })) : []),
-    ...(product && isSpec(entry.file) ? specFindings(entry, files, rules) : []),
+    ...(product && isSpec(entry.file, rules) ? specFindings(entry, files, rules) : []),
   ]);
   return found.map((finding) => ({ ...finding, id: `${finding.kind}:${finding.file}:${finding.detail}` })).sort((a, b) => byCodeUnit(a.id, b.id));
 }

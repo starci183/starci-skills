@@ -33,7 +33,7 @@ export const CODE = 'RT_PORT_RESTATED';
 const RUNTIMES_FILE = 'modules/models/runtimes.yaml';
 const UI_PORTS_FILE = 'ui/ports.mjs';
 const SONAR_FILE = 'scripts/gates/sonar-local.mjs';
-export const SELF_FILES = Object.freeze(['scripts/checks/check-port-once.mjs', 'tests/checks/check-port-once.spec.mjs']);
+export const SELF_FILES = Object.freeze(['scripts/checks/check-port-once.mjs']);
 
 const SCOPE = /^(?:scripts|engine|ui|ext|docs|knowledge|modules|examples|packages)\//;
 const TEXT_EXT = /\.(?:mjs|cjs|js|ts|tsx|yaml|yml|json|md|cmd|ps1|sh|toml)$/;
@@ -61,7 +61,7 @@ const DECLARATION_PORT = /\b(?:port|devPort|appPort)\s*:\s*(\d{4,5})\b/;
 const DECLARATION = { test: (text) => DECLARATION_EXPORT.test(text) || DECLARATION_PORT.test(text) };
 
 /** The port literals a text puts in a port position, as a Set of digit strings. */
-export function portLiteralsOf(text) {
+function portLiteralsOf(text) {
   const found = new Set();
   for (const re of CONTEXTS) { re.lastIndex = 0; for (const m of text.matchAll(re)) found.add(m[1]); }
   return found;
@@ -89,7 +89,7 @@ const ownerFilesOf = (owner) => (owner.startsWith(RUNTIMES_FILE) ? [RUNTIMES_FIL
  * The PORT_ONCE findings over {rel: text}: [{code, path, message}].
  * `files` is {repoRelativePath: fileText}; only in-scope entries are read.
  */
-export function portOnceFindings(files, { owned = null } = {}) {
+function portOnceFindings(files, { owned = null } = {}) {
   const literals = new Map(); // port -> Set<rel>
   for (const [rel, text] of Object.entries(files)) {
     if (!inScope(rel)) continue;
@@ -127,7 +127,7 @@ const portFindings = (port, rels, owned, codeFiles, files, findings) => {
 };
 
 /** Run PORT_ONCE on the runtime at `root`. */
-export function checkPortOnce(root = skillRoot) {
+function checkPortOnce(root = skillRoot) {
   const tracked = gitOutputOf(lsFiles(['-z'], { dir: root, maxBuffer: 64 * 1024 * 1024 }), 'git ls-files -z').split('\0').filter(Boolean);
   const files = {};
   for (const rel of tracked) {

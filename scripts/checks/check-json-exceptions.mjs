@@ -78,13 +78,6 @@ const LOCAL_ONLY = new Set(['config.json', 'settings.local.json', '.claude/setti
 const RUNTIME_OWNED_ROOTS = new Set(['.starciwork', 'runtime', RUNTIME_STATE_DIR]);
 
 /**
- * The skill-root spec tree: its synthetic checker fixtures (tests/fixtures) must not pollute the walk. Only this
- * exact root is skipped; a product or template `tests` directory (src/tests/tsconfig.json, a fake's payloads) is
- * authored source and stays in the inventory.
- */
-const SPEC_ROOT = 'tests';
-
-/**
  * Disposable scratch trees a spec makes at the skill root while it runs (the git-ignored `.gitignore` entries of the same names): a
  * scaffolded app built inside the checkout so its links resolve. A spec running beside the gate that scans the root would otherwise
  * find the scratch app's package.json and refuse a clean tree. Only these exact root prefixes are skipped.
@@ -158,7 +151,7 @@ function loadAllowlist(allowlistFile) {
 
 function shouldSkipDir(relativePosix, name) {
   if (SKIP_DIR_NAMES.has(name)) return true;
-  if (relativePosix === '' && (RUNTIME_OWNED_ROOTS.has(name) || name === SPEC_ROOT || SPEC_SCRATCH_PREFIXES.some((prefix) => name.startsWith(prefix)))) return true;
+  if (relativePosix === '' && (RUNTIME_OWNED_ROOTS.has(name) || SPEC_SCRATCH_PREFIXES.some((prefix) => name.startsWith(prefix)))) return true;
   if (GENERATED_MIRROR_SET.has(relativePosix ? `${relativePosix}/${name}` : name)) return true;
   if (relativePosix.startsWith('sites/') && (name === '.next' || name === 'out')) return true;
   return false;
@@ -226,7 +219,7 @@ function missingEntries(skillRoot, allowlist, directories, ignoreLocks) {
   return missing;
 }
 
-export function checkJsonExceptions({
+function checkJsonExceptions({
   root: optionRoot,
   skillRoot: skillRootOption,
   allowlistFile,

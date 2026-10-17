@@ -535,7 +535,6 @@ slots:
     profiles: [app]
     exemplifiedBy:
       - packages/hfs/templates/app/ci-workflows-lite/github/workflows/db-deploy.yml
-      - {path: tests/fixtures/hfs-callback-full/.github/workflows/db-deploy.yml, edition: full}
     editionWhy: "ruling:R212/case-2 (with the Work boundary amended by ruling:R212/case-4): lite manages its Supabase database deploy workflow; full owns an optional provider-specific workflow."
     # The database deploy workflow: workflow_dispatch only (like app.ci-e2e); starci app sync renders it under the managed ci group.
     path: ".github/workflows/db-deploy.yml"
@@ -546,6 +545,7 @@ slots:
     liteManagedBy: ci-workflows-lite
     rules: [HFS_MANAGED_FILE_DRIFT]
     since: 2.1.0
+    exampleNa: "owner:no-runtime-specs (2026-10-17): the only example of this slot in an edition was a deleted runtime fixture; the scaffold e2e exercises the scaffolded slot"
   - id: app.ci-stack-deploy
     since: 3.3.0
     profiles: [app]
@@ -657,8 +657,6 @@ slots:
   - id: app.scripts.delivery
     since: 3.1.0
     profiles: [app]
-    exemplifiedBy:
-      - {path: tests/fixtures/hfs-delivery-lite/scripts/build-frontend.mjs, edition: lite}
     editionWhy: "Lite splits product delivery tooling from managed codegen; full owns the same files through app.scripts (ruling:R212/case-2 (with the Work boundary amended by ruling:R212/case-4))."
     editions: [lite]
     # Product-owned environment, secret and build tooling, kept apart from lite's managed codegen script.
@@ -669,6 +667,7 @@ slots:
     tier: none
     tests: none
     rules: [HFS_PLAINTEXT_SECRET, HFS_SCRIPT_ONE_OFF, BE_SPEC_PLACEMENT, HFS_REPO_LOCAL_CHECK]
+    exampleNa: "owner:no-runtime-specs (2026-10-17): the only example of this slot in an edition was a deleted runtime fixture; the scaffold e2e exercises the scaffolded slot"
   - id: app.sides
     since: 3.1.0
     profiles: [app]
@@ -791,7 +790,6 @@ slots:
     profiles: [app]
     exemplifiedBy:
       - packages/hfs/templates/app/skeleton-lite/supabase/
-      - {path: tests/fixtures/hfs-callback-full/supabase/, edition: full}
     editionWhy: "ruling:R212/case-2 (owner:lite-production-swarm) (with the Work boundary amended by ruling:R212/case-4): Supabase is required in lite; full enables it only through a declared connection."
     # The one Supabase project directory, at the app root beside be/, fe/ and .starcistacks (never under a side).
     path: "supabase/"
@@ -802,11 +800,11 @@ slots:
     tier: none
     tests: none
     since: 2.1.0
+    exampleNa: "owner:no-runtime-specs (2026-10-17): the only example of this slot in an edition was a deleted runtime fixture; the scaffold e2e exercises the scaffolded slot"
   - id: app.supabase.config
     profiles: [app]
     exemplifiedBy:
       - packages/hfs/templates/app/skeleton-lite/supabase/config.toml
-      - {path: tests/fixtures/hfs-callback-full/supabase/config.toml, edition: full}
     editionWhy: "ruling:R212/case-2 (owner:lite-production-swarm) (with the Work boundary amended by ruling:R212/case-4): lite requires Supabase configuration; full requires it only when Supabase is declared."
     # The project configuration: auth keys are env(NAME) references, never literals (L08 judges its policy keys).
     path: "supabase/config.toml"
@@ -817,11 +815,11 @@ slots:
     tier: none
     tests: none
     since: 2.1.0
+    exampleNa: "owner:no-runtime-specs (2026-10-17): the only example of this slot in an edition was a deleted runtime fixture; the scaffold e2e exercises the scaffolded slot"
   - id: app.supabase.migrations
     profiles: [app]
     exemplifiedBy:
       - packages/hfs/templates/app/skeleton-lite/supabase/migrations/__timestamp___baseline.sql
-      - {path: tests/fixtures/hfs-callback-full/supabase/migrations/20261014100000_baseline.sql, edition: full}
     editionWhy: "ruling:R212/case-2 (owner:lite-production-swarm) (with the Work boundary amended by ruling:R212/case-4): lite uses Supabase schema authority and requires a migration; full opts into that provider."
     # The schema authority of an app on Supabase: forward-only SQL migrations named <timestamp14>_<kebab-name>.sql,
     # one file per change, immutable once on origin/main (L02-L08 judge them).
@@ -834,6 +832,7 @@ slots:
     tier: none
     tests: none
     since: 2.1.0
+    exampleNa: "owner:no-runtime-specs (2026-10-17): the only example of this slot in an edition was a deleted runtime fixture; the scaffold e2e exercises the scaffolded slot"
   - id: app.supabase.migrations.archive
     profiles: [app]
     # The migrations an existing app retired at its cutover (owner ruling 2026-10-13, migration baseline policy): the live schema is
@@ -858,8 +857,6 @@ slots:
   - id: app.supabase.types
     profiles: [app]
     templateNa: "Database row types are generated from the app's Supabase schema by contract:emit; a hand-authored scaffold template would invent the schema contract."
-    exemplifiedBy:
-      - {path: tests/fixtures/hfs-callback-full/supabase/types/database.types.ts, edition: full}
     editionWhy: "ruling:R212/case-2 (owner:lite-production-swarm) (with the Work boundary amended by ruling:R212/case-4): lite requires generated Supabase row types; full enables them with the provider."
     # The generated Database types (database.types.ts) contract:emit writes from the migrations; both sides read it
     # (sides.<side>.reads supabase/types/); drift against regeneration is L09.
@@ -871,6 +868,7 @@ slots:
     tier: none
     tests: none
     since: 2.1.0
+    exampleNa: "owner:no-runtime-specs (2026-10-17): the only example of this slot in an edition was a deleted runtime fixture; the scaffold e2e exercises the scaffolded slot"
   - id: app.supabase.templates
     profiles: [app]
     path: "supabase/templates/*.html"
@@ -1006,10 +1004,8 @@ slots:
     tier: none
     tests: none
     coverage: none
-    exemplifiedBy:
-      - {path: tests/fixtures/hfs-i18n-ledger/fe/i18n-dynamic-keys.yaml, editions: [lite, full]}
-      - {path: tests/fixtures/hfs-i18n-ledger/be/i18n-dynamic-keys.yaml, editions: [lite, full]}
     rules: [HFS_UNUSED_SYMBOL]
+    exampleNa: "owner:no-runtime-specs (2026-10-17): the only example of this slot in an edition was a deleted runtime fixture; the scaffold e2e exercises the scaffolded slot"
   - id: repo.packages
     since: 3.1.0
     profiles: [be, fe]
@@ -1401,8 +1397,6 @@ slots:
     since: 1.0.0
   - id: be.feature.realtime
     profiles: [be]
-    exemplifiedBy:
-      - {path: tests/fixtures/hfs-lite-slots/be/src/features/realtime/order-status/, edition: lite}
     editionWhy: "ruling:R212/case-2 (owner:lite-production-swarm) (with the Work boundary amended by ruling:R212/case-4): lite runs socket.io in the api process, one instance without Redis; full may scale its gateway."
     path: "src/features/realtime/<channel>/"
     presence: opt-in              # a push channel: reads and pushes only (a socket gateway or a GraphQL subscription), no domain write
@@ -1422,6 +1416,7 @@ slots:
     coverage: none
     rules: [BE_KIND_ISOLATION, BE_FEATURE_IMPORTS_FEATURE, BE_FEATURE_NOT_COMPOSED]
     since: 1.0.0
+    exampleNa: "owner:no-runtime-specs (2026-10-17): the only example of this slot in an edition was a deleted runtime fixture; the scaffold e2e exercises the scaffolded slot"
   - id: be.feature.realtime.graphql
     profiles: [be]
     editionWhy: "ruling:R212/case-2 (owner:lite-production-swarm) (with the Work boundary amended by ruling:R212/case-4): lite uses only the in-process socket.io gateway; the GraphQL subscription door remains full-only."
@@ -1607,8 +1602,6 @@ slots:
   - id: be.platform.event-bus
     since: 3.1.0
     profiles: [be]
-    exemplifiedBy:
-      - {path: tests/fixtures/hfs-lite-slots/be/src/modules/platform/event-bus/, edition: lite}
     editionWhy: "ruling:R212/case-2 (owner:lite-production-swarm) (with the Work boundary amended by ruling:R212/case-4): lite implements the event ports with outbox and pgmq; full uses its Kafka adapter."
     path: "src/modules/platform/event-bus/"
     presence: opt-in
@@ -1627,6 +1620,7 @@ slots:
     coverage: required
     budget: {indexExports: 60}
     rules: [BE_TIER_DIRECTION, ARCH_OWNER_CYCLE, BE_MODULE_SHAPE, BE_INFRA_OWNER]
+    exampleNa: "owner:no-runtime-specs (2026-10-17): the only example of this slot in an edition was a deleted runtime fixture; the scaffold e2e exercises the scaffolded slot"
   - id: be.platform.queue
     since: 3.1.0
     profiles: [be]
@@ -1750,8 +1744,6 @@ slots:
   - id: be.projections
     since: 3.1.0
     profiles: [be]
-    exemplifiedBy:
-      - {path: tests/fixtures/hfs-lite-slots/be/src/modules/projections/order-summary/, edition: lite}
     editionWhy: "ruling:R212/case-2 (owner:lite-production-swarm) (with the Work boundary amended by ruling:R212/case-4): lite projection tables live in Supabase migrations; full keeps the TypeORM projection entity beside its projection."
     path: "src/modules/projections/<name>/"
     presence: opt-in
@@ -1767,6 +1759,7 @@ slots:
     tests: unit-beside            # a measured slot: <name>.projection.spec.ts beside its projection is legal (the file owes 100 per file; a spec of its own is optional)
     coverage: required
     rules: [BE_PROJECTION_WRITE_OWNER, BE_PROJECTION_SHAPE, BE_TIER_DIRECTION, BE_CONTEXT_COUPLING]
+    exampleNa: "owner:no-runtime-specs (2026-10-17): the only example of this slot in an edition was a deleted runtime fixture; the scaffold e2e exercises the scaffolded slot"
   - id: be.integrations
     since: 3.1.0
     profiles: [be]
@@ -1796,7 +1789,6 @@ slots:
     profiles: [be]
     exemplifiedBy:
       - packages/hfs/templates/be/skeleton-lite/src/modules/integrations/supabase/
-      - {path: tests/fixtures/hfs-callback-full/be/src/modules/integrations/supabase/, edition: full}
     editionWhy: "ruling:R212/case-2 (owner:lite-production-swarm) (with the Work boundary amended by ruling:R212/case-4): lite requires the Supabase Auth and Storage integration; full opts in through a connection."
     # The only be import of @supabase/* (L10): the Auth admin and Storage admin client, plus the JWKS-based verification of
     # the Supabase access token the guard chain reads (L16). The connection itself is ordinary Postgres (the shared
@@ -1814,6 +1806,7 @@ slots:
     rules: [BE_TIER_DIRECTION, BE_ERROR_HOME, BE_SECRET_DEFAULT]
     coverage: required
     since: 2.1.0
+    exampleNa: "owner:no-runtime-specs (2026-10-17): the only example of this slot in an edition was a deleted runtime fixture; the scaffold e2e exercises the scaffolded slot"
 
   # ----- BE: tests (owner test layout 2026-09-30). Unit specs are <name>.service.spec.ts beside their service and nothing else; everything else
   # lives under src/tests/, one folder per kind, and the folder and the file suffix always agree (a file whose suffix does
@@ -1821,8 +1814,6 @@ slots:
   - id: be.tests.world
     since: 3.1.0
     profiles: [be]
-    exemplifiedBy:
-      - {path: tests/fixtures/hfs-lite-slots/be/src/tests/world/, edition: lite}
     editionWhy: "ruling:R212/case-2 (owner:lite-production-swarm) (with the Work boundary amended by ruling:R212/case-4): lite integration proofs use the local Supabase stack and network fakes; full also boots apps and self-hosted services."
     path: "src/tests/world/"
     presence: optional
@@ -1848,6 +1839,7 @@ slots:
       overridden in the DI container. It is the only test location that may import typeorm's DataSource or testcontainers,
       call migrate/runMigrations/synchronize, or write process.env.
     rules: [BE_TEST_TOPOLOGY, BE_TEST_CONSTRAINTS_ON]
+    exampleNa: "owner:no-runtime-specs (2026-10-17): the only example of this slot in an edition was a deleted runtime fixture; the scaffold e2e exercises the scaffolded slot"
 
   - id: be.tests.world.kit
     since: 3.1.0
@@ -2015,8 +2007,6 @@ slots:
     rules: [FE_NEXT_CONVENTIONS]
   - id: fe.route.callback
     profiles: [fe]
-    exemplifiedBy:
-      - {path: tests/fixtures/hfs-callback-full/fe/apps/web/src/app/auth/callback/route.ts, edition: full}
     # The auth callback of a Supabase session (the PKCE code exchange), kept only when the auth flow truly needs a server exchange
     # (prefer the client-side PKCE exchange in fe.modules.auth): the one non-health route handler of an app with a Supabase
     # connection; an app without one has no route handler in fe/ (L15).
@@ -2246,8 +2236,7 @@ slots:
     tests: none
     why: the canonical GraphQL client output of codegen is local and never committed; this specific slot overrides the tracked API parent
     rules: [FE_WIRE_GENERATED]
-    exemplifiedBy:
-      - {path: tests/fixtures/hfs-generated-wire/fe/apps/web/src/modules/api/graphql/__generated__/graphql.ts, editions: [lite, full]}
+    exampleNa: "owner:no-runtime-specs (2026-10-17): the only example of this slot in an edition was a deleted runtime fixture; the scaffold e2e exercises the scaffolded slot"
   - id: fe.transport.client
     since: 3.1.0
     profiles: [fe]

@@ -39,7 +39,7 @@ const EXAMPLE_FILE = 'config.example.yaml';
 export const OWNER_FILES = Object.freeze([
   'scripts/machine/home.mjs', 'engine/config.mjs', 'engine/orca-config.mjs',
   'scripts/reconciler/state.mjs', EXAMPLE_FILE,
-  'scripts/checks/check-default-once.mjs', 'tests/checks/check-default-once.spec.mjs',
+  'scripts/checks/check-default-once.mjs',
 ]);
 
 const SCOPE = /^(?:scripts|engine|ui|ext|packages)\//;
@@ -72,7 +72,7 @@ const walkDocumentedLeaves = (node, leaves) => {
   }
 };
 
-export function documentedLeaves(doc) {
+function documentedLeaves(doc) {
   const leaves = new Map();
   walkDocumentedLeaves(doc, leaves);
   return leaves;
@@ -97,7 +97,7 @@ function addCommentedLeaves(line, leaves) {
 }
 
 /** Leaf names the example documents only in comments (`# mode: chat`, `# workers: {base, max}`, `# frozenMinutes: <n>`). */
-export function commentedLeaves(exampleText) {
+function commentedLeaves(exampleText) {
   const leaves = new Map();
   for (const line of exampleText.split('\n')) {
     if (/^\s*#/.test(line)) addCommentedLeaves(line, leaves);
@@ -106,7 +106,7 @@ export function commentedLeaves(exampleText) {
 }
 
 /** The literal values the owner files declare: the home.mjs DEFAULTS block and engine/config.mjs's DEFAULT_OWNER_LANGUAGE. */
-export function ownerDefaults(homeText, configText = '') {
+function ownerDefaults(homeText, configText = '') {
   const defaults = /DEFAULTS\s*=\s*Object\.freeze\(\{([\s\S]*?)\}\)\)/.exec(homeText)?.[1] ?? '';
   const values = new Map();
   for (const m of defaults.matchAll(/\b([a-zA-Z]\w*)\s*:\s*([\d_]+|'[^']*')/g))
@@ -142,7 +142,7 @@ const leafLiteralFindings = (text, leaf, values, distinctive, push) => {
   }
 };
 
-export function defaultOnceFindings(files, { leaves, ownerValues = new Map(), ownerLanguage = 'en' } = {}) {
+function defaultOnceFindings(files, { leaves, ownerValues = new Map(), ownerLanguage = 'en' } = {}) {
   const findings = [];
   const langValues = new Set(['en', 'vi', ...(ownerLanguage ? [ownerLanguage] : [])]);
   for (const [rel, text] of Object.entries(files)) {
@@ -161,7 +161,7 @@ export function defaultOnceFindings(files, { leaves, ownerValues = new Map(), ow
 }
 
 /** Run DEFAULT_ONCE on the runtime at `root`. */
-export function checkDefaultOnce(root = skillRoot) {
+function checkDefaultOnce(root = skillRoot) {
   const tracked = gitOutputOf(lsFiles(['-z'], { dir: root, maxBuffer: 64 * 1024 * 1024 }), 'git ls-files -z').split('\0').filter(Boolean);
   const files = {};
   for (const rel of tracked) {
