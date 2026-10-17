@@ -26,7 +26,7 @@ import { STYLE_GLOB } from '../sync/index.mjs';
 import { byCodeUnit } from '../report/order.mjs';
 import { braceVariants, globExpression } from '../runtime/scripts/lib/glob.mjs';
 
-// --side judges only that side; root HFS findings belong to be, and Sonar always requires the full lint.
+// --side judges only that side; root HFS findings belong to be, its Sonar report stays on that side.
 export const LINT_SCHEMA = 'starci/lint@1';
 /** The side whose stylesheets stylelint judges. */
 const STYLE_SIDE = 'fe';
@@ -42,11 +42,10 @@ export function workspaceOf(workspace) {
   return rel;
 }
 
-/** Side scopes partition the full lint; Sonar requires the complete report and a frontend workspace cannot belong to be. */
+/** Side scopes partition the full lint; Sonar reports share that scope and a frontend workspace cannot belong to be. */
 function validateSide(opts) {
   if (opts.side === undefined) return;
   if (!SIDES.includes(opts.side)) throw new Error('LINT_SIDE_INVALID: --side is be or fe');
-  if (opts.sonar !== undefined) throw new Error('LINT_SIDE_SONAR_CONFLICT: --side and --sonar do not combine');
   if (opts.side === 'be' && opts.workspace !== undefined) throw new Error('LINT_SIDE_WORKSPACE_CONFLICT: --side be cannot judge a frontend workspace');
 }
 
@@ -312,7 +311,7 @@ export async function lintRepository({ repoRoot, opts, hfsCheck, trackedFiles = 
 
   let properties = '';
   try { properties = fs.readFileSync(path.join(repoRoot, 'sonar-project.properties'), 'utf8'); } catch { /* no properties: every finding keeps its own path */ }
-  const sourceRoots = sourceRootsOf(properties);
+  const sourceRoots = sourceRootsOf(properties).filter((root) => findingOnSide({ path: root }, opts.side));
   const tracked = sourceRoots.length ? trackedFiles(repoRoot) : [];
   const sonar = mergeReports([
     sonarReport(kept, { sourceRoots, tracked }),

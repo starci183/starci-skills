@@ -150,7 +150,7 @@ rules:
     cases:
       - id: case-1
         when: CI
-        write: The managed ci.yml runs `starci npm ci`, then `starci app lint --sonar reports/lint.sonar.json` at the app root.
+        write: The managed ci.yml runs `starci npm ci`, then `starci app lint --side <side> --sonar reports/lint.<side>.sonar.json` per side at the app root and merges both into reports/lint.sonar.json.
     verification:
       automated:
         - HFS_CI_MISSING_CANON

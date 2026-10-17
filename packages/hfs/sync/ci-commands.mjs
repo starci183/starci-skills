@@ -172,6 +172,24 @@ function buildEnv(source) {
   return ['        env:', ...[...values.keys()].sort(byCodeUnit).map(key => '          ' + key + ': ' + JSON.stringify(values.get(key)))].join('\n');
 }
 
+/** Side lint reports join into the single Sonar artifact even when one side could not write its report. */
+function sonarMergeSteps() {
+  return [
+    '      - name: merge Sonar lint reports',
+    "        if: always() && env.SONAR_TOKEN != ''",
+    '        run: |',
+    "          node --input-type=module <<'NODE'",
+    "          import fs from 'node:fs';",
+    "          const files = ['reports/lint.be.sonar.json', 'reports/lint.fe.sonar.json'];",
+    "          const reports = files.filter(file => fs.existsSync(file)).map(file => JSON.parse(fs.readFileSync(file, 'utf8')));",
+    '          const rules = [...new Map(reports.flatMap(report => report.rules).map(rule => [rule.id, rule])).values()];',
+    '          const issues = reports.flatMap(report => report.issues);',
+    "          fs.mkdirSync('reports', { recursive: true });",
+    "          fs.writeFileSync('reports/lint.sonar.json', JSON.stringify({ rules, issues }, null, 2) + '\\n');",
+    '          NODE',
+  ];
+}
+
 /** An omitted quality declaration preserves hosted Sonar, required OIDC Codecov, and the high production dependency audit. */
 export function ciWorkflowCommands(source, lcovReport = 'be/coverage/lcov.info', quality = undefined, { nodeMajor = '22' } = {}) {
   const configuredSonar = quality === undefined ? { token: 'SONAR_TOKEN', hostVar: 'SONAR_HOST_URL' } : quality.sonar;
@@ -198,11 +216,14 @@ export function ciWorkflowCommands(source, lcovReport = 'be/coverage/lcov.info',
         '          NODE_OPTIONS: --max-old-space-size=6144',
       ]),
       ...(sonar ? [
-        '      - name: lint with Sonar import',
-        "        if: env.SONAR_TOKEN != ''",
-        `        run: ${exampleCommand(source, 'npm run lint -- --sonar reports/lint.sonar.json')}`,
-        '        env:',
-        '          NODE_OPTIONS: --max-old-space-size=6144',
+        ...['be', 'fe'].flatMap((side) => [
+          '      - name: lint ' + side + ' with Sonar import',
+          "        if: env.SONAR_TOKEN != ''",
+          `        run: ${exampleCommand(source, 'npm run lint -- --side ' + side + ' --sonar reports/lint.' + side + '.sonar.json')}`,
+          '        env:',
+          '          NODE_OPTIONS: --max-old-space-size=6144',
+        ]),
+        ...sonarMergeSteps(),
         `      - uses: ${UPLOAD_ARTIFACT}`,
         "        if: always() && env.SONAR_TOKEN != '' && hashFiles('reports/lint.sonar.json') != ''",
         '        with:',
