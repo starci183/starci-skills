@@ -3503,12 +3503,13 @@ rules:
       - {path: packages/hfs/templates/app/skeleton-lite/supabase/config.toml, edition: lite}
     templateNa: "Database types are generated from each app migration set, not static templates; full-edition Supabase configuration is app-owned."
     witness: {status: unreachable, reason: "owner:no-runtime-specs (2026-10-17): the mutation witness was a deleted runtime spec or fixture", date: "2026-10-17"}
-    law: "The database configuration and its types are checked facts: `supabase/config.toml` carries no literal value under a credential key (the value is `env(NAME)`), `auth.jwt_expiry` is at most 3600, and signup, site url and redirect urls equal the Supabase block of hfs.json where it declares them; `supabase/types/database.types.ts` is committed and equals the text `contract:emit` regenerates from the migrations."
+    law: "The database configuration and its types are checked facts: `supabase/config.toml` carries no literal value under a credential key (the value is `env(NAME)`), `auth.jwt_expiry` is at most 3600, and signup, site url and redirect urls equal the Supabase block of hfs.json where it declares them; `supabase/types/database.types.ts` is committed and equals the text `contract:emit` regenerates from the migrations. Type emission refuses HFS_EMIT_DB_TYPES_STALE unless the complete applied migration version set equals the SQL filename stamps; lint and check report drift without writing types."
     kinds: [check]
     gates: [land, ci]
-    failureCodes: ["DB_CONFIG_POLICY", "DB_TYPES_DRIFT"]
+    failureCodes: ["DB_CONFIG_POLICY", "DB_TYPES_DRIFT", "HFS_EMIT_DB_TYPES_STALE"]
     enforcers:
       - {kind: hfs, id: db-config-types, at: scripts/hfs/rules/database.mjs}
+      - {kind: hfs, id: db-types-emit, at: packages/hfs/emit/db-types.mjs}
   - id: R217
     code: "FE_SUPABASE_CLIENT_OWNER"
     editions: [lite, full]
@@ -4025,12 +4026,13 @@ rules:
       - {path: packages/hfs/templates/app/ci-workflows-lite/github/workflows/db-deploy.yml, edition: lite}
       - {path: packages/hfs/templates/app/ci-workflows/github/workflows/ci.yml, edition: full}
     witness: {status: unreachable, reason: "owner:no-runtime-specs (2026-10-17): the mutation witness was a deleted runtime spec or fixture", date: "2026-10-17"}
-    law: "In lite and full apps, deployment jobs declare a protected environment, explicit permissions and concurrency, materialize sealed secrets through SOPS_AGE_KEY or starci app secret materialize, and reference only the age key and transport SSH key/known_hosts secrets. They never embed a dotenv blob or write a dotenv file. Every remote workflow action uses a 40-hex commit SHA; installed tools are checksum or digest verified, or supplied by a pinned action. App workflows start only on release tags [v*] or workflow_dispatch, never on a branch push."
+    law: "In lite and full apps, deployment jobs declare a protected environment, explicit permissions and concurrency, materialize sealed secrets through SOPS_AGE_KEY or starci app secret materialize, and reference only the age key and transport SSH key/known_hosts secrets. They never embed a dotenv blob or write a dotenv file. Every remote workflow action uses a 40-hex commit SHA (local actions are allowed and container actions require a full sha256 digest); supply-chain reports each unpinned uses reference at its source line, including disabled jobs and steps; installed tools are checksum or digest verified, or supplied by a pinned action. App workflows start only on release tags [v*] or workflow_dispatch, never on a branch push."
     kinds: [check]
     gates: [settle, land, ci]
     failureCodes: ["HFS_DEPLOY_WORKFLOW", "HFS_WORKFLOW_PIN", "HFS_CI_TOOL_INSTALL", "HFS_APP_WORKFLOW_TRIGGER"]
     enforcers:
       - {kind: hfs, id: deploy-workflow, at: scripts/hfs/rules/deploy-workflow.mjs}
+      - {kind: hfs, id: supply-chain, at: scripts/hfs/rules/supply-chain.mjs}
     exampleNa: "owner:no-runtime-specs (2026-10-17): the only example was a deleted runtime spec or fixture; the rule judges the runtime or the scaffold, which the scaffold e2e exercises"
   - id: R252
     code: "HFS_SCRIPT_PLAINTEXT_LOAD"
@@ -4359,7 +4361,7 @@ rules:
     exampleNa: "owner:no-runtime-specs (2026-10-17): the only example was a deleted runtime spec or fixture; the rule judges the runtime or the scaffold, which the scaffold e2e exercises"
   - id: R269
     code: "HFS_DEPENDABOT_MISSING"
-    law: "In lite and full apps, .github/dependabot.yml declares scheduled npm, github-actions and docker updates. The CI workflow runs npm audit --omit=dev as an enabled gate whose failure stops the job. The images workflow generates an SBOM and provenance for release images; a disabled step, comment or label is not evidence."
+    law: "In lite and full apps, .github/dependabot.yml declares scheduled npm, github-actions and docker updates. Every npm entry declares a minor-and-patch version group and a security-updates group; every group explicitly restricts update-types to minor and patch, leaving majors per package, and npm entries ignore @starci/* without version or update-type restrictions. The CI workflow runs npm audit --omit=dev as an enabled gate whose failure stops the job. The images workflow generates an SBOM and provenance for release images; a disabled step, comment or label is not evidence."
     kinds: [check]
     gates: ["settle","land","ci"]
     failureCodes: ["HFS_DEPENDABOT_MISSING", "HFS_AUDIT_STEP_MISSING", "HFS_SBOM_MISSING"]
@@ -4876,3 +4878,60 @@ rules:
       - {path: packages/eslint/be/module-shape.spec.mjs, editions: [lite, full], codes: [BE_MODULE_DEFINITION_MISSING]}
     witness:
       - {path: packages/eslint/be/module-shape.spec.mjs, editions: [lite, full], codes: [BE_MODULE_DEFINITION_MISSING]}
+  - id: R296
+    code: "CI_SECRET_SEALED"
+    law: "A name declared in ci.secrets or ci.dependabot.secrets never names a key stored inside an app sealed .starcistacks/<env>/secrets/<member>.enc member. App runtime and CI custody are separate; checks inspect key names without decrypting or printing values."
+    kinds: [check]
+    gates: [settle, land, ci]
+    failureCodes: ["CI_SECRET_SEALED"]
+    enforcers:
+      - {kind: hfs, id: ci-custody, at: scripts/hfs/rules/ci-custody.mjs}
+    editions: [lite, full]
+    docs:
+      - {path: docs/application-stacks.md#r296, editions: [lite, full]}
+    exemplifiedBy:
+      - {path: examples/lite-app/.starcistacks/application-stacks.yaml, edition: lite}
+      - {path: examples/ecommerce-app/.starcistacks/application-stacks.yaml, edition: full}
+      - {path: examples/shape-slot/.starcistacks/application-stacks.yaml, edition: full}
+      - {path: packages/hfs/templates/app/skeleton-lite/.starcistacks/application-stacks.yaml, edition: lite}
+      - {path: packages/hfs/templates/app/skeleton/.starcistacks/application-stacks.yaml, edition: full}
+    specNa: "owner:no-runtime-specs (2026-10-17): the runtime has no specs of its own; this code is enforced by runtime code and its spec proof was a deleted runtime spec"
+    witness: {status: unreachable, reason: "owner:no-runtime-specs (2026-10-17): the mutation witness was a deleted runtime spec or fixture", date: "2026-10-17"}
+  - id: R297
+    code: "APP_SECRET_IN_CI"
+    law: "A sealed member key granted to an app container by a deploy grant never appears in ci.secrets or ci.vars. The grant environment, member and selected key determine app custody; online GitHub custody is verified by starci app ci verify."
+    kinds: [check]
+    gates: [settle, land, ci]
+    failureCodes: ["APP_SECRET_IN_CI"]
+    enforcers:
+      - {kind: hfs, id: ci-custody, at: scripts/hfs/rules/ci-custody.mjs}
+    editions: [lite, full]
+    docs:
+      - {path: docs/application-stacks.md#r297, editions: [lite, full]}
+    exemplifiedBy:
+      - {path: examples/lite-app/.starcistacks/application-stacks.yaml, edition: lite}
+      - {path: examples/ecommerce-app/.starcistacks/application-stacks.yaml, edition: full}
+      - {path: examples/shape-slot/.starcistacks/application-stacks.yaml, edition: full}
+      - {path: packages/hfs/templates/app/skeleton-lite/.starcistacks/application-stacks.yaml, edition: lite}
+      - {path: packages/hfs/templates/app/skeleton/.starcistacks/application-stacks.yaml, edition: full}
+    specNa: "owner:no-runtime-specs (2026-10-17): the runtime has no specs of its own; this code is enforced by runtime code and its spec proof was a deleted runtime spec"
+    witness: {status: unreachable, reason: "owner:no-runtime-specs (2026-10-17): the mutation witness was a deleted runtime spec or fixture", date: "2026-10-17"}
+  - id: R298
+    code: "CI_DECLARATION_DRIFT"
+    law: "Workflow secrets and vars references are declared in their matching top-level ci class, except automatic GITHUB_TOKEN. Non-optional Actions declarations are consumed by a workflow; Dependabot secrets need no Actions read. Service token and variable bindings name declarations in the matching class. Missing declarations produce migration findings; a tree with neither ci declarations nor references stays quiet."
+    kinds: [check]
+    gates: [settle, land, ci]
+    failureCodes: ["CI_DECLARATION_DRIFT"]
+    enforcers:
+      - {kind: hfs, id: ci-custody, at: scripts/hfs/rules/ci-custody.mjs}
+    editions: [lite, full]
+    docs:
+      - {path: docs/application-stacks.md#r298, editions: [lite, full]}
+    exemplifiedBy:
+      - {path: examples/lite-app/.starcistacks/application-stacks.yaml, edition: lite}
+      - {path: examples/ecommerce-app/.starcistacks/application-stacks.yaml, edition: full}
+      - {path: examples/shape-slot/.starcistacks/application-stacks.yaml, edition: full}
+      - {path: packages/hfs/templates/app/skeleton-lite/.starcistacks/application-stacks.yaml, edition: lite}
+      - {path: packages/hfs/templates/app/skeleton/.starcistacks/application-stacks.yaml, edition: full}
+    specNa: "owner:no-runtime-specs (2026-10-17): the runtime has no specs of its own; this code is enforced by runtime code and its spec proof was a deleted runtime spec"
+    witness: {status: unreachable, reason: "owner:no-runtime-specs (2026-10-17): the mutation witness was a deleted runtime spec or fixture", date: "2026-10-17"}

@@ -397,6 +397,9 @@ surfaces:
       - full
     sources:
       - A15-STANDARD/0.2/security-custody
+      - docs/application-stacks.md#r296
+      - docs/application-stacks.md#r297
+      - docs/application-stacks.md#r298
     owedRules:
       - R248
       - R249
@@ -409,11 +412,17 @@ surfaces:
         - R43
         - R44
         - R191
+        - R296
+        - R297
+        - R298
       slots:
+        - app.starcistacks
+        - app.ci
         - app.sops
         - app.plaintext-env
         - repo.plaintext-env
       examples:
+        - examples/lite-app/.starcistacks/application-stacks.yaml
         - examples/lite-app/.sops.yaml
         - examples/lite-app/be/apps/api/src/api.env.ts
         - examples/lite-app/be/src/modules/platform/config/env-source.config.ts
@@ -427,11 +436,17 @@ surfaces:
         - R43
         - R44
         - R191
+        - R296
+        - R297
+        - R298
       slots:
+        - app.starcistacks
+        - app.ci
         - app.sops
         - app.plaintext-env
         - repo.plaintext-env
       examples:
+        - examples/ecommerce-app/.starcistacks/application-stacks.yaml
         - examples/ecommerce-app/.sops.yaml
         - examples/ecommerce-app/be/apps/order/src/order.env.ts
         - examples/ecommerce-app/be/src/modules/platform/config/env-source.config.ts

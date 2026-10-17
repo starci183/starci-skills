@@ -550,6 +550,19 @@ rulings:
     ruling: "The a19 checks commit removes the spec-over-budget rule (RT_SPEC_OVER_BUDGET) and its spec-budget enforcer, the runtime.tests, runtime.tests-proof-settle and runtime.brand-sources-replay slots, the spec-budget and spec-cache-key self-checks, and every runtime-spec entry of the rule catalog's proves, exemplifiedBy and witness lists (the rows they proved carry specNa, exampleNa or an unreachable witness citing owner:no-runtime-specs), under the owner ruling no-runtime-specs; the owner approved it in chat to the main coordinator (\"tests in packages and examples stay; runtime specs removed; delete codecov; no runtime tests in contribution\"), relayed to the a19 lead with the instruction to record these approvals."
     enforcedBy: [knowledge/hfs/rules.yaml, knowledge/hfs/runtime-slots.yaml]
 
+  - id: alpha20-secrets-by-consumer
+    date: '2026-10-17'
+    source: "the owner (thay) in chat to the main coordinator, relayed to the a20 lead"
+    ruling: "Owner words: \"Ok chot update .claude alpha.20 va examples va nivo lun\". The five consumer classes are app secrets in sealed .enc members, app public config in the manifest, CI secrets in GitHub secrets, CI public config in GitHub vars, and Dependabot secrets in its own store. The services block renders Sonar, Codecov, Dependabot and audit configuration. Runtime examples use SonarCloud and Codecov cloud; private apps use their own Sonar host (NIVO: sonar.starci.org). CI quality includes audit in the release gate, skipping Codecov without coverage, parallel fast/test/build jobs with a dependent Sonar job, lockfile caches, immutable SHA pins, and cut/app gate refusal on red main CI with an owner-only override recording who and why. Remove the alpha.19 bootstrap and add encrypted outside-repository DB dump plus explicitly armed linked reset with backup and auth/storage choices."
+    supersedes: []
+    enforcedBy: [scripts/hfs/ci-declaration.mjs, scripts/hfs/rules/ci-custody.mjs, packages/hfs/ci/cli.mjs, packages/hfs/sync/quality-services.mjs, packages/hfs/sync/ci-commands.mjs, packages/hfs/release/gate.mjs, scripts/supervisor/release-cut-plan.mjs, scripts/supervisor/verify-receipt.mjs, packages/hfs/db/dump.mjs, packages/hfs/db/reset.mjs]
+  - id: alpha20-ci-override-owner-only
+    date: '2026-10-17'
+    source: "the owner (thay) in chat to the main coordinator, relayed to the a20 lead"
+    ruling: "release ci-override is owner-only: record who/why in owner-rulings, and the verb must not be runnable by agents"
+    supersedes: []
+    enforcedBy: [scripts/supervisor/release-ci-override.mjs, scripts/supervisor/release-ci-override-cli.mjs, modules/kernel/command-policy.yaml]
+
 supersedes:
   'ruling:R212/case-2': ['ruling:R212/case-1']
   'ruling:R212/case-4': ['ruling:R212/case-1', 'ruling:R212/case-2']

@@ -96,6 +96,16 @@ ALIAS_PROPS:
   owner: op-retry
   kind: input-invalid
 
+APP_SECRET_IN_CI:
+  title: "App runtime secret appears in CI custody"
+  title_vi: "Bí mật ứng dụng xuất hiện trong CI"
+  meaning_vi: "Khóa cấp cho container ứng dụng cũng được khai báo hoặc tìm thấy trong kho CI."
+  causes_vi:
+    - "Khóa cấp cho container ứng dụng cũng được khai báo hoặc tìm thấy trong kho CI."
+  nextStep_vi: "Giữ khóa ứng dụng trong .enc và xóa khai báo hoặc bản sao CI sau khi kiểm tra nơi dùng."
+  owner: op-retry
+  kind: check-finding
+
 APP_ROUTER_GLOB:
   title: "App Router pathspec would glob"
   title_vi: "Đường dẫn App Router sẽ bị git đọc thành mẫu"
@@ -2024,6 +2034,16 @@ EFFECT_UNKNOWN_STUCK:
   surfacedAs: EFFECT_UNKNOWN_STUCK
   surfacedAt: scripts/reconciler/controllers/job.mjs
 
+NPM_INSTALL_REFUSED:
+  title: "Npm install or target canon movement failed"
+  title_vi: "Cài npm hoặc chuyển canon thất bại"
+  meaning_vi: "Yêu cầu, worktree, khóa, npm, canon đích hoặc diff không hợp lệ; pha chuyển pin có thể đã thất bại sau nâng CLI."
+  causes_vi:
+    - "Yêu cầu, worktree, khóa, npm, canon đích hoặc diff không hợp lệ; pha chuyển pin có thể đã thất bại sau nâng CLI."
+  nextStep_vi: "Đọc kết quả pin và diff; sửa nguyên nhân rồi chạy lại đúng canon, không giả định tự hoàn tác."
+  owner: op-retry
+  kind: verb-refusal
+
 PROVIDER_RESERVATION_HELD:
   title: "Provider slot held by a launch of unknown outcome"
   title_vi: "Chỗ provider bị giữ bởi một lần khởi động chưa rõ kết quả"
@@ -2560,6 +2580,16 @@ GOLDEN_MISSING:
   nextStep_vi: "Bước duyệt tự động không chạy được; op brand.decide lập lại câu hỏi có ảnh mẫu hợp lệ."
   owner: other-op:brand.decide
   kind: check-finding
+
+HFS_EMIT_DB_TYPES_STALE:
+  title: "Database types require current migration history"
+  title_vi: "Lịch sử migration chưa khớp để sinh kiểu"
+  meaning_vi: "Tập phiên bản đã áp dụng trong DB cục bộ khác dấu thời gian tệp supabase/migrations."
+  causes_vi:
+    - "Tập phiên bản đã áp dụng trong DB cục bộ khác dấu thời gian tệp supabase/migrations."
+  nextStep_vi: "Chạy npm run db:reset rồi starci app emit; kiểm tra cả phiên bản thiếu và phiên bản thừa."
+  owner: op-retry
+  kind: verb-refusal
 
 HFS_APPS_REQUIRED:
   title: "Repository has no apps directory"
@@ -4668,6 +4698,16 @@ RIGHTS_OP_OUTSIDE_OWNED:
   owner: op-retry
   kind: verb-refusal
 
+RIGHTS_OWNER_ONLY:
+  title: "Action requires an interactive owner"
+  title_vi: "Tác vụ chỉ dành cho chủ sở hữu tương tác"
+  meaning_vi: "Lệnh miễn trừ CI được gọi bởi agent, vai trò đã ràng buộc hoặc terminal không tương tác."
+  causes_vi:
+    - "Không xác minh được người gọi là chủ sở hữu tại terminal tương tác."
+  nextStep_vi: "Chủ sở hữu kiểm tra SHA và lý do rồi tự chạy release ci-override trong terminal tương tác; agent không được chạy lệnh này."
+  owner: owner
+  kind: verb-refusal
+
 RIGHTS_OP_CONTROL_PLANE:
   title: "Op control-plane verb refused"
   title_vi: "Từ chối op gọi động từ của mặt phẳng điều khiển"
@@ -5841,6 +5881,26 @@ SLICE_ROOT:
   owner: other-op:work.author
   kind: check-finding
 
+SONAR_DB_PASSWORD_MISMATCH:
+  title: "Sonar database password differs from stored volume"
+  title_vi: "Mật khẩu DB Sonar lệch volume"
+  meaning_vi: "Volume starci-sonarqube-postgres-data được tạo với mật khẩu khác SONARQUBE_DB_PASSWORD hiện tại."
+  causes_vi:
+    - "Volume starci-sonarqube-postgres-data được tạo với mật khẩu khác SONARQUBE_DB_PASSWORD hiện tại."
+  nextStep_vi: "Khôi phục mật khẩu cũ hoặc xuất backup trước khi tạo lại volume; không xóa volume khi chưa sao lưu."
+  owner: op-retry
+  kind: verb-refusal
+
+SONAR_TUNNEL_NOT_RUNNING:
+  title: "Public Sonar tunnel did not become ready"
+  title_vi: "Tunnel Sonar công khai chưa chạy"
+  meaning_vi: "Container tunnel không đạt trạng thái running trước thời hạn khởi động."
+  causes_vi:
+    - "Container tunnel không đạt trạng thái running trước thời hạn khởi động."
+  nextStep_vi: "Đọc trạng thái và log đã che bí mật trong từ chối; sửa cấu hình rồi chạy up --public."
+  owner: op-retry
+  kind: verb-refusal
+
 SOPS_MISSING:
   title: "sops is not installed"
   title_vi: "Chưa cài sops"
@@ -5851,6 +5911,16 @@ SOPS_MISSING:
   nextStep_vi: "Cài sops (Windows: winget install Mozilla.SOPS) rồi chạy lại."
   owner: owner
   kind: blocker
+
+STACKS_CI_LEGACY_FORM:
+  title: "Legacy service CI declaration is deprecated"
+  title_vi: "Khai báo CI của dịch vụ dùng dạng cũ"
+  meaning_vi: "Dịch vụ vẫn khai báo danh sách secrets hoặc vars theo dạng cũ được đọc trong một bản phát hành."
+  causes_vi:
+    - "Dịch vụ vẫn khai báo danh sách secrets hoặc vars theo dạng cũ được đọc trong một bản phát hành."
+  nextStep_vi: "Chuyển tên sang ci.secrets hoặc ci.vars và để dịch vụ tham chiếu tên."
+  owner: op-retry
+  kind: check-finding
 
 STACKS_CI_CONTRADICTION:
   title: "Stack says service off but CI calls it"
@@ -15550,6 +15620,146 @@ RT_SLOT_ID_SHAPE:
   owner: supervisor
   kind: check-finding
 
+CI_DECLARATION_DRIFT:
+  title: "Workflow references drift from CI declarations"
+  title_vi: "Workflow lệch khai báo CI"
+  meaning_vi: "Workflow hoặc liên kết dịch vụ thiếu khai báo đúng lớp, hoặc khai báo bắt buộc không được dùng."
+  causes_vi:
+    - "Workflow hoặc liên kết dịch vụ thiếu khai báo đúng lớp, hoặc khai báo bắt buộc không được dùng."
+  nextStep_vi: "Đối chiếu secrets và vars trong workflow với ci và liên kết dịch vụ; chỉ đánh dấu optional khi phù hợp."
+  owner: op-retry
+  kind: check-finding
+
+CI_DECLARATION_INVALID:
+  title: "Invalid consumer CI declaration"
+  title_vi: "Khai báo CI không hợp lệ"
+  meaning_vi: "Tên, lớp, phạm vi hoặc kiểu dữ liệu trong ci không hợp lệ."
+  causes_vi:
+    - "Tên, lớp, phạm vi hoặc kiểu dữ liệu trong ci không hợp lệ."
+  nextStep_vi: "Sửa khai báo ci theo schema; mỗi tên thuộc đúng một lớp và một phạm vi."
+  owner: op-retry
+  kind: verb-refusal
+
+CI_GITHUB_UNREADABLE:
+  title: "GitHub CI custody cannot be read or updated"
+  title_vi: "Không truy cập được kho CI GitHub"
+  meaning_vi: "gh thiếu quyền, lỗi thực thi hoặc trả dữ liệu không đọc được."
+  causes_vi:
+    - "gh thiếu quyền, lỗi thực thi hoặc trả dữ liệu không đọc được."
+  nextStep_vi: "Kiểm tra cài đặt và xác thực gh cùng quyền truy cập kho, rồi chạy lại."
+  owner: op-retry
+  kind: verb-refusal
+
+CI_NAME_UNDECLARED:
+  title: "CI name is not declared"
+  title_vi: "Tên CI chưa được khai báo"
+  meaning_vi: "Tên cần ghi không có trong lớp CI tương ứng của manifest."
+  causes_vi:
+    - "Tên cần ghi không có trong lớp CI tương ứng của manifest."
+  nextStep_vi: "Khai báo tên trong ci.secrets, ci.vars hoặc ci.dependabot.secrets trước khi ghi."
+  owner: op-retry
+  kind: verb-refusal
+
+CI_SCOPE_MISMATCH:
+  title: "CI scope differs from declaration"
+  title_vi: "Phạm vi CI không khớp"
+  meaning_vi: "Phạm vi repository, environment hoặc Dependabot của lệnh khác khai báo."
+  causes_vi:
+    - "Phạm vi repository, environment hoặc Dependabot của lệnh khác khai báo."
+  nextStep_vi: "Dùng đúng môi trường hoặc --dependabot theo lớp và phạm vi trong manifest."
+  owner: op-retry
+  kind: verb-refusal
+
+CI_SECRET_MISSING:
+  title: "Declared GitHub secret is missing"
+  title_vi: "Thiếu bí mật GitHub đã khai báo"
+  meaning_vi: "Tên bí mật bắt buộc chưa có trong kho hoặc môi trường được khai báo."
+  causes_vi:
+    - "Tên bí mật bắt buộc chưa có trong kho hoặc môi trường được khai báo."
+  nextStep_vi: "Dùng app ci secret set qua stdin cho đúng phạm vi rồi chạy app ci verify."
+  owner: op-retry
+  kind: check-finding
+
+CI_SECRET_SEALED:
+  title: "CI name overlaps sealed app custody"
+  title_vi: "Tên CI trùng khóa bí mật đã niêm phong"
+  meaning_vi: "Tên CI hoặc Dependabot cũng là khóa trong thành viên .enc của ứng dụng."
+  causes_vi:
+    - "Tên CI hoặc Dependabot cũng là khóa trong thành viên .enc của ứng dụng."
+  nextStep_vi: "Bỏ khóa ứng dụng khỏi khai báo CI; đưa bí mật CI vào kho GitHub tương ứng."
+  owner: op-retry
+  kind: check-finding
+
+CI_SECRET_UNDECLARED:
+  title: "GitHub secret has no declaration"
+  title_vi: "Bí mật GitHub chưa được khai báo"
+  meaning_vi: "GitHub có tên bí mật không nằm trong khai báo CI tương ứng."
+  causes_vi:
+    - "GitHub có tên bí mật không nằm trong khai báo CI tương ứng."
+  nextStep_vi: "Xác minh chủ sở hữu và thêm khai báo đúng lớp hoặc xóa tên thừa trên GitHub."
+  owner: op-retry
+  kind: check-finding
+
+CI_USAGE:
+  title: "Invalid app CI command"
+  title_vi: "Lệnh CI không hợp lệ"
+  meaning_vi: "Tác vụ hoặc tùy chọn app ci không đúng cú pháp."
+  causes_vi:
+    - "Tác vụ hoặc tùy chọn app ci không đúng cú pháp."
+  nextStep_vi: "Xem starci app ci --help và chạy lại với tác vụ, tên và phạm vi hợp lệ."
+  owner: op-retry
+  kind: verb-refusal
+
+CI_VALUE_ARGV:
+  title: "Secret value on command line refused"
+  title_vi: "Từ chối bí mật trên dòng lệnh"
+  meaning_vi: "Giá trị bí mật được truyền qua đối số thay vì stdin."
+  causes_vi:
+    - "Giá trị bí mật được truyền qua đối số thay vì stdin."
+  nextStep_vi: "Truyền giá trị bí mật qua stdin cho app ci secret set; không đặt giá trị vào đối số."
+  owner: op-retry
+  kind: verb-refusal
+
+CI_VALUE_EMPTY:
+  title: "Empty CI value refused"
+  title_vi: "Giá trị CI rỗng"
+  meaning_vi: "Không có giá trị hợp lệ để ghi."
+  causes_vi:
+    - "Không có giá trị hợp lệ để ghi."
+  nextStep_vi: "Cung cấp giá trị không rỗng qua stdin cho secret hoặc tùy chọn công khai cho var."
+  owner: op-retry
+  kind: verb-refusal
+
+CI_VAR_DRIFT:
+  title: "GitHub variable differs from declaration"
+  title_vi: "Biến GitHub lệch giá trị khai báo"
+  meaning_vi: "Giá trị biến công khai trên GitHub khác manifest."
+  causes_vi:
+    - "Giá trị biến công khai trên GitHub khác manifest."
+  nextStep_vi: "Kiểm tra giá trị công khai trong manifest và dùng app ci var sync --execute."
+  owner: op-retry
+  kind: check-finding
+
+CI_VAR_MISSING:
+  title: "Declared GitHub variable is missing"
+  title_vi: "Thiếu biến GitHub đã khai báo"
+  meaning_vi: "Tên biến công khai chưa có trong phạm vi được khai báo."
+  causes_vi:
+    - "Tên biến công khai chưa có trong phạm vi được khai báo."
+  nextStep_vi: "Dùng app ci var sync --execute hoặc var set cho đúng phạm vi rồi xác minh."
+  owner: op-retry
+  kind: check-finding
+
+CI_VAR_UNDECLARED:
+  title: "GitHub variable has no declaration"
+  title_vi: "Biến GitHub chưa được khai báo"
+  meaning_vi: "GitHub có biến công khai không nằm trong ci.vars."
+  causes_vi:
+    - "GitHub có biến công khai không nằm trong ci.vars."
+  nextStep_vi: "Thêm khai báo có chủ sở hữu hoặc xóa biến thừa trên GitHub rồi xác minh."
+  owner: op-retry
+  kind: check-finding
+
 CI_UPLOAD_NOT_SILENT:
   title: "Coverage upload can skip or fail silently"
   title_vi: "Bước tải coverage có thể bị bỏ qua hoặc lỗi mà không báo"
@@ -15571,6 +15781,66 @@ CI_TRIGGERS_RELEASE_ONLY:
   nextStep_vi: "Người giám sát đặt on của workflow gốc thành push với tags: ['v*'] và/hoặc branches: [main] cùng workflow_dispatch; ví dụ và template trong packages/hfs/templates/app/ci-workflows chỉ giữ tags: ['v*'] và workflow_dispatch (render lại ví dụ bằng starci app sync --write); không thêm trigger khác (docs/git-governance.md)."
   owner: supervisor
   kind: check-finding
+
+RELEASE_CI_OVERRIDE_CONFIRM:
+  title: "Owner did not confirm CI override SHA"
+  title_vi: "Chủ sở hữu chưa xác nhận SHA miễn trừ"
+  meaning_vi: "Xác nhận tương tác không khớp tiền tố SHA yêu cầu."
+  causes_vi:
+    - "Xác nhận tương tác không khớp tiền tố SHA yêu cầu."
+  nextStep_vi: "Chủ sở hữu kiểm tra commit và xác nhận đúng SHA trong terminal tương tác."
+  owner: owner
+  kind: verb-refusal
+
+RELEASE_CI_OVERRIDE_USAGE:
+  title: "Invalid release CI override request"
+  title_vi: "Yêu cầu miễn trừ CI không hợp lệ"
+  meaning_vi: "SHA hoặc lý do miễn trừ thiếu hay sai cú pháp."
+  causes_vi:
+    - "SHA hoặc lý do miễn trừ thiếu hay sai cú pháp."
+  nextStep_vi: "Chủ sở hữu chạy release ci-override với SHA đầy đủ và lý do không rỗng."
+  owner: owner
+  kind: verb-refusal
+
+RELEASE_CI_OVERRIDE_WRITE:
+  title: "CI override record could not be written"
+  title_vi: "Không ghi được bản miễn trừ CI"
+  meaning_vi: "Không thể ghi an toàn bản ghi miễn trừ hoặc owner-rulings."
+  causes_vi:
+    - "Không thể ghi an toàn bản ghi miễn trừ hoặc owner-rulings."
+  nextStep_vi: "Kiểm tra quyền ghi và khóa phát hành; chủ sở hữu chạy lại và kiểm tra bản ghi danh tính, lý do."
+  owner: owner
+  kind: verb-refusal
+
+RELEASE_CI_RED:
+  title: "Default branch CI blocks release"
+  title_vi: "CI nhánh mặc định chặn phát hành"
+  meaning_vi: "Lần CI hoàn tất mới nhất có kết luận không thành công và không có miễn trừ hợp lệ cho SHA."
+  causes_vi:
+    - "Lần CI hoàn tất mới nhất có kết luận không thành công và không có miễn trừ hợp lệ cho SHA."
+  nextStep_vi: "Sửa CI và chạy lại; chỉ chủ sở hữu được tạo miễn trừ theo SHA kèm danh tính và lý do."
+  owner: op-retry
+  kind: verb-refusal
+
+RELEASE_CI_UNKNOWN:
+  title: "Default branch CI verdict is unavailable"
+  title_vi: "Chưa đọc được kết quả CI nhánh mặc định"
+  meaning_vi: "Không đọc được gh, nhánh hoặc lần chạy CI phù hợp; cut từ chối, app gate cảnh báo."
+  causes_vi:
+    - "Không đọc được gh, nhánh hoặc lần chạy CI phù hợp; cut từ chối, app gate cảnh báo."
+  nextStep_vi: "Khôi phục quyền đọc GitHub và xác minh CI nhánh mặc định trước khi phát hành."
+  owner: op-retry
+  kind: verb-refusal
+
+RELEASE_SONAR_UNAVAILABLE:
+  title: "Requested release Sonar scan is unavailable"
+  title_vi: "Không chạy được Sonar cho phát hành"
+  meaning_vi: "Cấu hình host, token hoặc công cụ quét Sonar được yêu cầu chưa sẵn sàng."
+  causes_vi:
+    - "Cấu hình host, token hoặc công cụ quét Sonar được yêu cầu chưa sẵn sàng."
+  nextStep_vi: "Kiểm tra dịch vụ Sonar, biến token đã khai báo và công cụ quét rồi chạy gate --sonar."
+  owner: op-retry
+  kind: verb-refusal
 
 RELEASE_NOTES:
   title: "Release tag without finished release notes"
@@ -16397,6 +16667,196 @@ reserve-override-invalid:
   nextStep_vi: "Đối chiếu quyền từ goal đã được owner phê duyệt với đúng yêu cầu hiện tại; không dùng cờ tự khai để vượt vùng giữ lại."
   owner: owner
   kind: input-invalid
+DB_BACKUP_ARCHIVE_INVALID:
+  title: "Encrypted database archive is invalid"
+  title_vi: "Tệp sao lưu mã hóa không hợp lệ"
+  meaning_vi: "Archive age thiếu, rỗng hoặc không có header hợp lệ."
+  causes_vi:
+    - "Archive age thiếu, rỗng hoặc không có header hợp lệ."
+  nextStep_vi: "Tạo lại bản dump mã hóa đầy đủ và dùng receipt được xuất cùng archive."
+  owner: op-retry
+  kind: verb-refusal
+
+DB_BACKUP_CLI_FAILED:
+  title: "Database backup command failed"
+  title_vi: "Lệnh sao lưu DB thất bại"
+  meaning_vi: "Lệnh Supabase không hoàn tất thành công."
+  causes_vi:
+    - "Lệnh Supabase không hoàn tất thành công."
+  nextStep_vi: "Kiểm tra công cụ, liên kết dự án và quyền DB; chạy lại dump vào thư mục ngoài kho."
+  owner: op-retry
+  kind: verb-refusal
+
+DB_BACKUP_NO_RECIPIENT:
+  title: "Database backup has no public age recipient"
+  title_vi: "Thiếu người nhận age công khai"
+  meaning_vi: "Không đọc được người nhận age công khai hợp lệ từ .sops.yaml."
+  causes_vi:
+    - "Không đọc được người nhận age công khai hợp lệ từ .sops.yaml."
+  nextStep_vi: "Khai báo người nhận age trong .sops.yaml rồi tạo lại dump; không đưa khóa riêng vào kho."
+  owner: op-retry
+  kind: verb-refusal
+
+DB_BACKUP_QUERY_FAILED:
+  title: "Database backup inspection failed"
+  title_vi: "Không đọc được dữ liệu kiểm chứng sao lưu"
+  meaning_vi: "Truy vấn danh tính hoặc số hàng không đọc được hay trả dữ liệu không hợp lệ."
+  causes_vi:
+    - "Truy vấn danh tính hoặc số hàng không đọc được hay trả dữ liệu không hợp lệ."
+  nextStep_vi: "Kiểm tra kết nối và quyền truy vấn DB rồi tạo lại bản sao lưu đầy đủ."
+  owner: op-retry
+  kind: verb-refusal
+
+DB_BACKUP_TOOL_FAILED:
+  title: "Database archive or encryption tool failed"
+  title_vi: "Công cụ đóng gói hoặc mã hóa thất bại"
+  meaning_vi: "tar hoặc age không tạo được đầu ra hợp lệ."
+  causes_vi:
+    - "tar hoặc age không tạo được đầu ra hợp lệ."
+  nextStep_vi: "Kiểm tra tar, age, dung lượng và quyền ghi; tạo lại dump và xác minh receipt."
+  owner: op-retry
+  kind: verb-refusal
+
+DB_DUMP_INSIDE_REPO:
+  title: "Database backup output must be outside repository"
+  title_vi: "Đầu ra sao lưu nằm trong kho"
+  meaning_vi: "Đường dẫn sao lưu sau chuẩn hóa vẫn nằm trong worktree."
+  causes_vi:
+    - "Đường dẫn sao lưu sau chuẩn hóa vẫn nằm trong worktree."
+  nextStep_vi: "Chọn thư mục --out ngoài kho và ngoài các đường dẫn liên kết về kho."
+  owner: op-retry
+  kind: verb-refusal
+
+DB_RESET_BACKUP_ARCHIVE_MISSING:
+  title: "Database reset backup archive is missing"
+  title_vi: "Thiếu archive của bản sao lưu"
+  meaning_vi: "Receipt trỏ đến archive không tồn tại hoặc không đọc được."
+  causes_vi:
+    - "Receipt trỏ đến archive không tồn tại hoặc không đọc được."
+  nextStep_vi: "Khôi phục đúng archive bên ngoài kho hoặc tạo dump đầy đủ mới."
+  owner: op-retry
+  kind: verb-refusal
+
+DB_RESET_BACKUP_HASH:
+  title: "Database reset backup hash differs"
+  title_vi: "Hash bản sao lưu không khớp"
+  meaning_vi: "Kích thước hoặc SHA-256 của archive khác receipt."
+  causes_vi:
+    - "Kích thước hoặc SHA-256 của archive khác receipt."
+  nextStep_vi: "Không dùng archive này để reset; tạo và kiểm tra lại dump đầy đủ."
+  owner: op-retry
+  kind: verb-refusal
+
+DB_RESET_BACKUP_INVALID:
+  title: "Database reset backup receipt is invalid"
+  title_vi: "Receipt sao lưu reset không hợp lệ"
+  meaning_vi: "Receipt không đúng schema starci/db-backup@1 hoặc thiếu bằng chứng sao lưu đầy đủ."
+  causes_vi:
+    - "Receipt không đúng schema starci/db-backup@1 hoặc thiếu bằng chứng sao lưu đầy đủ."
+  nextStep_vi: "Tạo lại dump đầy đủ cho dự án và dùng receipt mới; schema-only không đủ cho reset."
+  owner: op-retry
+  kind: verb-refusal
+
+DB_RESET_BACKUP_MISSING:
+  title: "Database reset requires backup receipt"
+  title_vi: "Reset thiếu receipt sao lưu"
+  meaning_vi: "Không có đường dẫn receipt sao lưu đầy đủ trước reset."
+  causes_vi:
+    - "Không có đường dẫn receipt sao lưu đầy đủ trước reset."
+  nextStep_vi: "Chạy app db dump ra ngoài kho rồi truyền receipt qua --backup."
+  owner: op-retry
+  kind: verb-refusal
+
+DB_RESET_BACKUP_PROJECT:
+  title: "Database reset backup belongs to another project"
+  title_vi: "Bản sao lưu thuộc dự án khác"
+  meaning_vi: "Danh tính dự án trong receipt không khớp DB linked cần reset."
+  causes_vi:
+    - "Danh tính dự án trong receipt không khớp DB linked cần reset."
+  nextStep_vi: "Kiểm tra liên kết dự án và tạo dump đầy đủ cho đúng dự án."
+  owner: op-retry
+  kind: verb-refusal
+
+DB_RESET_BACKUP_STALE:
+  title: "Database reset backup is too old"
+  title_vi: "Bản sao lưu reset đã quá hạn"
+  meaning_vi: "Thời gian receipt vượt database.reset.backupMaxAgeHours, mặc định 24 giờ."
+  causes_vi:
+    - "Thời gian receipt vượt database.reset.backupMaxAgeHours, mặc định 24 giờ."
+  nextStep_vi: "Tạo bản dump mới ngay trước reset và kiểm tra đồng hồ cùng cấu hình tuổi sao lưu."
+  owner: op-retry
+  kind: verb-refusal
+
+DB_RESET_CHOICE_MISSING:
+  title: "Database reset requires auth and storage choices"
+  title_vi: "Reset thiếu lựa chọn auth hoặc storage"
+  meaning_vi: "Không có lựa chọn keep hoặc drop tường minh cho cả auth và storage."
+  causes_vi:
+    - "Không có lựa chọn keep hoặc drop tường minh cho cả auth và storage."
+  nextStep_vi: "Chỉ rõ --auth keep|drop và --storage keep|drop sau khi kiểm tra kế hoạch."
+  owner: op-retry
+  kind: verb-refusal
+
+DB_RESET_HEAD_MISMATCH:
+  title: "Database reset migration head differs"
+  title_vi: "Đầu migration sau reset không khớp"
+  meaning_vi: "Lịch sử migration sau reset khác tập dấu thời gian mong đợi."
+  causes_vi:
+    - "Lịch sử migration sau reset khác tập dấu thời gian mong đợi."
+  nextStep_vi: "Đối chiếu migration đã áp dụng và tệp SQL; giữ backup và phần phục hồi trước khi xử lý."
+  owner: op-retry
+  kind: verb-refusal
+
+DB_RESET_IDENTITY_MISSING:
+  title: "Database reset keep requires decrypt identity"
+  title_vi: "Reset keep thiếu danh tính giải mã"
+  meaning_vi: "Không có danh tính age giải mã được các phần auth hoặc storage cần giữ."
+  causes_vi:
+    - "Không có danh tính age giải mã được các phần auth hoặc storage cần giữ."
+  nextStep_vi: "Cung cấp SOPS_AGE_KEY hoặc SOPS_AGE_KEY_FILE ngoài kho và chứng minh giải mã trước reset."
+  owner: op-retry
+  kind: verb-refusal
+
+DB_RESET_LINKED_REQUIRED:
+  title: "Database reset requires explicit linked target"
+  title_vi: "Reset yêu cầu đích linked tường minh"
+  meaning_vi: "Reset từ xa thiếu --linked hoặc có đích không được hỗ trợ."
+  causes_vi:
+    - "Reset từ xa thiếu --linked hoặc có đích không được hỗ trợ."
+  nextStep_vi: "Dùng app db reset --linked; reset cục bộ dùng npm run db:reset."
+  owner: op-retry
+  kind: verb-refusal
+
+DB_RESET_QUERY_FILE_UNSUPPORTED:
+  title: "Database reset requires query-file support"
+  title_vi: "Reset cần hỗ trợ query --file"
+  meaning_vi: "Supabase đang dùng không hỗ trợ db query --file để khôi phục giao dịch."
+  causes_vi:
+    - "Supabase đang dùng không hỗ trợ db query --file để khôi phục giao dịch."
+  nextStep_vi: "Dùng phiên bản Supabase hỗ trợ query --file rồi chạy lại kế hoạch trước khi execute."
+  owner: op-retry
+  kind: verb-refusal
+
+DB_RESET_RECOVERY_PARTS:
+  title: "Encrypted database recovery parts retained"
+  title_vi: "Đã giữ phần phục hồi DB mã hóa"
+  meaning_vi: "Reset hoặc khôi phục thất bại sau khi tạo phần giữ auth hoặc storage mã hóa."
+  causes_vi:
+    - "Reset hoặc khôi phục thất bại sau khi tạo phần giữ auth hoặc storage mã hóa."
+  nextStep_vi: "Giữ thư mục phục hồi được báo và danh tính age; khôi phục có kiểm soát trước khi dọn."
+  owner: owner
+  kind: verb-refusal
+
+DB_RESET_VERIFY_FAILED:
+  title: "Database reset preservation verification failed"
+  title_vi: "Xác minh bảo toàn sau reset thất bại"
+  meaning_vi: "Dấu vân tay auth hoặc storage, dữ liệu drop hoặc khôi phục không đạt kiểm chứng."
+  causes_vi:
+    - "Dấu vân tay auth hoặc storage, dữ liệu drop hoặc khôi phục không đạt kiểm chứng."
+  nextStep_vi: "Dừng ghi dữ liệu, giữ phần phục hồi mã hóa và đối chiếu backup trước khi sửa hoặc thử lại."
+  owner: op-retry
+  kind: verb-refusal
+
 DB_MIGRATION_SHAPE:
   title: "A migration is named `<ts14>_<kebab>.sql`, stamped in valid UTC, appended after HEAD's active migrations, and immutable once on the base"
   title_vi: "Migration sai hình dạng hoặc bị sửa"

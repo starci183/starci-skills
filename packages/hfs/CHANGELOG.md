@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+- Added: consumer-class CI declarations, `app ci` custody verbs and R296-R298; manifest-driven quality files and split cached CI with immutable action pins.
+- Added: release audit/local Sonar and main-CI protection; encrypted outside-repository DB dump and armed linked reset with backup/auth/storage validation.
+- Fixed: DB types refuse stale migration history.
+
 ## 4.4.1 - 2026-10-17
 - Changed: the bundled runtime copies follow the runtime of 1.0.0-alpha.19 (owner ruling no-runtime-specs, 2026-10-17): the failure codes, the slot manifest (`exampleNa`) and the rule catalog (`specNa`, `exampleNa`) carry the removal of the runtime's own specs; package behavior is unchanged. The managed codecov.yml, the CI coverage upload and the hfs sync render stay (Codecov is kept for apps and examples); internal exports that only the deleted runtime specs read are no longer exported.
 

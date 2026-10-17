@@ -4413,3 +4413,17 @@ requirements:
     statement: "`starci app stack task <name>` refuses a missing or unknown task name with `STACK_TASK_UNDECLARED` (exit 2) and lists the declared names."
     status: advisory
     reason: Runtime behavior of the `task` verb of the canon CLI (packages/hfs/stack/task.mjs); it is not a property of app source, so no lint rule can enforce it.
+  - id: A20-CI-CONSUMER-CLASSES
+    source: docs/application-stacks.md#ci-secrets-and-variables-alpha20
+    sourceLine: 356
+    editions: [lite, full]
+    statement: "App runtime secrets, public app config, Actions secrets, Actions variables and Dependabot secrets have separate custody; CI names, scopes, service bindings and workflow reads agree with the manifest."
+    status: enforced
+    rules: [R296, R297, R298]
+  - id: A20-QUALITY-SERVICES
+    source: docs/application-stacks.md#quality-services
+    sourceLine: 395
+    editions: [lite, full]
+    statement: "The services block supplies Sonar, Codecov, Dependabot and audit renderer inputs, including cloud example and private app host settings."
+    status: advisory
+    reason: "The schema and stack gate validate service inputs and the sync renderer consumes them; R269 and R251 cover rendered supply-chain policy, not all service normalization branches."

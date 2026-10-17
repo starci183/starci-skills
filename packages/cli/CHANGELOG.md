@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+- Added: `app ci` and owner-only `release ci-override`; regenerated command docs and shell completions.
+- Changed: catalog documents DB dump/reset, app release audit/Sonar and CI checks, cut CI protection, npm install target canon pins and verified public Sonar startup.
+
 ## 1.4.1 - 2026-10-17
 - Changed: depends on @starci/hfs 4.4.1 and carries runtime 1.0.0-alpha.19; the catalog drops `starci test affected`, `starci test run`, `starci gate runtime-coverage` and `starci release env-test` and adds `starci release scaffold-e2e` (owner ruling no-runtime-specs, 2026-10-17).
 

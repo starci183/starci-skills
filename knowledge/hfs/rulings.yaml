@@ -504,3 +504,14 @@ rulings:
     supersedes: []
     amendmentScope: Reading of R263 under which every domain service call inside the receipt transaction was business processing, including a domain receipt wrapper of the platform Inbox.
     enforcedBy: [R263]
+
+  - id: alpha20-secrets-by-consumer
+    date: '2026-10-17'
+    topic: standard.ci-custody
+    status: live
+    ownerRuling: 20
+    source: "the owner (thay) in chat to the main coordinator, relayed to the a20 lead; owner:alpha20-secrets-by-consumer (2026-10-17)"
+    statement: >-
+      The five consumer classes are app secrets in sealed .enc members, app public config in the manifest, CI secrets in GitHub secrets, CI public config in GitHub vars, and Dependabot secrets in its own store. The services block renders Sonar, Codecov, Dependabot and audit configuration. Runtime examples use SonarCloud and Codecov cloud; private apps use their own Sonar host (NIVO: sonar.starci.org). CI quality includes audit in the release gate, skipping Codecov without coverage, parallel fast/test/build jobs with a dependent Sonar job, lockfile caches, immutable SHA pins, and cut/app gate refusal on red main CI with an owner-only override recording who and why. Remove the alpha.19 bootstrap and add encrypted outside-repository DB dump plus explicitly armed linked reset with backup and auth/storage choices.
+    supersedes: []
+    enforcedBy: [R296, R297, R298, R269, R251]

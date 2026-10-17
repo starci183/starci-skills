@@ -6,6 +6,20 @@ until every S* row in `docs/goal.md` holds with fresh evidence, then `1.0.0` fre
 
 ## [Unreleased]
 
+## 1.0.0-alpha.20 (unreleased)
+
+### Added
+- Secrets and config by consumer: app secrets remain sealed, public app config stays in the manifest, Actions secrets and vars use GitHub stores, and Dependabot has its own secrets. `starci app ci` sets declared names and verifies custody; R296-R298 refuse collisions and declaration drift.
+- Manifest services render Sonar, Codecov, Dependabot and audit files; the public examples use SonarCloud and Codecov OIDC with no secret file, while a scaffolded (private) app declares its own Sonar host. Dependabot groups minor/patch and security updates and ignores canon-managed @starci pins.
+- CI quality: audit in the app release gate, optional local Sonar, Codecov notices when coverage is absent, parallel fast/test/build jobs, dependent Sonar analysis, lockfile caches and immutable action pins. Release cut and app gate refuse red main CI; attributed CI overrides are owner-only.
+- Encrypted `starci app db dump` outside the repository and linked `starci app db reset` with a fresh backup, explicit auth/storage choices and mutation arming. DB type emission refuses stale migration history; CLI upgrades move the target canon's @starci pins.
+
+### Fixed
+- `starci gate sonar up --public` activates the public Compose profile and verifies tunnel readiness; database password mismatch and tunnel failures have scrubbed diagnostics.
+
+### Removed
+- The alpha.19 one-release bootstrap accepting a legacy 0/0 affected receipt; verification requires the current package and scaffold proof.
+
 ## [1.0.0-alpha.19] — 2026-10-17
 
 This release supersedes the alpha.18 cut, which was never tagged: it carries everything listed under 1.0.0-alpha.18 below, plus the removal of the runtime's own specs.
