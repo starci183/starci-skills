@@ -9,14 +9,14 @@ import fs from 'node:fs';
 import net from 'node:net';
 import { createRequire } from 'node:module';
 import path from 'node:path';
-import { scaffoldApp } from '../../packages/hfs/scaffold/app.mjs';
-import { supabasePortVars } from '../../packages/hfs/scaffold/supabase-ports.mjs';
-import { runNpm } from '../../scripts/api/npm/run-npm.mjs';
-import { nextBuildEnv } from '../../scripts/gates/build-env.mjs';
-import { runNpx } from '../../scripts/api/npm/run-npx.mjs';
-import { mkdtemp } from '../helpers/tmpdir.mjs';
-import { startSourceCanonRegistry } from '../helpers/source-canon-registry.mjs';
-import { OWNER_FILE, reclaimStaleStack, removeProjectStack } from '../helpers/supabase-project-stack.mjs';
+import { scaffoldApp } from '../packages/hfs/scaffold/app.mjs';
+import { supabasePortVars } from '../packages/hfs/scaffold/supabase-ports.mjs';
+import { runNpm } from '../scripts/api/npm/run-npm.mjs';
+import { nextBuildEnv } from '../scripts/gates/build-env.mjs';
+import { runNpx } from '../scripts/api/npm/run-npx.mjs';
+import { mkdtemp } from './helpers/tmpdir.mjs';
+import { startSourceCanonRegistry } from './helpers/source-canon-registry.mjs';
+import { OWNER_FILE, reclaimStaleStack, removeProjectStack } from './helpers/supabase-project-stack.mjs';
 
 const tail = (run, lines = 30) => `${run.stdout ?? ''}\n${run.stderr ?? ''}`.trim().split(/\r?\n/).slice(-lines).join('\n');
 
@@ -29,7 +29,7 @@ const gitStatus = cwd => execFileSync('git', ['status', '--porcelain=v1'], { cwd
 
 const APP_NAME = 'litedemo';
 /** What sync loads from the installed @starci/jest-preset (both editions install it): the Sonar exclusions the app's lint renders too. */
-const PRESETS = { sonarExclusions: createRequire(import.meta.url)('../../packages/jest-preset/index.cjs').sonarExclusions() };
+const PRESETS = { sonarExclusions: createRequire(import.meta.url)('../packages/jest-preset/index.cjs').sonarExclusions() };
 
 /** The one prerequisite that may skip: Docker answering. A busy port never skips; it fails (below). */
 const dockerProbe = spawnSync('docker', ['info'], { encoding: 'utf8', windowsHide: true, timeout: 60_000 });

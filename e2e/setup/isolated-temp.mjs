@@ -1,6 +1,6 @@
 // isolated-temp.mjs — the node --test preload that gives every spec process its own temp root and fails it on leaks.
 //
-//   node --import ./tests/setup/isolated-temp.mjs --import ./tests/setup/isolated-registry.mjs --test tests/*.spec.mjs     (npm test)
+//   node --import ./e2e/setup/isolated-temp.mjs --import ./e2e/setup/isolated-registry.mjs --test e2e/<file>.spec.mjs     (starci release scaffold-e2e)
 //
 // node --test runs each spec file in a child process with this import applied, and the child is where the fixtures
 // live. Loaded first — before isolated-registry, so the per-run machine registry lands inside the root too — it

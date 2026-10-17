@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // release-app-installs.mjs: the release verification of a scaffolded app against FRESH registry installs.
 // It runs the published `starci app scaffold release-app` (npx, canon-pins versions) into a temp dir, installs that app from the npm registry (`npm ci` on the
-// scaffold's own lockfile, or `npm install` when it has none), and runs tests/packages-hfs/hfs-scaffold-app.spec.mjs with
+// scaffold's own lockfile, or `npm install` when it has none), and runs e2e/hfs-scaffold-app.spec.mjs with
 // STARCI_APP_INSTALLS = that install and STARCI_REQUIRE_APP_INSTALLS=1. A missing install then fails the spec
 // instead of skipping it, so the lint, typecheck and api boot proofs can never pass silently.
 //
@@ -48,7 +48,7 @@ try {
   const lock = fs.existsSync(path.join(app, 'package-lock.json'));
   step(lock ? 'npm ci (registry)' : 'npm install (registry)', runNpm, [lock ? 'ci' : 'install', '--no-audit', '--no-fund'], { cwd: app });
   const env = { ...nextBuildEnv(), STARCI_APP_INSTALLS: path.join(app, 'node_modules'), STARCI_REQUIRE_APP_INSTALLS: '1' };
-  const r = runNode(['--test', path.join(root, 'tests/packages-hfs/hfs-scaffold-app.spec.mjs')], { cwd: root, env, stdio: 'inherit' });
+  const r = runNode(['--test', path.join(root, 'e2e/hfs-scaffold-app.spec.mjs')], { cwd: root, env, stdio: 'inherit' });
   exit = r.status ?? 1;
   console.log(exit === 0 ? 'release-app-installs: OK (scaffold lint, typecheck and api boot ran against fresh registry installs)' : `release-app-installs: FAILED (spec exit ${exit})`);
 } finally {

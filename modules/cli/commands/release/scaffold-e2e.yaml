@@ -1,0 +1,17 @@
+group: release
+verb: scaffold-e2e
+owner: runtime
+summary: run the scaffold end-to-end proof (full and lite scaffolds installed, built and run for real)
+impl: {script: scripts/gates/scaffold-e2e.mjs}
+conventions:
+  - "With release clean-test, the real test proof of the runtime (owner ruling no-runtime-specs): the runtime has no specs."
+  - "A skipped test is red: every scaffold test must run (Docker, npm and the source canon registry are prerequisites)."
+flags: []
+exit:
+  "0": every scaffold e2e test ran and passed
+  "1": a scaffold e2e test failed, was cancelled or was skipped
+  "2": the run could not start or bad usage
+json: none
+examples:
+  - starci release scaffold-e2e
+editions: [full]

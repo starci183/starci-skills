@@ -1,7 +1,7 @@
 // hfs-scaffold-app.e2e.spec.mjs - the single-service case end to end. `starci app scaffold demo` writes the monorepo into a
 // temp dir (fs.mkdtempSync under os.tmpdir(), removed with fs.rmSync in after), then the app REALLY installs: `npm ci` on
 // its own lockfile, the @starci scope resolved from this checkout's packed packages through the source-canon registry
-// (tests/helpers/source-canon-registry.mjs, the same registry the scaffold's lock step wrote the lockfile against; every
+// (e2e/helpers/source-canon-registry.mjs, the same registry the scaffold's lock step wrote the lockfile against; every
 // other package comes from the public registry). Then the app's own commands, run for real through npm:
 //   npm run typecheck   codegen, the be tsc and the turbo `typecheck` task of every fe workspace (turbo builds the fe
 //                       packages first: ^build) - every import of the skeleton resolves
@@ -20,16 +20,16 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { performance } from 'node:perf_hooks';
-import { scaffoldApp } from '../../packages/hfs/scaffold/app.mjs';
-import { parseYaml } from '../../engine/yaml.mjs';
-import { runNpm } from '../../scripts/api/npm/run-npm.mjs';
-import { mkdtemp } from '../helpers/tmpdir.mjs';
-import { runNpmAsync } from '../helpers/hfs-hfs-scaffold-app-e2e-fixture.mjs';
-import { startSourceCanonRegistry } from '../helpers/source-canon-registry.mjs';
+import { scaffoldApp } from '../packages/hfs/scaffold/app.mjs';
+import { parseYaml } from '../engine/yaml.mjs';
+import { runNpm } from '../scripts/api/npm/run-npm.mjs';
+import { mkdtemp } from './helpers/tmpdir.mjs';
+import { runNpmAsync } from './helpers/hfs-hfs-scaffold-app-e2e-fixture.mjs';
+import { startSourceCanonRegistry } from './helpers/source-canon-registry.mjs';
 
-const RUNTIME = path.resolve(import.meta.dirname, '..', '..');
+const RUNTIME = path.resolve(import.meta.dirname, '..');
 const require_ = createRequire(import.meta.url);
-const jestPreset = require_('../../packages/jest-preset/index.cjs');
+const jestPreset = require_('../packages/jest-preset/index.cjs');
 /** What sync loads from the installed jest preset: the Sonar exclusions and the coverage sources (the one coverage scope). */
 const PRESETS = { sonarExclusions: jestPreset.sonarExclusions() };
 

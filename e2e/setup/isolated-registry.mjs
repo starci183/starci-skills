@@ -1,8 +1,8 @@
 // isolated-registry.mjs — the node --test preload that gives one test run its own machine.sqlite and blob store.
 //
-//   node --import ./tests/setup/isolated-registry.mjs --test tests/*.spec.mjs     (npm test)
+//   node --import ./e2e/setup/isolated-registry.mjs --test e2e/<file>.spec.mjs     (starci release scaffold-e2e)
 //
-// scripts/supervisor/land.mjs passes it too. Loaded in the runner before any spec starts, it points
+// Loaded in the runner before any spec starts, it points
 // STARCI_TEST_MACHINE_FILE (engine/db/machine.mjs TEST_REGISTRY_ENV) at a fresh machine.sqlite and STARCI_ARTIFACT_ROOT
 // at a fresh blob store, both under the OS temp directory; every spec process, and every cli.mjs or kernel a spec spawns
 // with the inherited env, writes there instead of the host's live stores, and the runner removes the directory when it

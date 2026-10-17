@@ -1,7 +1,7 @@
 // _hfs-app-install.mjs - an app's node_modules for a spec that lints it, without installing anything: every package an existing
 // install holds is linked into <app>/node_modules (a junction per package, the first install that has it wins), and the runtime's
 // own @starci packages are copied there (a copy, not a link, so each resolves its own dependencies from the app, exactly as the
-// installed package would). tests/repo/canon-packed-load.spec.mjs links the same way. `uninstall` removes every link before the tree,
+// installed package would). `uninstall` removes every link before the tree,
 // so no delete ever walks through a junction into the install it points at.
 import fs from 'node:fs';
 import path from 'node:path';

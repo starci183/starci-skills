@@ -6,8 +6,8 @@
 // side is reported. The be core api also builds with its own build:be script and boots with start:core over a stand-in of its primary
 // database at the network edge (GET /health/live answers 200), then stops.
 // The scaffold resolves its real lockfile with npm (network or the npm cache), the @starci scope from this checkout's own packages
-// (tests/helpers/source-canon-registry.mjs: the canon versions are raised in the source before they are published, so the spec never
-// depends on publish state). Nothing is installed: the dependencies are linked from existing installs (tests/helpers/hfs-app-install.mjs;
+// (e2e/helpers/source-canon-registry.mjs: the canon versions are raised in the source before they are published, so the spec never
+// depends on publish state). Nothing is installed: the dependencies are linked from existing installs (e2e/helpers/hfs-app-install.mjs;
 // STARCI_APP_INSTALLS may add a product app's node_modules when the runtime holds no copy of a framework the skeleton imports).
 import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -17,20 +17,20 @@ import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
-import { main } from '../../packages/hfs/src/main.mjs';
-import { scaffoldApp } from '../../packages/hfs/scaffold/app.mjs';
-import { jestCoverageSource } from '../../packages/hfs/sync/index.mjs';
-import { coverageScope, jestCoverage, sonarCoverageExclusions } from '../../scripts/hfs/coverage-scope.mjs';
-import { dockerFindings } from '../../scripts/hfs/rules/docker.mjs';
-import { nextBuildEnv } from '../../scripts/gates/build-env.mjs';
-import { scaffoldBinGaps } from '../helpers/scaffold-bins.mjs';
-import { loadSlotManifest, resolveRepoDeclaration } from '../../scripts/hfs/slots.mjs';
-import { parseYaml } from '../../engine/yaml.mjs';
-import { LINT_DEPENDENCIES, RUNTIME, installInto, missingFrom, runtimeInstalls, uninstall } from '../helpers/hfs-app-install.mjs';
-import { createScaffoldAppBaseline, SERVER_READY_IMPORT } from '../helpers/scaffold-app-baseline.mjs';
-import { startSourceCanonRegistry } from '../helpers/source-canon-registry.mjs';
+import { main } from '../packages/hfs/src/main.mjs';
+import { scaffoldApp } from '../packages/hfs/scaffold/app.mjs';
+import { jestCoverageSource } from '../packages/hfs/sync/index.mjs';
+import { coverageScope, jestCoverage, sonarCoverageExclusions } from '../scripts/hfs/coverage-scope.mjs';
+import { dockerFindings } from '../scripts/hfs/rules/docker.mjs';
+import { nextBuildEnv } from '../scripts/gates/build-env.mjs';
+import { scaffoldBinGaps } from './helpers/scaffold-bins.mjs';
+import { loadSlotManifest, resolveRepoDeclaration } from '../scripts/hfs/slots.mjs';
+import { parseYaml } from '../engine/yaml.mjs';
+import { LINT_DEPENDENCIES, RUNTIME, installInto, missingFrom, runtimeInstalls, uninstall } from './helpers/hfs-app-install.mjs';
+import { createScaffoldAppBaseline, SERVER_READY_IMPORT } from './helpers/scaffold-app-baseline.mjs';
+import { startSourceCanonRegistry } from './helpers/source-canon-registry.mjs';
 
-const jestPreset = createRequire(import.meta.url)('../../packages/jest-preset/index.cjs');
+const jestPreset = createRequire(import.meta.url)('../packages/jest-preset/index.cjs');
 /** What sync loads from the installed jest preset: the Sonar exclusions. */
 const PRESETS = { sonarExclusions: jestPreset.sonarExclusions() };
 /** The one coverage scope of an app: the logic roles of the measured roots, derived from the slot manifest (scripts/hfs/coverage-scope.mjs). */
@@ -560,7 +560,7 @@ test('the scaffolded be core api builds with build:be and boots with start:core 
 
   assert.equal((await scaffoldBaseline.cloneInto(into)).root, app);
   // The scaffold declares the runtime peer of every driver integration pair it depends on (R111): nothing to add.
-  const { peerIntegrationFindings } = await import('../../scripts/hfs/rules/peer-integrations.mjs');
+  const { peerIntegrationFindings } = await import('../scripts/hfs/rules/peer-integrations.mjs');
   assert.deepEqual(peerIntegrationFindings({ repoRoot: app, files: ['package.json'] }), []);
   links = installInto(app, installs);
   assertValidationPeers(app);
