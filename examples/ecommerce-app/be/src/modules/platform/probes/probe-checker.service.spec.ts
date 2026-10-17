@@ -4,7 +4,7 @@ import type { Logger } from "@modules/platform/logging"
 import { TIMER } from "@modules/platform/retry"
 import type { Timer } from "@modules/platform/retry"
 import { Test } from "@nestjs/testing"
-import { ProbesErrorCode } from "./errors/probes.error"
+import { ProbesError, ProbesErrorCode } from "./errors/probes.error"
 import { ProbeCheckerService } from "./probe-checker.service"
 import { PROBES, PROBES_OPTIONS } from "./probes.decorators"
 import { ProbesLogEvent } from "./probes.log-events"
@@ -92,7 +92,60 @@ describe("ProbeCheckerService", () => {
             jest.useRealTimers()
         }
     })
+})
 
+describe("ProbeCheckerService deadline cleanup", () => {
+    it("propagates a deadline cancellation failure", async () => {
+        const { checker, database, cache, cancel } = await build()
+        const failure = new ProbesError({ code: ProbesErrorCode.DependencyUnavailable })
+        database.check.mockResolvedValue(undefined)
+        cache.check.mockResolvedValue(undefined)
+        cancel.mockImplementationOnce(() => {
+            throw failure
+        })
+
+        await expect(checker.check()).rejects.toBe(failure)
+
+        expect(cancel).toHaveBeenCalledTimes(2)
+    })
+
+    it("cancels deadlines even when logging a probe failure throws", async () => {
+        const { checker, database, cache, logger, cancel } = await build()
+        const failure = new ProbesError({ code: ProbesErrorCode.DependencyUnavailable })
+        database.check.mockRejectedValue(failure)
+        cache.check.mockResolvedValue(undefined)
+        logger.error.mockImplementation(() => {
+            throw failure
+        })
+
+        await expect(checker.check()).rejects.toBe(failure)
+
+        expect(logger.error).toHaveBeenCalledWith(ProbesLogEvent.ProbeFailed, failure, { dependency: "database" })
+        expect(cancel).toHaveBeenCalledTimes(2)
+    })
+
+    it("reports a synchronous probe failure before its deadline can be scheduled", async () => {
+        const { checker, database, cache, logger, timer, cancel } = await build()
+        const failure = new ProbesError({ code: ProbesErrorCode.DependencyUnavailable })
+        database.check.mockImplementation(() => {
+            throw failure
+        })
+        cache.check.mockResolvedValue(undefined)
+
+        expect(await checker.check()).toBeRefused({
+            code: ProbesErrorCode.DependencyUnavailable,
+            params: { database: "unreachable", cache: "ok" },
+        })
+        expect(database.check).toHaveBeenCalledTimes(1)
+        expect(cache.check).toHaveBeenCalledTimes(1)
+        expect(logger.error).toHaveBeenCalledTimes(1)
+        expect(logger.error).toHaveBeenCalledWith(ProbesLogEvent.ProbeFailed, failure, { dependency: "database" })
+        expect(timer.schedule).toHaveBeenCalledTimes(1)
+        expect(cancel).toHaveBeenCalledTimes(1)
+    })
+})
+
+describe("ProbeCheckerService successful cleanup", () => {
     it("clears probe deadlines after successful readiness", async () => {
         jest.useFakeTimers()
         try {

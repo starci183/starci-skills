@@ -4,12 +4,13 @@ import { mock } from "@starci/jest-preset"
 import { Test } from "@nestjs/testing"
 import { mockEntityManager } from "@starci/jest-preset"
 import { DatabaseReadinessService } from "./database-readiness.service"
-import { DatabaseErrorCode } from "./errors/database.error"
+import { DatabaseError, DatabaseErrorCode } from "./errors/database.error"
 import { PRIMARY_ENTITY_MANAGER } from "./primary.decorators"
 
 const build = async () => {
     const manager = mockEntityManager()
-    const deadlines = mock<DeadlineScheduler>({ schedule: new DeadlineSchedulerService().schedule })
+    const deadlines = mock<DeadlineScheduler>()
+    deadlines.schedule.mockImplementation(new DeadlineSchedulerService().schedule)
     const moduleRef = await Test.createTestingModule({
         providers: [
             DatabaseReadinessService,
@@ -17,7 +18,7 @@ const build = async () => {
             { provide: DEADLINE_SCHEDULER, useValue: deadlines },
         ],
     }).compile()
-    return { service: moduleRef.get(DatabaseReadinessService), manager }
+    return { service: moduleRef.get(DatabaseReadinessService), manager, deadlines }
 }
 
 describe("DatabaseReadinessService", () => {
@@ -39,12 +40,52 @@ describe("DatabaseReadinessService", () => {
         })
     })
 
+    it("answers unavailable when scheduling fails before a cancellation callback is returned", async () => {
+        const { service, manager, deadlines } = await build()
+        const cause = new DatabaseError({ code: DatabaseErrorCode.RequiredUnavailable })
+        deadlines.schedule.mockImplementation(() => {
+            throw cause
+        })
+        manager.query.mockImplementation(() => new Promise(() => {}))
+
+        await expect(service.check()).rejects.toMatchObject({
+            code: DatabaseErrorCode.RequiredUnavailable,
+            params: { dependency: "primary" },
+            cause,
+        })
+        expect(deadlines.schedule).toHaveBeenCalledWith(expect.any(Function), 1000)
+    })
+
+    it("cancels the deadline when starting the primary query throws synchronously", async () => {
+        jest.useFakeTimers()
+        try {
+            const { service, manager } = await build()
+            const cause = new DatabaseError({ code: DatabaseErrorCode.RequiredUnavailable })
+            manager.query.mockImplementation(() => {
+                throw cause
+            })
+
+            await expect(service.check()).rejects.toMatchObject({
+                code: DatabaseErrorCode.RequiredUnavailable,
+                params: { dependency: "primary" },
+                cause,
+            })
+            expect(jest.getTimerCount()).toBe(0)
+        } finally {
+            jest.useRealTimers()
+        }
+    })
+
     it("answers unavailable within one second when the database never responds", async () => {
         jest.useFakeTimers()
         try {
             const { service, manager } = await build()
             manager.query.mockImplementation(() => new Promise(() => {}))
-            const check = expect(service.check()).rejects.toMatchObject({ code: DatabaseErrorCode.RequiredUnavailable })
+            const check = expect(service.check()).rejects.toMatchObject({
+                code: DatabaseErrorCode.RequiredUnavailable,
+                params: { dependency: "primary" },
+                cause: expect.any(DatabaseError),
+            })
 
             await jest.advanceTimersByTimeAsync(1000)
 

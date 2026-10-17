@@ -3,12 +3,11 @@ import { RequestMethod } from "@nestjs/common"
 import { GUARDS_METADATA, METHOD_METADATA, PATH_METADATA } from "@nestjs/common/constants"
 import type { LivenessReport } from "@modules/domain/liveness"
 import { StatusController } from "@features/api/tool-status"
-import { buildToolStatusProof } from "@tests/fixtures/builders/api.builder"
-import { useTestWorld } from "@tests/world/test-world.kit"
+import { createToolStatusProof, useTestWorld } from "../../world/kit"
 
 describe("StatusController", () => {
     const world = useTestWorld({
-        modules: buildToolStatusProof,
+        modules: createToolStatusProof,
     })
 
     it("dispatches the tool id once and returns the typed status report", async () => {

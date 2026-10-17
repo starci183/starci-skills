@@ -50,6 +50,13 @@ describe("admit", () => {
         expect(subject(undefined)).toBeRefused(IdentityErrorCode.Unauthenticated)
     })
 
+    it.each([PublicReason.AuthHandshake, PublicReason.SignedWebhook, PublicReason.CatalogRead])(
+        "refuses a door with the unsupported public reason %s",
+        (reason) => {
+            expect(subject({ reason })).toBeRefused(IdentityErrorCode.Unauthenticated)
+        },
+    )
+
     it("refuses an unknown public reason supplied as runtime metadata", () => {
         const metadata = runtimeMetadata('{"reason":"tool-token"}')
         expect(subject(metadata)).toBeRefused(IdentityErrorCode.Unauthenticated)

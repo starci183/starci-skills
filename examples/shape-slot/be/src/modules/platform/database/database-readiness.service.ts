@@ -21,11 +21,19 @@ export class DatabaseReadinessService {
     async check(): Promise<DatabaseReadinessReport> {
         let cancel: (() => void) | undefined
         const deadline = new Promise<never>((_resolve, reject) => {
-            cancel = this.deadlines.schedule(() => reject(), READINESS_TIMEOUT_MS)
+            cancel = this.deadlines.schedule(
+                () =>
+                    reject(
+                        new DatabaseError({
+                            code: DatabaseErrorCode.RequiredUnavailable,
+                            params: { dependency: "primary" },
+                        }),
+                    ),
+                READINESS_TIMEOUT_MS,
+            )
         })
         try {
             await Promise.race([this.entityManager.query(sql`select 1`), deadline])
-            return { status: "ok", dependencies: { primary: "ok" } }
         } catch (error) {
             throw new DatabaseError({
                 code: DatabaseErrorCode.RequiredUnavailable,
@@ -35,5 +43,6 @@ export class DatabaseReadinessService {
         } finally {
             cancel?.()
         }
+        return { status: "ok", dependencies: { primary: "ok" } }
     }
 }

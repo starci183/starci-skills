@@ -1,5 +1,5 @@
 import assert from "node:assert/strict"
-import { createHmac } from "node:crypto"
+import { createHmac, randomBytes } from "node:crypto"
 import type { RawBodyRequest } from "@nestjs/common"
 import type { Request } from "express"
 import { FakeClock, fakeIds, mock } from "@starci/jest-preset"
@@ -14,7 +14,7 @@ import { useTestWorld } from "../../world/kit"
 import { createCalendarProof } from "../../world/kit"
 
 const clock = new FakeClock("2026-10-14T00:00:00.000Z")
-const signingFixture = "integration-calendar-provider-fixture"
+const signingFixture = randomBytes(32).toString("hex")
 const payload = { id: "calendar-proof" }
 const body = Buffer.from(JSON.stringify(payload))
 const request = mock<RawBodyRequest<Request>>({ rawBody: body })

@@ -49,6 +49,7 @@ export class ProbeCheckerService {
 
     private async state(probe: Probe): Promise<ProbeState> {
         let cancel: () => void = () => undefined
+        let state: ProbeState = "ok"
         try {
             await Promise.race([
                 probe.check(),
@@ -59,12 +60,12 @@ export class ProbeCheckerService {
                     )
                 }),
             ])
-            return "ok"
         } catch (error) {
             this.logger.error(ProbesLogEvent.ProbeFailed, error, { dependency: probe.name })
-            return "unreachable"
+            state = "unreachable"
         } finally {
             cancel()
         }
+        return state
     }
 }

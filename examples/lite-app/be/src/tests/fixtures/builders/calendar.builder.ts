@@ -1,10 +1,12 @@
-import type { CalendarReceiptIdsRow } from "@modules/domain/calendar-inbox"
-import { QueueInspectionClient } from "@modules/platform/queue"
+import {
+    type CalendarReceiptIdsRow,
+    READ_CALENDAR_RECEIPT_IDS,
+    DELETE_CALENDAR_RECEIPTS,
+} from "@modules/domain/calendar-inbox"
+import { QueueInspectionClient, DELETE_CALENDAR_OUTBOX } from "@modules/platform/queue"
 import { DELETE_CALENDAR_CLAIM } from "@modules/platform/inbox"
-import { READ_CALENDAR_RECEIPT_IDS, DELETE_CALENDAR_RECEIPTS } from "@modules/domain/calendar-inbox"
 import type { EntityManager } from "typeorm"
 import { CALENDAR_DELIVERY_QUEUE } from "@modules/queues/calendar-delivery"
-import { DELETE_CALENDAR_OUTBOX } from "@modules/platform/queue"
 
 /** Removes only the delivery and its handoff rows, including after a failed proof. */
 export const createCalendarBuilder = (manager: EntityManager) => ({

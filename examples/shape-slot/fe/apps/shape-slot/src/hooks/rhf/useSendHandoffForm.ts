@@ -13,7 +13,7 @@ const useSendHandoffValidation = () => {
     const revisionMin = t("sales.send.errors.revisionMin")
     const noteTooLong = t("sales.send.errors.noteTooLong")
     const serverError = t("errors.page.title")
-    const messages = [fingerprintRequired, revisionMin, noteTooLong, serverError]
+    const messages = new Set([fingerprintRequired, revisionMin, noteTooLong, serverError])
     return {
         schema: z.object({
             fingerprint: z.string().trim().min(1, fingerprintRequired),
@@ -21,7 +21,7 @@ const useSendHandoffValidation = () => {
             note: z.string().max(500, noteTooLong),
         }),
         serverError,
-        errorOf: (message?: string) => (message !== undefined && messages.includes(message) ? message : undefined),
+        errorOf: (message?: string) => (message !== undefined && messages.has(message) ? message : undefined),
     }
 }
 

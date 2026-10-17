@@ -1,7 +1,5 @@
 import { FakeClock, fakeIds, mock } from "@starci/jest-preset"
-import { JobClaimService } from "@modules/platform/jobs"
-import { JobRunnerService } from "@modules/platform/jobs"
-import { JobsLogEvent } from "@modules/platform/jobs"
+import { JobClaimService, JobRunnerService, JobsLogEvent } from "@modules/platform/jobs"
 import type { Logger } from "@modules/platform/logging"
 import type { QueueDelivery, QueueWorkerRegistry } from "@modules/platform/queue"
 import { createJobsBuilder } from "../fixtures/builders/jobs.builder"

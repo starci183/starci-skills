@@ -2,9 +2,6 @@ import { Secret } from "@modules/platform/config"
 import { PRIMARY_DATA_SOURCE } from "@modules/platform/database"
 import { ACCESS_TOKEN_VERIFIER } from "@modules/domain/identity"
 import { SUPABASE_ACCESS_TOKEN_VERIFIER, SUPABASE_ADMIN_CLIENT } from "@modules/integrations/supabase"
-import type { QueryBus } from "@nestjs/cqrs"
-import { mock } from "@starci/jest-preset"
-import { GetToolStatusQuery, StatusController } from "@features/api/tool-status"
 
 /** Compiles the real API root with public configuration and explicit infrastructure doubles. */
 export const buildWiringProof = () => ({
@@ -30,13 +27,3 @@ export const buildWiringProof = () => ({
         { token: ACCESS_TOKEN_VERIFIER, value: () => ({ ok: false }) },
     ],
 })
-
-/** Arranges the status transport collaborator and its expected typed query. */
-export const buildToolStatusProof = () => {
-    const queryBus = mock<QueryBus>()
-    return {
-        queryBus,
-        controller: new StatusController(queryBus),
-        query: (id: string) => new GetToolStatusQuery({ request: { id } }),
-    }
-}

@@ -1,9 +1,12 @@
 import { SchedulerClient } from "@modules/platform/jobs"
-import { QueueInspectionClient } from "@modules/platform/queue"
+import {
+    QueueInspectionClient,
+    INSERT_PENDING_BOOKING,
+    DELETE_BOOKING_OUTBOX,
+    type OutboxIdRow,
+} from "@modules/platform/queue"
 import type { EntityManager } from "typeorm"
 import { BOOKING_REMINDER_QUEUE } from "@modules/queues/booking-reminder"
-import { INSERT_PENDING_BOOKING, DELETE_BOOKING_OUTBOX } from "@modules/platform/queue"
-import type { OutboxIdRow } from "@modules/platform/queue"
 
 /** SQL-side outbox arrangements and cleanup on the world's connection. */
 export const createQueueBuilder = (manager: EntityManager) => ({

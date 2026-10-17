@@ -1,6 +1,6 @@
 import { fakeIds } from "@starci/jest-preset"
-import { SepayModule, SepayErrorCode, parseSepayConfig } from "@modules/integrations/sepay"
-import { EnvSource } from "@modules/platform/config"
+import { SepayModule, HttpSecurityErrorCode } from "@modules/integrations/sepay"
+import { Secret } from "@modules/platform/config"
 import { WebhookSignatureService } from "@modules/platform/http-security"
 import { present } from "../../fixtures/present.mapper"
 import { useTestWorld } from "../../world/use-test-world"
@@ -12,9 +12,12 @@ describe("sepay: notifier signature (integration)", () => {
     const world = useTestWorld({
         modules: [
             (w) =>
-                SepayModule.register(
-                    parseSepayConfig(new EnvSource({ SEPAY_WEBHOOK_SECRET: w.fake.sepay.values.webhookSecret })),
-                ),
+                SepayModule.register({
+                    secret: new Secret(
+                        present(present(w.fake.sepay, "SePay fake").values.webhookSecret, "SePay signing secret"),
+                    ),
+                    toleranceMs: 300_000,
+                }),
         ],
         apps: ["billing"],
     })
@@ -36,7 +39,7 @@ describe("sepay: notifier signature (integration)", () => {
         expect(delivery.status).toBe(204)
         expect(() => verify(delivery)).not.toThrow()
         expect(() => verify({ ...delivery, body: `${delivery.body} ` })).toThrow(
-            expect.objectContaining({ code: SepayErrorCode.WebhookSignatureInvalid }),
+            expect.objectContaining({ code: HttpSecurityErrorCode.WebhookSignatureInvalid }),
         )
     })
 
@@ -46,11 +49,13 @@ describe("sepay: notifier signature (integration)", () => {
         const bad = present(await world.fake.sepay.settle({ reference, amount: 1500 }), "bad signature delivery")
 
         expect(bad.status).toBe(401)
-        expect(() => verify(bad)).toThrow(expect.objectContaining({ code: SepayErrorCode.WebhookSignatureInvalid }))
+        expect(() => verify(bad)).toThrow(
+            expect.objectContaining({ code: HttpSecurityErrorCode.WebhookSignatureInvalid }),
+        )
 
         const stale = await world.fake.sepay.replayWebhook(reference, { ageMs: 600_000 })
         expect(stale.status).toBe(401)
-        expect(() => verify(stale)).toThrow(expect.objectContaining({ code: SepayErrorCode.WebhookReplayed }))
+        expect(() => verify(stale)).toThrow(expect.objectContaining({ code: HttpSecurityErrorCode.WebhookReplayed }))
 
         const retried = await world.fake.sepay.replayWebhook(reference, { ageMs: 1 })
         expect(retried.status).toBe(204)

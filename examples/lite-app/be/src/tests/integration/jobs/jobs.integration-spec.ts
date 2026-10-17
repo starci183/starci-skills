@@ -1,7 +1,6 @@
 import assert from "node:assert/strict"
 import type { ClaimedJob, FencedProcessor } from "@modules/platform/jobs"
-import { useTestWorld, TestWorldError, TestWorldErrorCode } from "../../world/kit"
-import { createJobsProof } from "../../world/kit"
+import { useTestWorld, TestWorldError, TestWorldErrorCode, createJobsProof } from "../../world/kit"
 
 const LEASE_MS = 100
 const world = useTestWorld({ modules: createJobsProof, rollback: true })

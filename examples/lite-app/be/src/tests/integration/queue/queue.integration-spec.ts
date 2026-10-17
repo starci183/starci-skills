@@ -1,9 +1,7 @@
 import assert from "node:assert/strict"
 import { fakeIds } from "@starci/jest-preset"
 import type { QueueOptions } from "@modules/platform/queue"
-import { useTestWorld, TestWorldError, TestWorldErrorCode } from "../../world/kit"
-import type { TestWorld } from "../../world/kit"
-import { createQueueProof } from "../../world/kit"
+import { useTestWorld, TestWorldError, TestWorldErrorCode, type TestWorld, createQueueProof } from "../../world/kit"
 
 const options: QueueOptions = {
     relayIntervalMs: 1,

@@ -1,4 +1,2 @@
-import type { WebhookProviderOptions } from "@modules/platform/http-security"
-
-/** The signing secret and replay window of the SePay notifier. */
-export type SepayOptions = WebhookProviderOptions
+/** The shared signing secret and replay window options used by SePay. */
+export type { WebhookProviderOptions } from "@modules/platform/http-security"

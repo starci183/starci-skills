@@ -1,16 +1,17 @@
 import { SchedulerClient } from "@modules/platform/jobs"
-import { QueueInspectionClient } from "@modules/platform/queue"
 import type { EntityManager } from "typeorm"
 import { FakeClock, mock } from "@starci/jest-preset"
 import type { Logger } from "@modules/platform/logging"
 import { BookingReminderQueue, BOOKING_REMINDER_QUEUE } from "@modules/queues/booking-reminder"
 import {
+    QueueInspectionClient,
     PgmqQueueTransportClient,
     QueueOutboxService,
     QueueRelayService,
     READ_BOOKING_OUTBOX,
+    type QueueOptions,
+    type BookingOutboxRow,
 } from "@modules/platform/queue"
-import type { QueueOptions, BookingOutboxRow } from "@modules/platform/queue"
 import { createQueueBuilder } from "../fixtures/builders/queue.builder"
 import type { TestDatabases } from "./use-test-world"
 
