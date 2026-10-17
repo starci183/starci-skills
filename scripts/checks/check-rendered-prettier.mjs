@@ -43,7 +43,7 @@ function serviceCases() {
 function matrixDeclaration(app, item) {
   const sonar = { provider: item.sonar === 'sonarcloud' ? 'sonarcloud' : 'sonarqube', mode: item.sonar === 'disabled' ? 'disabled' : 'hosted', host: { public: 'https://sonar.example.test' }, organization: 'render-check', projects: [{ key: 'render-check' }] };
   const codecov = { mode: item.codecov === 'disabled' ? 'disabled' : 'hosted', optional: item.codecov === 'optional', ...(item.codecov === 'flag' ? { flag: 'unit-tests' } : {}) };
-  if (item.privateBadges === 'tokens') { sonar.badgeToken = 'sqb_render_check'; codecov.badgeToken = 'render_check'; }
+  if (item.privateBadges === 'tokens') { sonar.badgeToken = 'sqb_example_badge'; codecov.badgeToken = 'example_badge'; }
   const apps = app.sides.fe.apps;
   const selected = item.build === 'two-apps' ? apps : apps.slice(0, 1);
   const images = item.build === 'absent' ? {} : Object.fromEntries(selected.map(entry => [entry.name, { app: entry.name, buildArgs: { values: { NEXT_PUBLIC_SITE_URL: 'https://' + entry.name + '.example.test' } } }]));
