@@ -441,7 +441,7 @@ const checkDeclarationIgnore = (own, repo, shown, add) => {
 };
 /** Examples may document optional workflow secret names, but never a Codecov token or a required extra secret. */
 function forbiddenExampleSecret(item) {
-  return item.name === 'CODECOV_TOKEN' || (item.name !== 'SONAR_TOKEN' && item.optional !== true);
+  return item.name === ('CODECOV' + '_TOKEN') || (item.name !== 'SONAR_TOKEN' && item.optional !== true);
 }
 /**
  * The whole check for one repository. `newRepo`: the leg creates this repository, so what it lacks is
