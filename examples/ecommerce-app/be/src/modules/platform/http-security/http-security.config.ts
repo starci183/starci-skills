@@ -1,11 +1,5 @@
 import type { EnvSource } from "@modules/platform/config"
-import type { HttpSecurityOptions, WebhookProviderOptions } from "./http-security.options"
-
-/** Reads the signature settings of one webhook provider: `<PREFIX>_WEBHOOK_SECRET` (required) and `<PREFIX>_WEBHOOK_TOLERANCE` (the replay window, five minutes by default). */
-export const parseWebhookProviderConfig = (env: EnvSource, prefix: string): WebhookProviderOptions => ({
-    secret: env.secret(`${prefix}_WEBHOOK_SECRET`),
-    toleranceMs: env.duration(`${prefix}_WEBHOOK_TOLERANCE`, 300_000),
-})
+import type { HttpSecurityOptions } from "./http-security.options"
 
 /** Reads the http-security options: the origin allowlist is required, the rate limits are tunables with literal defaults. */
 export const parseHttpSecurityConfig = (env: EnvSource): HttpSecurityOptions => ({

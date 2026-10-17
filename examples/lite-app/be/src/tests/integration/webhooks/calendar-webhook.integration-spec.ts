@@ -10,8 +10,7 @@ import type { HttpSecurityOptions } from "@modules/platform/http-security"
 import type { JobClaims } from "@modules/platform/jobs"
 import type { QueueOptions, RecordedJobRow } from "@modules/platform/queue"
 import { CALENDAR_DELIVERY_QUEUE } from "@modules/queues/calendar-delivery"
-import { useTestWorld } from "../../world/kit"
-import { createCalendarProof } from "../../world/kit"
+import { createCalendarProof, useTestWorld } from "../../world/kit"
 
 const clock = new FakeClock("2026-10-14T00:00:00.000Z")
 const signingFixture = randomBytes(32).toString("hex")

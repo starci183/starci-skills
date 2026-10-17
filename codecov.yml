@@ -87,6 +87,7 @@ component_management:
       paths:
         - "examples/ecommerce-app/be/src/modules/domain/invoice/**"
         - "examples/ecommerce-app/be/src/modules/domain/payment/**"
+        - "examples/ecommerce-app/be/src/modules/integrations/sepay/**"
     - component_id: ecommerce-app-platform
       name: ecommerce-app-platform
       paths:

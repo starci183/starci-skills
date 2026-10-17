@@ -11,7 +11,7 @@ const runCli = promisify(execFile)
 export const reapplyBookingSchedule = async (): Promise<Array<{ jobid: string }>> => {
     const appRoot = join(__dirname, "../../../..")
     const migration = readFileSync(join(appRoot, "supabase/migrations/20261015000000_public-surface.sql"), "utf8")
-    const declaration = migration.match(/select cron\.schedule\([\s\S]*?\);/u)?.[0]
+    const declaration = /select cron\.schedule\([\s\S]*?\);/u.exec(migration)?.[0]
     assert(declaration, "the migration must declare the booking reminder schedule")
     const { stdout: output } = await runCli(
         process.execPath,

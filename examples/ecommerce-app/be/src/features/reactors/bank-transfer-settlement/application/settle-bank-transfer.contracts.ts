@@ -7,6 +7,3 @@ export interface SettleBankTransferRequest {
     /** The delivered event. */
     readonly event: BankTransferReceivedEvent
 }
-
-/** Applying an event answers nothing: a redelivery is a no-op. */
-export type SettleBankTransferResult = void
