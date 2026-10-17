@@ -152,6 +152,13 @@ $defs:
       optional:
         description: Skip an unreachable quality provider with a notice; SonarQube defaults true, SonarCloud and Codecov false.
         type: boolean
+      badgeToken:
+        description: >-
+          codecov and sonar only: a read-only, public-safe badge token (Codecov graphing token, Sonar project badge token)
+          that the README badge of a private repository needs. It is public configuration rendered into README.md, never a
+          secret; a CI token or any write credential never goes here.
+        type: string
+        pattern: '^[A-Za-z0-9_-]{6,128}$'
       ecosystems: {type: array, items: {enum: [npm, docker, github-actions]}}
       schedule:
         type: object
@@ -275,6 +282,9 @@ $defs:
           repository: {type: string, pattern: '^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$'}
           defaultBranch: {type: string, minLength: 1, default: main}
           workflow: {type: string, pattern: '^[A-Za-z0-9_.-]+\.ya?ml$', default: ci.yml}
+          visibility:
+            description: The GitHub repository visibility; private READMEs need services.<id>.badgeToken for live badges. Omitted means unknown.
+            enum: [public, private]
       secrets: {type: array, items: {$ref: '#/$defs/ciSecret'}}
       vars: {type: array, items: {$ref: '#/$defs/ciVariable'}}
       dependabot:
@@ -310,6 +320,9 @@ $defs:
           purpose: {type: string}
           optional: {type: boolean}
   ciVariable:
+    description: >-
+      A public CI variable either carries its literal value, or declares ownerValue true (no value) when only the owner
+      may supply it; var sync skips an owner-supplied value and ci verify checks that it exists by name.
     anyOf:
       - type: object
         additionalProperties: false
@@ -328,6 +341,25 @@ $defs:
           scope: {const: environment}
           environment: {type: string, pattern: '^[a-z][a-z0-9-]*$'}
           value: {type: string}
+          purpose: {type: string}
+          optional: {type: boolean}
+      - type: object
+        additionalProperties: false
+        required: [name, scope, ownerValue]
+        properties:
+          name: {$ref: '#/$defs/ciName'}
+          scope: {const: repository}
+          ownerValue: {const: true}
+          purpose: {type: string}
+          optional: {type: boolean}
+      - type: object
+        additionalProperties: false
+        required: [name, scope, ownerValue, environment]
+        properties:
+          name: {$ref: '#/$defs/ciName'}
+          scope: {const: environment}
+          environment: {type: string, pattern: '^[a-z][a-z0-9-]*$'}
+          ownerValue: {const: true}
           purpose: {type: string}
           optional: {type: boolean}
   serviceStack:

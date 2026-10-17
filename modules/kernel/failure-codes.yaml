@@ -5944,6 +5944,16 @@ SOPS_MISSING:
   owner: owner
   kind: blocker
 
+STACKS_BADGE_TOKEN_SERVICE:
+  title: "Badge token on a service without badges"
+  title_vi: "Mã huy hiệu khai báo cho dịch vụ không có huy hiệu"
+  meaning_vi: "Chỉ services.codecov và services.sonar được khai báo badgeToken; dịch vụ khác không có huy hiệu README."
+  causes_vi:
+    - "badgeToken được đặt nhầm dưới một dịch vụ khác codecov hoặc sonar"
+  nextStep_vi: "Chuyển badgeToken về services.codecov hoặc services.sonar, hoặc xoá nó."
+  owner: op-retry
+  kind: check-finding
+
 STACKS_CI_LEGACY_FORM:
   title: "Legacy service CI declaration is deprecated"
   title_vi: "Khai báo CI của dịch vụ dùng dạng cũ"

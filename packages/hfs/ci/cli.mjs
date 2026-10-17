@@ -5,7 +5,7 @@ import { readCiDeclaration, sealedKeyNames } from '../runtime/scripts/hfs/ci-dec
 import { github, refuse } from './github.mjs';
 import { setSecret } from './secret.mjs';
 import { setVariable, syncVariables } from './vars.mjs';
-import { verifyCi } from './verify.mjs';
+import { badgeVisibilityNotices, verifyCi } from './verify.mjs';
 
 const COMMANDS = {
   'secret set': ['env', 'dependabot', 'repo'],
@@ -46,16 +46,18 @@ function parse(argv) {
 export async function ciMain(argv, { cwd = process.cwd(), stdout = (s) => process.stdout.write(s), stderr = (s) => process.stderr.write(s), stdin, env = process.env, tools = {} } = {}) {
   try {
     const parsed = parse(argv);
-    let declaration, sealed;
+    let doc, declaration, sealed;
     try {
-      declaration = readCiDeclaration(parseYaml(fs.readFileSync(path.join(cwd, '.starcistacks/application-stacks.yaml'), 'utf8')));
+      doc = parseYaml(fs.readFileSync(path.join(cwd, '.starcistacks/application-stacks.yaml'), 'utf8'));
+      declaration = readCiDeclaration(doc);
       sealed = sealedKeyNames(cwd, { fs });
     } catch { throw refuse('CI_DECLARATION_INVALID', 'the manifest or sealed key names could not be read'); }
     if (declaration.problems.length) throw refuse('CI_DECLARATION_INVALID', 'correct the CI declaration before using GitHub');
     const context = { ...parsed, declaration, sealed, gh: github({ cwd, env, spawn: tools.spawn }), stdin, stdout };
     if (parsed.command === 'secret set') return await setSecret(context);
-    if (parsed.command === 'var set') return setVariable(context);
+    if (parsed.command === 'var set') return await setVariable(context);
     if (parsed.command === 'var sync') return syncVariables(context);
+    context.notices = badgeVisibilityNotices({ doc, gh: context.gh, repo: context.gh.repository(parsed.options.repo) });
     return verifyCi(context);
   } catch (error) {
     stderr(`${error.code ? error.message : 'CI_USAGE: CI command could not complete'}\n`);

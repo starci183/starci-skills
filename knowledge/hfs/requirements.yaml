@@ -812,6 +812,20 @@ requirements:
     rules:
       - R234
     scope: Runtime/examples use SonarCloud; products use host Sonar.
+  - id: DOC-STACKS-060
+    source: docs/application-stacks.md#readme-status-badges
+    sourceLine: 501
+    editions:
+      - lite
+      - full
+    statement: A private repository's Codecov and Sonar badges carry a read-only `services.codecov|sonar.badgeToken`
+      (public configuration rendered into README.md, never a CI secret); the secret scans exempt only those two
+      manifest key paths and the `token=` query of a badge image on the declared host inside the managed README block.
+    status: enforced
+    rules:
+      - R06
+    scope: R06 (HFS_PLAINTEXT_SECRET) judges the narrow exemption; the missing-token notice of app sync and app ci verify
+      is advisory output, not a finding.
   - id: DOC-LITE-001
     source: docs/lite-edition.md#hfs-lite-edition
     sourceLine: 20

@@ -11,8 +11,8 @@ flags:
   - {name: env, type: string, summary: select the declared GitHub environment}
   - {name: dependabot, type: boolean, summary: select the Dependabot secret store}
   - {name: repo, type: string, summary: override the app repository with owner/name}
-  - {name: value, type: string, summary: public variable value that must agree with the manifest}
-  - {name: execute, type: boolean, summary: apply the variable sync plan}
+  - {name: value, type: string, summary: public variable value that must agree with the manifest; var set ownerValue requires stdin instead}
+  - {name: execute, type: boolean, summary: apply the variable sync plan; var sync skips ownerValue variables}
   - {name: json, type: boolean, summary: print verification findings as JSON}
 exit: {"0": action completed or verification clean, "1": verification findings, "2": refusal or bad usage}
 json: flag

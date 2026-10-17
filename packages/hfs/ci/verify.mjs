@@ -1,7 +1,8 @@
+import { badgeTokenNotices } from '../sync/readme-badges.mjs';
 import { refuse, scopeArgs, scopeName } from './github.mjs';
 
 /** Verification reports names and scopes only; values are compared in memory and excluded from findings. */
-export function verifyCi({ declaration, sealed, gh, options, stdout }) {
+export function verifyCi({ declaration, sealed, gh, options, stdout, notices = [] }) {
   const repo = gh.repository(options.repo), stores = [];
   const environments = [...new Set([...declaration.secrets, ...declaration.vars].filter((item) => item.scope === 'environment').map((item) => item.environment))].sort();
   for (const scope of [{}, ...environments.map((env) => ({ env })), { dependabot: true }]) {
@@ -29,8 +30,21 @@ export function verifyCi({ declaration, sealed, gh, options, stdout }) {
       add(sameKind.some((entry) => entry.name === row.name) ? 'CI_SCOPE_MISMATCH' : store.kind === 'secret' ? 'CI_SECRET_UNDECLARED' : 'CI_VAR_UNDECLARED', row.name, store.scope);
     }
   }
-  if (options.json) stdout(`${JSON.stringify({ ok: findings.length === 0, findings }, null, 2)}\n`);
+  if (options.json) stdout(`${JSON.stringify({ ok: findings.length === 0, findings, notices }, null, 2)}\n`);
   else if (!findings.length) stdout('CI verification passed\n');
   else for (const finding of findings) stdout(`${finding.code}: ${finding.name} (${finding.scope})\n`);
+  if (!options.json) for (const notice of notices) stdout(`${notice}\n`);
   return findings.length ? 1 : 0;
+}
+
+/** Manifest visibility wins; optional GitHub visibility discovery never changes verification findings or errors. */
+export function badgeVisibilityNotices({ doc, gh, repo }) {
+  let visibility = doc?.ci?.github?.visibility;
+  if (visibility === undefined) {
+    try {
+      const remote = gh.json(['repo', 'view', '--json', 'visibility', '--repo', repo]);
+      visibility = ['PRIVATE', 'INTERNAL'].includes(remote?.visibility) ? 'private' : 'public';
+    } catch { return []; }
+  }
+  return badgeTokenNotices({ ...doc, ci: { ...doc?.ci, github: { ...doc?.ci?.github, visibility } } }, { repository: `https://github.com/${repo}` });
 }

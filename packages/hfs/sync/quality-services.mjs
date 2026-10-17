@@ -3,7 +3,7 @@ import path from 'node:path';
 import { parseYaml as bundledParseYaml } from '../runtime/engine/yaml.mjs';
 import { qualityServices } from '../runtime/scripts/hfs/ci-declaration.mjs';
 import { isRuntimeExampleApp } from '../runtime/scripts/lib/runtime-example.mjs';
-import { renderReadmeBadges } from './readme-badges.mjs';
+import { badgeTokenNotices, renderReadmeBadges } from './readme-badges.mjs';
 import { DECLARATION } from './sonar-key.mjs';
 
 /** Apps without any service block retain the legacy CI defaults until they declare their services. */
@@ -53,9 +53,11 @@ export function dependabotUpdates(dependabot) {
 }
 
 /** README badges use only public manifest fields and the package repository fallback. */
-export function readDeclaredBadges(root, { parseYaml = bundledParseYaml } = {}) {
+export function readDeclaredBadges(root, { parseYaml = bundledParseYaml, notices } = {}) {
   let doc = {}, pkg = {};
   try { doc = parseYaml(fs.readFileSync(path.join(root, DECLARATION), 'utf8')); } catch { /* No declaration. */ }
   try { pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')); } catch { /* No repository fallback. */ }
-  return renderReadmeBadges(doc, { repository: pkg.repository, example: isRuntimeExampleApp(root) });
+  const options = { repository: pkg.repository, example: isRuntimeExampleApp(root) };
+  notices?.push(...badgeTokenNotices(doc, options));
+  return renderReadmeBadges(doc, options);
 }

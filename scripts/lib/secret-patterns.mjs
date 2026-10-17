@@ -1,3 +1,5 @@
+import { parseYaml } from '../../engine/yaml.mjs';
+
 // secret-patterns.mjs — the one list of secret shapes the runtime refuses to carry: the push secret scan
 // (scripts/supervisor/push-mains.mjs scanDiff) refuses an outgoing range that adds one, and the typed-log
 // redaction (scripts/kernel/typed-logs.mjs redactText) blanks the value before a log row is stored.
@@ -101,4 +103,79 @@ export function secretHits(file, text) {
     if (hit && !rule.placeholder?.test(hit[1] ?? '')) names.push(rule.name);
   }
   return names;
+}
+
+const BADGE_BEGIN = '<!-- >>> starci app sync (managed block; do not edit) >>> -->';
+const BADGE_END = '<!-- <<< starci app sync <<< -->';
+
+/** Provider-shaped credentials remain refused even where the keyword heuristic admits public badge tokens. */
+function blankBadgeValue(value) {
+  return secretHits('badge.mjs', value).length ? value : ' '.repeat(value.length);
+}
+
+/** Only scalar values at the two block-mapping service paths qualify; every other YAML substring remains scanned. */
+function manifestBadgeText(text) {
+  try { parseYaml(text); } catch { return text; }
+  const parents = [];
+  return text.split('\n').map(line => {
+    if (/^\s*(?:#.*)?$/.test(line)) return line;
+    const indent = /^ */.exec(line)[0].length;
+    while (parents.length && parents.at(-1).indent >= indent) parents.pop();
+    const match = /^( *)(?:([A-Za-z0-9_-]+)|"([A-Za-z0-9_-]+)"|'([A-Za-z0-9_-]+)'):(.*)$/.exec(line);
+    if (!match) { parents.push({ indent, key: null }); return line; }
+    match[5] = match[5].trimStart();
+    const key = match[2] ?? match[3] ?? match[4];
+    const keys = [...parents.map(parent => parent.key), key].join('.');
+    const container = /^(?:#.*)?$/.test(match[5].trim());
+    const nestedScalar = parents.some(parent => parent.container === false);
+    parents.push({ indent, key, container });
+    if (nestedScalar) return line;
+    if (!['services.codecov.badgeToken', 'services.sonar.badgeToken'].includes(keys)) return line;
+    const scalar = /^(?:"([A-Za-z0-9_-]{6,128})"|'([A-Za-z0-9_-]{6,128})'|([A-Za-z0-9_-]{6,128}))(?=\s*(?:#|$))/.exec(match[5]);
+    if (!scalar) return line;
+    const start = line.length - match[5].length;
+    return line.slice(0, start) + blankBadgeValue(scalar[0]) + match[5].slice(scalar[0].length);
+  }).join('\n');
+}
+
+/** Unreadable manifests admit only the default badge hosts; readable Sonar declarations select their own hosts. */
+function badgeHosts(manifestText) {
+  const hosts = new Set(['codecov.io']);
+  let doc;
+  try { doc = parseYaml(manifestText); } catch { hosts.add('sonarcloud.io'); return hosts; }
+  const sonar = doc?.services?.sonar;
+  if (sonar?.provider === 'sonarcloud') hosts.add('sonarcloud.io');
+  else for (const host of [sonar?.host?.public, sonar?.host?.local]) {
+    try { hosts.add(new URL(host).host); } catch { /* Invalid hosts admit nothing. */ }
+  }
+  return hosts;
+}
+
+/** Only token query values in managed Markdown badge images on declared hosts are blanked; links and other parameters remain scanned. */
+function readmeBadgeText(text, manifestText) {
+  const begin = text.indexOf(BADGE_BEGIN), end = text.indexOf(BADGE_END, begin + BADGE_BEGIN.length);
+  if (begin < 0 || end < 0) return text;
+  const hosts = badgeHosts(manifestText);
+  const start = begin + BADGE_BEGIN.length;
+  const block = text.slice(start, end).replace(/!\[[^\]\n]*\]\((https?:\/\/[^\s)]+)\)/g, (image, address) => {
+    let url;
+    try { url = new URL(address); } catch { return image; }
+    if (!hosts.has(url.host) || url.username || url.password) return image;
+    const badgePath = url.host === 'codecov.io' ? /\/graph\/badge\.svg$/.test(url.pathname) : url.pathname === '/api/project_badges/measure';
+    if (!badgePath) return image;
+    const fragment = address.indexOf('#');
+    const queryEnd = fragment < 0 ? address.length : fragment;
+    const safe = address.slice(0, queryEnd).replace(/([?&]token=)([^&#)\s]*)/g, (_, prefix, value) => prefix + blankBadgeValue(value));
+    return image.replace(address, () => safe + address.slice(queryEnd));
+  });
+  return text.slice(0, start) + block + text.slice(end);
+}
+
+/** Whole-file secret judgement exempts only declared public badge values and preserves original line numbers and every provider shape. */
+export function secretHitsInFile(file, fullText, { manifestText } = {}) {
+  const normalized = file.replace(/\\/g, '/');
+  let text = fullText;
+  if (/(?:^|\/)\.starcistacks\/application-stacks\.yaml$/.test(normalized)) text = manifestBadgeText(text);
+  if (/(?:^|\/)README\.md$/.test(normalized)) text = readmeBadgeText(text, manifestText);
+  return text.split(/\r?\n/).flatMap((line, index) => secretHits(file, line).map(pattern => ({ line: index + 1, pattern })));
 }

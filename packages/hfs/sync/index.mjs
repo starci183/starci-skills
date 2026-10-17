@@ -169,7 +169,7 @@ const SOURCE_SKIPPED = new Set(['node_modules', 'dist', 'coverage']);
  * lite brand tree exists, so sync can preserve its absence. `hasImage` identifies authored optional Dockerfiles without reading
  * their content. An app with no be folder has no source files.
  */
-export function appSource(root, { parseYaml } = {}) {
+export function appSource(root, { parseYaml, notices } = {}) {
   const files = [];
   const walk = dir => {
     let entries;
@@ -183,7 +183,7 @@ export function appSource(root, { parseYaml } = {}) {
   return { runtimeExample: isRuntimeExampleApp(root), files: files.sort(byCodeUnit), read: file => fs.readFileSync(path.join(root, 'be', file), 'utf8'),
     workPresent: fs.existsSync(path.join(root, '.starciwork')), hasImage: file => isFile(path.join(root, file), { followLinks: false }),
     stack: readDeclaredStack(root, { parseYaml }), quality: readDeclaredQuality(root, { parseYaml }),
-    badges: readDeclaredBadges(root, { parseYaml }),
+    badges: readDeclaredBadges(root, { parseYaml, notices }),
     qualityDeclared: hasDeclaredServices(root, { parseYaml }) };
 }
 
@@ -477,10 +477,10 @@ export function loadHfs(root, manifest = loadSlotManifest()) {
 }
 
 /** The rendered targets of the app at `root`: its hfs.json, the Sonar key the be side's stack declaration names, the presets it installs. */
-export async function renderRepo(root, { presets, parseYaml, manifest = loadSlotManifest() } = {}) {
+export async function renderRepo(root, { presets, parseYaml, notices, manifest = loadSlotManifest() } = {}) {
   const hfs = loadHfs(root, manifest);
   const sonarKey = await readDeclaredSonarKey(root, { parseYaml, fail: message => { throw new SyncError('HFS_SYNC_SONAR_KEY', message); } });
-  return { hfs, targets: renderTargets(hfs, presets ?? await loadPresets(root), { sonarKey, manifest, source: appSource(root, { parseYaml }) }) };
+  return { hfs, targets: renderTargets(hfs, presets ?? await loadPresets(root), { sonarKey, manifest, source: appSource(root, { parseYaml, notices }) }) };
 }
 
 /** `starci app sync --check | --write [--cwd <dir>]` at the app root; returns 0 clean, 1 drift, 2 usage. */
@@ -516,7 +516,9 @@ export async function runSync(argv, { cwd = process.cwd(), out = line => process
   const { write, cwdAt } = options;
   const root = cwdAt >= 0 ? path.resolve(cwd, argv[cwdAt + 1]) : cwd;
   try {
-    const { targets } = await renderRepo(root, { presets, parseYaml });
+    const notices = [];
+    const { targets } = await renderRepo(root, { presets, parseYaml, notices });
+    if (targets.some(target => target.path === 'README.md')) for (const notice of new Set(notices)) out(notice);
     if (write) {
       const written = writeTargets(root, targets);
       for (const file of written) out(`wrote ${file}`);

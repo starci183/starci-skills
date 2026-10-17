@@ -79,7 +79,10 @@ function stagedText(cwd, file) {
 
 /** The secret findings of `files` read from the index, as {file, code, message}; a file the name check already refused is not reported twice. */
 function secretGuardFindings(cwd, files, alreadyRefused = new Set()) {
-  return files.filter(file => !alreadyRefused.has(file)).flatMap(file => secretFileFindings({ file, text: stagedText(cwd, file) }).map(finding => ({ file, code: finding.code, message: finding.message })));
+  return files.filter(file => !alreadyRefused.has(file)).flatMap(file => {
+    const manifestText = /(?:^|\/)README\.md$/.test(file) ? stagedText(cwd, path.posix.join(path.posix.dirname(file), '.starcistacks/application-stacks.yaml')) ?? undefined : undefined;
+    return secretFileFindings({ file, text: stagedText(cwd, file), manifestText }).map(finding => ({ file, code: finding.code, message: finding.message }));
+  });
 }
 
 /** Findings for `files`: the guarded trees, then the secret guard over every file. */

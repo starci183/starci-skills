@@ -4,6 +4,14 @@ import { parseYaml } from '../../engine/yaml.mjs';
 
 const nameOf = (item) => typeof item === 'string' ? item : item?.name;
 
+/** A public CI variable declares either a manifest value or an owner-supplied value, never both. */
+function variableProblems(item, at, invalid) {
+  const hasValue = item != null && Object.hasOwn(item, 'value');
+  const hasOwnerValue = item != null && Object.hasOwn(item, 'ownerValue');
+  if (hasValue && hasOwnerValue) invalid(at, 'a variable has either a value or ownerValue');
+  else if (!hasValue && item?.ownerValue !== true) invalid(at, 'a variable needs a value or ownerValue: true');
+}
+
 /** Each CI name belongs to one class and scope; declarations contain names and public configuration only. */
 export function readCiDeclaration(doc) {
   const problems = [], seen = new Set();
@@ -17,8 +25,9 @@ export function readCiDeclaration(doc) {
     if (!['repository', 'environment'].includes(scope)) invalid(`${where}.scope`, 'scope must be repository or environment');
     if (scope === 'environment' && (typeof item?.environment !== 'string' || !/^[a-z][a-z0-9-]*$/.test(item.environment))) invalid(`${where}.environment`, 'environment scope requires an environment name');
     if ((dependabot || scope !== 'environment') && item && Object.hasOwn(item, 'environment')) invalid(`${where}.environment`, 'only environment scope may name an environment');
+    if (variable) variableProblems(item, where, invalid);
     return { name, scope, environment: item?.environment ?? null, purpose: item?.purpose ?? null,
-      optional: item?.optional === true, ...(variable ? { value: item?.value } : {}) };
+      optional: item?.optional === true, ...(variable ? { value: item?.value, ownerValue: item?.ownerValue === true } : {}) };
   });
   const ci = doc?.ci;
   const secrets = normalize(ci?.secrets, 'ci.secrets');

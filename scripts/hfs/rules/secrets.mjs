@@ -7,7 +7,7 @@
 // A finding names the file, the line and the pattern, never the value.
 import fs from 'node:fs';
 import path from 'node:path';
-import { FORBIDDEN_FILES, secretHits } from '../../lib/secret-patterns.mjs';
+import { FORBIDDEN_FILES, secretHitsInFile } from '../../lib/secret-patterns.mjs';
 import { isSopsEnvelope } from '../../lib/sops-envelope.mjs';
 import { found, readText } from './read.mjs';
 
@@ -34,20 +34,17 @@ export function untrackedSecretFindings({ repoRoot, files, repo }) {
  * no sops envelope, or a line that matches a secret pattern. `text` is the file's text, or null when it cannot be read (binary, too
  * large, absent). The whole-tree check reads the work tree and the commit hook (`starci app hygiene`) reads the staged blob: one judgement.
  */
-export function secretFileFindings({ file, text }) {
+export function secretFileFindings({ file, text, manifestText }) {
   const being = FORBIDDEN_FILES.find((rule) => rule.test(file));
   if (being) return [found(PLAINTEXT_SECRET, file, `${file} is a plaintext secret by being (${being.name}); a secret is committed only as a sops envelope at .starcistacks/<env>/secrets/<slug>.enc`, { pattern: being.name })];
   if (text === null || text === undefined || NOT_SCANNED.test(file)) return [];
   if (file.endsWith('.enc')) return isSopsEnvelope(text) ? [] : [found(PLAINTEXT_SECRET, file, `${file} is named like a sealed secret but is not a sops envelope; encrypt the value with sops and commit only the envelope`, { pattern: 'sops-not-envelope' })];
   const findings = [];
-  const lines = text.split(/\r?\n/);
   const seen = new Set();
-  for (const [index, line] of lines.entries()) {
-    for (const pattern of secretHits(file, line)) {
-      if (seen.has(pattern)) continue;
-      seen.add(pattern);
-      findings.push(found(PLAINTEXT_SECRET, file, `${file}:${index + 1} holds a plaintext secret (${pattern}); seal it with sops at .starcistacks/<env>/secrets/<slug>.enc and read it by *_FILE`, { line: index + 1, pattern }));
-    }
+  for (const { line, pattern } of secretHitsInFile(file, text, { manifestText })) {
+    if (seen.has(pattern)) continue;
+    seen.add(pattern);
+    findings.push(found(PLAINTEXT_SECRET, file, `${file}:${line} holds a plaintext secret (${pattern}); seal it with sops at .starcistacks/<env>/secrets/<slug>.enc and read it by *_FILE`, { line, pattern }));
   }
   return findings;
 }
@@ -62,7 +59,8 @@ export function secretFindings({ repoRoot, files, resolver }) {
       findings.push(found(PLAINTEXT_SECRET, file, `${file} is a plaintext secret file tracked in ${slot.slot}${destination}`, { slot: slot.slot, goesTo: slot.goesTo }));
       continue;
     }
-    findings.push(...secretFileFindings({ file, text: readText(repoRoot, file) }));
+    const manifestText = /(?:^|\/)README\.md$/.test(file) ? readText(repoRoot, path.posix.join(path.posix.dirname(file), '.starcistacks/application-stacks.yaml')) : undefined;
+    findings.push(...secretFileFindings({ file, text: readText(repoRoot, file), manifestText }));
   }
   return findings;
 }

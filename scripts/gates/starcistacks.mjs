@@ -51,7 +51,7 @@ const FOLLOW_UP = { op: 'workspace.manage', params: { mode: 'stacks' },
   detail: `author the services block of the repository stack declaration (sonar and every other delivery/quality service) from ${STACK_DECLARATION_TEMPLATE}` };
 /** Every finding code this check can emit. */
 export const CODES = [
-  'STACKS_DECLARATION_MISSING', 'STACKS_DECLARATION_INVALID', 'STACKS_SERVICES_MISSING',
+  'STACKS_BADGE_TOKEN_SERVICE', 'STACKS_DECLARATION_MISSING', 'STACKS_DECLARATION_INVALID', 'STACKS_SERVICES_MISSING',
   'STACKS_SCHEMA_INVALID', 'STACKS_SERVICE_UNKNOWN', 'STACKS_PROVIDER_UNKNOWN',
   'STACKS_SERVICE_AMBIGUOUS', 'STACKS_STACK_UNRESOLVED', 'STACKS_CUSTODY_MISSING', 'STACKS_CUSTODY_UNVERIFIED',
   'STACKS_OWNER_ACTION_REDUNDANT', 'STACKS_PROJECT_MISSING', 'STACKS_PROJECT_DRIFT', 'STACKS_HOST_DRIFT',
@@ -277,6 +277,7 @@ const checkEnabledService = (service, id, at, { governing, name, ciUses, ciText,
   checkServiceCi(service, id, at, { governing, name, ciUses, ciText, add, ambiguous });
 };
 const checkService = (id, entry, { schema, declFile, declaration, governing, name, ciUses, ciText, normalized, add, kind }) => {
+  if (entry?.badgeToken !== undefined && !['codecov', 'sonar'].includes(id)) add('refuse', 'STACKS_BADGE_TOKEN_SERVICE', `${declFile}#services.${id}.badgeToken`, 'badgeToken is allowed only on codecov or sonar');
   if (!Object.hasOwn(SERVICE_CATALOG, id)) {
     add('refuse', 'STACKS_SERVICE_UNKNOWN', `${declFile}#services.${id}`, `${id} is not a catalogued service (${Object.keys(SERVICE_CATALOG).join(', ')}); a service the catalog does not know is one nobody can read unambiguously`);
     return;

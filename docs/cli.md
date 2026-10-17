@@ -2901,10 +2901,12 @@ Conventions:
 - bare package names resolve only from knowledge/hfs/canon-pins.yaml and never through a registry lookup
 - explicit versions use exact x.y.z form and must agree with the canon pin when one exists, except the target CLI version on a canon upgrade
 - naming @starci/cli or passing --canon installs the exact target CLI first,
-- then reads its installed HFS runtime canon-pins.yaml and installs every pinned @starci package in the same host lock
+- then reads its installed HFS runtime canon-pins.yaml and, in the same host lock,
+- moves each other pinned @starci package only where a root or workspace package.json declares it, in its own section
 - --canon without a CLI positional uses the running runtime's exact CLI pin as the target
 - target pins never fall back to the running runtime when the target pin file is missing or inconsistent
-- each target StarCi pin is reported as moved or refused with a reason; a failed canon phase exits nonzero even when the first CLI install succeeded
+- each target StarCi pin is reported as moved (with its workspace), skipped when no package.json declares it, or refused with a reason
+- a failed canon phase exits nonzero even when the first CLI install succeeded
 - installs always use --save-exact and report the package.json and package-lock.json diff stat
 
 exit: 0 exact dependencies and any requested canon pins were installed; 1 npm, Git, target canon loading or the host lock failed; 2 the package, target pin or worktree was refused

@@ -48,7 +48,7 @@ import { SKILL_ROOT, readSupervisor, withSupervisor, supervisorSettings, product
 
 // The secret scan's patterns live in scripts/lib/secret-patterns.mjs, so the typed-log redaction
 // (scripts/kernel/typed-logs.mjs) imports the very same rules without loading the supervisor.
-import { FORBIDDEN_FILES, secretHits } from '../lib/secret-patterns.mjs';
+import { FORBIDDEN_FILES, secretHits, secretHitsInFile } from '../lib/secret-patterns.mjs';
 import { foldCase, realPath, slash } from '../lib/path-key.mjs';
 import { isSopsEnvelope, setCommand } from '../lib/sops-envelope.mjs';
 import { forEachFileLine } from '../lib/read-text.mjs';
@@ -72,7 +72,7 @@ export function scanDiff({ diff = '', files = [] } = {}) {
  *  when `encText(file)` can read it (a --unified=0 diff of an edited sops YAML holds only its changed lines), else
  *  on its added lines. Anything else in a `.enc` file is scanned like any other file, and a `.enc` under
  *  `.starcistacks/` that is not a sops envelope refuses the push by itself (sops-not-envelope). */
-function diffScanner(files = [], { encText = null } = {}) {
+function diffScanner(files = [], { encText = null, keepHit = null } = {}) {
   const findings = [];
   for (const file of files) for (const rule of FORBIDDEN_FILES) if (rule.test(slash(file))) findings.push({ file, line: null, pattern: rule.name });
   let file = null, line = 0, enc = null;
@@ -99,10 +99,45 @@ function diffScanner(files = [], { encText = null } = {}) {
       if (raw.startsWith('+')) {
         const text = raw.slice(1);
         if (enc) { enc.added.push(text); enc.line ??= line; }
-        for (const pattern of secretHits(file?.replace(/\.tpl$/, ''), text)) (enc ? enc.findings : findings).push({ file, line, pattern });
+        (enc ? enc.findings : findings).push(...addedLineFindings(file, line, text, keepHit));
         line += 1;
       } else if (!raw.startsWith('-')) line += 1;
     },
+  };
+}
+
+/** Every added line is scanned first; an optional whole-file judgement can then retain or drop its hits. */
+function addedLineFindings(file, line, text, keepHit) {
+  const patterns = secretHits(file?.replace(/\.tpl$/, ''), text);
+  if (!patterns.length || (keepHit && !keepHit(file, line))) return [];
+  return patterns.map(pattern => ({ file, line, pattern }));
+}
+
+/** Only badge-bearing paths use cached post-images; an unreadable post-image keeps every diff hit. */
+function badgeHitFilter(readText) {
+  const linesByFile = new Map();
+  return (file, line) => {
+    if (!/(?:^|\/)(?:README\.md|\.starcistacks\/application-stacks\.yaml)$/.test(file)) return true;
+    if (!linesByFile.has(file)) {
+      const text = readText(file);
+      const manifestText = /(?:^|\/)README\.md$/.test(file) ? readText(path.posix.join(path.posix.dirname(file), '.starcistacks/application-stacks.yaml')) ?? undefined : undefined;
+      linesByFile.set(file, text === null ? null : new Set(secretHitsInFile(file, text, { manifestText }).map(hit => hit.line)));
+    }
+    const lines = linesByFile.get(file);
+    return lines === null || lines.has(line);
+  };
+}
+
+/** Read each committed post-image once; a NUL commit prefix protects its leading whitespace from the git runner's trim. */
+function postImageReader(cwd, to) {
+  const texts = new Map();
+  return file => {
+    if (!texts.has(file)) {
+      const result = git(['show', '--format=%x00', '--no-patch', to, `${to}:${file}`], { cwd });
+      const readable = result.ok && result.stdout.startsWith('\0\n');
+      texts.set(file, readable ? result.stdout.slice(2) : null);
+    }
+    return texts.get(file);
   };
 }
 
@@ -123,7 +158,7 @@ export function scanRange({ cwd, from, to }) {
     const diff = git(['diff', '--no-color', '--unified=0', '--diff-filter=ACMR', `--output=${out}`, `${from}..${to}`], { cwd });
     if (!diff.ok) return { ok: false, error: diff.stderr || diff.error || 'git diff failed', findings: [] };
     const encText = (f) => { const r = git(['show', `${to}:${f}`], { cwd }); return r.ok ? r.stdout : null; };
-    const scanner = diffScanner(files, { encText });
+    const scanner = diffScanner(files, { encText, keepHit: badgeHitFilter(postImageReader(cwd, to)) });
     forEachFileLine(out, (l) => scanner.line(l));
     return { ok: scanner.findings.length === 0, findings: scanner.findings, files };
   } finally { safeRemove(dir, { hold: artifactHoldReason }); }
