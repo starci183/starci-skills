@@ -104,6 +104,7 @@ properties:
     properties:
       status: {enum: [deferred, supported]}
       reason: {type: string, minLength: 1}
+  ci: {$ref: '#/$defs/ciDeclaration'}
   services:
     description: >-
       The delivery, quality and platform services this repository's code and CI use - NOT Compose
@@ -119,6 +120,9 @@ properties:
     additionalProperties: false
     properties:
       sonar: {$ref: '#/$defs/service'}
+      codecov: {$ref: '#/$defs/service'}
+      dependabot: {$ref: '#/$defs/serviceOptionalCi'}
+      audit: {$ref: '#/$defs/serviceOptionalCi'}
       container-registry: {$ref: '#/$defs/service'}
       analytics: {$ref: '#/$defs/service'}
       error-tracking: {$ref: '#/$defs/service'}
@@ -140,6 +144,30 @@ $defs:
           local - a server a stack runs (stack and host.local required); hosted - a SaaS or remote
           server (host.public required); disabled - not used (reason required, CI must not call it).
         enum: [local, hosted, disabled]
+      organization: {type: string, minLength: 1}
+      target: {type: number, minimum: 0, maximum: 100}
+      components: {enum: [auto]}
+      required: {type: boolean}
+      ecosystems: {type: array, items: {enum: [npm, docker, github-actions]}}
+      schedule:
+        type: object
+        additionalProperties: false
+        required: [interval]
+        properties:
+          interval: {enum: [daily, weekly, monthly]}
+          day: {enum: [monday, tuesday, wednesday, thursday, friday, saturday, sunday]}
+          time: {type: string, pattern: '^(?:[01][0-9]|2[0-3]):[0-5][0-9]$'}
+      groups:
+        type: object
+        additionalProperties: false
+        properties:
+          minorPatch: {enum: [grouped]}
+          major: {enum: [per-package]}
+      ignore: {type: array, items: {type: string}}
+      security: {enum: [immediate]}
+      level: {enum: [low, moderate, high, critical]}
+      omitDev: {type: boolean}
+      in: {type: array, items: {enum: [release-gate, ci]}}
       purpose: {type: string, minLength: 1}
       reason: {type: string, minLength: 1}
       qualityGate:
@@ -200,6 +228,94 @@ $defs:
             properties:
               needed: {type: string, minLength: 1}
               reason: {type: string, minLength: 1}
+  serviceOptionalCi:
+    type: object
+    additionalProperties: false
+    required: [provider, mode, ownerAction]
+    properties:
+      provider: {$ref: '#/$defs/service/properties/provider'}
+      mode: {$ref: '#/$defs/service/properties/mode'}
+      organization: {$ref: '#/$defs/service/properties/organization'}
+      target: {$ref: '#/$defs/service/properties/target'}
+      components: {$ref: '#/$defs/service/properties/components'}
+      required: {$ref: '#/$defs/service/properties/required'}
+      ecosystems: {$ref: '#/$defs/service/properties/ecosystems'}
+      schedule: {$ref: '#/$defs/service/properties/schedule'}
+      groups: {$ref: '#/$defs/service/properties/groups'}
+      ignore: {$ref: '#/$defs/service/properties/ignore'}
+      security: {$ref: '#/$defs/service/properties/security'}
+      level: {$ref: '#/$defs/service/properties/level'}
+      omitDev: {$ref: '#/$defs/service/properties/omitDev'}
+      in: {$ref: '#/$defs/service/properties/in'}
+      purpose: {$ref: '#/$defs/service/properties/purpose'}
+      reason: {$ref: '#/$defs/service/properties/reason'}
+      qualityGate: {$ref: '#/$defs/service/properties/qualityGate'}
+      host: {$ref: '#/$defs/service/properties/host'}
+      stack: {$ref: '#/$defs/service/properties/stack'}
+      auth: {$ref: '#/$defs/service/properties/auth'}
+      projects: {$ref: '#/$defs/service/properties/projects'}
+      credentials: {$ref: '#/$defs/service/properties/credentials'}
+      runtimeSecrets: {$ref: '#/$defs/service/properties/runtimeSecrets'}
+      ci: {$ref: '#/$defs/service/properties/ci'}
+      ownerAction: {$ref: '#/$defs/service/properties/ownerAction'}
+  ciName: {type: string, pattern: '^[A-Z][A-Z0-9_]*$'}
+  ciDeclaration:
+    type: object
+    additionalProperties: false
+    properties:
+      secrets: {type: array, items: {$ref: '#/$defs/ciSecret'}}
+      vars: {type: array, items: {$ref: '#/$defs/ciVariable'}}
+      dependabot:
+        type: object
+        additionalProperties: false
+        properties:
+          secrets:
+            type: array
+            items:
+              type: object
+              additionalProperties: false
+              required: [name]
+              properties:
+                name: {$ref: '#/$defs/ciName'}
+                purpose: {type: string}
+  ciSecret:
+    anyOf:
+      - type: object
+        additionalProperties: false
+        required: [name, scope]
+        properties:
+          name: {$ref: '#/$defs/ciName'}
+          scope: {const: repository}
+          purpose: {type: string}
+          optional: {type: boolean}
+      - type: object
+        additionalProperties: false
+        required: [name, scope, environment]
+        properties:
+          name: {$ref: '#/$defs/ciName'}
+          scope: {const: environment}
+          environment: {type: string, pattern: '^[a-z][a-z0-9-]*$'}
+          purpose: {type: string}
+          optional: {type: boolean}
+  ciVariable:
+    anyOf:
+      - type: object
+        additionalProperties: false
+        required: [name, scope, value]
+        properties:
+          name: {$ref: '#/$defs/ciName'}
+          scope: {const: repository}
+          value: {type: string}
+          purpose: {type: string}
+      - type: object
+        additionalProperties: false
+        required: [name, scope, value, environment]
+        properties:
+          name: {$ref: '#/$defs/ciName'}
+          scope: {const: environment}
+          environment: {type: string, pattern: '^[a-z][a-z0-9-]*$'}
+          value: {type: string}
+          purpose: {type: string}
   serviceStack:
     description: >-
       Which stack defines a local service - either a project-owned .starcistacks stack
@@ -269,6 +385,9 @@ $defs:
     additionalProperties: false
     required: [wiring]
     properties:
+      token: {$ref: '#/$defs/ciName'}
+      hostVar: {$ref: '#/$defs/ciName'}
+      organizationVar: {$ref: '#/$defs/ciName'}
       wiring: {enum: [required, optional-follow-up, not-used]}
       workflow: {type: string, minLength: 1}
       permissions: {type: array, items: {type: string, minLength: 1}}

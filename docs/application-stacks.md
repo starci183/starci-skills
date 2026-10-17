@@ -351,3 +351,90 @@ In both editions, `HFS_DOCKER_STAGES` requires a `build` stage and a final `runt
 ## App image secret inputs {#r191}
 
 In both editions, `HFS_DOCKER_SECRETS` refuses COPY or ADD of `.env*` files, including names such as `.envbackup`; only the exact `.env.example` name is excepted. Secret directories, keys, certificates and kubeconfigs cannot enter the image. ADD URLs and credential ARG or ENV names are refused; published `NEXT_PUBLIC_*` inputs are permitted.
+
+
+## CI secrets and variables (alpha.20)
+
+One key belongs to one class. CI declarations hold names and public values; secret values stay in their consumer's store.
+
+| Class | Read by | Lives in |
+| --- | --- | --- |
+| App secret | App containers at runtime | `.starcistacks/<env>/secrets/<member>.enc` (SOPS/age, `*_FILE` grants) |
+| App public config | App build/runtime | Manifest `deploy.images.*.buildArgs.values`, `environment.json` |
+| CI secret | GitHub Actions | GitHub secrets, repository or environment scope |
+| CI public config | GitHub Actions | GitHub vars, repository or environment scope |
+| Dependabot secret | Dependabot | Dependabot secret store |
+
+```yaml
+ci:
+  secrets:
+    - {name: SONAR_TOKEN, scope: repository, purpose: Sonar analysis token}
+    - {name: VPS_SSH_KEY, scope: environment, environment: production, purpose: Deploy SSH key}
+    - {name: CODECOV_TOKEN, scope: repository, purpose: Optional upload token, optional: true}
+  vars:
+    - {name: SONAR_HOST_URL, scope: repository, value: 'https://sonar.starci.org'}
+    - {name: VPS_HOST, scope: environment, environment: production, value: '203.0.113.10'}
+  dependabot:
+    secrets: [{name: NPM_TOKEN, purpose: Private package access}]
+```
+
+Names match `^[A-Z][A-Z0-9_]*$`, never start with `GITHUB_`, and appear once across all three lists. Environment scope requires an environment name matching `^[a-z][a-z0-9-]*$`; repository scope omits it. Variables require a string value. Services reference names through `ci.token`, `ci.hostVar` and `ci.organizationVar`; each is a CI name, never a value. Legacy `services.*.ci.secrets/vars` remain readable for one release and produce `STACKS_CI_LEGACY_FORM` at suspect level. Examples declare no CI secrets except `SONAR_TOKEN`.
+
+### r296
+
+R296 `CI_SECRET_SEALED`: refuse a name declared in `ci.secrets` or `ci.dependabot.secrets` that is also a key inside `.starcistacks/*/secrets/*.enc`. CI and Dependabot secrets belong in their respective GitHub stores; inspection reads envelope key names without decrypting values.
+
+### r297
+
+R297 `APP_SECRET_IN_CI`: refuse a sealed member key handed to an app container by a deploy grant when it is also declared in `ci.secrets` or `ci.vars`. An app runtime secret belongs only to app custody. The online counterpart is `starci app ci verify`.
+
+### r298
+
+R298 `CI_DECLARATION_DRIFT`: refuse a workflow reference to `secrets.X` or `vars.X` absent from its declared CI class (`GITHUB_TOKEN` is exempt), a non-optional declared name no workflow reads, or a `services.*.ci.token` absent from `ci.secrets`. The online counterpart is `starci app ci verify`.
+
+## Quality services
+
+The services block declares the inputs for rendered quality configuration. SonarCloud requires `organization` or, for the runtime example form (`runtimeSecrets` without `credentials`), `ci.organizationVar`. That variable name defaults to `SONAR_ORGANIZATION` for this form. Examples read the organization locally from the runtime `config.yaml` `sonar.organization` and in CI from that repository variable. A product (`credentials` form) must state `organization`. An example uses SonarCloud and Codecov OIDC without a Codecov token; a private app may declare its own Sonar host.
+
+```yaml
+services:
+  sonar:
+    provider: sonarcloud
+    mode: hosted
+    host: {public: 'https://sonarcloud.io'}
+    organization: your-organization
+    projects: [{repository: your-app, key: your-app}]
+    qualityGate: starci-quality
+    auth: token
+    ci: {wiring: required, token: SONAR_TOKEN, hostVar: SONAR_HOST_URL}
+    ownerAction: none
+  codecov:
+    provider: codecov
+    mode: hosted
+    auth: oidc
+    ci: {wiring: required}
+    target: 100
+    components: auto
+    required: true
+    ownerAction: none
+  dependabot:
+    provider: github
+    mode: hosted
+    ecosystems: [npm, github-actions, docker]
+    schedule: {interval: weekly}
+    groups: {minorPatch: grouped, major: per-package}
+    ignore: ['@starci/*']
+    security: immediate
+    ownerAction: none
+  audit:
+    provider: npm
+    mode: local
+    level: high
+    omitDev: true
+    in: [release-gate, ci]
+    ownerAction: none
+```
+
+Absent or disabled Sonar normalizes to `null`. Enabled Sonar uses the public host before the local host, the first project key, declared organization and quality gate, and CI wiring. Normalization returns `organization` and `organizationVar` as strings or `null`; `organizationVar` preserves an explicit CI name and otherwise defaults to `SONAR_ORGANIZATION` only for the SonarCloud example form. Its token name defaults to the first legacy CI secret name or `SONAR_TOKEN`; its host variable defaults to `SONAR_HOST_URL`. Missing wiring defaults to `required`; missing quality gate defaults to `starci-quality` (`starci-quality-lite` with the example option).
+
+Absent Codecov defaults to enabled, OIDC, no token, target 100, automatic components, required coverage and required CI wiring. Disabled Codecov sets enabled to false. Token auth requires `ci.token`. Absent Dependabot defaults to the ecosystems, weekly schedule, groups, ignore and security settings above; absent audit defaults to high severity, development dependencies omitted, and both release-gate and CI consumers. Dependabot and audit may omit `ci`; all services still require `ownerAction`.
