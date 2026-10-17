@@ -65,7 +65,7 @@ describe("HTTP edge security", () => {
 
     it("sets every api security header and continues the request", () => {
         const response = mock<Response>()
-        const next = jest.fn<ReturnType<NextFunction>, Parameters<NextFunction>>()
+        const next: jest.MockedFunction<NextFunction> = jest.fn()
         securityHeaders(mock<Request>(), response, next)
         expect(response.setHeader.mock.calls).toEqual([
             ["Strict-Transport-Security", "max-age=31536000; includeSubDomains"],

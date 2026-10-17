@@ -3,7 +3,7 @@ import type { Application, NextFunction, Request, Response } from "express"
 
 /** Applies API response headers and removes the framework fingerprint before the app starts listening. */
 export const applySecurityHeaders = (app: INestApplication): void => {
-    const server = app.getHttpAdapter().getInstance<Application>()
+    const server: Application = app.getHttpAdapter().getInstance()
     server.disable("x-powered-by")
     app.use((_request: Request, response: Response, next: NextFunction): void => {
         response.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
