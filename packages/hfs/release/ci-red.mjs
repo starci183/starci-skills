@@ -20,29 +20,61 @@ function runsOf(result) {
   } catch { return null; }
 }
 
+/** Resolve each available default-branch reference once, including HEAD in detached release worktrees. */
+function referenceTips(spawn, cwd, defaultBranch) {
+  const refs = [`origin/${defaultBranch}`, defaultBranch, 'HEAD'];
+  return refs.flatMap((name) => {
+    const result = run(spawn, cwd, 'git', ['rev-parse', '--verify', '--quiet', `${name}^{commit}`]);
+    const tip = String(result.stdout ?? '').trim();
+    return !result.error && result.status === 0 && SHA.test(tip) ? [{ name, tip }] : [];
+  });
+}
+
+/** Equality proves reachability directly; ancestry is unknown only when every available probe errors. */
+function pushAncestry(spawn, cwd, row, refs) {
+  if (refs.some((ref) => ref.tip === row.headSha)) return { candidate: true, unknown: false };
+  let known = false;
+  for (const ref of refs) {
+    const result = run(spawn, cwd, 'git', ['merge-base', '--is-ancestor', row.headSha, ref.tip]);
+    if (!result.error && result.status === 0) return { candidate: true, unknown: false };
+    if (!result.error && result.status === 1) known = true;
+  }
+  return { candidate: false, unknown: !known };
+}
+
+/** Branch rows remain candidates; push rows must reach a resolved reference, and each databaseId counts once. */
+function candidateRuns(spawn, cwd, branch, pushes, refs) {
+  const candidates = branch.filter((row) => row && SHA.test(row.headSha));
+  let ancestryUnknown = refs.length === 0;
+  for (const row of pushes) {
+    if (!row || !SHA.test(row.headSha) || row.event !== 'push') continue;
+    const ancestry = pushAncestry(spawn, cwd, row, refs);
+    if (ancestry.candidate) candidates.push(row);
+    if (ancestry.unknown) ancestryUnknown = true;
+  }
+  const unique = new Map();
+  for (const row of candidates) if (!unique.has(row.databaseId)) unique.set(row.databaseId, row);
+  return { candidates: [...unique.values()], ancestryUnknown };
+}
+
 /** Reads branch runs plus push/tag runs whose commits are reachable from the default branch; the newest completed run decides, even if a newer run is pending. */
 export function latestDefaultBranchCi({ spawn, cwd, defaultBranch = 'main' }) {
+  const refs = referenceTips(spawn, cwd, defaultBranch);
+  const unknown = (why) => ({ state: 'unknown', why: `${why} (refs: ${refs.map((ref) => ref.name).join(', ') || 'none'})` });
   const args = ['run', 'list', '--workflow', 'ci.yml'];
   const tail = ['--limit', '20', '--json', FIELDS];
   const branch = runsOf(run(spawn, cwd, 'gh', [...args, '--branch', defaultBranch, ...tail]));
-  if (!branch) return { state: 'unknown', why: 'gh branch runs unavailable (missing gh, authentication, or unreadable response)' };
+  if (!branch) return unknown('gh branch runs unavailable (missing gh, authentication, or unreadable response)');
   const pushes = runsOf(run(spawn, cwd, 'gh', [...args, '--event', 'push', ...tail]));
-  if (!pushes) return { state: 'unknown', why: 'gh push runs unavailable (missing gh, authentication, or unreadable response)' };
-  const candidates = branch.filter((row) => row && SHA.test(row.headSha));
-  let ancestryUnknown = false;
-  for (const row of pushes) {
-    if (!row || !SHA.test(row.headSha) || row.event !== 'push') continue;
-    const ancestor = run(spawn, cwd, 'git', ['merge-base', '--is-ancestor', row.headSha, defaultBranch]);
-    if (!ancestor.error && ancestor.status === 0) candidates.push(row);
-    else if (ancestor.error || ancestor.status !== 1) ancestryUnknown = true;
-  }
+  if (!pushes) return unknown('gh push runs unavailable (missing gh, authentication, or unreadable response)');
+  const { candidates, ancestryUnknown } = candidateRuns(spawn, cwd, branch, pushes, refs);
   const completed = candidates.filter((row) => row.status === 'completed' && Number.isFinite(Date.parse(row.createdAt)));
   completed.sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt) || Number(b.databaseId) - Number(a.databaseId));
   const latest = completed[0];
-  if (!latest) return { state: 'unknown', why: ancestryUnknown ? 'cannot establish push run ancestry on the default branch' : 'no completed CI run on the default branch' };
+  if (!latest) return unknown(ancestryUnknown ? 'cannot establish push run ancestry on the default branch' : 'no completed CI run on the default branch');
   if (latest.conclusion === 'success') return { state: 'green', run: latest };
   if (RED.has(latest.conclusion)) return { state: 'red', run: latest };
-  return { state: 'unknown', why: 'latest completed CI run has no success or red conclusion', run: latest };
+  return { ...unknown('latest completed CI run has no success or red conclusion'), run: latest };
 }
 
 /** Only a complete starci/ci-override@1 record for this exact commit can excuse a red run. */
