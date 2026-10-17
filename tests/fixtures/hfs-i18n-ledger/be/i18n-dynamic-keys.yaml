@@ -1,4 +1,0 @@
-schema: starci/i18n-dynamic-keys@1
-namespaces:
-  orders:
-    - {suffix: Hint, reason: "composed from the field name at run time"}
