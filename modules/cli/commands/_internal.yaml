@@ -124,3 +124,5 @@ internal:
   - {path: scripts/checks/check-ruling-cites.mjs, why: "Runtime check-suite member", usedBy: [scripts/checks/check-runtime.mjs]}
   - {path: scripts/hfs/app-wiring.mjs, why: "Lite backend boot proof behind app check --wiring", usedBy: [scripts/hfs/check.mjs]}
   - {path: scripts/hfs/coverage-from.mjs, why: "Logic-file LCOV evidence behind app check --coverage-from", usedBy: [packages/hfs/src/main.mjs]}
+  - {path: scripts/supervisor/release-sealed-run.mjs, why: "Release cut example lint row in a sealed disposable copy", usedBy: [scripts/supervisor/release-l4.mjs, scripts/supervisor/release-sonar-report.mjs]}
+  - {path: scripts/supervisor/release-supabase-run.mjs, why: "Release cut lite integration row on the app's own local Supabase stack", usedBy: [scripts/supervisor/release-l4.mjs]}

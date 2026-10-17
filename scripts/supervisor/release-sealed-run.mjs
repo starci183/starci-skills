@@ -10,10 +10,10 @@ import { withMaterializedExample } from '../hfs/example-secrets.mjs';
 import { runNpm } from '../api/npm/run-npm.mjs';
 import { withoutGitLocalEnv } from '../lib/git.mjs';
 import { isMain } from '../lib/is-main.mjs';
+import { rowRunnerMain } from '../lib/row-runner-cli.mjs';
 
 const OWN_SCOPE = '@starci';
 const NOT_WALKED = new Set(['.git', 'node_modules', '.next', '.turbo', 'dist', 'coverage', '.starcistacks']);
-const USAGE = 'usage: release-sealed-run.mjs <example-dir> -- npm <args>';
 
 /** Links `from` (a node_modules folder) into `to` entry by entry; the @starci scope is copied so the canon's real path is inside the copy. */
 function linkModules(from, to) {
@@ -39,7 +39,7 @@ function linkDependencies(source, copy) {
 const commandEnv = () => Object.fromEntries(Object.entries(withoutGitLocalEnv(process.env)).filter(([name]) => !/^SOPS_AGE_KEY(?:_FILE)?$/iu.test(name)));
 
 /** Runs `npm <args>` of the example at `appDir` in a sealed copy; generated reports/ return to the source app. Resolves to the exit status. */
-export async function runSealedNpm(appDir, args, { stdio = 'inherit' } = {}) {
+async function runSealedNpm(appDir, args, { stdio = 'inherit' } = {}) {
   const source = path.resolve(appDir);
   return withMaterializedExample(source, '.', (copy) => {
     linkDependencies(source, copy);
@@ -51,9 +51,4 @@ export async function runSealedNpm(appDir, args, { stdio = 'inherit' } = {}) {
   });
 }
 
-async function main(argv) {
-  if (!argv[0] || argv[1] !== '--' || argv[2] !== 'npm' || argv.length < 4) { process.stderr.write(`${USAGE}\n`); return 2; }
-  return runSealedNpm(argv[0], argv.slice(3));
-}
-
-if (isMain(import.meta.url)) process.exitCode = await main(process.argv.slice(2));
+if (isMain(import.meta.url)) process.exitCode = await rowRunnerMain(process.argv.slice(2), { name: 'release-sealed-run.mjs', run: (dir, args) => runSealedNpm(dir, args) });

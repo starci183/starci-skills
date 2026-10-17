@@ -9,17 +9,18 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { createRequire } from 'node:module';
-import { npmSpawn, npxSpawn } from '../api/npm/lib.mjs';
+import { runNpm } from '../api/npm/run-npm.mjs';
+import { runNpx } from '../api/npm/run-npx.mjs';
+import { rowRunnerMain } from '../lib/row-runner-cli.mjs';
 import { isMain } from '../lib/is-main.mjs';
 
 const START_TIMEOUT_MS = 10 * 60_000;
 const STEP_TIMEOUT_MS = 5 * 60_000;
 const COMMAND_TIMEOUT_MS = 50 * 60_000;
-const USAGE = 'usage: release-supabase-run.mjs <example-dir> -- npm <args>';
 const LOCAL_HOSTS = new Set(['127.0.0.1', 'localhost', '[::1]']);
 
 const say = (line) => process.stderr.write(`supabase-run: ${line}\n`);
-const supabase = (dir, args, timeout) => npxSpawn(['--no-install', 'supabase', ...args], { cwd: dir, timeout, stdio: ['ignore', 'pipe', 'pipe'] });
+const supabase = (dir, args, timeout) => runNpx(['--no-install', 'supabase', ...args], { cwd: dir, timeout, stdio: ['ignore', 'pipe', 'pipe'] });
 
 /** The project id of the app's local stack: its supabase/config.toml `project_id` (each example app declares its own, so stacks never collide). */
 function projectOf(dir) {
@@ -53,7 +54,7 @@ async function appBeUrl(dir, db) {
 }
 
 /** Runs `npm <args>` of the example at `appDir` against its own fresh local stack; resolves to the exit status. */
-export async function runWithLocalSupabase(appDir, args) {
+async function runWithLocalSupabase(appDir, args) {
   const dir = path.resolve(appDir);
   const project = projectOf(dir);
   try {
@@ -65,7 +66,7 @@ export async function runWithLocalSupabase(appDir, args) {
     const stack = localStack(dir);
     const env = { ...process.env, PRIMARY_DB_URL: await appBeUrl(dir, stack.db), PRIMARY_DB_SCHEMA: 'public', SUPABASE_URL: stack.api, SUPABASE_SERVICE_ROLE_KEY: stack.serviceRole };
     say(`running npm ${args.join(' ')} against ${project} (local ${stack.db.host})`);
-    const run = npmSpawn(args, { cwd: dir, env, stdio: 'inherit', timeout: COMMAND_TIMEOUT_MS });
+    const run = runNpm(args, { cwd: dir, env, stdio: 'inherit', timeout: COMMAND_TIMEOUT_MS });
     if (run.error) say(`npm ${args.join(' ')} ended: ${run.error.code ?? run.error.message}`);
     return run.status ?? 1;
   } finally {
@@ -74,9 +75,4 @@ export async function runWithLocalSupabase(appDir, args) {
   }
 }
 
-async function main(argv) {
-  if (!argv[0] || argv[1] !== '--' || argv[2] !== 'npm' || argv.length < 4) { process.stderr.write(`${USAGE}\n`); return 2; }
-  try { return await runWithLocalSupabase(argv[0], argv.slice(3)); } catch (error) { say(error.message); return 1; }
-}
-
-if (isMain(import.meta.url)) process.exitCode = await main(process.argv.slice(2));
+if (isMain(import.meta.url)) process.exitCode = await rowRunnerMain(process.argv.slice(2), { name: 'supabase-run', run: (dir, args) => runWithLocalSupabase(dir, args) });
