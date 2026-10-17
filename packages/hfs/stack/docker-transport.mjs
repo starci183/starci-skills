@@ -36,7 +36,9 @@ function sshConfig(session, controlPath, windows) {
 /** The environment of a docker child: a private HOME with the ssh config, DOCKER_HOST, and the operator's docker config (registry logins) kept. */
 function dockerEnvironment(ctx, session, controlPath) {
   const home = path.join(session.dir, 'home');
-  fs.mkdirSync(path.join(home, '.ssh'), { recursive: true });
+  fs.mkdirSync(home, { recursive: true, mode: 0o700 });
+  fs.chmodSync(home, 0o700);
+  fs.mkdirSync(path.join(home, '.ssh'), { recursive: true, mode: 0o700 });
   writePrivate(ctx, path.join(home, '.ssh', 'config'), sshConfig(session, controlPath, (ctx.platform ?? process.platform) === 'win32'));
   const operatorHome = ctx.env.HOME ?? ctx.env.USERPROFILE ?? '';
   const dockerConfig = ctx.env.DOCKER_CONFIG ?? (operatorHome ? path.join(operatorHome, '.docker') : undefined);
@@ -45,7 +47,14 @@ function dockerEnvironment(ctx, session, controlPath) {
 
 /** OpenSSH resolves its default config from the account database, so Docker needs a private PATH entry that supplies -F explicitly. */
 function privateSshEnvironment(ctx, env, dir, controlPath) {
-  if ((ctx.platform ?? process.platform) === 'win32') return { env, executable: 'ssh' };
+  if ((ctx.platform ?? process.platform) === 'win32') {
+    const home = path.join(dir, 'home');
+    fs.mkdirSync(home, { recursive: true, mode: 0o700 });
+    fs.chmodSync(home, 0o700);
+    const originalHome = env.HOME ?? env.USERPROFILE;
+    const dockerConfig = env.DOCKER_CONFIG ?? (originalHome ? path.join(originalHome, '.docker') : undefined);
+    return { env: { ...env, HOME: home, USERPROFILE: home, ...(dockerConfig ? { DOCKER_CONFIG: dockerConfig } : {}) }, executable: 'ssh' };
+  }
   const originalHome = ctx.env.HOME;
   const home = path.join(dir, 'home');
   const config = path.join(home, '.ssh', 'config');
@@ -81,6 +90,13 @@ export async function withDockerTransport(ctx, config, { sshCmd = null } = {}, b
   const session = sealed ? openSealedSession(ctx, config) : null;
   const dir = session?.dir ?? sessionDirectory();
   let connection;
+  let cleaned = false;
+  function cleanup() {
+    if (cleaned) return;
+    cleaned = true;
+    if (session) session.cleanup();
+    else fs.rmSync(dir, { recursive: true, force: true });
+  }
   try {
     const controlPath = forward(path.join(dir, 'home', 'cm'));
     const baseEnv = session ? dockerEnvironment(ctx, session, controlPath) : ctx.env;
@@ -88,14 +104,13 @@ export async function withDockerTransport(ctx, config, { sshCmd = null } = {}, b
     const configFile = path.join(env.HOME ?? '', '.ssh', 'config');
     const options = ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=20'];
     const argv = session || executable !== 'ssh' ? [executable, ...options, '-F', configFile, '--', alias] : ['ssh', ...options, '--', alias];
-    connection = createSshSession(ctx, { argv, env, controlPath });
+    connection = createSshSession(ctx, { argv, env, controlPath, cleanup });
     const spawn = dockerSpawn(ctx, connection, env, alias);
     for (const note of session?.notes ?? []) ctx.stderr(`${note}\n`);
     return await body(Object.create(ctx, { spawn: { value: spawn }, stackSsh: { value: connection } }));
   } finally {
     try { await connection?.close(); } finally {
-      if (session) session.cleanup();
-      else fs.rmSync(dir, { recursive: true, force: true });
+      cleanup();
     }
   }
 }

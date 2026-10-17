@@ -5,7 +5,6 @@
 // the remote shell. The record holds names and digests, never a secret value. Files travel as text on stdin / stdout.
 import fs from 'node:fs';
 import path from 'node:path';
-import { eachInOrder, mapInOrder } from '../runtime/scripts/lib/in-order.mjs';
 import { firstLine, lines as splitLines } from './context.mjs';
 import { isReleaseId } from './digest.mjs';
 import { failure, refusal } from './errors.mjs';
@@ -56,9 +55,8 @@ export function createReleaseStore(config, ssh) {
     async store(dir, id) {
       const target = dirOf(id);
       const contents = FILES.map((name) => [name, readLocal(dir, name)]);
-      await run(`set -e; d="${target}"; if [ -d "$d" ]; then chmod -R u+w "$d"; else mkdir -p "$d"; fi`);
-      await eachInOrder(contents, ([name, text]) => run(`set -e; d="${target}"; cat > "$d/${name}"`, text));
-      await run(`set -e; d="${target}"; chmod 440 "$d/stack.yaml" "$d/release.json"; chmod 550 "$d"`);
+      const input = contents.map(([, text]) => Buffer.from(text, 'utf8').toString('base64')).join('\n') + '\n';
+      await run(`set -e; d="${target}"; if [ -d "$d" ]; then chmod -R u+w "$d"; else mkdir -p "$d"; fi; IFS= read -r stack; IFS= read -r release; printf '%s' "$stack" | base64 -d > "$d/stack.yaml"; printf '%s' "$release" | base64 -d > "$d/release.json"; chmod 440 "$d/stack.yaml" "$d/release.json"; chmod 550 "$d"`, input);
     },
     /** The release was verified: previous := current, current := id. */
     async accept(id) {
@@ -72,15 +70,22 @@ export function createReleaseStore(config, ssh) {
     /** Downloads a stored release (both files) into `targetDir` for a rollback or an audit. */
     async fetch(id, targetDir) {
       const source = dirOf(id);
-      const files = await mapInOrder(FILES, async (name) => [name, await run(`cat "${source}/${name}"`)]);
+      const out = await run(`set -e; for f in stack.yaml release.json; do test -r "${source}/$f"; base64 < "${source}/$f" | tr -d '\\n'; printf '\\n'; done`);
+      const frames = out.split('\n');
+      if (frames.length !== 3 || frames[2] !== '' || frames.slice(0, 2).some((frame) => !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/u.test(frame))) throw failure('STACK_RELEASE_SSH', 'invalid release response framing');
+      const files = FILES.map((name, index) => [name, Buffer.from(frames[index], 'base64').toString('utf8')]);
       fs.mkdirSync(targetDir, { recursive: true });
       for (const [name, text] of files) fs.writeFileSync(path.join(targetDir, name), text);
       return targetDir;
     },
     /** The stored releases, newest first: [{ id, current, previous }]. */
     async list() {
-      const [now, before] = [await pointer('current'), await pointer('previous')];
-      const out = await run(`cd "${base}/releases" 2>/dev/null && ls -1t || true`);
+      const pointerScript = (name) => `if [ -L "${base}/${name}" ]; then basename "$(readlink "${base}/${name}")"; else printf '\\n'; fi`;
+      const response = await run(`${pointerScript('current')}; ${pointerScript('previous')}; cd "${base}/releases" 2>/dev/null && ls -1t || true`);
+      const [current, previous, ...entries] = response.split('\n');
+      const now = isReleaseId(current) ? current : '';
+      const before = isReleaseId(previous) ? previous : '';
+      const out = entries.join('\n');
       return splitLines(out).filter(isReleaseId).map((id) => ({ id, current: id === now, previous: id === before }));
     },
   };

@@ -243,6 +243,8 @@ These requirements apply to lite and full; the rule catalog and its enforcers pr
 
 ## Swarm deploy tooling
 
+Windows stack commands prefer an SSH Unix-socket forward in the command's private 0700 HOME when runtime `ssh -V` reports OpenSSH 6.7 or later and a local AF_UNIX probe proves the Docker CLI accepts `DOCKER_HOST=unix://<path>`. Otherwise the command chooses a fresh ephemeral TCP port immediately before forwarding and asserts a `127.0.0.1` bind. The forwarded manager socket grants full Swarm control to local processes for the tunnel lifetime; each command owns one tunnel, closes it in `finally` and on SIGINT/SIGTERM, and removes its signal handlers afterward. The TCP port is never saved to state, environment files or logs.
+
 The generic Swarm deploy procedure ships in the canon as `starci app stack <verb>`; an app keeps its configuration in `.starcistacks/` and carries no render, provision or converge scripts of its own. Every verb runs at the app root, takes `--env <env>` (default `production`) and `--json`. Effectful verbs are a dry run by default; `--execute` performs the effects. Exit codes: `0` ok, `1` a check or step failed, `2` refusal or bad usage, `3` owner approval missing (swarm init).
 
 | Verb | What it does |
