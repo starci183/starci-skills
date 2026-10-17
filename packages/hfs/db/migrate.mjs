@@ -43,6 +43,8 @@ const POST_CHECKS = {
 };
 const postOk = (value) => plain(value) && Object.keys(value).every((key) => POST_FIELDS.includes(key) && POST_CHECKS[key](value[key]));
 
+const resetOk = (value) => plain(value) && Object.keys(value).every((key) => key === 'backupMaxAgeHours' && Number.isFinite(value[key]) && value[key] > 0);
+
 const CHECKS = {
   migrationsDir: [dirOk, 'must be a relative directory inside the app'],
   archiveDir: [dirOk, 'must be a relative directory inside the app'],
@@ -53,6 +55,7 @@ const CHECKS = {
   restamp: [listOf(pairOk), 'must be a list of { from, to } fourteen-digit stamps'],
   password: [passwordOk, 'must be { env, member, key } naming a sealed value'],
   postCutover: [postOk, `must use only ${POST_FIELDS.join(', ')} with valid values`],
+  reset: [resetOk, 'must be a mapping with only optional finite positive backupMaxAgeHours'],
 };
 
 /** Judges the `database:` block. Returns { config } or { problems }; `baseline` is the one required field. */
@@ -66,7 +69,7 @@ function normalizeDatabase(block) {
   if (block.baseline === undefined) problems.push('database.baseline: is required');
   if (problems.length > 0) return { problems };
   const config = {
-    migrationsDir: 'supabase/migrations', archiveDir: null, standard: null, heldBack: [], projectRef: null, restamp: [], password: null, postCutover: null, ...block,
+    migrationsDir: 'supabase/migrations', archiveDir: null, standard: null, heldBack: [], projectRef: null, restamp: [], password: null, postCutover: null, reset: null, ...block,
   };
   return { config };
 }
