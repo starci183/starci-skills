@@ -3089,6 +3089,7 @@ verify a scaffolded app against fresh registry installs
 | flag | type | |
 | --- | --- | --- |
 | `--keep` | boolean |  |
+| `--source` | boolean |  |
 
 exit: 0 scaffold install and application proof passed; 1 scaffold, install or application proof failed; 2 bad usage
 
@@ -3097,6 +3098,7 @@ json: none
 ```sh
 starci release app-installs
 starci release app-installs --keep
+starci release app-installs --source
 ```
 
 ### starci release check

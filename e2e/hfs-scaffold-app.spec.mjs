@@ -30,7 +30,8 @@ import { LINT_DEPENDENCIES, RUNTIME, installInto, missingFrom, runtimeInstalls, 
 import { createScaffoldAppBaseline, SERVER_READY_IMPORT } from './helpers/scaffold-app-baseline.mjs';
 import { startSourceCanonRegistry } from './helpers/source-canon-registry.mjs';
 
-const jestPreset = createRequire(import.meta.url)('../packages/jest-preset/index.cjs');
+const require = createRequire(import.meta.url);
+const jestPreset = require('../packages/jest-preset/index.cjs');
 /** What sync loads from the installed jest preset: the Sonar exclusions. */
 const PRESETS = { sonarExclusions: jestPreset.sonarExclusions() };
 /** The one coverage scope of an app: the logic roles of the measured roots, derived from the slot manifest (scripts/hfs/coverage-scope.mjs). */
@@ -300,13 +301,23 @@ function assertCoverageContract(app) {
   assert.deepEqual(codecov.ignore, ['fe/**'], 'fe/ is outside coverage');
   assert.deepEqual(Object.keys(codecov.coverage.status).sort(), ['patch', 'project']);
   const workflow = parseYaml(fs.readFileSync(path.join(app, '.github', 'workflows', 'ci.yml'), 'utf8'));
-  const steps = workflow.jobs.ci.steps;
+  // The managed CI runs as the jobs fast, test, build and sonar: the unit run and the Codecov upload are steps of the test job, which alone holds the
+  // OIDC identity token the upload authenticates with.
+  const jobs = workflow.jobs ?? {};
+  const isUpload = (step) => String(step.uses ?? '').startsWith('codecov/codecov-action@');
+  const unitJobs = Object.keys(jobs).filter((id) => (jobs[id].steps ?? []).some((step) => step.name === 'unit'));
+  const uploadJobs = Object.keys(jobs).filter((id) => (jobs[id].steps ?? []).some(isUpload));
+  assert.deepEqual(unitJobs, ['test'], `the unit run is a step of the test job alone (jobs: ${Object.keys(jobs).join(', ')})`);
+  assert.deepEqual(uploadJobs, ['test'], 'the coverage upload is a step of the test job alone');
+  const { steps } = jobs.test;
   const unit = steps.findIndex((step) => step.name === 'unit');
-  const upload = steps.findIndex((step) => String(step.uses ?? '').startsWith('codecov/codecov-action@'));
+  const upload = steps.findIndex(isUpload);
   assert.ok(unit >= 0 && upload > unit, 'the coverage upload follows the unit run');
   assert.equal(steps[upload].with.files, LCOV, 'the upload sends the lcov Sonar imports');
   assert.equal(steps[upload].with.use_oidc, true);
-  assert.equal(workflow.jobs.ci.env.CODECOV_TOKEN, undefined);
+  assert.equal(jobs.test.permissions?.['id-token'], 'write', 'the test job holds the OIDC identity token the upload authenticates with');
+  for (const [id, job] of Object.entries(jobs)) assert.equal(job.env?.CODECOV_TOKEN, undefined, `job ${id} carries no CODECOV_TOKEN`);
+  assert.equal(workflow.env?.CODECOV_TOKEN, undefined, 'the workflow carries no CODECOV_TOKEN');
 }
 
 const edit = (app, file, from, to) => {
@@ -352,7 +363,9 @@ test('a scaffolded app imports the be lcov into Sonar and Codecov with exactly t
   // The be unit run is the preset's: it writes lcov into be/coverage, the path both imports read.
   assert.equal(fs.readFileSync(path.join(root, 'be', 'jest.config.js'), 'utf8'), `module.exports = require("@starci/jest-preset").starciJestConfig({\n    coverage: ${jestCoverageSource(jestCoverage(MANIFEST))},\n})\n`);
   const config = jestPreset.starciJestConfig({ coverage: jestCoverage(MANIFEST) });
-  assert.ok(config.coverageReporters.includes('lcov'));
+  // The lcov reporter is the preset's own (packages/jest-preset/lcov.cjs, istanbul's lcov with stable function ids); the unit-run test below proves the file it writes.
+  const lcovReporters = config.coverageReporters.filter((reporter) => reporter === 'lcov' || (Array.isArray(reporter) && reporter[0] === require.resolve('../packages/jest-preset/lcov.cjs')));
+  assert.equal(lcovReporters.length, 1, `exactly one lcov reporter: ${JSON.stringify(config.coverageReporters)}`);
   assert.equal(`be/${config.coverageDirectory}/lcov.info`, LCOV);
 });
 

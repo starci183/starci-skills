@@ -998,6 +998,7 @@ complete -c starci -n '__starci_using_command reconciler up' -l no-build -d 'do 
 complete -c starci -n '__starci_using_command reconciler up' -l retire-stale-ledgers -d 'retire registered ledgers that point at temporary test paths'
 complete -c starci -n '__starci_using_command reconciler up' -l set-profile -r -a 'operational observe' -d 'update the reconciler profile before bringing services up'
 complete -c starci -n '__starci_using_command release app-installs' -l keep -d 'keep and print the temporary application path'
+complete -c starci -n '__starci_using_command release app-installs' -l source -d 'scaffold with this checkout and install the @starci scope from its packed tarballs (the pre-publish form release scaffold-e2e runs)'
 complete -c starci -n '__starci_using_command release check' -l final -d 'include final identity and main-branch proofs'
 complete -c starci -n '__starci_using_command release check' -l only -r -d 'comma-separated proof ids to run'
 complete -c starci -n '__starci_using_command release ci-override' -l sha -r -d 'required full 40 lowercase hex SHA of the red CI run'

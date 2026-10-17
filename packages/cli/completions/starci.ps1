@@ -162,7 +162,7 @@ Register-ArgumentCompleter -Native -CommandName starci -ScriptBlock {
         'reconciler status' = @('--json','--cwd','--quiet','--help','--edition')
         'reconciler stop' = @('--json','--cwd','--quiet','--help','--edition')
         'reconciler up' = @('--check','--services','--brief','--wait','--no-build','--retire-stale-ledgers','--set-profile','--json','--cwd','--quiet','--help','--edition')
-        'release app-installs' = @('--keep','--json','--cwd','--quiet','--help','--edition')
+        'release app-installs' = @('--keep','--source','--json','--cwd','--quiet','--help','--edition')
         'release check' = @('--final','--only','--json','--cwd','--quiet','--help','--edition')
         'release ci-override' = @('--sha','--reason','--repo','--json','--cwd','--quiet','--help','--edition')
         'release ci-status' = @('--repo','--tag','--wait','--json','--cwd','--quiet','--help','--edition')

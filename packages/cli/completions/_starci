@@ -1138,7 +1138,7 @@ _starci() {
     'reconciler:status') _values 'flags' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'reconciler:stop') _values 'flags' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'reconciler:up') _values 'flags' '--check' '--services' '--brief' '--wait' '--no-build' '--retire-stale-ledgers' '--set-profile' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
-    'release:app-installs') _values 'flags' '--keep' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
+    'release:app-installs') _values 'flags' '--keep' '--source' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'release:check') _values 'flags' '--final' '--only' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'release:ci-override') _values 'flags' '--sha' '--reason' '--repo' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'release:ci-status') _values 'flags' '--repo' '--tag' '--wait' '--json' '--cwd' '--quiet' '--help' '--edition' ;;

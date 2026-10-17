@@ -1112,7 +1112,7 @@ _starci() {
         reconciler:status) COMPREPLY=( $(compgen -W "--json --cwd --quiet --help --edition" -- "$cur") );;
         reconciler:stop) COMPREPLY=( $(compgen -W "--json --cwd --quiet --help --edition" -- "$cur") );;
         reconciler:up) COMPREPLY=( $(compgen -W "--check --services --brief --wait --no-build --retire-stale-ledgers --set-profile --json --cwd --quiet --help --edition" -- "$cur") );;
-        release:app-installs) COMPREPLY=( $(compgen -W "--keep --json --cwd --quiet --help --edition" -- "$cur") );;
+        release:app-installs) COMPREPLY=( $(compgen -W "--keep --source --json --cwd --quiet --help --edition" -- "$cur") );;
         release:check) COMPREPLY=( $(compgen -W "--final --only --json --cwd --quiet --help --edition" -- "$cur") );;
         release:ci-override) COMPREPLY=( $(compgen -W "--sha --reason --repo --json --cwd --quiet --help --edition" -- "$cur") );;
         release:ci-status) COMPREPLY=( $(compgen -W "--repo --tag --wait --json --cwd --quiet --help --edition" -- "$cur") );;

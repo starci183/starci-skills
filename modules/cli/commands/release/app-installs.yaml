@@ -5,6 +5,7 @@ summary: verify a scaffolded app against fresh registry installs
 impl: {script: scripts/gates/release-app-installs.mjs}
 flags:
   - {name: keep, type: boolean, summary: keep and print the temporary application path}
+  - {name: source, type: boolean, summary: "scaffold with this checkout and install the @starci scope from its packed tarballs (the pre-publish form release scaffold-e2e runs)"}
 exit:
   "0": scaffold install and application proof passed
   "1": scaffold, install or application proof failed
@@ -13,4 +14,5 @@ json: none
 examples:
   - starci release app-installs
   - starci release app-installs --keep
+  - starci release app-installs --source
 editions: [full]
