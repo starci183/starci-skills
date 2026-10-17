@@ -1,17 +1,4 @@
 {{header}}
 version: 2
 updates:
-  - package-ecosystem: npm
-    directory: /
-    schedule:
-      interval: weekly
-  - package-ecosystem: github-actions
-    directory: /
-    schedule:
-      interval: weekly
-  - package-ecosystem: docker
-    directories:
-      - /be/apps/*
-      - /fe/apps/*
-    schedule:
-      interval: weekly
+{{dependabotUpdates}}

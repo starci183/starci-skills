@@ -1,5 +1,16 @@
 # The stack declaration of the app, at the app root beside be/, fe/ and .starciwork (never under a side).
 schema: starci/application-stacks@1
+ci:
+  secrets:
+    - {name: SONAR_TOKEN, scope: repository, purpose: Optional SonarCloud analysis token for the public example, optional: true}
+    - {name: SOPS_AGE_KEY, scope: repository, purpose: Documentation-only deploy age identity; this example has no real deploy, optional: true}
+    - {name: VPS_SSH_KEY, scope: repository, purpose: Documentation-only deploy SSH key; this example has no real deploy, optional: true}
+    - {name: VPS_KNOWN_HOSTS, scope: repository, purpose: Documentation-only pinned host keys; this example has no real deploy, optional: true}
+  vars:
+    - {name: SONAR_HOST_URL, scope: repository, value: 'https://sonarcloud.io', purpose: Optional SonarCloud analysis host, optional: true}
+    - {name: SONAR_ORGANIZATION, scope: repository, value: your-organization, purpose: Documentation-only SonarCloud organization key; replace when enabling analysis, optional: true}
+    - {name: VPS_HOST, scope: repository, value: '203.0.113.10', purpose: Documentation-only deploy host; this example has no real deploy, optional: true}
+    - {name: VPS_USER, scope: repository, value: deploy, purpose: Documentation-only deploy user; this example has no real deploy, optional: true}
 services:
   sonar:
     provider: sonarcloud
@@ -15,12 +26,50 @@ services:
     ci:
       workflow: .github/workflows/examples.yml
       wiring: optional-follow-up
-      secrets: []
-      vars:
-        - {name: SONAR_HOST_URL, value: https://sonarcloud.io}
+      token: SONAR_TOKEN
+      hostVar: SONAR_HOST_URL
+      organizationVar: SONAR_ORGANIZATION
       provisioning: >-
-        The tag workflow scans only when the host repository has the secret SONAR_TOKEN and the variables SONAR_HOST_URL and SONAR_ORGANIZATION;
-        the project key on SonarCloud is <SONAR_ORGANIZATION>_<key above>. The release cut scans with the SONAR_TOKEN of the runtime's secret.env and the organization of the runtime's config.yaml (sonar.organization).
+        The runtime tag workflow scans only when the host repository has the secret SONAR_TOKEN and the variables SONAR_HOST_URL and SONAR_ORGANIZATION;
+        the project key on SonarCloud is <SONAR_ORGANIZATION>_<key above>. The rendered app CI leaves analysis as an optional follow-up.
+        The release cut scans with the SONAR_TOKEN of the runtime's secret.env and the organization of the runtime's config.yaml (sonar.organization).
     ownerAction:
       needed: SONAR_TOKEN (a SonarCloud token) in .claude/secret.env and as the repository secret, the SonarCloud organization key as config.yaml sonar.organization and as the repository variable SONAR_ORGANIZATION.
       reason: the runtime repository is public and holds no secret, so the token lives only in the owner's untracked secret.env and in GitHub.
+  codecov:
+    provider: codecov
+    mode: hosted
+    purpose: Public example coverage reporting through Codecov OIDC.
+    auth: oidc
+    target: 100
+    components: auto
+    required: true
+    ci: {wiring: optional-follow-up, workflow: .github/workflows/examples.yml}
+    ownerAction: none
+  dependabot:
+    provider: github
+    mode: hosted
+    purpose: Group minor and patch dependency updates and keep security updates immediate.
+    ecosystems: [npm, docker, github-actions]
+    schedule: {interval: weekly}
+    groups: {minorPatch: grouped, major: per-package}
+    ignore: ['@starci/*']
+    security: immediate
+    ownerAction: none
+  audit:
+    provider: npm
+    mode: local
+    purpose: Refuse high severity production dependency vulnerabilities in CI and the release gate.
+    level: high
+    omitDev: true
+    in: [release-gate, ci]
+    ownerAction: none
+  container-registry:
+    provider: ghcr
+    mode: hosted
+    purpose: Publish declared release images through the managed workflow when deployment is configured.
+    host: {public: 'https://ghcr.io'}
+    auth: github-token
+    projects: [{repository: shape-slot, key: shape-slot}]
+    ci: {wiring: optional-follow-up, workflow: .github/workflows/stack-deploy.yml}
+    ownerAction: none

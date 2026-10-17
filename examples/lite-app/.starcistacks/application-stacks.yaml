@@ -10,6 +10,17 @@
 # Only member names are tracked. Runtime checks seal ephemeral values in a disposable example copy;
 # a product initializes its own recipient and seals real members before deployment.
 schema: starci/application-stacks@1
+ci:
+  secrets:
+    - {name: SONAR_TOKEN, scope: repository, purpose: Optional example SonarCloud analysis token, optional: true}
+    - {name: SOPS_AGE_KEY, scope: environment, environment: production, purpose: Optional demonstration database deployment identity; no real deploy, optional: true}
+    - {name: VPS_SSH_KEY, scope: environment, environment: production, purpose: Optional demonstration SSH deploy key; no real deploy, optional: true}
+    - {name: VPS_KNOWN_HOSTS, scope: environment, environment: production, purpose: Optional demonstration SSH host verification; no real deploy, optional: true}
+  vars:
+    - {name: SONAR_HOST_URL, scope: repository, value: 'https://sonarcloud.io', purpose: Optional example SonarCloud host, optional: true}
+    - {name: SONAR_ORGANIZATION, scope: repository, value: your-organization, purpose: Documentation placeholder for the optional SonarCloud organization, optional: true}
+    - {name: VPS_HOST, scope: environment, environment: production, value: '203.0.113.10', purpose: Documentation address for demonstration deployment; no real deploy, optional: true}
+    - {name: VPS_USER, scope: environment, environment: production, value: deploy, purpose: Documentation user for demonstration deployment; no real deploy, optional: true}
 sources:
   - repository: lite-app
 backing:
@@ -165,7 +176,7 @@ environments:
 k8s:
   status: deferred
   reason: Whole-package Kubernetes deployment is deferred; production is a single-manager Docker Swarm on one VPS and development is the local Supabase CLI stack with host processes.
-# Local release analysis uses the shared host SonarQube extension and its sealed custody.
+# Public example quality services use SonarCloud and Codecov OIDC.
 services:
   sonar:
     provider: sonarcloud
@@ -181,12 +192,52 @@ services:
     ci:
       workflow: .github/workflows/examples.yml
       wiring: optional-follow-up
-      secrets: []
-      vars:
-        - {name: SONAR_HOST_URL, value: https://sonarcloud.io}
+      token: SONAR_TOKEN
+      hostVar: SONAR_HOST_URL
+      organizationVar: SONAR_ORGANIZATION
       provisioning: >-
-        The tag workflow scans only when the host repository has the secret SONAR_TOKEN and the variables SONAR_HOST_URL and SONAR_ORGANIZATION;
-        the project key on SonarCloud is <SONAR_ORGANIZATION>_<key above>. The release cut scans with the SONAR_TOKEN of the runtime's secret.env and the organization of the runtime's config.yaml (sonar.organization).
+        The runtime examples tag workflow scans only when its repository provides SONAR_TOKEN and SONAR_ORGANIZATION;
+        it uses https://sonarcloud.io and the project key <SONAR_ORGANIZATION>_<key above>. The rendered standalone app workflow reads
+        SONAR_TOKEN and SONAR_HOST_URL; standalone SonarCloud activation also needs the operator's organization configuration.
+        The release cut scans with SONAR_TOKEN from the runtime's secret.env and the organization from config.yaml (sonar.organization).
     ownerAction:
       needed: SONAR_TOKEN (a SonarCloud token) in .claude/secret.env and as the repository secret, the SonarCloud organization key as config.yaml sonar.organization and as the repository variable SONAR_ORGANIZATION.
       reason: the runtime repository is public and holds no secret, so the token lives only in the owner's untracked secret.env and in GitHub.
+  codecov:
+    provider: codecov
+    mode: hosted
+    purpose: Public example coverage reporting through GitHub OIDC.
+    auth: oidc
+    target: 100
+    components: auto
+    required: true
+    ci: {wiring: optional-follow-up, workflow: .github/workflows/examples.yml}
+    ownerAction: none
+  dependabot:
+    provider: github
+    mode: hosted
+    purpose: Weekly dependency updates with grouped minor and patch releases.
+    ecosystems: [npm, docker, github-actions]
+    schedule: {interval: weekly}
+    groups: {minorPatch: grouped, major: per-package}
+    ignore: ['@starci/*']
+    security: immediate
+    ownerAction: none
+  audit:
+    provider: npm
+    mode: local
+    purpose: Refuse high severity production dependency vulnerabilities in CI and release gates.
+    level: high
+    omitDev: true
+    in: [release-gate, ci]
+    ownerAction: none
+  container-registry:
+    provider: ghcr
+    mode: hosted
+    purpose: Demonstration image publication and deployment through GitHub Container Registry.
+    host: {public: 'https://ghcr.io'}
+    auth: github-token
+    projects:
+      - {repository: lite-app, key: lite-app}
+    ci: {wiring: optional-follow-up, workflow: .github/workflows/stack-deploy.yml}
+    ownerAction: none

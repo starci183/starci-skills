@@ -9,18 +9,14 @@ on:
 permissions:
   contents: read
 
-# One run per ref.
+# One run per ref: a release tag is never cancelled by another run.
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
-  ci:
+  fast:
     runs-on: ubuntu-latest
-    # id-token: write lets the Codecov upload authenticate with GitHub's OIDC token: no repository secret, no silent skip.
-    permissions:
-      contents: read
-      id-token: write
     env:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
     steps:
@@ -29,7 +25,22 @@ jobs:
         with:
           node-version: 22
           cache: npm
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        id: deps
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node22-modules-${{ hashFiles('package-lock.json') }}
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: |
+            .turbo
+            fe/apps/*/.next/cache
+          key: ${{ runner.os }}-node22-build-${{ hashFiles('package-lock.json') }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-node22-build-${{ hashFiles('package-lock.json') }}-
+            ${{ runner.os }}-node22-build-
       - run: npm ci --ignore-scripts
+        if: steps.deps.outputs.cache-hit != 'true'
       - name: production dependency audit
         run: npm audit --omit=dev --audit-level=high
       - name: lint
@@ -38,37 +49,141 @@ jobs:
       - name: lint with Sonar import
         if: env.SONAR_TOKEN != ''
         run: node node_modules/@starci/hfs/runtime/scripts/hfs/example-secrets.mjs --run . -- npm run lint -- --sonar reports/lint.sonar.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always() && env.SONAR_TOKEN != '' && hashFiles('reports/lint.sonar.json') != ''
+        with:
+          name: sonar-lint
+          path: reports/lint.sonar.json
       - name: format
         run: npm run format:check
       - name: typecheck
         run: npm run typecheck
+
+  test:
+    runs-on: ubuntu-latest
+    # Codecov OIDC authentication requires a job-scoped identity token.
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        id: deps
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node22-modules-${{ hashFiles('package-lock.json') }}
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: |
+            .turbo
+            fe/apps/*/.next/cache
+          key: ${{ runner.os }}-node22-build-${{ hashFiles('package-lock.json') }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-node22-build-${{ hashFiles('package-lock.json') }}-
+            ${{ runner.os }}-node22-build-
+      - run: npm ci --ignore-scripts
+        if: steps.deps.outputs.cache-hit != 'true'
       - name: unit
         run: npm test -- --ci
       - name: coverage proof
         run: node node_modules/@starci/hfs/runtime/scripts/hfs/example-secrets.mjs --run . -- npx starci app check --coverage-from be/coverage/lcov.info
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always() && hashFiles('be/coverage/lcov.info') != ''
+        with:
+          name: coverage-lcov
+          path: be/coverage/lcov.info
+      - name: coverage upload skipped
+        if: ${{ !cancelled() && hashFiles('be/coverage/lcov.info') == '' }}
+        run: |
+          echo "::notice::codecov upload skipped: no coverage file at be/coverage/lcov.info (the test step failed or produced none)"
+          exit 0
       - name: coverage upload
         uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5.5.5
-        if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/v') }}
+        if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/v') && hashFiles('be/coverage/lcov.info') != '' }}
         with:
           use_oidc: true
           files: be/coverage/lcov.info
           disable_search: true
           fail_ci_if_error: true
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        id: deps
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node22-modules-${{ hashFiles('package-lock.json') }}
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: |
+            .turbo
+            fe/apps/*/.next/cache
+          key: ${{ runner.os }}-node22-build-${{ hashFiles('package-lock.json') }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-node22-build-${{ hashFiles('package-lock.json') }}-
+            ${{ runner.os }}-node22-build-
+      - run: npm ci --ignore-scripts
+        if: steps.deps.outputs.cache-hit != 'true'
       - name: build be
         run: npm run build:be
       - name: build fe
         run: npm run build:fe
       - name: database migration checks
         run: node node_modules/@starci/hfs/runtime/scripts/hfs/example-secrets.mjs --run . -- npm run db:lint
+
+  sonar:
+    needs: [fast, test]
+    runs-on: ubuntu-latest
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        id: deps
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node22-modules-${{ hashFiles('package-lock.json') }}
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: |
+            .turbo
+            fe/apps/*/.next/cache
+          key: ${{ runner.os }}-node22-build-${{ hashFiles('package-lock.json') }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-node22-build-${{ hashFiles('package-lock.json') }}-
+            ${{ runner.os }}-node22-build-
+      - run: npm ci --ignore-scripts
+        if: steps.deps.outputs.cache-hit != 'true'
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/v') && env.SONAR_TOKEN != '' }}
+        with:
+          name: coverage-lcov
+          path: be/coverage
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/v') && env.SONAR_TOKEN != '' }}
+        with:
+          name: sonar-lint
+          path: reports
       - uses: SonarSource/sonarqube-scan-action@c7ee0f9df90b7aa20e8dcf9695dcfe2e7da5b4f2 # v7.2.1
         if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/v') && env.SONAR_TOKEN != '' }}
-        env:
-          SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL }}
       - uses: SonarSource/sonarqube-quality-gate-action@7a5fffe8e523c40e0c740b6bc2712ab503e52efa # v1.2.1
         if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/v') && env.SONAR_TOKEN != '' }}
         timeout-minutes: 10
-        env:
-          SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL }}
 
   db-types:
     runs-on: ubuntu-latest
@@ -78,7 +193,22 @@ jobs:
         with:
           node-version: 22
           cache: npm
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        id: deps
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node22-modules-${{ hashFiles('package-lock.json') }}
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: |
+            .turbo
+            fe/apps/*/.next/cache
+          key: ${{ runner.os }}-node22-build-${{ hashFiles('package-lock.json') }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-node22-build-${{ hashFiles('package-lock.json') }}-
+            ${{ runner.os }}-node22-build-
       - run: npm ci --ignore-scripts
+        if: steps.deps.outputs.cache-hit != 'true'
       - name: start Supabase
         run: npm run db:start
       - name: apply migrations

@@ -31,6 +31,8 @@ import { readDeclaredStack, stackWorkflowVariables } from './stack-images.mjs';
 import { byCodeUnit } from '../report/order.mjs';
 import { isRuntimeExampleApp } from '../runtime/scripts/lib/runtime-example.mjs';
 import { ciWorkflowCommands } from './ci-commands.mjs';
+import { dependabotUpdates, hasDeclaredServices, readDeclaredQuality, sonarHostLine } from './quality-services.mjs';
+import { qualityServices } from '../runtime/scripts/hfs/ci-declaration.mjs';
 
 export const TEMPLATES_DIR = path.join(import.meta.dirname, '..', 'templates');
 const NODE_MAJOR = 22;
@@ -167,7 +169,7 @@ const SOURCE_SKIPPED = new Set(['node_modules', 'dist', 'coverage']);
  * lite brand tree exists, so sync can preserve its absence. `hasImage` identifies authored optional Dockerfiles without reading
  * their content. An app with no be folder has no source files.
  */
-export function appSource(root) {
+export function appSource(root, { parseYaml } = {}) {
   const files = [];
   const walk = dir => {
     let entries;
@@ -180,7 +182,8 @@ export function appSource(root) {
   for (const dir of ['apps', 'src']) walk(dir);
   return { runtimeExample: isRuntimeExampleApp(root), files: files.sort(byCodeUnit), read: file => fs.readFileSync(path.join(root, 'be', file), 'utf8'),
     workPresent: fs.existsSync(path.join(root, '.starciwork')), hasImage: file => isFile(path.join(root, file), { followLinks: false }),
-    stack: readDeclaredStack(root) };
+    stack: readDeclaredStack(root, { parseYaml }), quality: readDeclaredQuality(root, { parseYaml }),
+    qualityDeclared: hasDeclaredServices(root, { parseYaml }) };
 }
 
 /**
@@ -299,6 +302,7 @@ export function variables(app, scope, presets, sonarKey, manifest = loadSlotMani
   const packages = opensPackages(fe);
   const lite = app.edition === 'lite';
   const providers = (app.sides.be.connections ?? []).map(connection => connection.provider);
+  const quality = source.quality ?? qualityServices({});
   return {
     header: HEADER(scope),
     project: app.project,
@@ -313,15 +317,18 @@ export function variables(app, scope, presets, sonarKey, manifest = loadSlotMani
     lintPrefix: 'npm run codegen --silent && ',
     nodeMajor: String(NODE_MAJOR),
     sonarKey: sonarKey ?? app.project,
+    sonarHostLine: sonarHostLine(quality.sonar),
     sonarExclusions: [presets?.sonarExclusions, '**/.next/**', '**/node_modules/**', '**/src/messages/**', ...(lite ? ['supabase/types/**'] : [])].filter(Boolean).join(','),
     sonarSources: ['be/apps', 'be/src', 'fe/apps', ...(packages ? ['fe/packages'] : [])].join(','),
     lcovReport: LCOV_REPORT,
-    ...ciWorkflowCommands(source, LCOV_REPORT),
+    ...ciWorkflowCommands(source, LCOV_REPORT, source.qualityDeclared === false ? undefined : source.quality),
     // The coverage scope is the same in both editions: lite measures exactly what full measures (ruling:R212/case-1, amended by ruling:R212/case-4).
     jestCoverage: scope === 'be' ? jestCoverageSource(jestCoverage(manifest, providers)) : '',
     coverageExclusions: scope === APP_SCOPE ? sonarCoverageExclusions(manifest, providers).join(',') : '',
     codecovPaths: scope === APP_SCOPE ? codecovPaths(manifest, providers).map(glob => `          - ${JSON.stringify(glob)}`).join('\n') : '',
     codecovComponents: scope === APP_SCOPE ? componentsYaml(coverageComponents(manifest, { ...source, apps: app.sides.be.apps, providers })) : '',
+    codecovTarget: quality.codecov.target,
+    dependabotUpdates: dependabotUpdates(quality.dependabot),
     tsconfigPaths: ['be/tsconfig.json', ...fe.apps.map(entry => `fe/apps/${entry.name}/tsconfig.json`), ...(packages ? ['fe/packages/*/tsconfig.json'] : [])].join(','),
     styleGlob: STYLE_GLOB,
     imageMatrix: imageMatrix(app, source),
@@ -356,7 +363,10 @@ export function renderTargets(hfs, presets, { sonarKey, readTemplate = readBundl
     const targets = targetsOf(scope, { edition: app.edition, manifest, hasTemplate })
       .filter(target => !(app.edition === 'lite' && source?.workPresent === false && target.path === '.starciwork/.gitignore'));
     return targets.map(target => {
-      const body = render(readTemplate(target.template), vars, readTemplate);
+      const template = target.path === 'codecov.yml' && source?.quality?.codecov.enabled === false
+        ? '{{header}}\n# Codecov is disabled in the manifest.\ncodecov:\n  require_ci_to_pass: false\n'
+        : readTemplate(target.template);
+      const body = render(template, vars, readTemplate);
       const where = onSide(scope, target.path);
       if (target.mode === 'scripts') {
         const scripts = parseScripts(body);
@@ -454,7 +464,7 @@ export function loadHfs(root, manifest = loadSlotManifest()) {
 export async function renderRepo(root, { presets, parseYaml, manifest = loadSlotManifest() } = {}) {
   const hfs = loadHfs(root, manifest);
   const sonarKey = await readDeclaredSonarKey(root, { parseYaml, fail: message => { throw new SyncError('HFS_SYNC_SONAR_KEY', message); } });
-  return { hfs, targets: renderTargets(hfs, presets ?? await loadPresets(root), { sonarKey, manifest, source: { ...appSource(root), stack: readDeclaredStack(root, { parseYaml }) } }) };
+  return { hfs, targets: renderTargets(hfs, presets ?? await loadPresets(root), { sonarKey, manifest, source: appSource(root, { parseYaml }) }) };
 }
 
 /** `starci app sync --check | --write [--cwd <dir>]` at the app root; returns 0 clean, 1 drift, 2 usage. */

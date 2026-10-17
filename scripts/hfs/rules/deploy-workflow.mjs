@@ -5,7 +5,6 @@ import { isPlainObject as record } from '../../../engine/plain-object.mjs';
 import { workflowEventOptions } from '../../lib/workflow-events.mjs';
 
 const DEPLOY = 'HFS_DEPLOY_WORKFLOW';
-const PIN = 'HFS_WORKFLOW_PIN';
 const TOOL = 'HFS_CI_TOOL_INSTALL';
 const TRIGGER = 'HFS_APP_WORKFLOW_TRIGGER';
 // Only the age identity and SSH transport credentials belong in the CI secret store.
@@ -81,18 +80,6 @@ function triggerFindings(doc, refuse) {
     if (!record(options) || !Array.isArray(options.tags) || options.tags.length !== 1 || options.tags[0] !== 'v*' || Object.keys(options).some((key) => key !== 'tags')) {
       findings.push(refuse(TRIGGER, 'push must contain only tags: [v*]; branch and path filters are forbidden'));
     }
-  }
-  return findings;
-}
-
-function actionFindings(doc, refuse) {
-  const findings = [];
-  for (const { key, value } of entries(doc)) {
-    if (key !== 'uses') continue;
-    const local = typeof value === 'string' && /^\.\/[\w./-]+$/.test(value);
-    const remote = typeof value === 'string' && /^[\w.-]+\/[\w.-]+(?:\/[\w./-]+)?@[a-f\d]{40}$/i.test(value);
-    const container = typeof value === 'string' && /^docker:\/\/[^\s@]+@sha256:[a-f\d]{64}$/i.test(value);
-    if (!local && !remote && !container) findings.push(refuse(PIN, 'every remote uses entry needs a full 40-hex commit SHA (a container action needs a sha256 digest)'));
   }
   return findings;
 }
@@ -209,7 +196,7 @@ function perWorkflow({ path: file, text }) {
   const refuse = (code, message) => found(code, file, `${code} ${file}: ${message}`);
   const doc = parseWorkflow(text);
   if (!record(doc)) return [refuse(TRIGGER, 'the workflow must be valid YAML with a release-only on block'), ...(deployName(file) ? [refuse(DEPLOY, 'the deploy workflow must be valid YAML')] : [])];
-  return [...triggerFindings(doc, refuse), ...actionFindings(doc, refuse), ...deploymentFindings(doc, file, refuse), ...toolFindings(doc, refuse)];
+  return [...triggerFindings(doc, refuse), ...deploymentFindings(doc, file, refuse), ...toolFindings(doc, refuse)];
 }
 
 /** Synchronous R251 findings over the tracked workflows of a lite/full app. */

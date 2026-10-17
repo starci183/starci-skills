@@ -1,6 +1,18 @@
 schema: starci/application-stacks@1
 sources:
   - repository: ecommerce-app
+# Public example CI names only; no real deployment is configured.
+ci:
+  secrets:
+    - {name: SONAR_TOKEN, scope: repository, purpose: Optional SonarCloud analysis token for the host repository, optional: true}
+    - {name: SOPS_AGE_KEY, scope: repository, purpose: Unused example deploy workflow age identity, optional: true}
+    - {name: VPS_SSH_KEY, scope: repository, purpose: Unused example deploy workflow SSH key, optional: true}
+    - {name: VPS_KNOWN_HOSTS, scope: repository, purpose: Unused example deploy workflow pinned SSH host keys, optional: true}
+  vars:
+    - {name: SONAR_HOST_URL, scope: repository, value: https://sonarcloud.io, purpose: Public SonarCloud analysis endpoint, optional: true}
+    - {name: SONAR_ORGANIZATION, scope: repository, value: your-organization, purpose: Documentation placeholder for the host repository SonarCloud organization key, optional: true}
+    - {name: VPS_HOST, scope: repository, value: 203.0.113.10, purpose: Documentation address for the unused example deploy workflow, optional: true}
+    - {name: VPS_USER, scope: repository, value: deploy, purpose: Documentation user for the unused example deploy workflow, optional: true}
 components:
   postgres:
     image: postgres:16@sha256:1a6ab3f5345eb6dbe04a1349529caabdb0ab09293a09590fad07b2246bfa4b54
@@ -67,8 +79,7 @@ environments:
     # browser/stack.mjs generates ephemeral values for an isolated browser run.
     # Production secret custody is outside this dev-only example scope.
     secrets: []
-# Delivery/quality services (contract change starcistacks-services). Sonar points to the shared host extension;
-# CI does not scan this example.
+# Delivery and quality services for this public example; host CI analysis is optional.
 services:
   sonar:
     provider: sonarcloud
@@ -84,15 +95,57 @@ services:
     ci:
       workflow: .github/workflows/examples.yml
       wiring: optional-follow-up
-      secrets: []
-      vars:
-        - {name: SONAR_HOST_URL, value: https://sonarcloud.io}
+      token: SONAR_TOKEN
+      hostVar: SONAR_HOST_URL
+      organizationVar: SONAR_ORGANIZATION
       provisioning: >-
         The tag workflow scans only when the host repository has the secret SONAR_TOKEN and the variables SONAR_HOST_URL and SONAR_ORGANIZATION;
         the project key on SonarCloud is <SONAR_ORGANIZATION>_<key above>. The release cut scans with the SONAR_TOKEN of the runtime's secret.env and the organization of the runtime's config.yaml (sonar.organization).
     ownerAction:
       needed: SONAR_TOKEN (a SonarCloud token) in .claude/secret.env and as the repository secret, the SonarCloud organization key as config.yaml sonar.organization and as the repository variable SONAR_ORGANIZATION.
       reason: the runtime repository is public and holds no secret, so the token lives only in the owner's untracked secret.env and in GitHub.
+  codecov:
+    provider: codecov
+    mode: hosted
+    purpose: Public example coverage uploads using GitHub OIDC.
+    auth: oidc
+    target: 100
+    components: auto
+    required: true
+    ci:
+      wiring: optional-follow-up
+      workflow: .github/workflows/examples.yml
+    ownerAction: none
+  dependabot:
+    provider: github
+    mode: hosted
+    purpose: Dependency updates with grouped minor and patch releases and separate majors.
+    ecosystems: [npm, docker, github-actions]
+    schedule: {interval: weekly}
+    groups: {minorPatch: grouped, major: per-package}
+    ignore: ['@starci/*']
+    security: immediate
+    ownerAction: none
+  audit:
+    provider: npm
+    mode: local
+    purpose: Production dependency vulnerability checks in release and CI gates.
+    level: high
+    omitDev: true
+    in: [release-gate, ci]
+    ownerAction: none
+  container-registry:
+    provider: ghcr
+    mode: hosted
+    purpose: Image publishing template for the unused example deploy workflow.
+    host: {public: https://ghcr.io}
+    auth: github-token
+    projects: [{repository: ecommerce-app, key: ecommerce-app}]
+    ci:
+      wiring: optional-follow-up
+      workflow: .github/workflows/stack-deploy.yml
+      provisioning: The public example has no deploy images; a real app grants packages write to its automatic GitHub workflow token.
+    ownerAction: none
 k8s:
   status: deferred
   reason: >-

@@ -9,68 +9,61 @@ on:
 permissions:
   contents: read
 
-# One run per ref.
+# One run per ref: a release tag is never cancelled by another run.
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
-  ci:
+  fast:
     runs-on: ubuntu-latest
-    # id-token: write lets the Codecov upload authenticate with GitHub's OIDC token: no repository secret, no silent skip.
-    permissions:
-      contents: read
-      id-token: write
-    env:
-      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+{{sonarEnv}}
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
-        with:
-          node-version: {{nodeMajor}}
-          cache: npm
-      - run: npm ci --ignore-scripts
+{{> app/ci-workflows/install-steps.yml}}
       - name: production dependency audit
-        run: npm audit --omit=dev --audit-level=high
-      - name: lint
-        if: env.SONAR_TOKEN == ''
-        run: {{ciLint}}
-      - name: lint with Sonar import
-        if: env.SONAR_TOKEN != ''
-        run: {{ciLintSonar}}
+        run: {{auditCommand}}
+{{ciLintSteps}}
       - name: format
         run: npm run format:check
       - name: typecheck
         run: npm run typecheck
+
+  test:
+    runs-on: ubuntu-latest
+    # Codecov OIDC authentication requires a job-scoped identity token.
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+{{> app/ci-workflows/install-steps.yml}}
       - name: unit
         run: npm test -- --ci
       - name: coverage proof
         run: {{ciCoverageProof}}
-      - name: coverage upload
-        uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5.5.5
-        if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/v') }}
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always() && hashFiles('{{lcovReport}}') != ''
         with:
-          use_oidc: true
-          files: {{lcovReport}}
-          disable_search: true
-          fail_ci_if_error: true
+          name: {{lcovArtifact}}
+          path: {{lcovReport}}
+{{codecovSteps}}
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+{{> app/ci-workflows/install-steps.yml}}
       - name: build be
         run: npm run build:be
       - name: build fe
         run: npm run build:fe
       - name: database migration checks
         run: {{ciDatabaseLint}}
-{{> app/ci-workflows/sonar-steps.yml}}
+
+{{sonarJob}}
 
   db-types:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
-        with:
-          node-version: {{nodeMajor}}
-          cache: npm
-      - run: npm ci --ignore-scripts
+{{> app/ci-workflows/install-steps.yml}}
       - name: start Supabase
         run: npm run db:start
       - name: apply migrations
