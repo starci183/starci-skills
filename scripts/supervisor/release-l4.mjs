@@ -34,10 +34,15 @@ const LITE_NO_SCRIPTS = Object.freeze(['test:contract', 'test:e2e']);
 export const scriptsOf = (app) => EXAMPLE_SCRIPTS.filter((script) => !(app.edition === 'lite' && LITE_NO_SCRIPTS.includes(script)) && !idleScripts(app.layers).some((idle) => idle.script === script));
 /** The scripts that judge an app's sealed members: run in a disposable copy with fresh nondeployable envelopes (release-sealed-run.mjs), as the app's own ci.yml runs its lint; the runtime tracks no ciphertext. */
 const SEALED_SCRIPTS = Object.freeze(['lint']);
-/** The command of one app script row: `npm run <script>`, through release-sealed-run.mjs for SEALED_SCRIPTS. */
-const scriptCommand = (runtime, app, script) => (SEALED_SCRIPTS.includes(script)
-  ? { cmd: 'node', args: [path.join(runtime, 'scripts', 'supervisor', 'release-sealed-run.mjs'), app.dir, '--', 'npm', 'run', script] }
-  : { cmd: 'npm', args: ['run', script] });
+/** The scripts of a lite (Supabase) app that run against its own disposable local Supabase CLI stack (release-supabase-run.mjs): its integration specs connect to that stack. */
+const LOCAL_STACK_SCRIPTS = Object.freeze(['test:integration']);
+/** The command of one app script row: `npm run <script>`, through release-sealed-run.mjs for SEALED_SCRIPTS and release-supabase-run.mjs for a lite app's LOCAL_STACK_SCRIPTS. */
+function scriptCommand(runtime, app, script) {
+  const through = (runner) => ({ cmd: 'node', args: [path.join(runtime, 'scripts', 'supervisor', runner), app.dir, '--', 'npm', 'run', script] });
+  if (SEALED_SCRIPTS.includes(script)) return through('release-sealed-run.mjs');
+  if (app.edition === 'lite' && LOCAL_STACK_SCRIPTS.includes(script)) return through('release-supabase-run.mjs');
+  return { cmd: 'npm', args: ['run', script] };
+}
 /** The proofs of the checks column that only a tool outside npm scripts can give (Sonar: release-l4-sonar.mjs): each must answer {ok, log}. */
 const L4_PROOFS = Object.freeze(['sonar']);
 const STEP_TIMEOUT_MS = 60 * 60_000;
