@@ -75,7 +75,7 @@ export const useClientOnlyAtBoundary = {
     schema: [],
     messages: {
       slot:
-        "`\"use client\"` on a {{slot}}. Routes, pages and layouts are server components: making one a client component ships its whole subtree, including the message catalog, to every reader and stops it reading data on the server. Move the interaction into a block below it and put the directive on that block's `index.tsx`; context providers go in the route tree's `providers.tsx`.",
+        "`\"use client\"` on a {{slot}}. Routes, pages and layouts are server components: making one a client component ships its whole subtree, including the message catalog, to every reader and stops it reading data on the server. Keep the {{slot}} a server component that renders a client component: move the interaction into a block (or overlay) below it, put the directive on that block's `index.tsx`, and import that entry from the {{slot}}; context providers go in the route tree's `providers.tsx`.",
       elsewhere:
         "`\"use client\"` here is not at an interaction boundary. The directive belongs on the `index.tsx` of the interactive block (or overlay), on a leaf whose interaction is intrinsic, on `error.tsx`/`global-error.tsx`, on the route tree's `providers.tsx` (the context providers a layout renders around its children), or on the client state of the stack (`components/providers/<name>/index.tsx`, `hooks/`, `redux/`, `modules/toast/`). Below a client block the file is already client; above one it must stay a server component.",
     },

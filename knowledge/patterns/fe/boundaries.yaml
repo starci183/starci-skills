@@ -96,6 +96,9 @@ rules:
       forbidden on a client page.
       A server page can host an overlay: it imports the public `features/overlays/<Name>/index.tsx` entry and renders it;
       the overlay declares `"use client"` and receives serializable props. This does not make the page a client component.
+      The same holds for a feature page owner or layout owner (`features/pages/<Name>/index.tsx`): it stays a server
+      component and renders the client block (`components/blocks/<Name>/index.tsx`) or overlay that carries the directive;
+      the directive never moves up onto the owner.
       FE_CLIENT_BOUNDARY accepts the overlay entry and keeps the page server; FE_CLIENT_SERVER_IMPORT judges server-only
       imports made by the client file; FE_CLIENT_REACHES_SERVER follows the overlay's runtime dependencies toward the
       server. None refuses the server-to-client composition itself. The overlay must still keep server-only APIs and
