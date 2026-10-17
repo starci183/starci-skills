@@ -42,6 +42,7 @@ import { escapeRegExp } from '../lib/regex.mjs';
 import { isInfrastructureValueFile } from './starcistacks-value-file.mjs';
 import { STACK_DECLARATION_TEMPLATE } from '../lib/example-refs.mjs';
 import { checkSecretForm, kindOf } from './starcistacks-form.mjs';
+import { readCiDeclaration } from '../hfs/ci-declaration.mjs';
 import { applicationStackFindings } from './starcistacks-runtime.mjs';
 export { DECLARATION, STACK_ROOT, findStackDeclaration };
 const RESULT_SCHEMA = 'starci/starcistacks-check@1';
@@ -50,6 +51,9 @@ const FOLLOW_UP = { op: 'workspace.manage', params: { mode: 'stacks' },
   detail: `author the services block of the repository stack declaration (sonar and every other delivery/quality service) from ${STACK_DECLARATION_TEMPLATE}` };
 /** The closed service catalog: its providers and the CI text that shows a workflow calls it. */
 const SERVICE_CATALOG = {
+  codecov: { providers: ['codecov'], words: ['codecov'], ci: [/codecov\/codecov-action/i] },
+  dependabot: { providers: ['github'], words: ['dependabot'], ci: [] },
+  audit: { providers: ['npm'], words: ['audit'], ci: [/\bnpm audit\b/] },
   sonar: { providers: ['sonarqube', 'sonarcloud'], words: ['sonar', 'sonarqube', 'sonarcloud'],
     ci: [/SonarSource\/sonar(?:qube|cloud)-[a-z-]+-action/i, /\bsonar-scanner\b/i, /\bSONAR_TOKEN\b/] },
   'container-registry': { providers: ['ghcr', 'dockerhub', 'ecr', 'gar'], words: ['ghcr', 'registry', 'docker hub', 'dockerhub'],
@@ -66,6 +70,7 @@ export const CODES = [
   'STACKS_SERVICE_UNDECLARED', 'STACKS_CI_CONTRADICTION', 'STACKS_CI_UNUSED', 'STACKS_CI_NAME_UNREFERENCED',
   'STACKS_PLAINTEXT_TRACKED', 'STACKS_ENC_TWIN_MISSING', 'STACKS_GITIGNORE_OPEN', 'STACKS_DECLARATION_IGNORED',
   'STACKS_GITIGNORE_VALUE_OPEN', 'STACKS_RUNBOOK_IGNORED', 'STACKS_QUALITY_GATE_DRIFT',
+  'CI_DECLARATION_INVALID', 'STACKS_CI_LEGACY_FORM',
   'STACKS_EXAMPLE_FORM', 'STACKS_PRODUCT_FORM', 'HFS_STACKS_SHAPE',
 ];
 /** A plaintext value file inside infra/** (compose, terraform): env files, keys, certificates, tfvars. */
@@ -88,19 +93,20 @@ const appendSchemaObjectErrors = (out, node, s, where, run) => {
     else if (plain(s.additionalProperties)) out.push(...run(child, s.additionalProperties, `${where}.${key}`));
   }
 };
-/** The subset of JSON Schema the declaration schema uses: type, const, enum, pattern, minLength, required, properties, additionalProperties, items, minProperties, $ref, anyOf. */
+/** The subset of JSON Schema the declaration schema uses: type, const, enum, pattern, minLength, required, properties, additionalProperties, items, minProperties, minimum, maximum, $ref, anyOf. */
 function schemaErrors(value, shape, at = '$', root = declarationSchema()) {
   const resolve = (ref) => ref.slice(2).split('/').reduce((node, key) => node?.[key], root);
   const typeOk = (node, s) => ({ object: plain, array: Array.isArray, integer: Number.isInteger }[s.type] ?? ((n) => (s.type ? typeof n === s.type : true)))(node);
   const run = (node, s, where) => {
     if (!plain(s)) return [];
     if (s.$ref) return run(node, resolve(s.$ref), where);
-    if (Array.isArray(s.anyOf))
-      return s.anyOf.some((option) => run(node, option, where).length === 0) ? [] : [{ path: where, message: 'matches none of the allowed shapes' }];
+    if (Array.isArray(s.anyOf) && !s.anyOf.some((option) => run(node, option, where).length === 0))
+      return [{ path: where, message: 'matches none of the allowed shapes' }];
     if (!typeOk(node, s)) return [{ path: where, message: `expected ${s.type}` }];
     const out = [];
     if (Object.hasOwn(s, 'const') && node !== s.const) out.push({ path: where, message: `must be ${JSON.stringify(s.const)}` });
     if (Array.isArray(s.enum) && !s.enum.includes(node)) out.push({ path: where, message: `must be one of ${s.enum.join(', ')}` });
+    if (typeof node === 'number' && ((s.minimum !== undefined && node < s.minimum) || (s.maximum !== undefined && node > s.maximum))) out.push({ path: where, message: 'number outside allowed range' });
     if (typeof node === 'string') out.push(...stringErrors(node, s, where));
     if (Array.isArray(node)) { appendSchemaArrayErrors(out, node, s, where, run); return out; }
     if (!plain(node)) return out;
@@ -145,10 +151,8 @@ const ownerActionOf = (s) => {
   const noAction = s.ownerAction === 'none' ? 'none' : null;
   return plain(s.ownerAction) ? { needed: text(s.ownerAction.needed), reason: text(s.ownerAction.reason) } : noAction;
 };
-/** One declared service with its custody resolved to presence (never a value). */
-export function normalizeService(id, entry, { declaringRepo } = {}) {
-  const s = plain(entry) ? entry : {};
-  const stack = plain(s.stack) ? s.stack : null;
+/** Resolve a declared stack to its host or repository directory without reading custody values. */
+function normalizeStack(stack, entry, declaringRepo) {
   // owner: host - the stack lives inside the installed runtime tree (.claude/ext/<service>);
   // `environment` is the slot the extension serves, not a path segment (<root>/<compose> resolves it).
   const hostOwned = declaredStack(entry)?.hostOwned ?? false;
@@ -159,18 +163,26 @@ export function normalizeService(id, entry, { declaringRepo } = {}) {
   let stackDir = null;
   if (hostOwned) stackDir = extDir;
   else if (stackRepo && text(stack.root) && text(stack.environment)) stackDir = path.join(stackRepo, stack.root, stack.environment);
+  return stack ? { owner: text(stack.owner), repository: text(stack.repository), root: text(stack.root), environment: text(stack.environment), compose: text(stack.compose),
+    container: text(stack.container), publishedBy: text(stack.publishedBy), hostOwned, repo: stackRepo, dir: stackDir,
+    composeFile: stackDir && text(stack.compose) ? path.join(stackDir, stack.compose) : null } : null;
+}
+/** One declared service with its custody resolved to presence (never a value). */
+export function normalizeService(id, entry, { declaringRepo } = {}) {
+  const s = plain(entry) ? entry : {};
+  const stack = plain(s.stack) ? s.stack : null;
+  const normalizedStack = normalizeStack(stack, entry, declaringRepo);
   const credentials = list(s.credentials).filter(plain).map((credential) => normalizeCredential(credential, declaringRepo));
   const ci = plain(s.ci) ? s.ci : {};
   return {
-    id, provider: text(s.provider), mode: text(s.mode), purpose: text(s.purpose), reason: text(s.reason), auth: text(s.auth), qualityGate: text(s.qualityGate),
+    id, organization: text(s.organization), provider: text(s.provider), mode: text(s.mode), purpose: text(s.purpose), reason: text(s.reason), auth: text(s.auth), qualityGate: text(s.qualityGate),
     host: { local: text(s.host?.local), public: text(s.host?.public), fromCredential: text(s.host?.fromCredential) },
-    stack: stack ? { owner: text(stack.owner), repository: text(stack.repository), root: text(stack.root), environment: text(stack.environment), compose: text(stack.compose),
-      container: text(stack.container), publishedBy: text(stack.publishedBy), hostOwned, repo: stackRepo, dir: stackDir,
-      composeFile: stackDir && text(stack.compose) ? path.join(stackDir, stack.compose) : null } : null,
+    stack: normalizedStack,
     projects: list(s.projects).filter(plain).map((project) => ({ repository: text(project.repository), key: text(project.key), name: text(project.name) })),
     credentials,
     runtimeSecrets: list(s.runtimeSecrets).map(String),
-    ci: { wiring: text(ci.wiring), workflow: text(ci.workflow), permissions: list(ci.permissions).map(String),
+    ci: { token: text(ci.token), hostVar: text(ci.hostVar),
+      organizationVar: text(ci.organizationVar) || (s.provider === 'sonarcloud' && list(s.runtimeSecrets).length && !credentials.length ? 'SONAR_ORGANIZATION' : null), wiring: text(ci.wiring), workflow: text(ci.workflow), permissions: list(ci.permissions).map(String),
       secrets: list(ci.secrets).filter(plain).map((item) => ({ name: text(item.name), credential: text(item.credential) })),
       vars: list(ci.vars).filter(plain).map((item) => ({ name: text(item.name), value: text(item.value) })),
       provisioning: text(ci.provisioning) },
@@ -273,29 +285,48 @@ const checkEnabledService = (service, id, at, { governing, name, ciUses, ciText,
   if (service.mode === 'hosted' && !service.host.public && !service.host.fromCredential) ambiguous('a hosted service names host.public, or host.fromCredential when the endpoint travels inside a credential');
   if (ciUses[id].length && service.ci.wiring !== 'not-used' && !service.host.public) ambiguous('GitHub CI reaches a service only through host.public; name it');
   if (!service.auth) ambiguous('auth is token, oidc, github-token or none');
-  if (service.auth === 'token' && !service.credentials.length && !service.runtimeSecrets.length) ambiguous('auth token names at least one credential in custody, or the runtime secret.env variables an example reads (runtimeSecrets)');
+  if (service.auth === 'token' && !service.credentials.length && !service.runtimeSecrets.length && !service.ci.token) ambiguous('auth token names at least one credential in custody, or the runtime secret.env variables an example reads (runtimeSecrets)');
   if (service.host.fromCredential && !service.credentials.some((credential) => credential.id === service.host.fromCredential)) ambiguous(`host.fromCredential names ${service.host.fromCredential}, which is not one of its credentials`);
   if (!service.projects.length) ambiguous('an enabled service lists the project key of every repository it serves');
   checkServiceCi(service, id, at, { governing, name, ciUses, ciText, add, ambiguous });
+};
+const checkServiceForm = (service, id, entry, at, kind, add, ambiguous) => {
+  if (service.provider && !SERVICE_CATALOG[id].providers.includes(service.provider))
+    add('refuse', 'STACKS_PROVIDER_UNKNOWN', `${at}.provider`, `${service.provider} is not a ${id} provider (${SERVICE_CATALOG[id].providers.join(', ')})`);
+  if (Object.hasOwn(entry?.ci ?? {}, 'secrets') || Object.hasOwn(entry?.ci ?? {}, 'vars'))
+    add('suspect', 'STACKS_CI_LEGACY_FORM', `${at}.ci`, 'move the names to the top-level ci block and name them by services.<id>.ci.token / hostVar');
+  if (id === 'sonar' && service.provider === 'sonarcloud' && !service.organization
+    && !(kind === 'example' && service.runtimeSecrets.length && !service.credentials.length && service.ci.organizationVar))
+    ambiguous('provider sonarcloud requires organization; the runtime example form may use ci.organizationVar');
+  if (kind === 'example' && id === 'sonar' && service.provider !== 'sonarcloud')
+    add('refuse', 'STACKS_EXAMPLE_FORM', at, 'an example sonar provider must be sonarcloud');
+  if (kind === 'example' && id === 'codecov' && (service.auth !== 'oidc' || service.ci.token))
+    add('refuse', 'STACKS_EXAMPLE_FORM', at, 'an example codecov service uses auth oidc without a token');
 };
 const checkService = (id, entry, { schema, declFile, declaration, governing, name, ciUses, ciText, normalized, add, kind }) => {
   if (!Object.hasOwn(SERVICE_CATALOG, id)) {
     add('refuse', 'STACKS_SERVICE_UNKNOWN', `${declFile}#services.${id}`, `${id} is not a catalogued service (${Object.keys(SERVICE_CATALOG).join(', ')}); a service the catalog does not know is one nobody can read unambiguously`);
     return;
   }
-  for (const issue of schemaErrors(entry, schema.$defs.service, `services.${id}`))
+  for (const issue of schemaErrors(entry, ['dependabot', 'audit'].includes(id) ? schema.$defs.serviceOptionalCi : schema.$defs.service, `services.${id}`))
     add('refuse', 'STACKS_SCHEMA_INVALID', `${declFile}#${issue.path}`, issue.message);
   const service = normalizeService(id, entry, { declaringRepo: declaration.repo });
   normalized[id] = service;
   const at = `${declFile}#services.${id}`;
   const ambiguous = (message) => add('refuse', 'STACKS_SERVICE_AMBIGUOUS', at, message);
-  if (service.provider && !SERVICE_CATALOG[id].providers.includes(service.provider))
-    add('refuse', 'STACKS_PROVIDER_UNKNOWN', `${at}.provider`, `${service.provider} is not a ${id} provider (${SERVICE_CATALOG[id].providers.join(', ')})`);
+  checkServiceForm(service, id, entry, at, kind, add, ambiguous);
   if (checkDisabledService(service, id, at, ciUses, ambiguous, add)) return;
+  if (['codecov', 'dependabot', 'audit'].includes(id)) {
+    if (id === 'codecov' && !['oidc', 'token'].includes(service.auth)) ambiguous('codecov auth must be oidc or token');
+    if (id === 'codecov' && service.auth === 'token' && !service.ci.token) ambiguous('codecov auth token requires ci.token');
+    checkServiceCi(service, id, at, { governing, name, ciUses, ciText, add, ambiguous });
+    return;
+  }
   checkEnabledService(service, id, at, { governing, name, ciUses, ciText, add, kind }, ambiguous);
 };
 const checkUndeclared = ({ repo, ciUses, normalized, services, declFile, add }) => {
   for (const [id, files] of Object.entries(ciUses)) {
+    if (['codecov', 'dependabot', 'audit'].includes(id)) continue;
     if (!files.length || normalized[id] || (services && Object.hasOwn(services, id))) continue;
     const viaSource = resolveStackService(repo, id);
     if (viaSource && !services) continue;
@@ -421,6 +452,14 @@ export function checkStarciStacks(repoRoot, { newRepo = false, examplesRoot = pa
   const governing = own.missing ? governingDeclaration(repo) : null;
   const shown = (file) => slash(path.relative(repo, file)) || '.';
   const { declaration, services, declFile } = declarationView(own, governing, missingLevel, shown, add);
+  if (declaration?.doc && Object.hasOwn(declaration.doc, 'ci')) {
+    for (const issue of schemaErrors(declaration.doc.ci, declarationSchema().$defs.ciDeclaration, 'ci'))
+      add('refuse', 'CI_DECLARATION_INVALID', `${declFile}#${issue.path}`, issue.message);
+    const ci = readCiDeclaration(declaration.doc);
+    for (const problem of ci.problems) add('refuse', problem.code, `${declFile}#${problem.at}`, problem.message);
+    if (kindOf(repo, examplesRoot) === 'example' && ci.secrets.some((item) => item.name !== 'SONAR_TOKEN'))
+      add('refuse', 'STACKS_EXAMPLE_FORM', `${declFile}#ci.secrets`, 'an example declares no CI secrets except SONAR_TOKEN');
+  }
   // CI evidence: which services the workflows call, and which secret/variable names they read.
   const workflows = workflowTexts(repo);
   const ciText = workflows.map((workflow) => workflow.text).join('\n');
@@ -472,7 +511,7 @@ export function ownerAskConflict({ repo, question } = {}) {
   return null;
 }
 // ---- CLI ------------------------------------------------------------------------------------------------
-const USAGE = 'Usage: starci gate starcistacks <repo-root> [--new] [--json]\n\nHolds a repository\'s stack declaration services block (sonar, container-registry, analytics, error-tracking) and its custody layout to modules/schemas/application-stacks.schema.yaml and stacks-layout.yaml. Exit 0 clean (suspects allowed), 1 refused, 2 usage.\n';
+const USAGE = 'Usage: starci gate starcistacks <repo-root> [--new] [--json]\n\nHolds a repository\'s stack declaration services block (sonar, codecov, dependabot, audit, container-registry, analytics, error-tracking) and its custody layout to modules/schemas/application-stacks.schema.yaml and stacks-layout.yaml. Exit 0 clean (suspects allowed), 1 refused, 2 usage.\n';
 async function checkStarciStacksMain(argv = []) {
   const rest = argv;
   const args = rest.filter((arg) => !['--json', '--new'].includes(arg));
