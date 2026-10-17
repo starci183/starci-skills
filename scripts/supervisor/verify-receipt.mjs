@@ -21,9 +21,19 @@ export function verifyRecord({ sha, tree, root, base, check, tests, at = Date.no
   return { ...record, digest: digestOf(record) };
 }
 
-/** Writes `record` (tmp + rename: a reader never sees a torn file); returns the file. */
+// DEPRECATED, one release only - REMOVE IN 1.0.0-alpha.20 (with its call below). The host runtime deployed before alpha.19 runs the alpha.18 `runtime deploy`,
+// which accepts the proven affected receipt <root>/.runtime/affected/<base12>-<tip12>.json (schema starci/affected-receipt@1: ok, clean, base, tip, passed === total)
+// before it would run the removed spec verb. A verified commit leaves that file too: 0 of 0 runtime spec files (the runtime has none, owner ruling no-runtime-specs),
+// written only here, after the check, the package clean-test and the scaffold e2e passed, and carrying this verify receipt's digest. Nothing in alpha.19 reads it.
+const LEGACY_AFFECTED_SCHEMA = 'starci/affected-receipt@1';
+const legacyAffectedOf = (record) => ({ schema: LEGACY_AFFECTED_SCHEMA, root: record.root, base: record.base, tip: record.sha, clean: true, ok: true, files: 0, passed: 0, total: 0,
+  reused: 0, via: 'runtime-verify', verify: { schema: record.schema, digest: record.digest, check: record.check, tests: record.tests } });
+
+/** Writes `record` (tmp + rename: a reader never sees a torn file) and its one-release alpha.18 deployer receipt; returns the verify receipt file. */
 export function writeVerifyReceipt(root, record) {
-  return writeProofFile(verifyReceiptFile(root, record.sha), record);
+  const file = writeProofFile(verifyReceiptFile(root, record.sha), record);
+  writeProofFile(proofFileOf({ kind: 'affected-receipt', root, base: record.base, sha: record.sha }), legacyAffectedOf(record));
+  return file;
 }
 
 function testsProblem(tests) {

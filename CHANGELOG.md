@@ -31,6 +31,7 @@ Owner ruling (2026-10-17, `owner:no-runtime-specs`): "Tests in packages/ and exa
 - A changed checker is never landed by the self-learning loop: no runtime spec can prove it wrongly blocked a correct example; it is proposed to the owner.
 
 ### Release
+- Deploy bootstrap, one release only (removed in alpha.20): a host still on the alpha.18 deployer accepts a proven affected receipt in the source tree before it would run the removed spec verb. `starci runtime verify` therefore also writes `.runtime/affected/<base>-<tip>.json` (`starci/affected-receipt@1`, 0 of 0 runtime spec files, carrying the verify receipt's digest) for a verified commit only; nothing in alpha.19 reads it.
 - Packages to publish (their bundled runtime copies changed): `@starci/hfs` 4.4.1, `@starci/cli` 1.4.1 (pins HFS 4.4.1, carries runtime 1.0.0-alpha.19), `@starci/eslint-canon-be` 3.4.1 and `@starci/eslint-canon-fe` 8.4.1 (with their alpha.18.1 patch rules). The canon pins, the code-pattern bindings and the example package.json pins are bound to them; the example lockfiles resolve them after the publish.
 
 ## [1.0.0-alpha.18] — 2026-10-16
