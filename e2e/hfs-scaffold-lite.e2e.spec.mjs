@@ -225,6 +225,8 @@ test('hfs lite scaffold end to end: clean app, builds, isolated Supabase data, t
     'HFS_SLOT_REQUIRED_MISSING',
     'HFS_MIN_INSTANCES',
     'HFS_MANAGED_FILE_DRIFT',
+    // The managed ci.yml is rendered for the lite edition (its db-types job): judged as full it misses the full job shape until the upgrade re-renders it.
+    'CI_STANDARD',
     'HFS_GITIGNORE_BLOCK_DRIFT',
     'HFS_SONAR_CONFIG',
     'HFS_RULE_OFF_WITHOUT_REPLACEMENT',
