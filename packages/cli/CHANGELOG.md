@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.7.0 - 2026-10-18
+- Changed: pins @starci/hfs 4.7.0 and carries runtime 1.0.0-alpha.22; `release cut`, `app release` and `release ci-override` help describe the candidate CI flow; `release app-installs --source`; `app coverage merge` and `app ci local` help.
+
 ## 1.6.0 - 2026-10-18
 - Changed: pins @starci/hfs 4.6.0 and carries runtime 1.0.0-alpha.21; `npm install` moves a StarCi pin only where a package.json declares it; `app ci` help documents ownerValue variables.
 

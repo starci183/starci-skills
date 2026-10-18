@@ -1,5 +1,8 @@
 # Changelog
 
+## 8.4.5 - 2026-10-18
+- Changed: bundled runtime copies follow runtime 1.0.0-alpha.22 (failure codes, the rule catalog with R301 and the candidate trigger laws, canon pins); canon rules are unchanged.
+
 ## 8.4.4 - 2026-10-18
 - Changed: bundled runtime copies follow runtime 1.0.0-alpha.21 (canon pins, failure codes, the narrowed secret patterns); canon rules are unchanged.
 

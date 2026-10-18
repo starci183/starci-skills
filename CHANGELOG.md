@@ -6,6 +6,28 @@ until every S* row in `docs/goal.md` holds with fresh evidence, then `1.0.0` fre
 
 ## [Unreleased]
 
+## [1.0.0-alpha.22] — 2026-10-18
+
+Hotfix of the red alpha.21 CI (run 39070215259) and the candidate CI flow: this release is the first cut through it.
+
+### Added
+- Candidate CI (OWNER RULING candidate-ci, 2026-10-18: "never again have main receive a release whose CI is red, with the owner confirming afterwards"): `starci release cut` pushes the exact release sha to `refs/heads/release/candidate-<version>`, waits for the `ci` and `examples` workflow runs of that sha, and creates the tag and pushes main + tag atomically only when they are green. Red refuses `RELEASE_CANDIDATE_CI_RED` with the failing jobs and steps, no run or no end `RELEASE_CANDIDATE_CI_TIMEOUT`, unreadable GitHub `RELEASE_CI_UNKNOWN`; nothing reaches main, and a re-cut force-moves only the candidate ref. The release record logs the verdict; the owner's sha-bound `starci release ci-override` record is the documented emergency path. `starci app release push --execute` follows the same flow for apps.
+- One CI standard (OWNER RULING ci-standard, 2026-10-18): `knowledge/hfs/ci-standard.yaml` and R301 `CI_STANDARD` (job shape, full history + STARCI_BASE_REF, heap per heavy step, per-side Sonar lint, optional-provider probes, job timeouts, sha-pinned actions; the other items name their rules) over the managed app CI, the example apps and the runtime's own workflows (which also get R299).
+- The managed CI is sharded and parallel (NIVO v0.2.3: 20- and 45-minute jobs were cancelled at lint and at 670 of 904 unit suites): lint is a matrix over be and fe, the unit run a matrix of `ci.jobs.test.shards` (default 6) shards without the per-file threshold, and a coverage job merges their lcov (`starci app coverage merge`), proves 100 per file and uploads to Codecov; Sonar merges the per-side lint reports. Job timeouts come from `ci.jobs.<job>.timeoutMinutes` (defaults in the CI standard); the jest and build caches are keyed by the lockfile and saved always. R301 checks all of it.
+- `starci app ci local` runs the rendered CI jobs on this machine, in parallel, to predict the result while GitHub runs it; the cut releases the host lock while it waits for the candidate CI.
+- `starci release app-installs --source`: the registry-install scaffold proof against the checkout's packed @starci tarballs; `starci release scaffold-e2e` runs it (e2e/hfs-scaffold-app-installs.e2e.spec.mjs), so the runtime verify and the cut prove it before any publish.
+
+### Changed
+- The cut no longer reads the latest main CI run (a red main needs no override before the next release); `starci app release gate` no longer reads the default-branch CI. The annotated tag is created after the candidate CI, not before it.
+- R221 `CI_TRIGGERS_RELEASE_ONLY` and R251's app trigger check allow `branches: ['release/candidate-*']` and require it in every `ci.yml` (and the runtime's `examples.yml`); the rendered app CI, the canon CI, examples.yml and the example apps trigger on it. Both pre-push hooks name the candidate ref.
+- examples.yml (owner-path commit) lints each example side with its own Sonar report and a 6 GB heap, as the rendered app CI does.
+
+### Fixed
+- alpha.21 CI "Scaffold app against registry installs": e2e/hfs-scaffold-app.spec.mjs read `jobs.ci.steps` after the rendered CI split into fast/test/build/sonar (and expected a plain 'lcov' reporter); it now finds the unit run and the upload in the test job by content. The published hfs 4.6.0 / cli 1.6.0 were not defective: the fixed spec passes 7 of 7 against them.
+
+### Evidence
+- Packages: @starci/hfs 4.7.0, @starci/cli 1.7.0, @starci/eslint-canon-be 3.4.5, @starci/eslint-canon-fe 8.4.5 (bundled runtime copies); runtime 1.0.0-alpha.22.
+
 ## [1.0.0-alpha.21] — 2026-10-18
 
 This release supersedes the alpha.20 cut, which was never tagged (its cut on 31440f234 was refused: the rendered ecommerce-app and shape-slot ci.yml were not prettier-stable); the alpha.20 packages stay published. It carries everything listed under 1.0.0-alpha.20 below, plus the changes here.
