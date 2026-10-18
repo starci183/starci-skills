@@ -25,9 +25,9 @@ export type DataTableRow = { readonly id: string }
 export type DataTableCellInteraction = {
     /** Invoked by a cell click or Enter/Space on the focused cell, excluding nested controls. */
     readonly onAction?: () => void
-    readonly onDragOver?: DragEventHandler<HTMLTableCellElement>
-    readonly onDragLeave?: DragEventHandler<HTMLTableCellElement>
-    readonly onDrop?: DragEventHandler<HTMLTableCellElement>
+    readonly onDragOver?: DragEventHandler<HTMLDivElement>
+    readonly onDragLeave?: DragEventHandler<HTMLDivElement>
+    readonly onDrop?: DragEventHandler<HTMLDivElement>
     readonly isHighlighted?: boolean
     readonly tone?: "neutral" | "muted"
 }
@@ -150,6 +150,20 @@ export const DataTable = <Row extends DataTableRow>({
     const visibleRows = isLoading ? [] : rows
     const state = isLoading ? "loading" : rows.length === 0 ? "empty" : "ready"
     const scrollStyle = maxBlockSize === undefined ? undefined : { "--starci-core-data-table-max-block-size": maxBlockSize } as CSSProperties
+    // RAC filters consumer key handlers out of Cell props. The native scroll owner captures activation before its grid handlers.
+    const onCellKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+        if (event.key !== "Enter" && event.key !== " ") return
+        const cell = event.target
+        if (!(cell instanceof HTMLTableCellElement) || cell.closest(".starci-core-data-table-scroll") !== event.currentTarget) return
+        const row = visibleRows.find((candidate) => candidate.id === cell.dataset.grammarRowId)
+        const columnId = cell.dataset.grammarColumnId
+        if (row === undefined || columnId === undefined) return
+        const action = getCellInteraction?.(row, columnId)?.onAction
+        if (action === undefined) return
+        event.preventDefault()
+        event.stopPropagation()
+        if (!event.repeat) action()
+    }
     return (
         <HeroTable
             aria-busy={isLoading || undefined}
@@ -160,7 +174,7 @@ export const DataTable = <Row extends DataTableRow>({
             data-grammar-table-sticky={stickyHeader ? "true" : "false"}
             data-grammar-table-bounded={maxBlockSize === undefined ? "false" : "true"}
         >
-            <HeroTable.ScrollContainer className="starci-core-data-table-scroll" data-contract="LAYOUT-3" data-grammar-table-scroll="true" style={scrollStyle}>
+            <HeroTable.ScrollContainer className="starci-core-data-table-scroll" data-contract="LAYOUT-3" data-grammar-table-scroll="true" style={scrollStyle} onKeyDownCapture={onCellKeyDown}>
                 <HeroTable.Content
                     aria-label={label}
                     {...(getCellInteraction === undefined ? {} : { keyboardNavigationBehavior: "arrow" as const })}
@@ -237,6 +251,9 @@ export const DataTable = <Row extends DataTableRow>({
                                             data-grammar-table-align={column.align ?? "start"}
                                             data-grammar-cell-highlighted={interaction?.isHighlighted ? "true" : "false"}
                                             data-grammar-cell-tone={interaction?.tone ?? "neutral"}
+                                            data-grammar-cell-interaction={interaction === undefined ? "false" : "true"}
+                                            data-grammar-row-id={row.id}
+                                            data-grammar-column-id={column.id}
                                             {...(interaction?.onAction === undefined ? {} : {
                                                 focusMode: "cell" as const,
                                                 onClick: (event: MouseEvent<HTMLTableCellElement>) => {
@@ -245,18 +262,18 @@ export const DataTable = <Row extends DataTableRow>({
                                                     event.stopPropagation()
                                                     interaction.onAction?.()
                                                 },
-                                                onKeyDown: (event: KeyboardEvent<HTMLTableCellElement>) => {
-                                                    if (event.target !== event.currentTarget || (event.key !== "Enter" && event.key !== " ")) return
-                                                    event.preventDefault()
-                                                    event.stopPropagation()
-                                                    if (!event.repeat) interaction.onAction?.()
-                                                },
                                             })}
-                                            {...(interaction?.onDragOver === undefined ? {} : { onDragOver: interaction.onDragOver })}
-                                            {...(interaction?.onDragLeave === undefined ? {} : { onDragLeave: interaction.onDragLeave })}
-                                            {...(interaction?.onDrop === undefined ? {} : { onDrop: interaction.onDrop })}
                                         >
-                                            {renderCell(row, column.id)}
+                                            {interaction === undefined ? renderCell(row, column.id) : (
+                                                <div
+                                                    className="starci-core-data-table-cell-content"
+                                                    {...(interaction.onDragOver === undefined ? {} : { onDragOver: interaction.onDragOver })}
+                                                    {...(interaction.onDragLeave === undefined ? {} : { onDragLeave: interaction.onDragLeave })}
+                                                    {...(interaction.onDrop === undefined ? {} : { onDrop: interaction.onDrop })}
+                                                >
+                                                    {renderCell(row, column.id)}
+                                                </div>
+                                            )}
                                         </HeroTable.Cell>
                                     })}
                             </HeroTable.Row>

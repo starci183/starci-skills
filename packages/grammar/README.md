@@ -162,7 +162,7 @@ DescriptionList, Disclosure, ListBox, Pagination, Stepper, Subnav, Tabs, TagGrou
 `onDragLeave`, `onDrop`, `isHighlighted` and `tone` (`neutral` or `muted`). Cells remain semantic
 table cells under the existing arrow-key navigation. An actionable cell takes focus itself,
 activates once with Enter/Space or a click on its plain content, and leaves nested controls to
-their own actions. Native drag callbacks receive the actual table-cell event; the caller owns
+their own actions. Native drag callbacks receive the actual inner content-frame event (`HTMLDivElement`); the caller owns
 payload validation, accepted targets and effects. Highlighting takes precedence over muted tone.
 
 `DragItem` is a native drag-source frame with `isDisabled`, `onDragStart`, `onDragEnd`,

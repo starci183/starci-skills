@@ -857,6 +857,17 @@
         background: var(--accent-soft, Highlight);
     }
 
+    .starci-core-data-table-cell[data-grammar-cell-interaction="true"] {
+        height: 1px;
+        padding: 0;
+    }
+
+    .starci-core-data-table-cell-content {
+        box-sizing: border-box;
+        height: 100%;
+        padding: 0.75rem;
+    }
+
     .starci-core-drag-item {
         display: flex;
         min-width: 0;
