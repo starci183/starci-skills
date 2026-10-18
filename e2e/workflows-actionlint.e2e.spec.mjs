@@ -29,7 +29,10 @@ const workflowsUnder = (dir) => (fs.existsSync(dir) ? fs.readdirSync(dir).filter
 /** actionlint over `files` (absolute, all below `root`), the root mounted read-only at /repo. */
 function actionlint(image, root, files) {
   const relative = files.map((file) => path.relative(root, file).split(path.sep).join('/'));
-  const run = spawnSync('docker', ['run', '--rm', '-v', `${root}:/repo:ro`, '-w', '/repo', '--entrypoint', 'actionlint', image, '-shellcheck=', ...relative],
+  // POSIX temp roots are private to their creator; the image's guest user cannot traverse them. Match the caller's identity
+  // without widening fixture permissions. Windows has no POSIX uid/gid and retains Docker Desktop's mount identity.
+  const user = typeof process.getuid === 'function' && typeof process.getgid === 'function' ? ['--user', `${process.getuid()}:${process.getgid()}`] : [];
+  const run = spawnSync('docker', ['run', '--rm', ...user, '-v', `${root}:/repo:ro`, '-w', '/repo', '--entrypoint', 'actionlint', image, '-shellcheck=', ...relative],
     { encoding: 'utf8', windowsHide: true, timeout: 600_000, maxBuffer: 64 * 1024 * 1024 });
   return { status: run.status, output: `${run.stdout ?? ''}${run.stderr ?? ''}${run.error ? run.error.message : ''}` };
 }
