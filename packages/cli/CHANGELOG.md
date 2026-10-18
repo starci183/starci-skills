@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.7.1 - 2026-10-18
+- Fixed: `app coverage merge` declares its variadic report paths (1.7.0 refused the rendered `merge --out <lcov> <dir>` as too many positional arguments); pins @starci/hfs 4.7.1.
+
 ## 1.7.0 - 2026-10-18
 - Changed: pins @starci/hfs 4.7.0 and carries runtime 1.0.0-alpha.22; `release cut`, `app release` and `release ci-override` help describe the candidate CI flow; `release app-installs --source`; `app coverage merge` and `app ci local` help.
 

@@ -23,11 +23,12 @@ Hotfix of the red alpha.21 CI (run 39070215259) and the candidate CI flow: this 
 - examples.yml (owner-path commit) lints each example side with its own Sonar report and a 6 GB heap, as the rendered app CI does.
 
 ### Fixed
+- The first alpha.22 candidate run (refused, main untouched): the rendered lint upload condition nested ${{ matrix.side }} inside an if: expression (actionlint: always true; now format()), `starci app coverage merge` declared no paths (cli 1.7.1), and @starci/hfs 4.7.0 did not pack coverage/ (4.7.1). Guards before any cut: `release scaffold-e2e` runs actionlint (the examples workflow's digest-pinned image) over the example, runtime and freshly scaffolded workflows; `release app-installs` executes the rendered test and coverage jobs (`starci app ci local --jobs test,coverage`) with the installed cli; the self-check package-imports refuses a packed package that loads a file npm pack does not include.
 - npm audit --omit=dev --audit-level=high is clean again without the breaking @nestjs/graphql 14: every scaffolded app root and the examples that serve GraphQL (ecommerce-app, lite-app, relocked) carry the npm override `@graphql-tools/utils` 12.1.0 (canon pin; GHSA-7mx3-vvmw-hjmv covers <=12.0.0; 12.1.0 is the lowest fix every declared range accepts). Owner ruling graphql-tools-utils-override; drop it when @nestjs/graphql 14 is adopted.
 - alpha.21 CI "Scaffold app against registry installs": e2e/hfs-scaffold-app.spec.mjs read `jobs.ci.steps` after the rendered CI split into fast/test/build/sonar (and expected a plain 'lcov' reporter); it now finds the unit run and the upload in the test job by content. The published hfs 4.6.0 / cli 1.6.0 were not defective: the fixed spec passes 7 of 7 against them.
 
 ### Evidence
-- Packages: @starci/hfs 4.7.0, @starci/cli 1.7.0, @starci/eslint-canon-be 3.4.5, @starci/eslint-canon-fe 8.4.5 (bundled runtime copies); runtime 1.0.0-alpha.22.
+- Packages: @starci/hfs 4.7.1, @starci/cli 1.7.1 (4.7.0 / 1.7.0 were published and are superseded), @starci/eslint-canon-be 3.4.6, @starci/eslint-canon-fe 8.4.6 (bundled runtime copies; 3.4.5 / 8.4.5 published and superseded); runtime 1.0.0-alpha.22.
 
 ## [1.0.0-alpha.21] — 2026-10-18
 

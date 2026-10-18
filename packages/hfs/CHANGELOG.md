@@ -1,5 +1,8 @@
 # Changelog
 
+## 4.7.1 - 2026-10-18
+- Fixed: the package files list carries coverage/ (4.7.0 shipped `app coverage merge` without coverage/cli.mjs); the lint upload condition of the managed CI names the per-side report with format() instead of a nested ${{ }} that actionlint reads as always true.
+
 ## 4.7.0 - 2026-10-18
 - Added: `app release push --execute` pushes the release sha to `release/candidate-<version>` and moves the branch and the tag only when its ci.yml run is green (RELEASE_CANDIDATE_CI_RED / _TIMEOUT, RELEASE_CI_UNKNOWN; the owner's sha-bound override record is the emergency path); the managed ci.yml and pre-push hook carry the candidate ref; R301 CI_STANDARD in the app check.
 - Added: the managed CI shards the unit run (`ci.jobs.test.shards`, default 6), lints each side in its own job and merges coverage in a coverage job (`starci app coverage merge`); `ci.jobs.<job>.timeoutMinutes`; jest/build caches keyed by the lockfile and saved always; `starci app ci local` runs the rendered jobs locally in parallel.
