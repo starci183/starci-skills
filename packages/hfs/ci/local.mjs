@@ -7,7 +7,7 @@
 //   - the unit shards write their lcov to be/coverage/shards/shard-<i> (on GitHub each shard has its own runner and uploads it), which is where the
 //     coverage job's `starci app coverage merge` reads them;
 //   - sonar and db-types run only when --jobs names them.
-// Each instance logs to <tmp>/starci-ci-local-*/<job>[-<matrix>].log. Exit 0 every instance green, 1 one red, 2 bad usage or no ci.yml. Run steps through bash.
+// Each instance logs to <job>[-<matrix>].log in --logs <dir>, else a new <tmp>/starci-ci-local-* directory. Exit 0 every instance green, 1 one red, 2 bad usage or no ci.yml. Run steps through bash.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -19,15 +19,16 @@ const GITHUB_ONLY_IF = /SONAR_TOKEN\s*!=\s*''|refs\/tags|startsWith\(github\.ref
 const LOCAL_IF = /^(?:\$\{\{\s*)?(?:always\(\)|!cancelled\(\)|env\.SONAR_TOKEN\s*==\s*'')(?:\s*\}\})?$/;
 
 function parseArgs(argv) {
-  const opts = { jobs: null, parallel: Math.max(1, Math.min(4, Math.floor(os.cpus().length / 2))), dryRun: false, json: false };
+  const opts = { logs: null, jobs: null, parallel: Math.max(1, Math.min(4, Math.floor(os.cpus().length / 2))), dryRun: false, json: false };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     if (arg === '--dry-run') opts.dryRun = true;
     else if (arg === '--json') opts.json = true;
-    else if (arg === '--jobs' || arg === '--parallel') {
+    else if (arg === '--jobs' || arg === '--parallel' || arg === '--logs') {
       const value = argv[index + 1];
       if (!value || value.startsWith('--')) throw new Error(`${arg} needs a value`);
-      if (arg === '--jobs') opts.jobs = value.split(',').map((job) => job.trim()).filter(Boolean);
+      if (arg === '--logs') opts.logs = value;
+      else if (arg === '--jobs') opts.jobs = value.split(',').map((job) => job.trim()).filter(Boolean);
       else if (!/^[1-9]\d*$/.test(value)) throw new Error('--parallel takes a positive integer');
       else opts.parallel = Number(value);
       index += 1;
@@ -124,7 +125,7 @@ async function runPlan(plan, { parallel, root, env, logs, report }) {
 /** `starci app ci local`. */
 export async function ciLocalMain(argv, { cwd = process.cwd(), stdout = (s) => process.stdout.write(s), stderr = (s) => process.stderr.write(s), env = process.env } = {}) {
   let opts;
-  try { opts = parseArgs(argv); } catch (error) { stderr(`starci app ci local: ${error.message}; usage: starci app ci local [--jobs <id,...>] [--parallel <n>] [--dry-run] [--json]\n`); return 2; }
+  try { opts = parseArgs(argv); } catch (error) { stderr(`starci app ci local: ${error.message}; usage: starci app ci local [--jobs <id,...>] [--parallel <n>] [--logs <dir>] [--dry-run] [--json]\n`); return 2; }
   const file = path.join(cwd, '.github', 'workflows', 'ci.yml');
   if (!fs.existsSync(file)) { stderr('starci app ci local: no .github/workflows/ci.yml (run starci app sync --write)\n'); return 2; }
   const plan = localPlan(parseYaml(fs.readFileSync(file, 'utf8')), opts.jobs);
@@ -134,7 +135,8 @@ export async function ciLocalMain(argv, { cwd = process.cwd(), stdout = (s) => p
     else for (const instance of plan) stdout(`${instance.label}${instance.needs.length ? ` (after ${instance.needs.join(', ')})` : ''}\n${instance.steps.map((step) => `  ${step.run !== undefined ? 'run ' : 'skip'} ${step.name}${step.skip ? ` - ${step.skip}` : ''}`).join('\n')}\n`);
     return 0;
   }
-  const logs = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-ci-local-'));
+  const logs = opts.logs ? path.resolve(cwd, opts.logs) : fs.mkdtempSync(path.join(os.tmpdir(), 'starci-ci-local-'));
+  fs.mkdirSync(logs, { recursive: true });
   const defaultBranch = 'main';
   const runEnv = { ...env, CI: 'true', STARCI_BASE_REF: env.STARCI_BASE_REF ?? `origin/${defaultBranch}`, SONAR_TOKEN: '' };
   stdout(`starci app ci local: ${plan.length} job instance(s), ${opts.parallel} at a time; logs in ${logs}\n`);

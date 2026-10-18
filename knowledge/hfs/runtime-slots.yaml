@@ -183,6 +183,7 @@ ruleParams:
       - {id: sonar-rules, run: scripts/checks/check-sonar-rules.mjs}
       - {id: installed-artefacts, run: scripts/checks/check-installed-artefacts.mjs}
       - {id: test-spawn-seam, run: scripts/checks/check-test-spawn-seam.mjs}
+      - {id: package-imports, run: scripts/checks/check-package-imports.mjs}
 
 slots:
 
@@ -705,9 +706,9 @@ slots:
     profiles: [runtime]
     # The scaffold e2e, the only specs of the runtime outside packages/ and examples/ (owner ruling no-runtime-specs, 2026-10-17: the runtime has no
     # runtime tests; the package clean-test and the scaffold e2e decide). The files are listed one by one so e2e/ never becomes a second tests/:
-    # `starci release scaffold-e2e` runs the three .e2e.spec.mjs files (the third is `starci release app-installs --source`), `starci release app-installs` the registry-install proof; helpers/ is their shared
+    # `starci release scaffold-e2e` runs the four .e2e.spec.mjs files (the third is `starci release app-installs --source`, the fourth actionlint over every workflow), `starci release app-installs` the registry-install proof; helpers/ is their shared
     # code and setup/ their --import preloads. RT_SPEC_PLACEMENT refuses a spec anywhere else.
-    path: "e2e/{hfs-scaffold-app.e2e.spec.mjs,hfs-scaffold-app-installs.e2e.spec.mjs,hfs-scaffold-lite.e2e.spec.mjs,hfs-scaffold-app.spec.mjs,helpers/hfs-app-install.mjs,helpers/hfs-hfs-scaffold-app-e2e-fixture.mjs,helpers/scaffold-app-baseline.mjs,helpers/scaffold-bins.mjs,helpers/source-canon-registry.mjs,helpers/supabase-project-stack.mjs,helpers/tmpdir.mjs,setup/file-watchdog.mjs,setup/isolated-registry.mjs,setup/isolated-temp.mjs,setup/low-priority.mjs,setup/repo-root-guard.mjs,setup/runtime-copies.mjs}"
+    path: "e2e/{hfs-scaffold-app.e2e.spec.mjs,hfs-scaffold-app-installs.e2e.spec.mjs,workflows-actionlint.e2e.spec.mjs,hfs-scaffold-lite.e2e.spec.mjs,hfs-scaffold-app.spec.mjs,helpers/hfs-app-install.mjs,helpers/hfs-hfs-scaffold-app-e2e-fixture.mjs,helpers/scaffold-app-baseline.mjs,helpers/scaffold-bins.mjs,helpers/source-canon-registry.mjs,helpers/supabase-project-stack.mjs,helpers/tmpdir.mjs,setup/file-watchdog.mjs,setup/isolated-registry.mjs,setup/isolated-temp.mjs,setup/low-priority.mjs,setup/repo-root-guard.mjs,setup/runtime-copies.mjs}"
     presence: required
     tracked: tracked
     tier: none

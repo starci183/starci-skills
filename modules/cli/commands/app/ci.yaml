@@ -16,6 +16,7 @@ flags:
   - {name: json, type: boolean, summary: print verification findings (or the local plan and results) as JSON}
   - {name: jobs, type: string, summary: "local: the jobs to run, comma separated (default fast,lint,test,coverage,build; sonar and db-types only when named)"}
   - {name: parallel, type: string, summary: "local: job instances run at once (default half the CPUs, at most 4)"}
+  - {name: logs, type: string, summary: "local: the directory the job logs go to (default a new temp directory)"}
   - {name: dry-run, type: boolean, summary: "local: print which steps would run and which only GitHub can run"}
 conventions:
   - "local reads .github/workflows/ci.yml and runs every job instance (matrix values substituted) on this machine, in parallel, a job after its needs"

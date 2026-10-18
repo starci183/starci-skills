@@ -22,6 +22,7 @@
     "release/**",
     "db/**",
     "ci/**",
+    "coverage/**",
     "lint/**",
     "scaffold/**",
     "report/**",

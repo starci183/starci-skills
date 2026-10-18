@@ -6,13 +6,23 @@
 // on CI after it (alpha.21: the spec still read the CI job `ci` the rendered workflow had split into fast, test, build and sonar).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import path from 'node:path';
 import { runNode } from '../scripts/api/node/run-node.mjs';
 
 const RUNTIME = path.resolve(import.meta.dirname, '..');
 const tail = (text) => String(text ?? '').split(/\r?\n/).slice(-40).join('\n');
 
-test('the scaffolded app passes the registry-install proof against fresh installs of the packed @starci tarballs, no proof skipped', { timeout: 2_400_000 }, () => {
+/** The installed SQL parser extracts one Bun-built native binding at the isolated temp root, and a jest run leaves its default caches (`jest`, `jest_rt`)
+ * there: process infrastructure of the commands this spec runs, not fixtures; removed before the leak guard, as the lite scaffold spec does. */
+function removeToolTemp() {
+  const isolated = process.env.STARCI_TEST_TEMP_DIR;
+  if (!isolated || !fs.existsSync(isolated)) return;
+  for (const entry of fs.readdirSync(isolated).filter((name) => /^\.bun-[\w-]+\.node$/u.test(name) || name === 'jest' || name === 'jest_rt')) fs.rmSync(path.join(isolated, entry), { recursive: true, force: true });
+}
+
+test('the scaffolded app passes the registry-install proof against fresh installs of the packed @starci tarballs, no proof skipped', { timeout: 2_400_000 }, (t) => {
+  t.after(removeToolTemp);
   const run = runNode([path.join(RUNTIME, 'scripts', 'gates', 'release-app-installs.mjs'), '--source'], { cwd: RUNTIME, timeout: 2_400_000, maxBuffer: 512 * 1024 * 1024 });
   const output = `${run.stdout ?? ''}\n${run.stderr ?? ''}`;
   assert.equal(run.status, 0, `release app-installs --source exit ${run.status ?? run.error?.message}:\n${tail(output)}`);

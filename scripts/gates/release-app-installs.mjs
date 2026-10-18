@@ -30,6 +30,8 @@ import { main as hfsMain } from '../../packages/hfs/src/main.mjs';
 import { startSourceCanonRegistry } from '../../e2e/helpers/source-canon-registry.mjs';
 import { createRequire } from 'node:module';
 import { prepareE2e } from './scaffold-e2e.mjs';
+import { init } from '../api/git/init.mjs';
+import { add } from '../api/git/add.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const keep = process.argv.includes('--keep');
@@ -99,6 +101,12 @@ try {
   } finally {
     if (registry) fs.rmSync(npmrc, { force: true });
   }
+  // The rendered CI's test and coverage jobs EXECUTED with the installed @starci/cli (alpha.22: the rendered `starci app coverage merge` was refused by the
+  // published cli's argument check, and the published hfs lacked the coverage/ folder; no proof had run the command). `starci app ci local` runs every unit shard
+  // and then the coverage job's own steps (merge, coverage proof) as ci.yml spells them. The coverage proof reads the tracked files: the app is a git repository.
+  if (!init(app).ok) { console.error('release-app-installs: FAILED at git init of the app'); throw new StepFailed(1); }
+  step('git add (the coverage proof reads tracked files)', (args, opts) => add(args, opts), ['-A'], { cwd: app });
+  step('starci app ci local --jobs test,coverage (the rendered shards, merge and coverage proof, installed cli)', runNpx, ['--no-install', 'starci', 'app', 'ci', 'local', '--jobs', 'test,coverage', '--parallel', '3', '--logs', path.join(into, 'ci-local-logs')], { cwd: app });
   const env = { ...nextBuildEnv(), STARCI_APP_INSTALLS: path.join(app, 'node_modules'), STARCI_REQUIRE_APP_INSTALLS: '1' };
   const r = runNode(['--test', path.join(root, 'e2e/hfs-scaffold-app.spec.mjs')], { cwd: root, env, stdio: 'inherit' });
   exit = r.status ?? 1;

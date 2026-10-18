@@ -37,7 +37,7 @@ Register-ArgumentCompleter -Native -CommandName starci -ScriptBlock {
     $flags = @{
         'app add' = @('--event','--from','--service','--connection','--owner','--failed','--done','--fe','--no-types','--json','--cwd','--quiet','--help','--edition')
         'app check' = @('--fast','--base','--wiring','--coverage-from','--json','--cwd','--quiet','--help','--edition')
-        'app ci' = @('--env','--dependabot','--repo','--value','--execute','--json','--jobs','--parallel','--dry-run','--json','--cwd','--quiet','--help','--edition')
+        'app ci' = @('--env','--dependabot','--repo','--value','--execute','--json','--jobs','--parallel','--logs','--dry-run','--json','--cwd','--quiet','--help','--edition')
         'app coverage' = @('--out','--cwd','--json','--cwd','--quiet','--help','--edition')
         'app db' = @('--out','--schema-only','--auth','--storage','--backup','--stamp','--map','--apply','--local','--execute','--linked','--url-env','--green-at','--owner-confirms-old-app-gone','--json','--json','--cwd','--quiet','--help','--edition')
         'app emit' = @('--json','--cwd','--quiet','--help','--edition')
@@ -305,6 +305,7 @@ Register-ArgumentCompleter -Native -CommandName starci -ScriptBlock {
         'app ci --value' = @()
         'app ci --jobs' = @()
         'app ci --parallel' = @()
+        'app ci --logs' = @()
         'app coverage --out' = @()
         'app coverage --cwd' = @()
         'app db --out' = @()

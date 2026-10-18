@@ -36,3 +36,21 @@ test('the verb merges every lcov.info below a directory and refuses when there i
   assert.match(err, /no lcov report/);
   assert.equal(await coverageMain(['merge', 'empty'], { cwd: root, stdout: () => {}, stderr: () => {} }), 2, '--out is required');
 });
+
+test('a shard placeholder of zeros (its own instrumentation of an unloaded file) never adds phantom entries; a file no shard ran stays uncovered', () => {
+  const ran = 'SF:/w/be/src/c.service.ts\nFN:2,run#0\nFNDA:3,run#0\nDA:2,3\nBRDA:2,0,0,1\nBRDA:2,0,1,1\nend_of_record\n';
+  const placeholder = 'SF:/w/be/src/c.service.ts\nFN:1,(anonymous_0)\nFN:2,run\nFNDA:0,(anonymous_0)\nFNDA:0,run\nDA:2,0\nBRDA:2,0,0,0\nBRDA:2,1,0,0\nBRDA:2,1,1,0\nend_of_record\nSF:/w/be/src/d.service.ts\nFN:1,go\nFNDA:0,go\nDA:1,0\nend_of_record\n';
+  const merged = mergeLcov([placeholder, ran, placeholder]);
+  const c = merged.slice(merged.indexOf('SF:/w/be/src/c.service.ts'), merged.indexOf('SF:/w/be/src/d.service.ts'));
+  for (const line of ['FNF:1', 'FNH:1', 'LF:1', 'LH:1', 'BRF:2', 'BRH:2']) assert.ok(c.includes(`${line}\n`), `${line} in ${c}`);
+  const d = merged.slice(merged.indexOf('SF:/w/be/src/d.service.ts'));
+  for (const line of ['FNF:1', 'FNH:0', 'LF:1', 'LH:0']) assert.ok(d.includes(`${line}\n`), `${line} in ${d}`);
+});
+
+test('branches merge by line and block ordinal across shards that numbered blocks differently; a loaded-only record adds no branch; a real gap stays', () => {
+  const tested = 'SF:/w/be/src/e.guard.ts\nFN:21,Guard#0\nFN:24,can#1\nFNDA:8,Guard#0\nFNDA:8,can#1\nDA:21,8\nDA:24,8\nBRDA:21,6,0,8\nBRDA:21,7,0,8\nBRDA:24,8,0,8\nBRDA:24,8,1,0\nend_of_record\n';
+  const loadedOnly = 'SF:/w/be/src/e.guard.ts\nFN:21,Guard#0\nFN:24,can#1\nFNDA:0,Guard#0\nFNDA:0,can#1\nDA:1,1\nDA:21,0\nBRDA:21,0,0,0\nend_of_record\n';
+  const renumbered = 'SF:/w/be/src/e.guard.ts\nFN:21,Guard#0\nFN:24,can#1\nFNDA:1,Guard#0\nFNDA:1,can#1\nDA:21,1\nDA:24,1\nBRDA:21,0,0,1\nBRDA:21,1,0,1\nBRDA:24,2,0,1\nBRDA:24,2,1,0\nend_of_record\n';
+  const merged = mergeLcov([loadedOnly, tested, renumbered]);
+  for (const line of ['FNF:2', 'FNH:2', 'BRF:4', 'BRH:3', 'BRDA:24,0,1,0']) assert.ok(merged.includes(`${line}\n`), `${line} in ${merged}`);
+});

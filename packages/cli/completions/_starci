@@ -91,6 +91,7 @@ _starci() {
     'app:ci:--value') return 0 ;;
     'app:ci:--jobs') return 0 ;;
     'app:ci:--parallel') return 0 ;;
+    'app:ci:--logs') return 0 ;;
     'app:coverage:--out') return 0 ;;
     'app:coverage:--cwd') return 0 ;;
     'app:db:--out') return 0 ;;
@@ -1017,7 +1018,7 @@ _starci() {
     case "$words[2]:$words[3]" in
     'app:add') _values 'flags' '--event' '--from' '--service' '--connection' '--owner' '--failed' '--done' '--fe' '--no-types' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'app:check') _values 'flags' '--fast' '--base' '--wiring' '--coverage-from' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
-    'app:ci') _values 'flags' '--env' '--dependabot' '--repo' '--value' '--execute' '--json' '--jobs' '--parallel' '--dry-run' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
+    'app:ci') _values 'flags' '--env' '--dependabot' '--repo' '--value' '--execute' '--json' '--jobs' '--parallel' '--logs' '--dry-run' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'app:coverage') _values 'flags' '--out' '--cwd' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'app:db') _values 'flags' '--out' '--schema-only' '--auth' '--storage' '--backup' '--stamp' '--map' '--apply' '--local' '--execute' '--linked' '--url-env' '--green-at' '--owner-confirms-old-app-gone' '--json' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'app:emit') _values 'flags' '--json' '--cwd' '--quiet' '--help' '--edition' ;;

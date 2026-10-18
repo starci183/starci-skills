@@ -74,6 +74,7 @@ set declared GitHub CI secrets and variables, verify their custody, or run the m
 | `--json` | boolean |  |
 | `--jobs` | string |  |
 | `--parallel` | string |  |
+| `--logs` | string |  |
 | `--dry-run` | boolean |  |
 
 Positionals: action, operation?, name?
@@ -109,7 +110,7 @@ merge the lcov reports of the sharded unit run into one report
 | `--out` | string |  |
 | `--cwd` | string |  |
 
-Positionals: action
+Positionals: action, paths
 
 Conventions:
 

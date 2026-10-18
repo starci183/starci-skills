@@ -18128,6 +18128,16 @@ kernel-launch-dispatch-mismatch:
   surfacedBy: decision-item
   surfacedAs: runtime-defect
   surfacedAt: scripts/kernel/workflow-launch-custody.mjs
+PACKAGE_IMPORT_UNPACKED:
+  title: "A packed @starci package loads a file it does not publish"
+  title_vi: "Một gói @starci khi đóng gói nạp một tệp mà nó không phát hành"
+  meaning_vi: "Mã của gói (import tĩnh, import() động, require, new URL(..., import.meta.url)) trỏ tới một tệp tương đối không nằm trong danh sách npm pack, hoặc ra ngoài thư mục gói: bản phát hành sẽ lỗi khi chạy tới đó."
+  causes_vi:
+    - "Thêm thư mục mã mới (ví dụ coverage/) mà không thêm vào trường files của package.json"
+  nextStep_vi: "Thêm đường dẫn vào files của package.json (một new URL không phải tệp yaml là đường dẫn tính toán, không bị kiểm)."
+  owner: runtime-core
+  kind: check-finding
+
 TEST_SPAWN_OUTSIDE_SEAM:
   title: "A test runner is started outside the one launcher that clears the enclosing spec run"
   title_vi: "Một bộ chạy test được khởi động ngoài bộ khởi chạy duy nhất xóa dấu của lần chạy spec bao quanh"

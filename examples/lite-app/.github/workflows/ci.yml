@@ -115,7 +115,7 @@ jobs:
         env:
           NODE_OPTIONS: --max-old-space-size=6144
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        if: always() && env.SONAR_TOKEN != '' && hashFiles('reports/lint.${{ matrix.side }}.sonar.json') != ''
+        if: always() && env.SONAR_TOKEN != '' && hashFiles(format('reports/lint.{0}.sonar.json', matrix.side)) != ''
         with:
           name: sonar-lint-${{ matrix.side }}
           path: reports/lint.${{ matrix.side }}.sonar.json

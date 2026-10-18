@@ -5,6 +5,7 @@ summary: merge the lcov reports of the sharded unit run into one report
 impl: null
 positional:
   - {name: action, enum: [merge], required: true, variadic: false}
+  - {name: paths, required: true, variadic: true}
 flags:
   - {name: out, type: string, summary: "the merged lcov to write (the managed CI writes be/coverage/lcov.info)"}
   - {name: cwd, type: string, summary: the app root (default the current directory)}

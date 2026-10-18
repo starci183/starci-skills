@@ -346,6 +346,7 @@ complete -c starci -n '__starci_using_command app ci' -l execute -d 'apply the v
 complete -c starci -n '__starci_using_command app ci' -l json -d 'print verification findings (or the local plan and results) as JSON'
 complete -c starci -n '__starci_using_command app ci' -l jobs -r -d 'local: the jobs to run, comma separated (default fast,lint,test,coverage,build; sonar and db-types only when named)'
 complete -c starci -n '__starci_using_command app ci' -l parallel -r -d 'local: job instances run at once (default half the CPUs, at most 4)'
+complete -c starci -n '__starci_using_command app ci' -l logs -r -d 'local: the directory the job logs go to (default a new temp directory)'
 complete -c starci -n '__starci_using_command app ci' -l dry-run -d 'local: print which steps would run and which only GitHub can run'
 complete -c starci -n '__starci_using_command app coverage' -l out -r -d 'the merged lcov to write (the managed CI writes be/coverage/lcov.info)'
 complete -c starci -n '__starci_using_command app coverage' -l cwd -r -d 'the app root (default the current directory)'
