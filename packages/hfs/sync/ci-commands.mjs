@@ -210,11 +210,12 @@ function sonarMergeSteps(condition) {
 const STANDARD = new URL('../runtime/knowledge/hfs/ci-standard.yaml', import.meta.url);
 /** The per-job settings of the managed CI: ci.jobs.<job>.timeoutMinutes and ci.jobs.test.shards of the manifest over the defaults of the CI standard. */
 function ciJobSettings(declaration) {
-  const defaults = parseYaml(fs.readFileSync(STANDARD, 'utf8')).defaults;
+  const { defaults, heap } = parseYaml(fs.readFileSync(STANDARD, 'utf8'));
   const jobs = declaration?.ci?.jobs ?? {};
   const timeout = (job) => String(jobs[job]?.timeoutMinutes ?? defaults.timeoutMinutes[job]);
   const shards = Number(jobs.test?.shards ?? defaults.shards);
   return {
+    nodeOptions: `--max-old-space-size=${heap.minMiB}`,
     timeoutFast: timeout('fast'), timeoutLint: timeout('lint'), timeoutTest: timeout('test'), timeoutCoverage: timeout('coverage'),
     timeoutBuild: timeout('build'), timeoutSonar: timeout('sonar'), timeoutDbTypes: timeout('db-types'),
     testShards: `[${Array.from({ length: shards }, (_, index) => index + 1).join(', ')}]`, testShardTotal: String(shards),
@@ -252,13 +253,13 @@ export function ciWorkflowCommands(source, lcovReport = 'be/coverage/lcov.info',
       ...(sonar ? ["        if: env.SONAR_TOKEN == ''"] : []),
       `        run: ${exampleCommand(source, 'npm run lint -- --side ' + side)}`,
       '        env:',
-      '          NODE_OPTIONS: --max-old-space-size=6144',
+      `          NODE_OPTIONS: ${settings.nodeOptions}`,
       ...(sonar ? [
         '      - name: lint with Sonar import',
         "        if: env.SONAR_TOKEN != ''",
         `        run: ${exampleCommand(source, 'npm run lint -- --side ' + side + ' --sonar reports/lint.' + side + '.sonar.json')}`,
         '        env:',
-        '          NODE_OPTIONS: --max-old-space-size=6144',
+        `          NODE_OPTIONS: ${settings.nodeOptions}`,
         `      - uses: ${UPLOAD_ARTIFACT}`,
         // Inside an if: expression the matrix value is an argument of format(), never a nested ${{ }} (actionlint: a nested expression makes the condition always true).
         "        if: always() && env.SONAR_TOKEN != '' && hashFiles(format('reports/lint.{0}.sonar.json', matrix.side)) != ''",

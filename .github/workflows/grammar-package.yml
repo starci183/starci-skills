@@ -43,6 +43,8 @@ jobs:
 
       - name: Typecheck
         run: npm run typecheck
+        env:
+          NODE_OPTIONS: --max-old-space-size=6144
 
       - name: Pack check (no stories in the tarball)
         run: npm run pack:check

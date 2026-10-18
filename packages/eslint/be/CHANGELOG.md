@@ -1,5 +1,8 @@
 # Changelog
 
+## 3.4.8 - 2026-10-18
+- Changed: bundled runtime pins follow @starci/hfs 4.7.3 and @starci/cli 1.7.3 for the alpha.22 typecheck heap repair; canon rules are unchanged.
+
 ## 3.4.7 - 2026-10-18
 - Changed: bundled runtime copies follow the alpha.22 re-cut (canon pins hfs 4.7.2, cli 1.7.2, jest-preset 2.3.2); canon rules are unchanged.
 

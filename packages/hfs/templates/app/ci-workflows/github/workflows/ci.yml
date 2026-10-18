@@ -30,6 +30,8 @@ jobs:
         run: npm run format:check
       - name: typecheck
         run: npm run typecheck
+        env:
+          NODE_OPTIONS: {{nodeOptions}}
 
   lint:
     timeout-minutes: {{timeoutLint}}
@@ -86,7 +88,7 @@ jobs:
       - name: coverage proof
         run: {{ciCoverageProof}}
         env:
-          NODE_OPTIONS: --max-old-space-size=6144
+          NODE_OPTIONS: {{nodeOptions}}
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always() && hashFiles('{{lcovReport}}') != ''
         with:

@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.7.3 - 2026-10-18
+- Changed: pins @starci/hfs 4.7.3 for the managed CI typecheck heap repair.
+
 ## 1.7.2 - 2026-10-18
 - Changed: pins @starci/hfs 4.7.2; `app coverage merge` help names the shard istanbul reports.
 

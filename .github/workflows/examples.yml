@@ -155,6 +155,8 @@ jobs:
       # tsc over be/, then turbo typecheck over every fe workspace (the packages are built first: ^build).
       - name: Typecheck both sides
         run: npm run typecheck
+        env:
+          NODE_OPTIONS: --max-old-space-size=6144
       # The app lint runs per side with a 6 GB heap, as the rendered app CI does (the CI standard, knowledge/hfs/ci-standard.yaml: sonar-lint-per-side, heap-per-step),
       # each in a temporary copy with fresh sealed members; only its Sonar report returns to the source tree, and the two reports merge into the one
       # reports/lint.sonar.json the Sonar scan imports.
