@@ -2,6 +2,7 @@
 
 ## 4.7.3 - 2026-10-18
 - Fixed: the managed CI typecheck step declares the CI standard's raised Node heap, preventing the NIVO release candidate's typecheck from exhausting Node's default heap; the CI standard checks typecheck steps too.
+- Fixed: the fresh coverage job runs codegen before the whole-app coverage proof, preparing ignored GraphQL wire types before the app check or its isolated example copy starts; a failed generator stops the proof.
 
 ## 4.7.2 - 2026-10-18
 - Fixed: `app coverage merge` merges the shard istanbul maps through the installed @starci/jest-preset/merge (4.7.1 merged lcov text and reported phantom gaps on real data); the managed unit step sets STARCI_COVERAGE_SHARD and uploads coverage-final.json; `app lint` accepts a canon inside the app's linked node_modules.
