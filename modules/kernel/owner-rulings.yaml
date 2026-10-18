@@ -620,6 +620,13 @@ rulings:
     supersedes: [graphql-13-advisory-accepted-until-a19]
     enforcedBy: [knowledge/hfs/canon-pins.yaml, packages/hfs/scaffold/app.mjs]
 
+  - id: owner-path-1e9a6d1ce-followup
+    date: '2026-10-18'
+    source: "the main coordinator, relaying the owner's approval of the owner-path change's intent (ruling owner-path-1e9a6d1ce)"
+    ruling: "The second alpha.22 candidate run (39102060047) was red on examples.yml's per-side starci app lint in every example (node_modules tracked, the canon outside the app root). The cause predates the split: the alpha.21 examples run 39070205551 failed the same way with the single combined step. The sealed example copy (scripts/hfs/example-secrets.mjs) links node_modules, git on Linux tracks that symlink as a file, and app lint resolved the linked canon outside the copy. The follow-up keeps the owner-path steps of 1e9a6d1ce unchanged and fixes the copy (its git exclude names node_modules) and the lint's own-install check (the app's linked node_modules counts as its install); a new L4 row, linux-examples-lint, runs the examples workflow's steps up to its lint in Linux before every cut."
+    supersedes: []
+    enforcedBy: [scripts/hfs/example-secrets.mjs, packages/hfs/lint/run.mjs, scripts/supervisor/release-examples-lint.mjs]
+
 supersedes:
   'ruling:R212/case-2': ['ruling:R212/case-1']
   'ruling:R212/case-4': ['ruling:R212/case-1', 'ruling:R212/case-2']

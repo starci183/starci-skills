@@ -8,6 +8,8 @@
 import { appChainLimit, once } from './release-l4-schedule.mjs';
 
 export const LINUX_ROW = 'linux-parity';
+/** The examples workflow's lint steps in the Linux container (release-examples-lint.mjs): always local, also when the full parity is delegated. */
+export const EXAMPLES_LINT_ROW = 'linux-examples-lint';
 
 const carriedOr = (carry, name, work) => () => carry[name] ?? work();
 
@@ -53,6 +55,9 @@ export function l4Graph({ plan, apps, settings, tasks, carry = {}, deps = {} }) 
   const rows = [...root.rows, ...appRows({ plan, apps, carry, tasks, trigger: root.trigger, appOf })];
   if (plan.linux && tasks.parity) {
     rows.push({ id: LINUX_ROW, pool: 'containers', after: [], run: carriedOr(carry, LINUX_ROW, () => tasks.parity()) });
+  }
+  if (!plan.linux && tasks.examplesLint) {
+    rows.push({ id: EXAMPLES_LINT_ROW, pool: 'containers', after: [], run: carriedOr(carry, EXAMPLES_LINT_ROW, () => tasks.examplesLint()) });
   }
   const { pools } = settings;
   return { rows, limits: { prep: pools.prep, root: pools.root, apps: once(() => appChainLimit({ settings, deps })), proofs: pools.proofs, containers: pools.containers } };

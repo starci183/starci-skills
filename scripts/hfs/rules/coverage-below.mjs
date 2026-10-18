@@ -18,7 +18,7 @@ const countOf = (value) => /^\d+$/.test(value) && Number.isSafeInteger(Number(va
 const slash = (value) => path.posix.normalize(String(value).replaceAll('\\', '/'));
 
 const emptyRecord = (source) => ({ source, lines: new Map(), functions: new Map(), branches: new Map(), summary: {}, problems: [] });
-export const addHits = (map, key, hits) => map.set(key, Math.min(Number.MAX_SAFE_INTEGER, (map.get(key) ?? 0) + hits));
+const addHits = (map, key, hits) => map.set(key, Math.min(Number.MAX_SAFE_INTEGER, (map.get(key) ?? 0) + hits));
 const parseProblem = (record, line, tag) => record.problems.push(`invalid ${tag} at lcov line ${line}`);
 
 function lineData(record, value, line) {

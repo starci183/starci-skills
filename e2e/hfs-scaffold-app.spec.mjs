@@ -315,6 +315,7 @@ function assertCoverageContract(app) {
   assert.ok(Array.isArray(shards) && shards.length > 1, 'the unit run is a shard matrix');
   const unitStep = jobs.test.steps.find((step) => step.name === 'unit');
   assert.ok(unitStep.run.includes('--shard=${{ matrix.shard }}/' + shards.length) && unitStep.run.includes('--coverageThreshold={}'), 'each shard runs its share without the per-file threshold');
+  assert.equal(unitStep.env?.STARCI_COVERAGE_SHARD, '1', 'a shard measures only what it loads and writes the istanbul JSON the coverage job merges');
   assert.deepEqual(jobs.coverage.needs, 'test', 'the coverage job waits for every shard');
   const { steps } = jobs.coverage;
   const merge = steps.findIndex((step) => String(step.run ?? '').includes(`app coverage merge --out ${LCOV} `));

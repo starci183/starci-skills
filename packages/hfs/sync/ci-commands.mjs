@@ -234,6 +234,8 @@ export function ciWorkflowCommands(source, lcovReport = 'be/coverage/lcov.info',
   return {
     ...settings,
     lcovShardsDir: lcovReport.split('/').slice(0, -1).concat('shards').join('/'),
+    // The istanbul JSON a shard writes beside the lcov (STARCI_COVERAGE_SHARD=1): what the coverage job merges.
+    shardCoverageReport: lcovReport.split('/').slice(0, -1).concat('coverage-final.json').join('/'),
     ciBuildEnv: build.env,
     ciBuildSteps: build.steps,
     ciLint: exampleCommand(source, 'npm run lint'),

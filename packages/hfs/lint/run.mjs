@@ -140,7 +140,10 @@ const inside = (root, file) => { const rel = path.relative(root, file); return r
 /** Read the installed canon's source selectors, then enumerate that scope; unavailable or unsupported selectors cannot prove coverage. */
 async function sourceFiles({ repoRoot, cwd, side, scope }) {
   const entry = createRequire(path.join(cwd, 'package.json')).resolve(`@starci/eslint-canon-${side}`);
-  if (!inside(fs.realpathSync(repoRoot), fs.realpathSync(entry))) throw new Error('the installed canon is outside the app root');
+  // The canon must be the app's own install: resolved inside the app root, or inside the app's node_modules when that folder is a link to the install
+  // (the runtime's examples lint in a sealed copy whose node_modules links the example's own install, scripts/hfs/example-secrets.mjs).
+  const ownInstall = [repoRoot, path.join(repoRoot, 'node_modules')].filter((dir) => fs.existsSync(dir)).map((dir) => fs.realpathSync(dir));
+  if (!ownInstall.some((root) => inside(root, fs.realpathSync(entry)))) throw new Error('the installed canon is outside the app root');
   const canon = await import(pathToFileURL(entry).href);
   const factory = side === 'be' ? canon.starciBeConfig : canon.starciFeConfig;
   if (typeof factory !== 'function' || typeof canon.loadHfs !== 'function') throw new Error('the installed canon has no supported config factory');

@@ -16,8 +16,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { planFor } from './push-git.mjs';
 import { unlinkNodeModulesLink } from '../api/fs/unlink-node-modules-link.mjs';
-import { parityInWorker, stepInWorker } from './release-l4-offload.mjs';
-import { l4Graph, LINUX_ROW } from './release-l4-graph.mjs';
+import { examplesLintInWorker, parityInWorker, stepInWorker } from './release-l4-offload.mjs';
+import { EXAMPLES_LINT_ROW, l4Graph, LINUX_ROW } from './release-l4-graph.mjs';
 import { runGraph, scheduleSettings } from './release-l4-schedule.mjs';
 import { sonarSupplier } from './release-l4-sonar.mjs';
 import { byCodeUnit } from '../lib/list.mjs';
@@ -172,17 +172,18 @@ const proofWork = (sup) => async (name) => {
  * `parity` runs the Linux container (default: in a worker thread); `parity: null` leaves it out of a stand-in run. `carry` maps a row name to a result that stands in for running it
  * (a row already green for this commit, or reused from another one). A red row never cancels another; a row that throws stops the rest from starting and is raised once the running rows settled.
  */
-export async function runL4(repo, { proofs, parity = parityInWorker, step = stepInWorker, plan = planL4(repo), apps = exampleApps(repo), supplier = null, unlink = unlinkNodeModulesLink, parityDeps = {}, concurrencyDeps = {}, carry = {}, settings = scheduleSettings() } = {}) {
+export async function runL4(repo, { proofs, parity = parityInWorker, examplesLint = examplesLintInWorker, step = stepInWorker, plan = planL4(repo), apps = exampleApps(repo), supplier = null, unlink = unlinkNodeModulesLink, parityDeps = {}, concurrencyDeps = {}, carry = {}, settings = scheduleSettings() } = {}) {
   const sup = proofs === undefined ? (supplier ?? sonarSupplier(apps)) : { proofs, close: () => {} };
   const tasks = {
     step: stepWork({ step, unlink }),
     proof: proofWork(sup),
     ...(parity ? { parity: async () => parity(repo, { apps: () => apps.map((a) => a.name), ...parityDeps }) } : {}),
+    ...(parity && examplesLint ? { examplesLint: async () => examplesLint(repo, { apps: () => apps.map((a) => a.name), ...parityDeps }) } : {}),
   };
   try {
     const { rows, limits } = l4Graph({ plan, apps, settings: ciSettings(plan, settings), tasks, carry, deps: concurrencyDeps });
     const results = await runGraph(rows, limits);
     const ordered = [...plan.steps.map((s) => s.name), ...plan.proofs].map((name) => results.get(name));
-    return [...ordered, ...(results.has(LINUX_ROW) ? [results.get(LINUX_ROW)] : [])];
+    return [...ordered, ...[LINUX_ROW, EXAMPLES_LINT_ROW].filter((row) => results.has(row)).map((row) => results.get(row))];
   } finally { sup.close?.(); }
 }

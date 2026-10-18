@@ -103,7 +103,7 @@ starci app ci local --jobs lint,test --parallel 4
 
 ### starci app coverage
 
-merge the lcov reports of the sharded unit run into one report
+merge the coverage of the sharded unit run into one lcov report
 
 | flag | type | |
 | --- | --- | --- |
@@ -114,12 +114,14 @@ Positionals: action, paths
 
 Conventions:
 
-- the CI standard shards the unit run (npm test -- --shard=i/N); each shard writes an lcov over the whole coverage scope
-- merge sums every line, function and branch hit by identity across the reports and writes one record per source file
-- a path is an lcov file or a directory searched for every lcov.info below it; no report found refuses (exit 2), never an empty report
-- the coverage proof (starci app check --coverage-from), the Codecov upload and the Sonar import read the merged report
+- the CI standard shards the unit run: STARCI_COVERAGE_SHARD=1 npm test -- --shard=i/N
+- each shard measures only the files it loads and writes istanbul JSON (coverage-final.json)
+- merge runs the app's installed @starci/jest-preset/merge: istanbul-lib-coverage joins the shard maps by source location
+- the merged lcov is written by the preset's own lcov reporter, as an unsharded run writes it
+- a path is a coverage-final.json or a directory searched for every one below it; no report found refuses (exit 2)
+- the coverage proof (starci app check --coverage-from) refuses a measured file the merge does not hold
 
-exit: 0 merged; 2 bad usage or no report found
+exit: 0 merged; 2 bad usage, no installed preset or no report found
 
 json: none
 

@@ -1,12 +1,12 @@
-// cli.mjs - `starci app coverage merge --out <lcov> <path>...`: the lcov reports of the sharded unit run (one per `npm test -- --shard=i/N`, downloaded into a
-// directory by the coverage job of the managed CI) merged into the one report the coverage proof, the Codecov upload and the Sonar import read
-// (runtime/scripts/hfs/lcov-merge.mjs: hits summed by line, function and branch identity, one record per source file). A path is an lcov file or a
-// directory searched for every lcov.info below it; no report found is a refusal, so a merge never writes an empty report that would read as "nothing to measure".
-import fs from 'node:fs';
+// cli.mjs - `starci app coverage merge --out <lcov> <report-or-dir>...`: the coverage of the sharded unit run (one coverage-final.json per
+// `STARCI_COVERAGE_SHARD=1 npm test -- --shard=i/N`, downloaded into a directory by the coverage job of the managed CI) merged into the one lcov the
+// coverage proof, the Codecov upload and the Sonar import read. The merge is the app's installed @starci/jest-preset (`@starci/jest-preset/merge`):
+// istanbul-lib-coverage merges the shard maps by source location, and the preset's own lcov reporter writes the result exactly as an unsharded run
+// would. A path is a coverage-final.json or a directory searched for every one below it; no report found refuses (exit 2), never an empty report.
 import path from 'node:path';
-import { lcovFilesUnder, mergeLcov } from '../runtime/scripts/hfs/lcov-merge.mjs';
+import { createRequire } from 'node:module';
 
-const USAGE = 'usage: starci app coverage merge --out <lcov> <lcov-or-dir>... [--cwd <dir>]';
+const USAGE = 'usage: starci app coverage merge --out <lcov> <coverage-final.json-or-dir>... [--cwd <dir>]';
 
 function parse(argv) {
   const [action, ...rest] = argv;
@@ -23,27 +23,30 @@ function parse(argv) {
     else opts.inputs.push(arg);
   }
   if (!opts.out || !opts.inputs.length) throw new Error(USAGE);
+  if (path.basename(opts.out) !== 'lcov.info') throw new Error(`--out names the lcov.info the coverage proof reads; ${USAGE}`);
   return opts;
 }
 
-/** Exit 0 merged, 2 bad usage or no report found. */
-export async function coverageMain(argv, { cwd: baseCwd = process.cwd(), stdout = (s) => process.stdout.write(s), stderr = (s) => process.stderr.write(s) } = {}) {
+/** The app's installed preset merge (resolved from the app root, like the presets `starci app sync` loads). */
+function installedMerge(cwd) {
+  try { return createRequire(path.join(cwd, 'package.json'))('@starci/jest-preset/merge').mergeCoverage; } catch (error) {
+    throw new Error(`@starci/jest-preset/merge is not installed under ${cwd} (${error.code ?? error.message}); install the canon @starci/jest-preset`);
+  }
+}
+
+/** Exit 0 merged, 2 bad usage, no preset or no report found. `merge` replaces the installed preset merge in a spec. */
+export async function coverageMain(argv, { cwd: baseCwd = process.cwd(), stdout = (s) => process.stdout.write(s), stderr = (s) => process.stderr.write(s), merge } = {}) {
   let opts;
   try { opts = parse(argv); } catch (error) { stderr(`starci app coverage: ${error.message}\n`); return 2; }
   const cwd = path.resolve(baseCwd, opts.cwd ?? '.');
-  const files = [];
-  for (const input of opts.inputs) {
-    const target = path.resolve(cwd, input);
-    if (!fs.existsSync(target)) { stderr(`starci app coverage: ${input} does not exist\n`); return 2; }
-    files.push(...lcovFilesUnder(target));
+  try {
+    const run = merge ?? installedMerge(cwd);
+    const outDir = path.dirname(path.resolve(cwd, opts.out));
+    const result = run({ inputs: opts.inputs.map((input) => path.resolve(cwd, input)), outDir });
+    stdout(`starci app coverage merge: ${result.reports} shard report(s), ${result.files} source file(s) -> ${path.relative(cwd, path.join(outDir, 'lcov.info')).replaceAll('\\', '/')}\n`);
+    return 0;
+  } catch (error) {
+    stderr(`starci app coverage: ${error.message}\n`);
+    return 2;
   }
-  const out = path.resolve(cwd, opts.out);
-  const sources = files.filter((file) => path.resolve(file) !== out);
-  if (!sources.length) { stderr(`starci app coverage: no lcov report under ${opts.inputs.join(', ')}; the unit shards wrote none\n`); return 2; }
-  const merged = mergeLcov(sources.map((file) => fs.readFileSync(file, 'utf8')));
-  fs.mkdirSync(path.dirname(out), { recursive: true });
-  fs.writeFileSync(out, merged);
-  const records = merged.split('\n').filter((line) => line.startsWith('SF:')).length;
-  stdout(`starci app coverage merge: ${sources.length} report(s), ${records} source file(s) -> ${path.relative(cwd, out).replaceAll('\\', '/')}\n`);
-  return 0;
 }

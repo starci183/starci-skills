@@ -75,6 +75,7 @@ function testSharding(doc, say) {
   const total = /--shard=\$\{\{\s*matrix\.shard\s*\}\}\/(\d+)/.exec(unit ? runOf(unit) : '');
   if (unit && !total) out.push(say('test-sharding', 'the unit run must pass --shard=${{ matrix.shard }}/<N>'));
   if (total && Array.isArray(shards) && Number(total[1]) !== shards.length) out.push(say('test-sharding', `the unit run's shard total ${total[1]} must equal the ${shards.length} matrix shards`));
+  if (unit && String(unit.env?.STARCI_COVERAGE_SHARD ?? '') !== '1') out.push(say('test-sharding', 'a shard runs the unit step with STARCI_COVERAGE_SHARD: "1": it measures only the files it loads and writes the istanbul JSON the coverage job merges'));
   if (unit && !runOf(unit).includes('--coverageThreshold={}')) out.push(say('test-sharding', 'a shard measures without the per-file threshold (--coverageThreshold={}); the coverage job proves it on the merged report'));
   const coverage = record(doc.jobs?.coverage) ? stepsOf(doc.jobs.coverage) : [];
   const merge = coverage.findIndex((step) => /app coverage merge\b/.test(runOf(step)));

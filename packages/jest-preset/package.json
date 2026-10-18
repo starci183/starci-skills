@@ -54,6 +54,9 @@
     "./builders": {
       "types": "./builders.d.ts",
       "default": "./builders.cjs"
+    },
+    "./merge": {
+      "default": "./merge.cjs"
     }
   },
   "files": [

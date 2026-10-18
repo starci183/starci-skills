@@ -160,10 +160,12 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-node22-jest-${{ hashFiles('package-lock.json') }}-shard${{ matrix.shard }}-
             ${{ runner.os }}-node22-jest-${{ hashFiles('package-lock.json') }}-
-      # Each shard measures without the per-file threshold (a shard loads only its share of the specs, and a small suite may leave a shard empty);
-      # the coverage job proves 100 per file on the merged report.
+      # A shard (STARCI_COVERAGE_SHARD=1, the jest preset) measures only the files its specs load, without the per-file threshold, and writes istanbul
+      # JSON; the coverage job merges the shards by source location and proves 100 per file on the merged report. A small suite may leave a shard empty.
       - name: unit
         run: npm test -- --ci --forceExit --cacheDirectory .jest-cache --shard=${{ matrix.shard }}/6 --passWithNoTests --coverageThreshold={}
+        env:
+          STARCI_COVERAGE_SHARD: "1"
       - name: Jest cache save
         if: always()
         uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
@@ -171,10 +173,10 @@ jobs:
           path: .jest-cache
           key: ${{ runner.os }}-node22-jest-${{ hashFiles('package-lock.json') }}-shard${{ matrix.shard }}-${{ github.run_id }}
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        if: always() && hashFiles('be/coverage/lcov.info') != ''
+        if: always() && hashFiles('be/coverage/coverage-final.json') != ''
         with:
           name: coverage-shard-${{ matrix.shard }}
-          path: be/coverage/lcov.info
+          path: be/coverage/coverage-final.json
 
   coverage:
     needs: test

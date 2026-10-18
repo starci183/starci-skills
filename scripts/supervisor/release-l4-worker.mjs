@@ -8,6 +8,10 @@ async function runTask({ task, payload }) {
     const { runParity } = await import('./release-linux-parity.mjs');
     return runParity(payload.repo, { apps: () => payload.apps });
   }
+  if (task === 'examples-lint') {
+    const { runExamplesLint } = await import('./release-examples-lint.mjs');
+    return runExamplesLint(payload.repo, { apps: () => payload.apps });
+  }
   throw new Error(`release worker: unknown task ${task}`);
 }
 

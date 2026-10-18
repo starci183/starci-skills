@@ -53,6 +53,10 @@ export async function materializeExample(repoRoot, { createIdentity = generateAp
 function trackExample(repoRoot) {
   const env = withoutGitLocalEnv(process.env);
   if (!initGit(repoRoot, { env }).ok) throw new Error('could not initialize the isolated example git tree');
+  // The linked node_modules (linkExampleDependencies: a junction on Windows, a symlink elsewhere) is the install, never a tracked entry: git treats a
+  // symlink as a file, which the app's `node_modules/` (directory) ignore line does not match, so on Linux `git add -A` tracked it (HFS_TRACKED_MUST_BE_IGNORED,
+  // HFS_ROOT_ENTRY_FORBIDDEN in every examples.yml lint since the link). The copy's own exclude file ignores it in any form.
+  fs.appendFileSync(path.join(repoRoot, '.git', 'info', 'exclude'), ['', '# the linked install of the example (example-secrets.mjs)', 'node_modules', ''].join('\n'));
   const staged = addGit(['-A', '--', '.'], { cwd: repoRoot, env });
   if (staged.error || staged.status !== 0) throw new Error('could not stage the isolated example git tree');
 }

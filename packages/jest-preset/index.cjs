@@ -223,15 +223,21 @@ function starciJestConfig(options) {
       if (hasCoverageSubjects(root, `src/tests/${name}/**/*.${suffix}.ts`)) testProjects.push(suite(name, suffix))
     }
   }
+  // A shard of the managed CI (STARCI_COVERAGE_SHARD=1, one of npm test -- --shard=i/N) measures only the files its tests load, without the per-file threshold, and
+  // writes istanbul JSON: the coverage job merges the shards by source location (merge.cjs) and the coverage proof enforces 100 per file on the merged report. The
+  // all-files instrumentation of collectCoverageFrom is off there: it instruments an unloaded file with another transform (other functions and branches).
+  const shard = process.env.STARCI_COVERAGE_SHARD === "1"
   return {
     testTimeout: 120_000,
     coverageProvider: "v8",
-    collectCoverageFrom: collectCoverageFrom(coverage),
-    // A glob key is applied to every matching file on its own: each measured file must reach 100, not the average.
-    coverageThreshold: Object.fromEntries(coverage.roots.map((root) => rootGlob(root, coverage.roles)).filter((glob) => hasCoverageSubjects(process.cwd(), glob)).map((glob) => [`./${glob}`, { ...COVERAGE_THRESHOLD }])),
+    ...(shard ? {} : {
+      collectCoverageFrom: collectCoverageFrom(coverage),
+      // A glob key is applied to every matching file on its own: each measured file must reach 100, not the average.
+      coverageThreshold: Object.fromEntries(coverage.roots.map((root) => rootGlob(root, coverage.roles)).filter((glob) => hasCoverageSubjects(process.cwd(), glob)).map((glob) => [`./${glob}`, { ...COVERAGE_THRESHOLD }])),
+    }),
     coverageDirectory: "coverage",
-    // lcov is what Sonar imports (coverage/lcov.info); text-summary and text are what the developer reads.
-    coverageReporters: ["text-summary", "text", [require.resolve("./lcov.cjs"), {}]],
+    // lcov is what Sonar imports (coverage/lcov.info); text-summary and text are what the developer reads; a shard writes the json the merge reads.
+    coverageReporters: shard ? ["text-summary", "json"] : ["text-summary", "text", [require.resolve("./lcov.cjs"), {}]],
     projects: [
       {
         ...shared,

@@ -17,5 +17,8 @@ export function offload(task, payload) {
 /** A plan step run in a worker: same arguments and result as runStep (scripts/supervisor/push-git.mjs). */
 export const stepInWorker = (step, options) => offload('step', { step, options });
 
+/** The examples workflow's lint steps in the Linux container (scripts/supervisor/release-examples-lint.mjs), in a worker. */
+export const examplesLintInWorker = (repo, deps = {}) => offload('examples-lint', { repo, apps: deps.apps?.(repo) ?? [] });
+
 /** The Linux parity container run in a worker: same row as runParity (scripts/supervisor/release-linux-parity.mjs). */
 export const parityInWorker = (repo, deps = {}) => offload('parity', { repo, apps: deps.apps?.(repo) ?? [] });
