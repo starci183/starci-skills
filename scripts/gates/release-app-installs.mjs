@@ -117,6 +117,8 @@ try {
       const errors = removed.errors.map((e) => `${e.code} ${e.path}`).join('; ');
       console.log(`release-app-installs: could not remove ${into}: ${errors}`);
     }
+    // The scratch folder itself goes when it is left empty: git tracks no empty directory, and the runtime check refuses one (HFS_EMPTY_DIR).
+    try { if (!fs.readdirSync(scratch).length) fs.rmdirSync(scratch); } catch { /* another run still holds it */ }
   }
 }
 process.exit(exit);
