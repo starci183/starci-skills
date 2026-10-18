@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.10.0 - 2026-10-18
+
+Minor, additive: table-cell interactions, native drag-source presentation, controlled command toggles and caption-aware video.
+
+- Added: `DataTable.getCellInteraction` and `DataTableCellInteraction` for cell actions, native drag-over/leave/drop callbacks, highlighting and muted tone. Actionable cells retain table semantics and arrow-key focus, activate with Enter/Space or a plain-content click, and leave nested controls to their own actions.
+- Added: exported `DragItem` and `DragItemProps`, a native drag-source frame with selected, invalid and dashed states and a caller-owned leading color. Its content must provide the operation without dragging; the frame adds no focus stop.
+- Added: command `Button` accepts controlled boolean `aria-pressed` and forwards both `true` and `false` to the native button; destination buttons do not accept toggle state.
+- Added: exported `Video`, `VideoProps` and `VideoCaptionsTrack` with native controls, accessible title, poster and genuine optional WebVTT captions. Unavailable captions produce no placeholder track; caption language and cross-origin media policy remain explicit caller inputs.
+
 ## 0.9.14 - 2026-10-12
 
 Patch (owner review of nivo.vn, FOCUS-1). No API change.

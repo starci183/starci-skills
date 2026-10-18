@@ -1,7 +1,7 @@
 "use client"
 
 import { Checkbox as HeroCheckbox, Table as HeroTable, type Selection, type SortDescriptor } from "@heroui/react"
-import { useState, type CSSProperties, type ReactNode } from "react"
+import { useState, type CSSProperties, type DragEventHandler, type KeyboardEvent, type MouseEvent, type ReactNode } from "react"
 import { Skeleton } from "../../primitive/Skeleton/index.js"
 import { navigationClassName } from "../../navigationClassNames.js"
 
@@ -21,12 +21,25 @@ export type DataTableSort = {
 
 export type DataTableRow = { readonly id: string }
 
+/** Cell effects belong to the caller; the table owns cell semantics, focus and activation. */
+export type DataTableCellInteraction = {
+    /** Invoked by a cell click or Enter/Space on the focused cell, excluding nested controls. */
+    readonly onAction?: () => void
+    readonly onDragOver?: DragEventHandler<HTMLTableCellElement>
+    readonly onDragLeave?: DragEventHandler<HTMLTableCellElement>
+    readonly onDrop?: DragEventHandler<HTMLTableCellElement>
+    readonly isHighlighted?: boolean
+    readonly tone?: "neutral" | "muted"
+}
+
 export type DataTableProps<Row extends DataTableRow> = {
     /** Names the table, e.g. "Invoices". */
     readonly label: string
     readonly columns: ReadonlyArray<DataTableColumn>
     readonly rows: ReadonlyArray<Row>
     readonly renderCell: (row: Row, columnId: string) => ReactNode
+    /** Optional cell actions and native drop events. An actionable cell receives arrow-key focus itself. */
+    readonly getCellInteraction?: (row: Row, columnId: string) => DataTableCellInteraction | undefined
     /** Controlled sort. Sorting the rows stays with the app; the table announces `aria-sort`. */
     readonly sort?: DataTableSort
     readonly onSortChange?: (sort: DataTableSort) => void
@@ -59,6 +72,20 @@ export type DataTableProps<Row extends DataTableRow> = {
 const hideFromAssistiveTechnology = (node: HTMLElement | null) => node?.setAttribute("aria-hidden", "true")
 
 const SELECTION_COLUMN = "starci-data-table-selection"
+
+// Labels activate their associated inputs; editable content, media and ARIA widgets own their gestures too.
+const CELL_CONTROL_SELECTOR = [
+    "button", "a", "input", "select", "textarea", "label", "summary",
+    "audio[controls]", "video[controls]", '[contenteditable]:not([contenteditable="false"])',
+    '[tabindex]:not([tabindex="-1"])',
+    ...["button", "link", "checkbox", "combobox", "listbox", "menuitem", "menuitemcheckbox", "menuitemradio", "option", "radio", "searchbox", "slider", "spinbutton", "switch", "tab", "textbox", "treeitem"].map((role) => `[role="${role}"]`),
+].join(",")
+
+const isNestedCellControl = (target: EventTarget, cell: HTMLTableCellElement): boolean => {
+    if (!(target instanceof Element)) return false
+    const control = target.closest(CELL_CONTROL_SELECTOR)
+    return control !== null && control !== cell && cell.contains(control)
+}
 
 const toSortDescriptor = (sort: DataTableSort): SortDescriptor => ({ column: sort.columnId, direction: sort.direction })
 
@@ -94,6 +121,7 @@ export const DataTable = <Row extends DataTableRow>({
     columns,
     rows,
     renderCell,
+    getCellInteraction,
     sort,
     onSortChange,
     selectionMode = "none",
@@ -135,6 +163,7 @@ export const DataTable = <Row extends DataTableRow>({
             <HeroTable.ScrollContainer className="starci-core-data-table-scroll" data-contract="LAYOUT-3" data-grammar-table-scroll="true" style={scrollStyle}>
                 <HeroTable.Content
                     aria-label={label}
+                    {...(getCellInteraction === undefined ? {} : { keyboardNavigationBehavior: "arrow" as const })}
                     className="starci-core-data-table-content"
                     data-contract="FOCUS-2 STATE-1"
                     selectionMode={isSkeleton ? "none" : selectionMode}
@@ -200,11 +229,36 @@ export const DataTable = <Row extends DataTableRow>({
                                             <SelectionCheckbox label={selectRowLabel?.(row)} />
                                         </HeroTable.Cell>
                                     ) : null}
-                                    {columns.map((column) => (
-                                        <HeroTable.Cell key={column.id} className="starci-core-data-table-cell" data-grammar-table-align={column.align ?? "start"}>
+                                    {columns.map((column) => {
+                                        const interaction = getCellInteraction?.(row, column.id)
+                                        return <HeroTable.Cell
+                                            key={column.id}
+                                            className="starci-core-data-table-cell"
+                                            data-grammar-table-align={column.align ?? "start"}
+                                            data-grammar-cell-highlighted={interaction?.isHighlighted ? "true" : "false"}
+                                            data-grammar-cell-tone={interaction?.tone ?? "neutral"}
+                                            {...(interaction?.onAction === undefined ? {} : {
+                                                focusMode: "cell" as const,
+                                                onClick: (event: MouseEvent<HTMLTableCellElement>) => {
+                                                    // Descendant controls keep their own actions; plain cell content activates the cell.
+                                                    if (isNestedCellControl(event.target, event.currentTarget)) return
+                                                    event.stopPropagation()
+                                                    interaction.onAction?.()
+                                                },
+                                                onKeyDown: (event: KeyboardEvent<HTMLTableCellElement>) => {
+                                                    if (event.target !== event.currentTarget || (event.key !== "Enter" && event.key !== " ")) return
+                                                    event.preventDefault()
+                                                    event.stopPropagation()
+                                                    if (!event.repeat) interaction.onAction?.()
+                                                },
+                                            })}
+                                            {...(interaction?.onDragOver === undefined ? {} : { onDragOver: interaction.onDragOver })}
+                                            {...(interaction?.onDragLeave === undefined ? {} : { onDragLeave: interaction.onDragLeave })}
+                                            {...(interaction?.onDrop === undefined ? {} : { onDrop: interaction.onDrop })}
+                                        >
                                             {renderCell(row, column.id)}
                                         </HeroTable.Cell>
-                                    ))}
+                                    })}
                             </HeroTable.Row>
                         ))}
                     </HeroTable.Body>

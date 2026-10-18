@@ -6,7 +6,7 @@ states and scales, and the family registry. Core, Heritage and Offset Pop are si
 Each one implements the same contract with its own scoped visual DNA. The package contains no
 routes, domain entities, product decisions or feature-named shells.
 
-Common ships **95 renderers**. Every family renders all of them. A family changes presentation
+Common publishes its renderers through `COMMON_GRAMMAR_COMPONENTS`. Every family renders all of them. A family changes presentation
 only: props, DOM, ARIA and keyboard behaviour stay the same.
 
 ## Install
@@ -158,6 +158,36 @@ Tooltip. Dialog, AlertDialog, Drawer, Popover and DropdownMenu are controlled th
 **Navigation & Data (14).** Accordion, AvatarGroup, Breadcrumbs, Calendar, DataTable,
 DescriptionList, Disclosure, ListBox, Pagination, Stepper, Subnav, Tabs, TagGroup, Timeline.
 
+`DataTable.getCellInteraction(row, columnId)` optionally supplies `onAction`, `onDragOver`,
+`onDragLeave`, `onDrop`, `isHighlighted` and `tone` (`neutral` or `muted`). Cells remain semantic
+table cells under the existing arrow-key navigation. An actionable cell takes focus itself,
+activates once with Enter/Space or a click on its plain content, and leaves nested controls to
+their own actions. Native drag callbacks receive the actual table-cell event; the caller owns
+payload validation, accepted targets and effects. Highlighting takes precedence over muted tone.
+
+`DragItem` is a native drag-source frame with `isDisabled`, `onDragStart`, `onDragEnd`,
+`isSelected`, `isInvalid`, `isDashed` and an optional caller-owned `leadingColor`. Its `children`
+must include a published control providing the operation without dragging, including selection
+and a keyboard-reachable destination when used with cell actions. Selection, invalidity and the
+category must also be expressed in accessible content. The frame itself adds no focus stop.
+
+Command `Button` accepts controlled boolean `aria-pressed` for a toggle action and forwards both
+`true` and `false` to its native button. Omit it for an ordinary command and keep a toggle's visible
+label stable as its state changes, following the [ARIA button pattern](https://www.w3.org/WAI/ARIA/apg/patterns/button/).
+
+`Video` takes `src`, accessible `title`, optional `poster`, and an optional nullable `captions` descriptor
+(`src`, human-readable `label`, optional BCP 47 `srcLang` when the actual language is known). It keeps
+native controls, inline playback and metadata preloading, with one default captions track when supplied.
+Supply a genuine WebVTT resource timed to
+the rendered media, including relevant non-speech audio; empty tracks and guessed timing do not
+satisfy this contract. Null or omission exposes no track and does not claim accessible caption coverage;
+the caller owns caption creation, availability and an appropriate alternative for legacy media. Wrap it in `MediaFrame`
+to reserve an aspect ratio. The track URL must be same-origin unless the caller supplies
+`crossOrigin` (`anonymous` or `use-credentials`) and both resource servers support the corresponding
+CORS request; the renderer leaves this unset by default to preserve ordinary media loading.
+The [HTML media and track standard](https://html.spec.whatwg.org/multipage/media.html#the-track-element)
+defines the native loading and caption behaviour (reviewed 2026-10-18).
+
 **Surfaces (14).** EmptyNotice, FencedCodeBlock, HorizontalScrollRegion, MarkdownArticle,
 MarkdownTableFrame, MediaFrame, Rail, SectionHeader, StaticStateRow, SurfaceAccordionCard,
 SurfaceCard, SurfaceCopyGroup, SurfaceListCard, VerticalScrollRegion.
@@ -167,7 +197,7 @@ PrimaryRailLayout, Sidebar, TopBar, WorkspaceShell. Storybook also pins three pa
 each family: a settings form, a data list with a filter drawer and pagination, and a mobile home
 with TopBar, BottomNav and a Toast.
 
-`COMMON_GRAMMAR_COMPONENTS` is the frozen registry of all 95 renderers.
+`COMMON_GRAMMAR_COMPONENTS` is the frozen registry of the published renderers.
 `COMMON_FORMS_COMPONENTS`, `COMMON_OVERLAYS_COMPONENTS` and `COMMON_NAVIGATION_COMPONENTS` are the
 0.5.0 groups. `defineGrammarFamily` builds a new family over the registry. It may replace
 renderers with prop-compatible versions and add extensions whose names don't collide with Common's.
@@ -213,9 +243,8 @@ renderers with prop-compatible versions and add extensions whose names don't col
 
 ```sh
 npm run typecheck
-npm test                 # build + node --test + vitest spec list
-npm run build-storybook  # static Storybook (all 95 renderers + family pages)
-npx vitest run --project storybook   # stories in Chromium with axe (a11y `todo` mode)
+npm test                 # typecheck + build; the package has no spec suites
+npm run build-storybook  # static Storybook for the authored component and family stories
 npm pack --dry-run
 ```
 

@@ -41,6 +41,7 @@ type ButtonBase = {
  * supplies middle-click, copy-link, and the `link` role. Pending or disabled withholds the href.
  */
 type DestinationButton = {
+    readonly "aria-pressed"?: never
     readonly href: string
     readonly target?: "_blank" | "_self"
     readonly rel?: string
@@ -53,6 +54,8 @@ type DestinationButton = {
 
 /** A same-document command. It renders the vendor button and may submit or reset a form. */
 type CommandButton = {
+    /** Controlled toggle state. Keep the action label unchanged between pressed and unpressed. */
+    readonly "aria-pressed"?: boolean
     readonly onPress?: () => void
     readonly type?: ButtonType
     readonly href?: never
@@ -148,6 +151,7 @@ export const Button = (props: ButtonProps) => {
             data-width={width}
             data-contract={width === "fill" ? "MEASURE-2" : undefined}
             fullWidth={width === "fill"}
+            {...(props["aria-pressed"] === undefined ? {} : { "aria-pressed": props["aria-pressed"] })}
             className={isSkeleton ? `starci-core-button ${SKELETON_CLASS_NAME}` : "starci-core-button"}
             {...(unavailable || onPress === undefined ? {} : { onPress })}
         >

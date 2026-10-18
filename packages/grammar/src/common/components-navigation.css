@@ -769,6 +769,14 @@
     }
 
     /* ---------- DataTable ---------- */
+    .starci-core-video {
+        display: block;
+        width: 100%;
+        max-width: 100%;
+        height: auto;
+        object-fit: contain;
+    }
+
     .starci-core-data-table {
         min-width: 0;
         max-width: 100%;
@@ -839,6 +847,42 @@
         color: var(--muted, GrayText);
         white-space: normal;
         text-align: center;
+    }
+
+    .starci-core-data-table-cell[data-grammar-cell-tone="muted"] {
+        background: var(--surface-secondary, Canvas);
+    }
+
+    .starci-core-data-table-cell[data-grammar-cell-highlighted="true"] {
+        background: var(--accent-soft, Highlight);
+    }
+
+    .starci-core-drag-item {
+        display: flex;
+        min-width: 0;
+        width: 100%;
+        flex-direction: column;
+        gap: 0.25rem;
+        border: 1px solid var(--separator, GrayText);
+        border-inline-start: 4px solid var(--starci-drag-item-leading, var(--separator, GrayText));
+        border-radius: var(--radius, 0.5rem);
+        background: var(--surface, Canvas);
+        padding: 0.25rem 0.5rem;
+    }
+
+    .starci-core-drag-item[data-grammar-selected="true"] {
+        outline: 2px solid var(--accent, Highlight);
+        outline-offset: 1px;
+    }
+
+    .starci-core-drag-item[data-grammar-invalid="true"] {
+        border-color: var(--danger, Mark);
+        border-inline-start-color: var(--starci-drag-item-leading, var(--danger, Mark));
+        background: var(--danger-soft, Canvas);
+    }
+
+    .starci-core-drag-item[data-grammar-dashed="true"] {
+        border-style: dashed;
     }
 
     /* ---------- DescriptionList ---------- */

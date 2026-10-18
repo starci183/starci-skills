@@ -3,6 +3,7 @@
 import { Accordion } from "../core/branch/Accordion/index.js"
 import { Calendar } from "../core/branch/Calendar/index.js"
 import { DataTable } from "../core/branch/DataTable/index.js"
+import { DragItem } from "../core/branch/DragItem/index.js"
 import { Disclosure } from "../core/branch/Disclosure/index.js"
 import { FlowGraph } from "../core/branch/FlowGraph/index.js"
 import { ListBox } from "../core/branch/ListBox/index.js"
@@ -20,10 +21,12 @@ import { Avatar } from "../core/primitive/Avatar/index.js"
 import { Image } from "../core/primitive/Image/index.js"
 import { Link } from "../core/primitive/Link/index.js"
 import { Rating } from "../core/primitive/Rating/index.js"
+import { Video } from "../core/primitive/Video/index.js"
 
 export { Accordion, type AccordionItem, type AccordionProps } from "../core/branch/Accordion/index.js"
 export { Calendar, type CalendarProps } from "../core/branch/Calendar/index.js"
-export { DataTable, type DataTableColumn, type DataTableProps, type DataTableRow, type DataTableSort } from "../core/branch/DataTable/index.js"
+export { DataTable, type DataTableCellInteraction, type DataTableColumn, type DataTableProps, type DataTableRow, type DataTableSort } from "../core/branch/DataTable/index.js"
+export { DragItem, type DragItemProps } from "../core/branch/DragItem/index.js"
 export { Disclosure, type DisclosureProps } from "../core/branch/Disclosure/index.js"
 export { FlowGraph, radialPositions, type FlowGraphEdge, type FlowGraphHeight, type FlowGraphLayout, type FlowGraphNode, type FlowGraphNodeSize, type FlowGraphProps, type FlowGraphTone } from "../core/branch/FlowGraph/index.js"
 export { ListBox, type ListBoxItem, type ListBoxProps } from "../core/branch/ListBox/index.js"
@@ -41,9 +44,10 @@ export { Avatar, avatarInitials, type AvatarProps, type AvatarSize } from "../co
 export { Image, type AssetSlotProps, type ImageAspect, type ImageLoadState, type ImageProps } from "../core/primitive/Image/index.js"
 export { Link, type LinkKind, type LinkProps } from "../core/primitive/Link/index.js"
 export { Rating, type RatingProps } from "../core/primitive/Rating/index.js"
+export { Video, type VideoCaptionsTrack, type VideoProps } from "../core/primitive/Video/index.js"
 
 /** Every navigation-group renderer, spread into `COMMON_GRAMMAR_COMPONENTS`. */
 export const COMMON_NAVIGATION_COMPONENTS = Object.freeze({
     Accordion, Avatar, AvatarGroup, BottomNav, Breadcrumbs, Calendar, DataTable, DescriptionList,
-    Disclosure, FlowGraph, Footer, Image, Link, ListBox, Pagination, Rating, Stepper, TagGroup, Timeline, TopBar,
+    Disclosure, DragItem, FlowGraph, Footer, Image, Link, ListBox, Pagination, Rating, Stepper, TagGroup, Timeline, TopBar, Video,
 } as const)
