@@ -23,6 +23,7 @@ Hotfix of the red alpha.21 CI (run 39070215259) and the candidate CI flow: this 
 - examples.yml (owner-path commit) lints each example side with its own Sonar report and a 6 GB heap, as the rendered app CI does.
 
 ### Fixed
+- Sonar's JavaScript analyzer receives the existing 6144 MiB CI Node budget through `sonar.javascript.node.maxspace` in the managed app configuration and the runtime configuration producer, leaving memory for Java and the OS on the 8 GB runner. The unsupported `sonar.nodejs.maxspace` left the NIVO v0.2.4 tag scan at a 2240 MB limit, where analysis ran out of memory.
 - The NIVO v0.2.4 candidate's fast job exhausted Node's default heap during typecheck. Managed app CI, the examples workflow and the grammar package workflow now declare the CI standard's 6 GB heap on each typecheck step; R301 checks typecheck alongside the other heavy steps.
 - The NIVO v0.2.4 candidate's coverage job proved 100% on all 882 measured logic files but failed the whole-app check because its fresh runner had no generated GraphQL wire types. The managed coverage proof now runs codegen before the app check, including before the isolated example copy, and stops if generation fails.
 - The first alpha.22 candidate run (refused, main untouched): the rendered lint upload condition nested ${{ matrix.side }} inside an if: expression (actionlint: always true; now format()), `starci app coverage merge` declared no paths (cli 1.7.1), and @starci/hfs 4.7.0 did not pack coverage/ (4.7.1). Guards before any cut: `release scaffold-e2e` runs actionlint (the examples workflow's digest-pinned image) over the example, runtime and freshly scaffolded workflows; `release app-installs` executes the rendered test and coverage jobs (`starci app ci local --jobs test,coverage`) with the installed cli; the self-check package-imports refuses a packed package that loads a file npm pack does not include.
@@ -35,8 +36,9 @@ Hotfix of the red alpha.21 CI (run 39070215259) and the candidate CI flow: this 
 - Sharded coverage equals the unsharded run on lines and functions for every file (NIVO: 883 of 883), but a file may hold 1-2 more branch entries than the unsharded run (NIVO: 27 files): jest merges raw V8 across test files before it converts them, while shards convert apart. Extra entries can only add uncovered branches, never hide one. Exact branch equality (merging raw V8 across shards) is an alpha.23 follow-up.
 
 ### Evidence
-- Package versions: @starci/hfs 4.7.3, @starci/cli 1.7.3, @starci/jest-preset 2.3.2, @starci/eslint-canon-be 3.4.9, @starci/eslint-canon-fe 8.4.9 (bundled runtime copies); the earlier alpha.22 patch sets (hfs 4.7.0-4.7.2, cli 1.7.0-1.7.2, eslint-canon 3.4.5-3.4.8 / 8.4.5-8.4.8) were published; runtime 1.0.0-alpha.22.
-- The package phase was stopped after lint canons 3.4.8/8.4.8 reached npm and before HFS/CLI upload to repair the coverage prerequisites. Their published payloads stay immutable; lint canons 3.4.9/8.4.9 carry the final pins through a fresh native package phase.
+- Package versions for this cut: @starci/hfs 4.7.4, @starci/cli 1.7.4, @starci/jest-preset 2.3.2, @starci/eslint-canon-be 3.4.10, @starci/eslint-canon-fe 8.4.10 (bundled runtime copies); the earlier alpha.22 patch sets (hfs 4.7.0-4.7.3, cli 1.7.0-1.7.3, eslint-canon 3.4.5-3.4.9 / 8.4.5-8.4.9) were published; runtime 1.0.0-alpha.22.
+- The package phase was stopped after lint canons 3.4.8/8.4.8 reached npm and before HFS/CLI upload to repair the coverage prerequisites. Their published payloads stay immutable; lint canons 3.4.9/8.4.9 carried the replacement pins through the completed native package phase.
+- The NIVO v0.2.4 tag scan then exposed the unsupported Sonar heap key. HFS 4.7.4 and CLI 1.7.4 carry the correction, and lint canons 3.4.10/8.4.10 carry their matching bundled pins; the published HFS 4.7.3, CLI 1.7.3 and lint canons 3.4.9/8.4.9 stay immutable.
 
 ## [1.0.0-alpha.21] — 2026-10-18
 

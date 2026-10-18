@@ -1,5 +1,8 @@
 # Changelog
 
+## 8.4.10 - 2026-10-18
+- Changed: bundled canon pins follow @starci/hfs 4.7.4 and @starci/cli 1.7.4 for the Sonar analyzer heap property correction; canon rules are unchanged.
+
 ## 8.4.9 - 2026-10-18
 - Changed: bundled canon pins advance with both lint canons after the interrupted alpha.22 package publication; canon rules are unchanged.
 

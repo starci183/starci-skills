@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.7.4 - 2026-10-18
+- Changed: pins @starci/hfs 4.7.4 for the managed Sonar analyzer heap property correction.
+
 ## 1.7.3 - 2026-10-18
 - Changed: pins @starci/hfs 4.7.3 for the managed CI typecheck heap repair.
 

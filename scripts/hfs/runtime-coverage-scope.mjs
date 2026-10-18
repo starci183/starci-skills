@@ -76,6 +76,6 @@ sonar.sourceEncoding=UTF-8
 sonar.sources=${sources.join(',')}
 sonar.inclusions=**/${SOURCE_FILES}
 sonar.exclusions=${excludes.join(',')}
-sonar.nodejs.maxspace=8192
+sonar.javascript.node.maxspace=6144
 `;
 };
