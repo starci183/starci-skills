@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.7.7 - 2026-10-19
+- Changed: pins @starci/hfs 4.7.7 for the current canon pins carrying the front-end module classification correction.
+
 ## 1.7.5 - 2026-10-18
 - Changed: pins @starci/hfs 4.7.5 for the managed Codecov coverage scope aligned with the native logic-file proof.
 

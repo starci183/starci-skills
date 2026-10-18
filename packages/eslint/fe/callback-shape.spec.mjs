@@ -77,6 +77,9 @@ for (const edition of ["lite", "full"]) {
         { filename: CALLBACK, code: pureCallback([["const next = safeNextPath(searchParams.get(\"next\"), origin);", 'const rawNext = searchParams.get("next"); const inner = rawNext ? safeNextPath(rawNext, origin) : null; const next = inner ?? "/";']]) },
         { filename: CALLBACK, code: pureCallback([['next === "/" ? AUTH_ROUTES.workspaces : next', 'recoveryPath(searchParams.get("type"))']], `${PURE_IMPORTS}
 import { recoveryPath } from "@/modules/auth/recovery-path"`) },
+        // The public auth barrel owns pure redirect helpers just as its explicitly named implementation does.
+        { filename: CALLBACK, code: pureCallback([['next === "/" ? AUTH_ROUTES.workspaces : next', 'recoveryPath(searchParams.get("type"))']], `${PURE_IMPORTS}
+import { recoveryPath } from "@/modules/auth"`) },
         // This rule judges only the callback slot.
         { filename: at("apps/web/src/modules/auth/server.ts"), code: 'export const writeCookies = () => cookies().set("session", "value")' },
         { filename: at("apps/web/src/app/health/live/route.ts"), code: 'export async function GET() { return Response.json({ alive: true }) }' },
@@ -123,6 +126,9 @@ import { recoveryPath } from "@/modules/auth/recovery-path"`) },
         invalid(callback(BODY.replace("return NextResponse", 'const [profile] = request; return NextResponse'))),
         // A helper that does I/O, awaits, returns a non-text value or reaches a non-owner module is no pure helper; neither is an unknown export or a computed table.
         ...["remoteNext", "asyncNext", "viaRemote", "processNext", "storedNext", "objectNext", "missingHelper"].map((name) => invalid(pureCallback([["safeNextPath", name]]))),
+        // Resolving the public auth owner never grants an impure helper re-exported by its barrel.
+        invalid(pureCallback([['next === "/" ? AUTH_ROUTES.workspaces : next', 'remoteNext(searchParams.get("type"))']], `${PURE_IMPORTS}
+import { remoteNext } from "@/modules/auth"`)),
         invalid(pureCallback([["AUTH_ROUTES.workspaces", "COMPUTED_ROUTES.home"], ["AUTH_ROUTES", "COMPUTED_ROUTES"]])),
         invalid(pureCallback([['safeNextPath(searchParams.get("next"), origin)', "safeNextPath(code, origin)"]])),
         invalid(pureCallback([['safeNextPath(searchParams.get("next"), origin)', "readStore()"]], `${PURE_IMPORTS}

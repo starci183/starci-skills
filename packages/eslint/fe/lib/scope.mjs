@@ -7,6 +7,7 @@
  */
 
 import { dirname, join, resolve } from "node:path"
+import ts from "typescript"
 import { hfsOf } from "./hfs.mjs"
 import { normalizePath } from "./path.mjs"
 
@@ -139,19 +140,26 @@ export const resolveImport = (context, specifier) => {
 }
 
 /**
- * The classification of the file an import specifier resolves to, trying the extensions a module file has. Null when the
- * specifier resolves to no path.
+ * The classification of an existing module file, resolving explicit files before extension and directory-index candidates.
+ * Virtual rule inputs with no existing candidate retain the path-only slot classification.
  *
  * @param {object} context - The ESLint rule context.
  * @param {string} specifier - The module specifier.
- * @returns {object | null} The slot classification (`{ slot, root, role, ... }`) of the first candidate a slot owns.
+ * @returns {object | null} The resolved file's owned slot classification, or the virtual-input classification when no file exists.
  */
 export const classifyImport = (context, specifier) => {
   const target = resolveImport(context, specifier)
   if (target === null) return null
   const hfs = hfsOf(context)
-  // The specifier names no extension: try the ones a module file has and take the candidate a slot gives a role, else the first a slot owns.
-  const owned = [`${target}.ts`, `${target}.tsx`, `${target}/index.ts`, `${target}/index.tsx`, target]
+  const candidates = [`${target}.ts`, `${target}.tsx`, `${target}/index.ts`, `${target}/index.tsx`, target]
+  // Match the owner helper's on-disk module order; a nonexistent auth.ts must not shadow auth/index.ts.
+  const existing = [target, ...candidates].find((candidate) => ts.sys.fileExists(candidate))
+  if (existing !== undefined) {
+    const found = hfs.classify(existing)
+    return found.slot && found.status === "owned" ? found : null
+  }
+  // RuleTester deliberately accepts virtual source paths; preserve its existing slot/role inference only without a real target.
+  const owned = candidates
     .map((candidate) => hfs.classify(candidate))
     .filter((found) => found.slot && found.status === "owned")
   return owned.find((found) => found.role) ?? owned[0] ?? null

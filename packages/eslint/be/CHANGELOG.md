@@ -1,5 +1,8 @@
 # Changelog
 
+## 3.4.13 - 2026-10-19
+- Changed: bundled canon pins follow @starci/hfs 4.7.7, @starci/cli 1.7.7 and @starci/eslint-canon-fe 8.4.13; back-end canon rules are unchanged.
+
 ## 3.4.11 - 2026-10-18
 - Changed: bundled canon pins follow @starci/hfs 4.7.5 and @starci/cli 1.7.5 for the managed Codecov coverage scope correction; canon rules are unchanged.
 

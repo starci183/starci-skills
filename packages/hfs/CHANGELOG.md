@@ -1,5 +1,8 @@
 # Changelog
 
+## 4.7.7 - 2026-10-19
+- Changed: bundled canon pins follow the front-end canon's module classification correction in 8.4.13; HFS command behavior is unchanged.
+
 ## 4.7.5 - 2026-10-18
 - Fixed: Codecov ignores the same slot-derived coverage complement as Sonar, including imported config, module and persistence files in shard reports. Project, patch and component targets remain at 100% on every measured logic file.
 
