@@ -24,6 +24,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { isDeepStrictEqual } from 'node:util';
+import { parseYaml } from '../../engine/yaml.mjs';
 import { walkFiles } from '../lib/walk.mjs';
 import { generatedRootsOf, isHistoryPath } from '../lib/check-scan.mjs';
 import { ts } from '../hfs/runtime-rules/source-ast.mjs';
@@ -65,6 +67,95 @@ const dropGeneratedBlocks = (text) => {
     return inside ? '' : line;
   }).join('\n');
 };
+
+const YAML_IGNORE_HEADER = /^ignore[ \t]*:[ \t]*(?:#.*)?\r?$/;
+const YAML_IGNORE_PATTERN = /^[A-Za-z0-9_@./{},*?+!-]+$/;
+
+/** A parsed top-level ignore string sequence is the authority for locating its source scalars. */
+function yamlIgnoreDocument(text) {
+  let doc;
+  try { doc = parseYaml(text); } catch { return null; }
+  if (!doc || typeof doc !== 'object' || !Object.hasOwn(doc, 'ignore')
+    || !Array.isArray(doc.ignore) || !doc.ignore.length || !doc.ignore.every(value => typeof value === 'string')) return null;
+  return doc;
+}
+
+/** Find a one-line quoted scalar's end in one pass, respecting double-quote escapes and doubled single quotes. */
+function yamlQuotedScalarEnd(line, start) {
+  const quote = line[start];
+  for (let index = start + 1; index < line.length; index += 1) {
+    const char = line[index];
+    if (quote === '"' && char === '\\') { index += 1; continue; }
+    if (char !== quote) continue;
+    if (quote === "'" && line[index + 1] === "'") { index += 1; continue; }
+    return index + 1;
+  }
+  return null;
+}
+
+const yamlHorizontalSpace = char => char === ' ' || char === '\t';
+
+/** Locate one simple sequence scalar without consuming its trailing comment or line ending. */
+function yamlSequenceScalar(line) {
+  const indent = line.search(/\S/);
+  if (indent < 0 || line[indent] !== '-' || !yamlHorizontalSpace(line[indent + 1])) return null;
+  let start = indent + 1;
+  while (yamlHorizontalSpace(line[start])) start += 1;
+  const quote = line[start];
+  let end;
+  if (quote === '"' || quote === "'") end = yamlQuotedScalarEnd(line, start);
+  else {
+    const comment = line.indexOf('#', start);
+    end = start + line.slice(start, comment < 0 ? line.length : comment).trimEnd().length;
+  }
+  if (end === null || end === start) return null;
+  const tail = line.slice(end).trimStart();
+  if (tail && !tail.startsWith('#')) return null;
+  return { indent, prefix: line.slice(0, start), value: line.slice(start, end), suffix: line.slice(end) };
+}
+
+/** Locate only a consistently indented block sequence of the parsed array's exact length. */
+function yamlIgnoreScalars(lines, header, count) {
+  const scalars = [];
+  let itemIndent = null;
+  for (let index = header + 1; index < lines.length && scalars.length < count; index += 1) {
+    const trimmed = lines[index].trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const scalar = yamlSequenceScalar(lines[index]);
+    if (!scalar) return null;
+    if (itemIndent !== null && scalar.indent !== itemIndent) return null;
+    itemIndent = scalar.indent;
+    scalars.push({ index, ...scalar });
+  }
+  return scalars.length === count ? scalars : null;
+}
+
+/** The located ranges must belong only to top-level ignore, including when surrounding YAML contains multiline scalars. */
+function ownsYamlIgnoreScalars(lines, doc, scalars) {
+  const probe = [...lines];
+  for (const scalar of scalars) probe[scalar.index] = `${scalar.prefix}null${scalar.suffix}`;
+  let parsedProbe;
+  try { parsedProbe = parseYaml(probe.join('\n')); } catch { return false; }
+  return isDeepStrictEqual(parsedProbe, { ...doc, ignore: doc.ignore.map(() => null) });
+}
+
+/** Top-level YAML ignore sequences contain exclusion patterns, not citations. Unsupported shapes retain the original scan; comments and line positions stay intact. */
+function dropYamlIgnorePatterns(text) {
+  const lines = text.split('\n');
+  const headers = lines.flatMap((line, index) => YAML_IGNORE_HEADER.test(line) ? [index] : []);
+  if (headers.length !== 1) return text;
+  const doc = yamlIgnoreDocument(text);
+  if (!doc) return text;
+  const scalars = yamlIgnoreScalars(lines, headers[0], doc.ignore.length);
+  if (!scalars || !ownsYamlIgnoreScalars(lines, doc, scalars)) return text;
+
+  for (const [index, scalar] of scalars.entries()) {
+    if (YAML_IGNORE_PATTERN.test(doc.ignore[index]))
+      lines[scalar.index] = `${scalar.prefix}${' '.repeat(scalar.value.length)}${scalar.suffix}`;
+  }
+  return lines.join('\n');
+}
+
 const expandBraces = (token) => {
   const open = token.indexOf('{');
   if (open < 0) return [token];
@@ -226,6 +317,7 @@ function checkContractCites(root = DEFAULT_ROOT, scan = DEFAULT_SCAN) {
     const rel = path.relative(root, file).replaceAll('\\', '/');
     const text = fs.readFileSync(file, 'utf8');
     let prose = SOURCE_EXT.test(rel) ? commentsAsText(rel, text) : text;
+    if (/\.ya?ml$/.test(rel)) prose = dropYamlIgnorePatterns(prose);
     if (MANIFEST_SLOTS.has(rel)) prose = dropSlotPathValues(prose);
     checked += citesCheckedIn(root, rel, prose, readTarget, dead);
   }
