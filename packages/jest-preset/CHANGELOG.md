@@ -1,5 +1,8 @@
 # Changelog
 
+## 2.3.2 - 2026-10-18
+- Added: shard mode `STARCI_COVERAGE_SHARD=1` (only the loaded files are measured, no per-file threshold, istanbul JSON) and `@starci/jest-preset/merge` (istanbul-lib-coverage merge by source location, lcov through the preset reporter): the coverage job of the sharded managed CI.
+
 ## 2.3.1 - 2026-10-18
 
 - Fixed: coverage excludes only compiler-emitted constructor `design:paramtypes` metadata guards injected by the preset transform; application source is never excluded, and the generated anchor is omitted from LCOV.

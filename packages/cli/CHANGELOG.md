@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.7.2 - 2026-10-18
+- Changed: pins @starci/hfs 4.7.2; `app coverage merge` help names the shard istanbul reports.
+
 ## 1.7.1 - 2026-10-18
 - Fixed: `app coverage merge` declares its variadic report paths (1.7.0 refused the rendered `merge --out <lcov> <dir>` as too many positional arguments); pins @starci/hfs 4.7.1.
 

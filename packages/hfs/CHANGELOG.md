@@ -1,5 +1,8 @@
 # Changelog
 
+## 4.7.2 - 2026-10-18
+- Fixed: `app coverage merge` merges the shard istanbul maps through the installed @starci/jest-preset/merge (4.7.1 merged lcov text and reported phantom gaps on real data); the managed unit step sets STARCI_COVERAGE_SHARD and uploads coverage-final.json; `app lint` accepts a canon inside the app's linked node_modules.
+
 ## 4.7.1 - 2026-10-18
 - Fixed: the package files list carries coverage/ (4.7.0 shipped `app coverage merge` without coverage/cli.mjs); the lint upload condition of the managed CI names the per-side report with format() instead of a nested ${{ }} that actionlint reads as always true.
 

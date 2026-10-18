@@ -29,8 +29,11 @@ Hotfix of the red alpha.21 CI (run 39070215259) and the candidate CI flow: this 
 - npm audit --omit=dev --audit-level=high is clean again without the breaking @nestjs/graphql 14: every scaffolded app root and the examples that serve GraphQL (ecommerce-app, lite-app, relocked) carry the npm override `@graphql-tools/utils` 12.1.0 (canon pin; GHSA-7mx3-vvmw-hjmv covers <=12.0.0; 12.1.0 is the lowest fix every declared range accepts). Owner ruling graphql-tools-utils-override; drop it when @nestjs/graphql 14 is adopted.
 - alpha.21 CI "Scaffold app against registry installs": e2e/hfs-scaffold-app.spec.mjs read `jobs.ci.steps` after the rendered CI split into fast/test/build/sonar (and expected a plain 'lcov' reporter); it now finds the unit run and the upload in the test job by content. The published hfs 4.6.0 / cli 1.6.0 were not defective: the fixed spec passes 7 of 7 against them.
 
+### Known limitations
+- Sharded coverage equals the unsharded run on lines and functions for every file (NIVO: 883 of 883), but a file may hold 1-2 more branch entries than the unsharded run (NIVO: 27 files): jest merges raw V8 across test files before it converts them, while shards convert apart. Extra entries can only add uncovered branches, never hide one. Exact branch equality (merging raw V8 across shards) is an alpha.23 follow-up.
+
 ### Evidence
-- Packages: @starci/hfs 4.7.1, @starci/cli 1.7.1 (4.7.0 / 1.7.0 were published and are superseded), @starci/eslint-canon-be 3.4.6, @starci/eslint-canon-fe 8.4.6 (bundled runtime copies; 3.4.5 / 8.4.5 published and superseded); runtime 1.0.0-alpha.22.
+- Packages: @starci/hfs 4.7.2, @starci/cli 1.7.2, @starci/jest-preset 2.3.2, @starci/eslint-canon-be 3.4.7, @starci/eslint-canon-fe 8.4.7 (bundled runtime copies); the earlier alpha.22 patch sets (hfs 4.7.0 / 4.7.1, cli 1.7.0 / 1.7.1, eslint-canon 3.4.5-3.4.6 / 8.4.5-8.4.6) were published and are superseded; runtime 1.0.0-alpha.22.
 
 ## [1.0.0-alpha.21] — 2026-10-18
 

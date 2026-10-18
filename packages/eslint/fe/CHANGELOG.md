@@ -1,5 +1,8 @@
 # Changelog
 
+## 8.4.7 - 2026-10-18
+- Changed: bundled runtime copies follow the alpha.22 re-cut (canon pins hfs 4.7.2, cli 1.7.2, jest-preset 2.3.2); canon rules are unchanged.
+
 ## 8.4.6 - 2026-10-18
 - Changed: bundled runtime copies follow the alpha.22 re-cut (canon pins hfs 4.7.1, cli 1.7.1); canon rules are unchanged.
 
