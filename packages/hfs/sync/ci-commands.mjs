@@ -92,14 +92,14 @@ function codecovSteps(lcovReport, codecov) {
 }
 
 /** Sonar consumes the test coverage and fast lint artifacts only on release tags with a configured token. */
-function sonarJob(sonar, lcovReport, lcovArtifact, nodeMajor) {
+function sonarJob(sonar, lcovReport, lcovArtifact, nodeMajor, timeout) {
   if (!sonar) return '';
   const condition = sonar.optional ? SONAR_CONDITION.replace(' }}', " && steps.sonar-availability.outputs.up == 'true' }}") : SONAR_CONDITION;
   const host = sonar.provider === 'sonarcloud' ? 'https://sonarcloud.io' : `\${{ vars.${sonar.hostVar} }}`;
   const header = [
     '  sonar:',
-    '    needs: [fast, test]',
-    '    timeout-minutes: 20',
+    '    needs: [lint, coverage]',
+    `    timeout-minutes: ${timeout}`,
     '    runs-on: ubuntu-latest',
     '    env:',
     `      SONAR_TOKEN: \${{ secrets.${sonar.token} }}`,
@@ -116,8 +116,10 @@ function sonarJob(sonar, lcovReport, lcovArtifact, nodeMajor) {
     `      - uses: ${DOWNLOAD_ARTIFACT}`,
     `        if: ${condition}`,
     '        with:',
-    '          name: sonar-lint',
+    '          pattern: sonar-lint-*',
     '          path: reports',
+    '          merge-multiple: true',
+    ...sonarMergeSteps(condition),
     '      - uses: SonarSource/sonarqube-scan-action@c7ee0f9df90b7aa20e8dcf9695dcfe2e7da5b4f2 # v7.2.1',
     `        if: ${condition}`,
     '      - uses: SonarSource/sonarqube-quality-gate-action@7a5fffe8e523c40e0c740b6bc2712ab503e52efa # v1.2.1',
@@ -187,11 +189,11 @@ function frontendBuild(source, app) {
   return { env: singleEnv, steps };
 }
 
-/** Side lint reports join into the single Sonar artifact even when one side could not write its report. */
-function sonarMergeSteps() {
+/** The per-side lint reports (one artifact per lint matrix side) join into the one reports/lint.sonar.json the Sonar import reads, even when one side wrote none. */
+function sonarMergeSteps(condition) {
   return [
     '      - name: merge Sonar lint reports',
-    "        if: always() && env.SONAR_TOKEN != ''",
+    `        if: ${condition}`,
     '        run: |',
     "          node --input-type=module <<'NODE'",
     "          import fs from 'node:fs';",
@@ -205,6 +207,20 @@ function sonarMergeSteps() {
   ];
 }
 
+const STANDARD = new URL('../runtime/knowledge/hfs/ci-standard.yaml', import.meta.url);
+/** The per-job settings of the managed CI: ci.jobs.<job>.timeoutMinutes and ci.jobs.test.shards of the manifest over the defaults of the CI standard. */
+function ciJobSettings(declaration) {
+  const defaults = parseYaml(fs.readFileSync(STANDARD, 'utf8')).defaults;
+  const jobs = declaration?.ci?.jobs ?? {};
+  const timeout = (job) => String(jobs[job]?.timeoutMinutes ?? defaults.timeoutMinutes[job]);
+  const shards = Number(jobs.test?.shards ?? defaults.shards);
+  return {
+    timeoutFast: timeout('fast'), timeoutLint: timeout('lint'), timeoutTest: timeout('test'), timeoutCoverage: timeout('coverage'),
+    timeoutBuild: timeout('build'), timeoutSonar: timeout('sonar'), timeoutDbTypes: timeout('db-types'),
+    testShards: `[${Array.from({ length: shards }, (_, index) => index + 1).join(', ')}]`, testShardTotal: String(shards),
+  };
+}
+
 /** An omitted quality declaration preserves hosted Sonar, required OIDC Codecov, and the high production dependency audit. */
 export function ciWorkflowCommands(source, lcovReport = 'be/coverage/lcov.info', quality = undefined, { nodeMajor = '22', app } = {}) {
   const configuredSonar = quality === undefined ? { token: 'SONAR_TOKEN', hostVar: 'SONAR_HOST_URL' } : quality.sonar;
@@ -213,7 +229,11 @@ export function ciWorkflowCommands(source, lcovReport = 'be/coverage/lcov.info',
   const audit = quality?.audit ?? { level: 'high', omitDev: true };
   const lcovArtifact = 'coverage-lcov';
   const build = frontendBuild(source, app);
+  const settings = ciJobSettings(buildDeclaration(source));
+  const side = '${{ matrix.side }}';
   return {
+    ...settings,
+    lcovShardsDir: lcovReport.split('/').slice(0, -1).concat('shards').join('/'),
     ciBuildEnv: build.env,
     ciBuildSteps: build.steps,
     ciLint: exampleCommand(source, 'npm run lint'),
@@ -224,32 +244,28 @@ export function ciWorkflowCommands(source, lcovReport = 'be/coverage/lcov.info',
     sonarTokenSecret: sonar?.token ?? 'SONAR_TOKEN',
     sonarHostVar: sonar?.hostVar ?? 'SONAR_HOST_URL',
     sonarEnv: sonar ? `    env:\n      SONAR_TOKEN: \${{ secrets.${sonar.token} }}` : '',
+    // One lint job per side (the lint matrix): with a Sonar token each side writes its own report, uploaded as sonar-lint-<side> and merged by the sonar job.
     ciLintSteps: [
-      ...['be', 'fe'].flatMap((side) => [
-        '      - name: lint ' + side,
-        ...(sonar ? ["        if: env.SONAR_TOKEN == ''"] : []),
-        `        run: ${exampleCommand(source, 'npm run lint -- --side ' + side)}`,
+      '      - name: lint',
+      ...(sonar ? ["        if: env.SONAR_TOKEN == ''"] : []),
+      `        run: ${exampleCommand(source, 'npm run lint -- --side ' + side)}`,
+      '        env:',
+      '          NODE_OPTIONS: --max-old-space-size=6144',
+      ...(sonar ? [
+        '      - name: lint with Sonar import',
+        "        if: env.SONAR_TOKEN != ''",
+        `        run: ${exampleCommand(source, 'npm run lint -- --side ' + side + ' --sonar reports/lint.' + side + '.sonar.json')}`,
         '        env:',
         '          NODE_OPTIONS: --max-old-space-size=6144',
-      ]),
-      ...(sonar ? [
-        ...['be', 'fe'].flatMap((side) => [
-          '      - name: lint ' + side + ' with Sonar import',
-          "        if: env.SONAR_TOKEN != ''",
-          `        run: ${exampleCommand(source, 'npm run lint -- --side ' + side + ' --sonar reports/lint.' + side + '.sonar.json')}`,
-          '        env:',
-          '          NODE_OPTIONS: --max-old-space-size=6144',
-        ]),
-        ...sonarMergeSteps(),
         `      - uses: ${UPLOAD_ARTIFACT}`,
-        "        if: always() && env.SONAR_TOKEN != '' && hashFiles('reports/lint.sonar.json') != ''",
+        `        if: always() && env.SONAR_TOKEN != '' && hashFiles('reports/lint.${side}.sonar.json') != ''`,
         '        with:',
-        '          name: sonar-lint',
-        '          path: reports/lint.sonar.json',
+        `          name: sonar-lint-${side}`,
+        `          path: reports/lint.${side}.sonar.json`,
       ] : []),
     ].join('\n'),
     codecovSteps: codecovSteps(lcovReport, codecov),
-    sonarJob: sonarJob(sonar, lcovReport, lcovArtifact, nodeMajor),
+    sonarJob: sonarJob(sonar, lcovReport, lcovArtifact, nodeMajor, settings.timeoutSonar),
     lcovArtifact,
   };
 }

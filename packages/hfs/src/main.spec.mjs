@@ -15,7 +15,8 @@ test('the app implementation loads with no installed dependency and refuses a mi
   assert.match(err, /^starci app check /m);
   assert.match(err, /^starci app scaffold <name>/m);
   assert.match(err, /^starci app secret list/m);
-  assert.deepEqual(VERBS, ['scaffold', 'add', 'lint', 'sync', 'check', 'upgrade', 'stack', 'release', 'explain', 'emit', 'new', 'secret', 'ci', 'db', 'hygiene']);
+  assert.match(err, /^starci app coverage merge --out <lcov>/m);
+  assert.deepEqual(VERBS, ['scaffold', 'add', 'lint', 'sync', 'check', 'upgrade', 'stack', 'release', 'explain', 'emit', 'new', 'secret', 'ci', 'db', 'hygiene', 'coverage']);
 });
 
 test('global options use cwd and upgrade refuses a lite target with its typed usage exit', async (t) => {

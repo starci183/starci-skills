@@ -7,7 +7,7 @@ description: >-
   for the items marked `check: ci-standard`, the rules or renders named in `by` for the others.
 type: object
 additionalProperties: false
-required: [schema, id, title, jobs, heap, items]
+required: [schema, id, title, jobs, defaults, heap, items]
 properties:
   schema:
     const: starci/ci-standard@1
@@ -23,6 +23,24 @@ properties:
     properties:
       full: {$ref: '#/$defs/jobShape'}
       lite: {$ref: '#/$defs/jobShape'}
+  defaults:
+    type: object
+    additionalProperties: false
+    required: [shards, timeoutMinutes]
+    properties:
+      shards: {type: integer, minimum: 1, maximum: 20}
+      timeoutMinutes:
+        type: object
+        additionalProperties: false
+        required: [fast, lint, test, coverage, build, sonar, db-types]
+        properties:
+          fast: {$ref: '#/$defs/minutes'}
+          lint: {$ref: '#/$defs/minutes'}
+          test: {$ref: '#/$defs/minutes'}
+          coverage: {$ref: '#/$defs/minutes'}
+          build: {$ref: '#/$defs/minutes'}
+          sonar: {$ref: '#/$defs/minutes'}
+          db-types: {$ref: '#/$defs/minutes'}
   heap:
     type: object
     additionalProperties: false
@@ -35,6 +53,7 @@ properties:
     minItems: 1
     items: {$ref: '#/$defs/item'}
 $defs:
+  minutes: {type: integer, minimum: 5, maximum: 360}
   jobId:
     type: string
     pattern: "^[a-z][a-z0-9-]*$"

@@ -1,10 +1,10 @@
 group: app
 verb: ci
 owner: "@starci/hfs"
-summary: set declared GitHub CI secrets and variables and verify their custody
+summary: set declared GitHub CI secrets and variables, verify their custody, or run the managed CI locally
 impl: null
 positional:
-  - {name: action, enum: [secret, var, verify], required: true, variadic: false}
+  - {name: action, enum: [secret, var, verify, local], required: true, variadic: false}
   - {name: operation, enum: [set, sync], required: false, variadic: false}
   - {name: name, required: false, variadic: false}
 flags:
@@ -13,8 +13,15 @@ flags:
   - {name: repo, type: string, summary: override the app repository with owner/name}
   - {name: value, type: string, summary: public variable value that must agree with the manifest; var set ownerValue requires stdin instead}
   - {name: execute, type: boolean, summary: apply the variable sync plan; var sync skips ownerValue variables}
-  - {name: json, type: boolean, summary: print verification findings as JSON}
-exit: {"0": action completed or verification clean, "1": verification findings, "2": refusal or bad usage}
+  - {name: json, type: boolean, summary: print verification findings (or the local plan and results) as JSON}
+  - {name: jobs, type: string, summary: "local: the jobs to run, comma separated (default fast,lint,test,coverage,build; sonar and db-types only when named)"}
+  - {name: parallel, type: string, summary: "local: job instances run at once (default half the CPUs, at most 4)"}
+  - {name: dry-run, type: boolean, summary: "local: print which steps would run and which only GitHub can run"}
+conventions:
+  - "local reads .github/workflows/ci.yml and runs every job instance (matrix values substituted) on this machine, in parallel, a job after its needs"
+  - "it skips what only GitHub runs (uses: actions, npm ci, the lint baseline, a step whose if: needs a Sonar token, a tag ref or step outputs) and lists it"
+  - "the unit shards write be/coverage/shards/shard-<i>, which the coverage job merges; each instance logs to a temp directory"
+exit: {"0": "action completed, verification clean or every local job green", "1": "verification findings or a local job red", "2": refusal or bad usage}
 json: flag
 examples:
   - starci app ci secret set SONAR_TOKEN
@@ -24,4 +31,6 @@ examples:
   - starci app ci var sync
   - starci app ci var sync --execute
   - starci app ci verify --json
+  - starci app ci local --dry-run
+  - starci app ci local --jobs lint,test --parallel 4
 editions: [full, lite]

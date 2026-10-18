@@ -13,7 +13,7 @@ _starci() {
     fi
     if [ "$COMP_CWORD" -eq 2 ]; then
         case "$group" in
-        app) COMPREPLY=( $(compgen -W "add check ci db emit explain hygiene lint new release scaffold secret stack sync upgrade" -- "$cur") );;
+        app) COMPREPLY=( $(compgen -W "add check ci coverage db emit explain hygiene lint new release scaffold secret stack sync upgrade" -- "$cur") );;
         check) COMPREPLY=( $(compgen -W "run" -- "$cur") );;
         connect) COMPREPLY=( $(compgen -W "ask-gateway telegram telegram-media tunnel" -- "$cur") );;
         debug) COMPREPLY=( $(compgen -W "digest run" -- "$cur") );;
@@ -63,6 +63,10 @@ _starci() {
         app:ci:--env) return 0;;
         app:ci:--repo) return 0;;
         app:ci:--value) return 0;;
+        app:ci:--jobs) return 0;;
+        app:ci:--parallel) return 0;;
+        app:coverage:--out) return 0;;
+        app:coverage:--cwd) return 0;;
         app:db:--out) return 0;;
         app:db:--auth) return 0;;
         app:db:--storage) return 0;;
@@ -987,7 +991,8 @@ _starci() {
     case "$group:$verb" in
         app:add) COMPREPLY=( $(compgen -W "--event --from --service --connection --owner --failed --done --fe --no-types --json --cwd --quiet --help --edition" -- "$cur") );;
         app:check) COMPREPLY=( $(compgen -W "--fast --base --wiring --coverage-from --json --cwd --quiet --help --edition" -- "$cur") );;
-        app:ci) COMPREPLY=( $(compgen -W "--env --dependabot --repo --value --execute --json --json --cwd --quiet --help --edition" -- "$cur") );;
+        app:ci) COMPREPLY=( $(compgen -W "--env --dependabot --repo --value --execute --json --jobs --parallel --dry-run --json --cwd --quiet --help --edition" -- "$cur") );;
+        app:coverage) COMPREPLY=( $(compgen -W "--out --cwd --json --cwd --quiet --help --edition" -- "$cur") );;
         app:db) COMPREPLY=( $(compgen -W "--out --schema-only --auth --storage --backup --stamp --map --apply --local --execute --linked --url-env --green-at --owner-confirms-old-app-gone --json --json --cwd --quiet --help --edition" -- "$cur") );;
         app:emit) COMPREPLY=( $(compgen -W "--json --cwd --quiet --help --edition" -- "$cur") );;
         app:explain) COMPREPLY=( $(compgen -W "--json --cwd --quiet --help --edition" -- "$cur") );;

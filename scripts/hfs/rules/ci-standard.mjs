@@ -1,10 +1,13 @@
 // ci-standard.mjs - R301 CI_STANDARD: the one StarCi CI standard (knowledge/hfs/ci-standard.yaml, OWNER RULING ci-standard 2026-10-18: ".claude defines ONE standard CI
 // ruleset, its own CI and the examples follow it, and apps inherit it"). This file checks the items the standard marks `check: ci-standard`:
-//   job-shape              the managed ci.yml holds exactly the edition's jobs; the unit run and the Codecov upload are steps of `test`, which alone holds the OIDC id-token
-//   full-history-base-ref  every actions/checkout fetches the full history; the fast job writes STARCI_BASE_REF before it lints
+//   job-shape              the managed ci.yml holds exactly the edition's jobs; the unit run is in `test`, the proof and the Codecov upload in `coverage` (the one OIDC job)
+//   full-history-base-ref  every actions/checkout fetches the full history; a job that lints writes STARCI_BASE_REF before it lints
 //   heap-per-step          every heavy step (heap.steps) declares NODE_OPTIONS --max-old-space-size >= heap.minMiB on the step
 //   sonar-lint-per-side    a lint with --sonar names --side
 //   optional-providers     an optional (continue-on-error) Codecov or Sonar step follows its availability probe in the same job
+//   test-sharding          the test job is a shard matrix; each shard runs --shard=i/N without the per-file threshold; the coverage job merges, then proves
+//   lint-parallel          the lint job is a matrix over side [be, fe]
+//   cache-saved-always     no cache keyed by the commit sha; actions/cache/save runs under if: always()
 //   timeouts               every job declares timeout-minutes
 //   sha-pinned-actions     every remote `uses:` names a 40-hex commit sha (docker:// a sha256 digest; ./ local actions allowed)
 // `ciStandardFindings({doc, file, scope})` is the pure core: scope `app-ci` (an app's managed .github/workflows/ci.yml: the example apps and every app through the
@@ -15,6 +18,7 @@ import { parseWorkflow } from '../runtime-rules/workflow-source.mjs';
 import { found } from './read.mjs';
 import { appWorkflowFindings } from './app-workflow-findings.mjs';
 import { isPlainObject as record } from '../../../engine/plain-object.mjs';
+import { byCodeUnit } from '../../lib/list.mjs';
 
 export const CI_STANDARD = 'CI_STANDARD';
 const STANDARD_FILE = new URL('../../../knowledge/hfs/ci-standard.yaml', import.meta.url);
@@ -52,10 +56,47 @@ function jobShape(doc, edition, standard, say) {
   const withStep = (match) => jobsOf(doc).filter(([, job]) => stepsOf(job).some((step) => match(step))).map(([id]) => id);
   const unit = withStep((step) => step.name === 'unit');
   const upload = withStep((step) => usesOf(step).startsWith('codecov/codecov-action@'));
+  const proof = withStep((step) => /app check --coverage-from/.test(runOf(step)));
   if (unit.join() !== 'test') out.push(say('job-shape', `the unit run must be a step of the test job alone, not of ${unit.join(', ') || 'no job'}`));
-  if (upload.length && upload.join() !== 'test') out.push(say('job-shape', `the Codecov upload must be a step of the test job alone, not of ${upload.join(', ')}`));
+  if (proof.join() !== 'coverage') out.push(say('job-shape', `the coverage proof must be a step of the coverage job alone, not of ${proof.join(', ') || 'no job'}`));
+  if (upload.length && upload.join() !== 'coverage') out.push(say('job-shape', `the Codecov upload must be a step of the coverage job alone, not of ${upload.join(', ')}`));
   const oidc = jobsOf(doc).filter(([, job]) => job.permissions?.['id-token'] === 'write').map(([id]) => id);
-  if (upload.length && oidc.join() !== 'test') out.push(say('job-shape', `only the test job holds the OIDC id-token (id-token: write), not ${oidc.join(', ') || 'no job'}`));
+  if (upload.length && oidc.join() !== 'coverage') out.push(say('job-shape', `only the coverage job holds the OIDC id-token (id-token: write), not ${oidc.join(', ') || 'no job'}`));
+  return out;
+}
+
+function testSharding(doc, say) {
+  const test = record(doc.jobs?.test) ? doc.jobs.test : null;
+  if (!test) return [];
+  const out = [];
+  const shards = test.strategy?.matrix?.shard;
+  if (!Array.isArray(shards) || !shards.length) out.push(say('test-sharding', 'the test job must be a matrix over shard (ci.jobs.test.shards)'));
+  const unit = stepsOf(test).find((step) => step.name === 'unit');
+  const total = /--shard=\$\{\{\s*matrix\.shard\s*\}\}\/(\d+)/.exec(unit ? runOf(unit) : '');
+  if (unit && !total) out.push(say('test-sharding', 'the unit run must pass --shard=${{ matrix.shard }}/<N>'));
+  if (total && Array.isArray(shards) && Number(total[1]) !== shards.length) out.push(say('test-sharding', `the unit run's shard total ${total[1]} must equal the ${shards.length} matrix shards`));
+  if (unit && !runOf(unit).includes('--coverageThreshold={}')) out.push(say('test-sharding', 'a shard measures without the per-file threshold (--coverageThreshold={}); the coverage job proves it on the merged report'));
+  const coverage = record(doc.jobs?.coverage) ? stepsOf(doc.jobs.coverage) : [];
+  const merge = coverage.findIndex((step) => /app coverage merge\b/.test(runOf(step)));
+  const proof = coverage.findIndex((step) => /app check --coverage-from/.test(runOf(step)));
+  if (merge < 0 || (proof >= 0 && merge > proof)) out.push(say('test-sharding', 'the coverage job must merge the shard reports (starci app coverage merge) before the coverage proof'));
+  return out;
+}
+
+function lintParallel(doc, say) {
+  const sides = record(doc.jobs?.lint) ? doc.jobs.lint.strategy?.matrix?.side : null;
+  return Array.isArray(sides) && sides.map(String).sort(byCodeUnit).join() === 'be,fe' ? [] : [say('lint-parallel', 'the lint job must be a matrix over side [be, fe]')];
+}
+
+function cacheSavedAlways(doc, say) {
+  const out = [];
+  for (const [id, job] of jobsOf(doc)) {
+    for (const step of stepsOf(job)) {
+      const uses = usesOf(step);
+      if (/^actions\/cache(?:\/restore)?@/.test(uses) && String(step.with?.key ?? '').includes('github.sha')) out.push(say('cache-saved-always', `job ${id}: a cache keyed by the commit sha never warms; key it by the lockfile hash (and the run) with restore-keys`));
+      if (uses.startsWith('actions/cache/save@') && !/^(?:\$\{\{\s*)?always\(\)/.test(String(step.if ?? '').trim())) out.push(say('cache-saved-always', `job ${id}: actions/cache/save runs under if: always(), so a red run still warms the cache`));
+    }
+  }
   return out;
 }
 
@@ -66,10 +107,12 @@ function fullHistory(doc, say) {
       if (usesOf(step).startsWith('actions/checkout@') && String(step.with?.['fetch-depth']) !== '0') out.push(say('full-history-base-ref', `job ${id}: actions/checkout must fetch the full history (fetch-depth: 0)`));
     }
   }
-  const fast = record(doc.jobs?.fast) ? stepsOf(doc.jobs.fast) : [];
-  const base = fast.findIndex((step) => /STARCI_BASE_REF=.*>>\s*"?\$GITHUB_ENV"?/.test(runOf(step)));
-  const lint = fast.findIndex((step) => /\bnpm run lint\b|\bstarci app lint\b/.test(runOf(step)));
-  if (lint >= 0 && (base < 0 || base > lint)) out.push(say('full-history-base-ref', 'the fast job must write STARCI_BASE_REF to GITHUB_ENV before its first lint step'));
+  for (const [id, job] of jobsOf(doc)) {
+    const steps = stepsOf(job);
+    const base = steps.findIndex((step) => /STARCI_BASE_REF=.*>>\s*"?\$GITHUB_ENV"?/.test(runOf(step)));
+    const lint = steps.findIndex((step) => /\bnpm run lint\b|\bstarci app lint\b/.test(runOf(step)));
+    if (lint >= 0 && (base < 0 || base > lint)) out.push(say('full-history-base-ref', `job ${id} must write STARCI_BASE_REF to GITHUB_ENV before its first lint step`));
+  }
   return out;
 }
 
@@ -91,7 +134,7 @@ function sonarLintPerSide(doc, say) {
   for (const [id, job] of jobsOf(doc)) {
     for (const step of stepsOf(job)) {
       const run = runOf(step);
-      if (/\b(?:npm run lint|starci(?:\.mjs)?["']?\s+app lint|app lint)\b/.test(run) && /\s--sonar\b/.test(run) && !/\s--side\s+(?:be|fe)\b/.test(run)) {
+      if (/\b(?:npm run lint|starci(?:\.mjs)?["']?\s+app lint|app lint)\b/.test(run) && /\s--sonar\b/.test(run) && !/\s--side\s+(?:be\b|fe\b|\$\{\{\s*matrix\.side\s*\}\})/.test(run)) {
         out.push(say('sonar-lint-per-side', `job ${id}, step ${step.name ?? 'lint'}: a lint with a Sonar import must name its side (--side be|fe) and the reports are merged afterwards; a combined lint with Sonar breaks the standard`));
       }
     }
@@ -142,6 +185,9 @@ export function ciStandardFindings({ doc, file, scope, edition = 'full', standar
     'heap-per-step': () => heapPerStep(doc, standard, say),
     'sonar-lint-per-side': () => sonarLintPerSide(doc, say),
     'optional-providers': () => optionalProviders(doc, say),
+    'test-sharding': () => testSharding(doc, say),
+    'lint-parallel': () => lintParallel(doc, say),
+    'cache-saved-always': () => cacheSavedAlways(doc, say),
     timeouts: () => timeouts(doc, say),
     'sha-pinned-actions': () => shaPinned(doc, say),
   };

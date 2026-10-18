@@ -62,7 +62,7 @@ starci app check --coverage-from coverage/lcov.info
 
 ### starci app ci
 
-set declared GitHub CI secrets and variables and verify their custody
+set declared GitHub CI secrets and variables, verify their custody, or run the managed CI locally
 
 | flag | type | |
 | --- | --- | --- |
@@ -72,10 +72,19 @@ set declared GitHub CI secrets and variables and verify their custody
 | `--value` | string |  |
 | `--execute` | boolean |  |
 | `--json` | boolean |  |
+| `--jobs` | string |  |
+| `--parallel` | string |  |
+| `--dry-run` | boolean |  |
 
 Positionals: action, operation?, name?
 
-exit: 0 action completed or verification clean; 1 verification findings; 2 refusal or bad usage
+Conventions:
+
+- local reads .github/workflows/ci.yml and runs every job instance (matrix values substituted) on this machine, in parallel, a job after its needs
+- it skips what only GitHub runs (uses: actions, npm ci, the lint baseline, a step whose if: needs a Sonar token, a tag ref or step outputs) and lists it
+- the unit shards write be/coverage/shards/shard-<i>, which the coverage job merges; each instance logs to a temp directory
+
+exit: 0 action completed, verification clean or every local job green; 1 verification findings or a local job red; 2 refusal or bad usage
 
 json: flag
 
@@ -87,6 +96,34 @@ starci app ci var set SONAR_HOST_URL
 starci app ci var sync
 starci app ci var sync --execute
 starci app ci verify --json
+starci app ci local --dry-run
+starci app ci local --jobs lint,test --parallel 4
+```
+
+### starci app coverage
+
+merge the lcov reports of the sharded unit run into one report
+
+| flag | type | |
+| --- | --- | --- |
+| `--out` | string |  |
+| `--cwd` | string |  |
+
+Positionals: action
+
+Conventions:
+
+- the CI standard shards the unit run (npm test -- --shard=i/N); each shard writes an lcov over the whole coverage scope
+- merge sums every line, function and branch hit by identity across the reports and writes one record per source file
+- a path is an lcov file or a directory searched for every lcov.info below it; no report found refuses (exit 2), never an empty report
+- the coverage proof (starci app check --coverage-from), the Codecov upload and the Sonar import read the merged report
+
+exit: 0 merged; 2 bad usage or no report found
+
+json: none
+
+```sh
+starci app coverage merge --out be/coverage/lcov.info be/coverage/shards
 ```
 
 ### starci app db

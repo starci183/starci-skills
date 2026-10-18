@@ -16,12 +16,12 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: false
 
+# The job shape of the StarCi CI standard (knowledge/hfs/ci-standard.yaml): fast, lint per side, the unit run in shards, one coverage merge, build,
+# sonar, and the database types of the lite edition. Timeouts and the shard count come from ci.jobs of .starcistacks/application-stacks.yaml (defaults in the standard).
 jobs:
   fast:
     timeout-minutes: 20
     runs-on: ubuntu-latest
-    env:
-      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
@@ -35,12 +35,54 @@ jobs:
         with:
           path: node_modules
           key: ${{ runner.os }}-node22-modules-${{ hashFiles('package-lock.json') }}
-      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+      # The build cache is restored in every job and saved by the build job always (build-cache-save.yml), keyed by the lockfile and the run.
+      - uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: |
             .turbo
             fe/apps/*/.next/cache
-          key: ${{ runner.os }}-node22-build-${{ hashFiles('package-lock.json') }}-${{ github.sha }}
+          key: ${{ runner.os }}-node22-build-${{ hashFiles('package-lock.json') }}-${{ github.run_id }}
+          restore-keys: |
+            ${{ runner.os }}-node22-build-${{ hashFiles('package-lock.json') }}-
+            ${{ runner.os }}-node22-build-
+      - run: npm ci --ignore-scripts
+        if: steps.deps.outputs.cache-hit != 'true'
+      - name: production dependency audit
+        run: npm audit --omit=dev --audit-level=high
+      - name: format
+        run: npm run format:check
+      - name: typecheck
+        run: npm run typecheck
+
+  lint:
+    timeout-minutes: 30
+    runs-on: ubuntu-latest
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+    strategy:
+      fail-fast: false
+      matrix:
+        side: [be, fe]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        id: deps
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node22-modules-${{ hashFiles('package-lock.json') }}
+      # The build cache is restored in every job and saved by the build job always (build-cache-save.yml), keyed by the lockfile and the run.
+      - uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: |
+            .turbo
+            fe/apps/*/.next/cache
+          key: ${{ runner.os }}-node22-build-${{ hashFiles('package-lock.json') }}-${{ github.run_id }}
           restore-keys: |
             ${{ runner.os }}-node22-build-${{ hashFiles('package-lock.json') }}-
             ${{ runner.os }}-node22-build-
@@ -62,52 +104,81 @@ jobs:
             base="$BEFORE"
           fi
           echo "STARCI_BASE_REF=$base" >> "$GITHUB_ENV"
-      - name: production dependency audit
-        run: npm audit --omit=dev --audit-level=high
-      - name: lint be
+      - name: lint
         if: env.SONAR_TOKEN == ''
-        run: node node_modules/@starci/hfs/runtime/scripts/hfs/example-secrets.mjs --run . -- npm run lint -- --side be
+        run: node node_modules/@starci/hfs/runtime/scripts/hfs/example-secrets.mjs --run . -- npm run lint -- --side ${{ matrix.side }}
         env:
           NODE_OPTIONS: --max-old-space-size=6144
-      - name: lint fe
-        if: env.SONAR_TOKEN == ''
-        run: node node_modules/@starci/hfs/runtime/scripts/hfs/example-secrets.mjs --run . -- npm run lint -- --side fe
-        env:
-          NODE_OPTIONS: --max-old-space-size=6144
-      - name: lint be with Sonar import
+      - name: lint with Sonar import
         if: env.SONAR_TOKEN != ''
-        run: node node_modules/@starci/hfs/runtime/scripts/hfs/example-secrets.mjs --run . -- npm run lint -- --side be --sonar reports/lint.be.sonar.json
+        run: node node_modules/@starci/hfs/runtime/scripts/hfs/example-secrets.mjs --run . -- npm run lint -- --side ${{ matrix.side }} --sonar reports/lint.${{ matrix.side }}.sonar.json
         env:
           NODE_OPTIONS: --max-old-space-size=6144
-      - name: lint fe with Sonar import
-        if: env.SONAR_TOKEN != ''
-        run: node node_modules/@starci/hfs/runtime/scripts/hfs/example-secrets.mjs --run . -- npm run lint -- --side fe --sonar reports/lint.fe.sonar.json
-        env:
-          NODE_OPTIONS: --max-old-space-size=6144
-      - name: merge Sonar lint reports
-        if: always() && env.SONAR_TOKEN != ''
-        run: |
-          node --input-type=module <<'NODE'
-          import fs from 'node:fs';
-          const files = ['reports/lint.be.sonar.json', 'reports/lint.fe.sonar.json'];
-          const reports = files.filter(file => fs.existsSync(file)).map(file => JSON.parse(fs.readFileSync(file, 'utf8')));
-          const rules = [...new Map(reports.flatMap(report => report.rules).map(rule => [rule.id, rule])).values()];
-          const issues = reports.flatMap(report => report.issues);
-          fs.mkdirSync('reports', { recursive: true });
-          fs.writeFileSync('reports/lint.sonar.json', JSON.stringify({ rules, issues }, null, 2) + '\n');
-          NODE
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        if: always() && env.SONAR_TOKEN != '' && hashFiles('reports/lint.sonar.json') != ''
+        if: always() && env.SONAR_TOKEN != '' && hashFiles('reports/lint.${{ matrix.side }}.sonar.json') != ''
         with:
-          name: sonar-lint
-          path: reports/lint.sonar.json
-      - name: format
-        run: npm run format:check
-      - name: typecheck
-        run: npm run typecheck
+          name: sonar-lint-${{ matrix.side }}
+          path: reports/lint.${{ matrix.side }}.sonar.json
 
   test:
-    timeout-minutes: 45
+    timeout-minutes: 25
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4, 5, 6]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        id: deps
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node22-modules-${{ hashFiles('package-lock.json') }}
+      # The build cache is restored in every job and saved by the build job always (build-cache-save.yml), keyed by the lockfile and the run.
+      - uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: |
+            .turbo
+            fe/apps/*/.next/cache
+          key: ${{ runner.os }}-node22-build-${{ hashFiles('package-lock.json') }}-${{ github.run_id }}
+          restore-keys: |
+            ${{ runner.os }}-node22-build-${{ hashFiles('package-lock.json') }}-
+            ${{ runner.os }}-node22-build-
+      - run: npm ci --ignore-scripts
+        if: steps.deps.outputs.cache-hit != 'true'
+      - name: Jest cache restore
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: .jest-cache
+          key: ${{ runner.os }}-node22-jest-${{ hashFiles('package-lock.json') }}-shard${{ matrix.shard }}-${{ github.run_id }}
+          restore-keys: |
+            ${{ runner.os }}-node22-jest-${{ hashFiles('package-lock.json') }}-shard${{ matrix.shard }}-
+            ${{ runner.os }}-node22-jest-${{ hashFiles('package-lock.json') }}-
+      # Each shard measures without the per-file threshold (a shard loads only its share of the specs, and a small suite may leave a shard empty);
+      # the coverage job proves 100 per file on the merged report.
+      - name: unit
+        run: npm test -- --ci --forceExit --cacheDirectory .jest-cache --shard=${{ matrix.shard }}/6 --passWithNoTests --coverageThreshold={}
+      - name: Jest cache save
+        if: always()
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: .jest-cache
+          key: ${{ runner.os }}-node22-jest-${{ hashFiles('package-lock.json') }}-shard${{ matrix.shard }}-${{ github.run_id }}
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always() && hashFiles('be/coverage/lcov.info') != ''
+        with:
+          name: coverage-shard-${{ matrix.shard }}
+          path: be/coverage/lcov.info
+
+  coverage:
+    needs: test
+    timeout-minutes: 20
     runs-on: ubuntu-latest
     # Codecov OIDC authentication requires a job-scoped identity token.
     permissions:
@@ -126,27 +197,24 @@ jobs:
         with:
           path: node_modules
           key: ${{ runner.os }}-node22-modules-${{ hashFiles('package-lock.json') }}
-      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+      # The build cache is restored in every job and saved by the build job always (build-cache-save.yml), keyed by the lockfile and the run.
+      - uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: |
             .turbo
             fe/apps/*/.next/cache
-          key: ${{ runner.os }}-node22-build-${{ hashFiles('package-lock.json') }}-${{ github.sha }}
+          key: ${{ runner.os }}-node22-build-${{ hashFiles('package-lock.json') }}-${{ github.run_id }}
           restore-keys: |
             ${{ runner.os }}-node22-build-${{ hashFiles('package-lock.json') }}-
             ${{ runner.os }}-node22-build-
       - run: npm ci --ignore-scripts
         if: steps.deps.outputs.cache-hit != 'true'
-      - name: Jest cache
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
-          path: .jest-cache
-          key: ${{ runner.os }}-node22-jest-${{ hashFiles('package-lock.json') }}-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-node22-jest-${{ hashFiles('package-lock.json') }}-
-            ${{ runner.os }}-node22-jest-
-      - name: unit
-        run: npm test -- --ci --forceExit --cacheDirectory .jest-cache
+          pattern: coverage-shard-*
+          path: be/coverage/shards
+      - name: merge coverage
+        run: npx starci app coverage merge --out be/coverage/lcov.info be/coverage/shards
       - name: coverage proof
         run: node node_modules/@starci/hfs/runtime/scripts/hfs/example-secrets.mjs --run . -- npx starci app check --coverage-from be/coverage/lcov.info
         env:
@@ -186,12 +254,13 @@ jobs:
         with:
           path: node_modules
           key: ${{ runner.os }}-node22-modules-${{ hashFiles('package-lock.json') }}
-      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+      # The build cache is restored in every job and saved by the build job always (build-cache-save.yml), keyed by the lockfile and the run.
+      - uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: |
             .turbo
             fe/apps/*/.next/cache
-          key: ${{ runner.os }}-node22-build-${{ hashFiles('package-lock.json') }}-${{ github.sha }}
+          key: ${{ runner.os }}-node22-build-${{ hashFiles('package-lock.json') }}-${{ github.run_id }}
           restore-keys: |
             ${{ runner.os }}-node22-build-${{ hashFiles('package-lock.json') }}-
             ${{ runner.os }}-node22-build-
@@ -206,11 +275,19 @@ jobs:
           NEXT_PUBLIC_SITE_URL: "https://lite-app.example"
           NEXT_PUBLIC_SUPABASE_ANON_KEY: "sb_publishable_fake_example_lite_app_public_key"
           NEXT_PUBLIC_SUPABASE_URL: "https://example-project.supabase.co"
+      - name: build cache save
+        if: always()
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: |
+            .turbo
+            fe/apps/*/.next/cache
+          key: ${{ runner.os }}-node22-build-${{ hashFiles('package-lock.json') }}-${{ github.run_id }}
       - name: database migration checks
         run: node node_modules/@starci/hfs/runtime/scripts/hfs/example-secrets.mjs --run . -- npm run db:lint
 
   sonar:
-    needs: [fast, test]
+    needs: [lint, coverage]
     timeout-minutes: 20
     runs-on: ubuntu-latest
     env:
@@ -229,12 +306,13 @@ jobs:
         with:
           path: node_modules
           key: ${{ runner.os }}-node22-modules-${{ hashFiles('package-lock.json') }}
-      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+      # The build cache is restored in every job and saved by the build job always (build-cache-save.yml), keyed by the lockfile and the run.
+      - uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: |
             .turbo
             fe/apps/*/.next/cache
-          key: ${{ runner.os }}-node22-build-${{ hashFiles('package-lock.json') }}-${{ github.sha }}
+          key: ${{ runner.os }}-node22-build-${{ hashFiles('package-lock.json') }}-${{ github.run_id }}
           restore-keys: |
             ${{ runner.os }}-node22-build-${{ hashFiles('package-lock.json') }}-
             ${{ runner.os }}-node22-build-
@@ -248,8 +326,21 @@ jobs:
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/v') && env.SONAR_TOKEN != '' }}
         with:
-          name: sonar-lint
+          pattern: sonar-lint-*
           path: reports
+          merge-multiple: true
+      - name: merge Sonar lint reports
+        if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/v') && env.SONAR_TOKEN != '' }}
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const files = ['reports/lint.be.sonar.json', 'reports/lint.fe.sonar.json'];
+          const reports = files.filter(file => fs.existsSync(file)).map(file => JSON.parse(fs.readFileSync(file, 'utf8')));
+          const rules = [...new Map(reports.flatMap(report => report.rules).map(rule => [rule.id, rule])).values()];
+          const issues = reports.flatMap(report => report.issues);
+          fs.mkdirSync('reports', { recursive: true });
+          fs.writeFileSync('reports/lint.sonar.json', JSON.stringify({ rules, issues }, null, 2) + '\n');
+          NODE
       - uses: SonarSource/sonarqube-scan-action@c7ee0f9df90b7aa20e8dcf9695dcfe2e7da5b4f2 # v7.2.1
         if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/v') && env.SONAR_TOKEN != '' }}
       - uses: SonarSource/sonarqube-quality-gate-action@7a5fffe8e523c40e0c740b6bc2712ab503e52efa # v1.2.1
@@ -272,12 +363,13 @@ jobs:
         with:
           path: node_modules
           key: ${{ runner.os }}-node22-modules-${{ hashFiles('package-lock.json') }}
-      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+      # The build cache is restored in every job and saved by the build job always (build-cache-save.yml), keyed by the lockfile and the run.
+      - uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: |
             .turbo
             fe/apps/*/.next/cache
-          key: ${{ runner.os }}-node22-build-${{ hashFiles('package-lock.json') }}-${{ github.sha }}
+          key: ${{ runner.os }}-node22-build-${{ hashFiles('package-lock.json') }}-${{ github.run_id }}
           restore-keys: |
             ${{ runner.os }}-node22-build-${{ hashFiles('package-lock.json') }}-
             ${{ runner.os }}-node22-build-

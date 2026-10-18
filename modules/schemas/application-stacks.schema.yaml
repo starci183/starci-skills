@@ -287,6 +287,25 @@ $defs:
             enum: [public, private]
       secrets: {type: array, items: {$ref: '#/$defs/ciSecret'}}
       vars: {type: array, items: {$ref: '#/$defs/ciVariable'}}
+      jobs:
+        description: >-
+          Per-job settings of the managed CI (the CI standard, knowledge/hfs/ci-standard.yaml defaults): timeoutMinutes per job and the number of unit-run shards.
+          Omitted settings take the standard's defaults; starci app sync renders them.
+        type: object
+        additionalProperties: false
+        properties:
+          fast: {$ref: '#/$defs/ciJob'}
+          lint: {$ref: '#/$defs/ciJob'}
+          test:
+            type: object
+            additionalProperties: false
+            properties:
+              timeoutMinutes: {type: integer, minimum: 5, maximum: 360}
+              shards: {type: integer, minimum: 1, maximum: 20}
+          coverage: {$ref: '#/$defs/ciJob'}
+          build: {$ref: '#/$defs/ciJob'}
+          sonar: {$ref: '#/$defs/ciJob'}
+          db-types: {$ref: '#/$defs/ciJob'}
       dependabot:
         type: object
         additionalProperties: false
@@ -300,6 +319,11 @@ $defs:
               properties:
                 name: {$ref: '#/$defs/ciName'}
                 purpose: {type: string}
+  ciJob:
+    type: object
+    additionalProperties: false
+    properties:
+      timeoutMinutes: {type: integer, minimum: 5, maximum: 360}
   ciSecret:
     anyOf:
       - type: object

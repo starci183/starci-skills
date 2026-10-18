@@ -29,6 +29,7 @@
 //   starci app sync (--check | --write) [--cwd <dir>]  the managed files of the root (scripts, husky, CI, .gitignore block, sonar, prettier) and
 //                                            of each side (tsconfig, eslint, jest, stylelint); sync/cli.mjs
 //   starci app hygiene                             the pre-commit guard: staged .starciwork and .starcistacks paths, and the secrets guard over every staged file (read from the index); sync/cli.mjs
+//   starci app coverage merge --out <lcov> <lcov-or-dir>...  the lcov reports of the sharded unit run merged into one (coverage/cli.mjs; the managed CI coverage job)
 //   starci app new service <dir> <name> [--inject <Decorator>=<module>:<Type> | <Class>=<module>]... [--cwd <dir>]
 //                                            a back-end `<name>.service.ts` and its `<name>.service.spec.ts` skeleton (scaffold/service.mjs; <dir> is
 //                                            relative to be/): the spec is built
@@ -89,7 +90,7 @@ import { dbPostCutoverMain } from '../db/post-cutover.mjs';
 import { dbDumpMain } from '../db/dump.mjs';
 import { dbResetMain } from '../db/reset.mjs';
 
-export const VERBS = Object.freeze(['scaffold', 'add', 'lint', 'sync', 'check', 'upgrade', 'stack', 'release', 'explain', 'emit', 'new', 'secret', 'ci', 'db', 'hygiene']);
+export const VERBS = Object.freeze(['scaffold', 'add', 'lint', 'sync', 'check', 'upgrade', 'stack', 'release', 'explain', 'emit', 'new', 'secret', 'ci', 'db', 'hygiene', 'coverage']);
 const DATABASE_VERBS = new Map([['baseline', dbBaselineMain], ['restamp', dbRestampMain], ['plan', dbPlanMain], ['migrate', dbMigrateMain], ['post-cutover', dbPostCutoverMain], ['dump', dbDumpMain], ['reset', dbResetMain]]);
 
 const USAGE = `starci app scaffold <name> [--into <dir>] [--edition full|lite] [--registry-visibility public|private] [--cwd <dir>]
@@ -128,6 +129,7 @@ starci app ci var set <NAME> [--env E] [--value v] [--repo owner/name] [--cwd <d
 starci app ci var sync [--execute] [--repo owner/name] [--cwd <dir>]
 starci app ci verify [--json] [--repo owner/name] [--cwd <dir>]
 starci app hygiene [--cwd <dir>]
+starci app coverage merge --out <lcov> <lcov-or-dir>... [--cwd <dir>]
 `;
 const PER_CODE_LIMIT = 25;
 const VALUE_FLAGS = new Set(['--base', '--inject', '--into', '--event', '--from', '--service', '--connection', '--owner', '--failed', '--done', '--coverage-from', '--registry-visibility']);
@@ -419,7 +421,7 @@ async function stackAppMain(argv, { cwd, edition, stackMain, stdout: out, stderr
   return run(argv, { cwd, out, err });
 }
 
-const DIRECT_VERBS = new Map([['ci', async (argv, io) => (await import('../ci/cli.mjs')).ciMain(argv, io)], ['lint', lintMain], ['secret', secretMain], ['db', databaseMain], ['upgrade', upgradeAppMain], ['stack', stackAppMain], ['release', releaseMain]]);
+const DIRECT_VERBS = new Map([['ci', async (argv, io) => (await import('../ci/cli.mjs')).ciMain(argv, io)], ['lint', lintMain], ['secret', secretMain], ['db', databaseMain], ['upgrade', upgradeAppMain], ['stack', stackAppMain], ['release', releaseMain], ['coverage', async (argv, io) => (await import('../coverage/cli.mjs')).coverageMain(argv, io)]]);
 const PARSED_VERBS = new Map([['check', checkMain], ['emit', emitMain], ['new', newMain], ['add', addMain], ['scaffold', scaffoldMain], ['explain', explainMain]]);
 
 function dispatchMain(verb, argv, io) {

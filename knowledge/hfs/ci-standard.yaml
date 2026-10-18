@@ -13,8 +13,16 @@ title: The one StarCi CI standard
 
 # The jobs of the managed app CI (job ids, in this order), per edition; `sonar` exists when the Sonar service is enabled.
 jobs:
-  full: {required: [fast, test, build], optional: [sonar]}
-  lite: {required: [fast, test, build], optional: [db-types, sonar]}
+  full: {required: [fast, lint, test, coverage, build], optional: [sonar]}
+  lite: {required: [fast, lint, test, coverage, build], optional: [db-types, sonar]}
+
+# The per-job settings the managed CI renders when .starcistacks/application-stacks.yaml ci.jobs leaves them out (ci.jobs.<job>.timeoutMinutes,
+# ci.jobs.test.shards). Sized from a real run (NIVO v0.2.3 on the 2-vCPU GitHub runner, 2026-10-18): the be lint with the Sonar import took 11.5 minutes and the
+# fe lint more than 8 in one 20-minute job, and ~900 unit suites ran at ~4 s each (670 of 904 in 45 minutes). One lint job per side, and 6 shards of ~150 suites
+# (~10 minutes each plus the install) leave each job well inside its timeout.
+defaults:
+  shards: 6
+  timeoutMinutes: {fast: 20, lint: 30, test: 25, coverage: 20, build: 30, sonar: 20, db-types: 30}
 
 # The steps that need a raised Node heap on the GitHub runner, matched on their `run` text, and the least heap they must declare in NODE_OPTIONS.
 heap:
@@ -28,13 +36,13 @@ items:
     covers: [app-ci, runtime]
     by: [R221 CI_TRIGGERS_RELEASE_ONLY, R251 HFS_APP_WORKFLOW_TRIGGER]
   - id: job-shape
-    title: the job shape fast / test / build / sonar
-    requires: "the managed CI holds exactly the jobs of `jobs` for its edition; the unit run and the coverage upload are steps of `test`, and only `test` holds the OIDC id-token"
+    title: the job shape fast / lint / test / coverage / build / sonar
+    requires: "the managed CI holds exactly the jobs of `jobs` for its edition; the unit run is a step of `test`; the merge, the coverage proof and the Codecov upload are steps of `coverage`, which alone holds the OIDC id-token"
     covers: [app-ci]
     check: ci-standard
   - id: full-history-base-ref
     title: full history and the lint base STARCI_BASE_REF
-    requires: "every actions/checkout of the managed CI fetches the full history (fetch-depth: 0), and the fast job writes STARCI_BASE_REF to GITHUB_ENV before it lints"
+    requires: "every actions/checkout of the managed CI fetches the full history (fetch-depth: 0), and the lint job writes STARCI_BASE_REF to GITHUB_ENV before it lints"
     covers: [app-ci]
     check: ci-standard
   - id: heap-per-step
@@ -47,6 +55,21 @@ items:
     requires: "a lint with a Sonar import (--sonar) names its side (--side be|fe); the reports are merged into reports/lint.sonar.json afterwards; no combined lint with Sonar"
     covers: [app-ci, runtime]
     check: ci-standard
+  - id: test-sharding
+    title: the unit run in shards, merged once
+    requires: "the test job is a matrix over shard (ci.jobs.test.shards, default defaults.shards); each shard runs npm test with --shard=<i>/<N> and without the per-file threshold, uploads its lcov, and the coverage job merges them (starci app coverage merge) before the coverage proof proves 100 per file"
+    covers: [app-ci]
+    check: ci-standard
+  - id: lint-parallel
+    title: lint each side in its own job
+    requires: "the lint job is a matrix over side [be, fe]; each side lints (with its own Sonar report when a token is set) in parallel, and the sonar job merges the reports"
+    covers: [app-ci]
+    check: ci-standard
+  - id: cache-saved-always
+    title: caches keyed by the lockfile and saved always
+    requires: "no actions/cache key holds the commit sha (a cache saved only on a green run never warms); the jest and build caches restore by lockfile hash (restore-keys) and save with actions/cache/save under if: always()"
+    covers: [app-ci]
+    check: ci-standard
   - id: fe-build-env
     title: each fe app builds with its own env
     requires: "the build job builds every fe app with that app's own public build values (static NEXT_PUBLIC_* from the declaration), never a shared env"
@@ -58,8 +81,8 @@ items:
     covers: [app-ci]
     check: ci-standard
   - id: timeouts
-    title: a timeout on every job
-    requires: "every job declares timeout-minutes"
+    title: a timeout on every job, configurable per job
+    requires: "every job declares timeout-minutes; the managed CI renders ci.jobs.<job>.timeoutMinutes of the manifest, else defaults.timeoutMinutes"
     covers: [app-ci, runtime]
     check: ci-standard
   - id: sha-pinned-actions

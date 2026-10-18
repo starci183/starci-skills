@@ -301,8 +301,8 @@ function assertCoverageContract(app) {
   assert.deepEqual(codecov.ignore, ['fe/**'], 'fe/ is outside coverage');
   assert.deepEqual(Object.keys(codecov.coverage.status).sort(), ['patch', 'project']);
   const workflow = parseYaml(fs.readFileSync(path.join(app, '.github', 'workflows', 'ci.yml'), 'utf8'));
-  // The managed CI runs as the jobs fast, test, build and sonar: the unit run and the Codecov upload are steps of the test job, which alone holds the
-  // OIDC identity token the upload authenticates with.
+  // The managed CI runs the CI standard's jobs (knowledge/hfs/ci-standard.yaml): the unit run is sharded in the test job, each shard uploads its lcov,
+  // and the coverage job, which alone holds the OIDC identity token, merges them, proves 100 per file and uploads the merged report to Codecov.
   // The release candidate (owner ruling candidate-ci): `starci app release push` waits for this workflow's run on release/candidate-<version>.
   assert.deepEqual(workflow.on.push, { branches: ['release/candidate-*'], tags: ['v*'] }, 'the managed CI runs on the release candidate ref and the release tag');
   const jobs = workflow.jobs ?? {};
@@ -310,14 +310,21 @@ function assertCoverageContract(app) {
   const unitJobs = Object.keys(jobs).filter((id) => (jobs[id].steps ?? []).some((step) => step.name === 'unit'));
   const uploadJobs = Object.keys(jobs).filter((id) => (jobs[id].steps ?? []).some(isUpload));
   assert.deepEqual(unitJobs, ['test'], `the unit run is a step of the test job alone (jobs: ${Object.keys(jobs).join(', ')})`);
-  assert.deepEqual(uploadJobs, ['test'], 'the coverage upload is a step of the test job alone');
-  const { steps } = jobs.test;
-  const unit = steps.findIndex((step) => step.name === 'unit');
+  assert.deepEqual(uploadJobs, ['coverage'], 'the coverage upload is a step of the coverage job alone');
+  const shards = jobs.test.strategy?.matrix?.shard;
+  assert.ok(Array.isArray(shards) && shards.length > 1, 'the unit run is a shard matrix');
+  const unitStep = jobs.test.steps.find((step) => step.name === 'unit');
+  assert.ok(unitStep.run.includes('--shard=${{ matrix.shard }}/' + shards.length) && unitStep.run.includes('--coverageThreshold={}'), 'each shard runs its share without the per-file threshold');
+  assert.deepEqual(jobs.coverage.needs, 'test', 'the coverage job waits for every shard');
+  const { steps } = jobs.coverage;
+  const merge = steps.findIndex((step) => String(step.run ?? '').includes(`app coverage merge --out ${LCOV} `));
+  const proof = steps.findIndex((step) => String(step.run ?? '').includes(`app check --coverage-from ${LCOV}`));
   const upload = steps.findIndex(isUpload);
-  assert.ok(unit >= 0 && upload > unit, 'the coverage upload follows the unit run');
+  assert.ok(merge >= 0 && proof > merge && upload > proof, 'the coverage job merges the shards, proves the merged report, then uploads it');
   assert.equal(steps[upload].with.files, LCOV, 'the upload sends the lcov Sonar imports');
   assert.equal(steps[upload].with.use_oidc, true);
-  assert.equal(jobs.test.permissions?.['id-token'], 'write', 'the test job holds the OIDC identity token the upload authenticates with');
+  assert.equal(jobs.coverage.permissions?.['id-token'], 'write', 'the coverage job holds the OIDC identity token the upload authenticates with');
+  assert.deepEqual(Object.keys(jobs).filter((id) => jobs[id].permissions?.['id-token'] === 'write'), ['coverage'], 'no other job holds the identity token');
   for (const [id, job] of Object.entries(jobs)) assert.equal(job.env?.CODECOV_TOKEN, undefined, `job ${id} carries no CODECOV_TOKEN`);
   assert.equal(workflow.env?.CODECOV_TOKEN, undefined, 'the workflow carries no CODECOV_TOKEN');
 }

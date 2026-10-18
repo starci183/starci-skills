@@ -44,6 +44,8 @@ function parse(argv) {
 
 /** Manifest and sealed key reads remain offline; only github.mjs may invoke the GitHub CLI. */
 export async function ciMain(argv, { cwd = process.cwd(), stdout = (s) => process.stdout.write(s), stderr = (s) => process.stderr.write(s), stdin, env = process.env, tools = {} } = {}) {
+  // `ci local` runs the rendered CI on this machine (local.mjs): no manifest custody and no GitHub.
+  if (argv[0] === 'local') return (await import('./local.mjs')).ciLocalMain(argv.slice(1), { cwd, stdout, stderr, env });
   try {
     const parsed = parse(argv);
     let doc, declaration, sealed;

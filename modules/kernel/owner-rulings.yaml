@@ -606,6 +606,13 @@ rulings:
     supersedes: []
     enforcedBy: [knowledge/hfs/ci-standard.yaml, scripts/hfs/runtime-rules/runtime-ci-standard.mjs]
 
+  - id: owner-path-1e9a6d1ce
+    date: '2026-10-18'
+    source: "the owner in chat to the main coordinator (\"Ok\"), relayed to the a22 lead with the instruction to record the approval"
+    ruling: "The owner approved the a22 owner-path commit 1e9a6d1ce (.github/workflows/examples.yml, the owner's protected zone): each example side lints in its own step with its own Sonar report and NODE_OPTIONS --max-old-space-size=6144, and an inline step merges the reports into the one reports/lint.sonar.json the Sonar scan imports, as the CI standard (ruling ci-standard) requires. It tightens a gate and loosens none; recorded after the commit, in the same a22 cut."
+    supersedes: []
+    enforcedBy: [.github/workflows/examples.yml, scripts/hfs/runtime-rules/runtime-ci-standard.mjs]
+
 supersedes:
   'ruling:R212/case-2': ['ruling:R212/case-1']
   'ruling:R212/case-4': ['ruling:R212/case-1', 'ruling:R212/case-2']

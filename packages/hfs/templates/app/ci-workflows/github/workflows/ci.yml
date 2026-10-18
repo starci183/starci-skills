@@ -16,24 +16,58 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: false
 
+# The job shape of the StarCi CI standard (knowledge/hfs/ci-standard.yaml): fast, lint per side, the unit run in shards, one coverage merge, build,
+# and sonar. Timeouts and the shard count come from ci.jobs of .starcistacks/application-stacks.yaml (defaults in the standard).
 jobs:
   fast:
-    timeout-minutes: 20
+    timeout-minutes: {{timeoutFast}}
     runs-on: ubuntu-latest
-{{sonarEnv}}
     steps:
 {{> app/ci-workflows/install-steps.yml}}
-{{> app/ci-workflows/lint-base.yml}}
       - name: production dependency audit
         run: {{auditCommand}}
-{{ciLintSteps}}
       - name: format
         run: npm run format:check
       - name: typecheck
         run: npm run typecheck
 
+  lint:
+    timeout-minutes: {{timeoutLint}}
+    runs-on: ubuntu-latest
+{{sonarEnv}}
+    strategy:
+      fail-fast: false
+      matrix:
+        side: [be, fe]
+    steps:
+{{> app/ci-workflows/install-steps.yml}}
+{{> app/ci-workflows/lint-base.yml}}
+{{ciLintSteps}}
+
   test:
-    timeout-minutes: 45
+    timeout-minutes: {{timeoutTest}}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: {{testShards}}
+    steps:
+{{> app/ci-workflows/install-steps.yml}}
+{{> app/ci-workflows/jest-cache.yml}}
+      # Each shard measures without the per-file threshold (a shard loads only its share of the specs, and a small suite may leave a shard empty);
+      # the coverage job proves 100 per file on the merged report.
+      - name: unit
+        run: npm test -- --ci --forceExit --cacheDirectory .jest-cache --shard=${{ matrix.shard }}/{{testShardTotal}} --passWithNoTests --coverageThreshold={}
+{{> app/ci-workflows/jest-cache-save.yml}}
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always() && hashFiles('{{lcovReport}}') != ''
+        with:
+          name: coverage-shard-${{ matrix.shard }}
+          path: {{lcovReport}}
+
+  coverage:
+    needs: test
+    timeout-minutes: {{timeoutCoverage}}
     runs-on: ubuntu-latest
     # Codecov OIDC authentication requires a job-scoped identity token.
     permissions:
@@ -41,9 +75,12 @@ jobs:
       id-token: write
     steps:
 {{> app/ci-workflows/install-steps.yml}}
-{{> app/ci-workflows/jest-cache.yml}}
-      - name: unit
-        run: npm test -- --ci --forceExit --cacheDirectory .jest-cache
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: coverage-shard-*
+          path: {{lcovShardsDir}}
+      - name: merge coverage
+        run: npx starci app coverage merge --out {{lcovReport}} {{lcovShardsDir}}
       - name: coverage proof
         run: {{ciCoverageProof}}
         env:
@@ -56,12 +93,13 @@ jobs:
 {{codecovSteps}}
 
   build:
-    timeout-minutes: 30
+    timeout-minutes: {{timeoutBuild}}
     runs-on: ubuntu-latest
     steps:
 {{> app/ci-workflows/install-steps.yml}}
       - name: build be
         run: npm run build:be
 {{ciBuildSteps}}
+{{> app/ci-workflows/build-cache-save.yml}}
 
 {{sonarJob}}
