@@ -466,6 +466,11 @@ pins:
     group: framework
     side: be
     why: 'the GraphQL transport of every back end (be.transport.graphql) that the front end calls; the ecommerce-app resolution on 2026-10-13. Stays on 13.x for alpha.18: the npm-audit advisory fixed by 14.0.3 (semver major) is a documented accepted exception, upgrade deferred to alpha.19 (owner ruling graphql-13-advisory-accepted-until-a19, 2026-10-16).'
+  '@graphql-tools/utils':
+    version: 12.1.0
+    group: framework
+    side: be
+    why: 'an npm override of every app root (and of the examples that serve GraphQL), never a declared dependency: @nestjs/graphql 13.x pulls @graphql-tools/utils <=12.0.0, which npm audit --audit-level=high reports (GHSA-7mx3-vvmw-hjmv, prototype pollution in mergeDeep). 12.1.0 is a fixed release on the same major and the lowest one every declared range accepts (@graphql-tools/schema and /merge, used at runtime, require ^12.1.0; NIVO v0.2.1 6a1d8e80 overrides 12.0.4, below that range), so the advisory closes without the breaking @nestjs/graphql 14. DROP this pin and the override when @nestjs/graphql 14 is adopted (owner ruling graphql-tools-utils-override, 2026-10-18).'
   '@nestjs/apollo':
     version: 13.4.5
     group: framework

@@ -97,6 +97,7 @@
     "contract:emit": "starci app emit"
   },
   "overrides": {
+    "@graphql-tools/utils": "12.1.0",
     "@xyflow/react": "12.11.6",
     "dayjs": "1.11.21",
     "zod": "4.4.3",

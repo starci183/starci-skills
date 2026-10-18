@@ -613,6 +613,13 @@ rulings:
     supersedes: []
     enforcedBy: [.github/workflows/examples.yml, scripts/hfs/runtime-rules/runtime-ci-standard.mjs]
 
+  - id: graphql-tools-utils-override
+    date: '2026-10-18'
+    source: "the owner via the main coordinator, relayed to the a22 lead (NIVO v0.2.1 6a1d8e80 precedent)"
+    ruling: "npm audit --omit=dev --audit-level=high reports GHSA-7mx3-vvmw-hjmv (@graphql-tools/utils <=12.0.0, pulled by @nestjs/graphql 13.x). Without the breaking @nestjs/graphql 14, every scaffolded app root and every example that serves GraphQL carries the npm override of @graphql-tools/utils at its canon pin (knowledge/hfs/canon-pins.yaml), a fixed release on the same major that every declared range accepts (NIVO overrides 12.0.4, below the range @graphql-tools/schema and /merge declare). Narrow: this one package, this one advisory; drop the pin and the override when @nestjs/graphql 14 is adopted. It supersedes the alpha.18 acceptance of that advisory (graphql-13-advisory-accepted-until-a19)."
+    supersedes: [graphql-13-advisory-accepted-until-a19]
+    enforcedBy: [knowledge/hfs/canon-pins.yaml, packages/hfs/scaffold/app.mjs]
+
 supersedes:
   'ruling:R212/case-2': ['ruling:R212/case-1']
   'ruling:R212/case-4': ['ruling:R212/case-1', 'ruling:R212/case-2']

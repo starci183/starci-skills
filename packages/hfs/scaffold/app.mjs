@@ -300,9 +300,10 @@ export function peerDependencies(pkg, pins, pairs = parseYaml(fs.readFileSync(PE
 /**
  * The fe-stack core packages one version of which the whole install resolves (npm `overrides`, at their canon pins): a
  * transitive dependency otherwise brings its own (zustand 4 under @xyflow/react, dayjs under typeorm, a hoisted newer zod
- * that breaks the zodResolver types), and @xyflow/react itself stays the grammar's one version.
+ * that breaks the zodResolver types), and @xyflow/react itself stays the grammar's one version. @graphql-tools/utils is the one security override: @nestjs/graphql 13.x
+ * pulls <=12.0.0 (GHSA-7mx3-vvmw-hjmv), and the pin's fixed 12.x closes the advisory until @nestjs/graphql 14 is adopted (then drop it; canon-pins.yaml says why).
  */
-const ROOT_OVERRIDES = Object.freeze(['@xyflow/react', 'dayjs', 'zod', 'zustand']);
+const ROOT_OVERRIDES = Object.freeze(['@graphql-tools/utils', '@xyflow/react', 'dayjs', 'zod', 'zustand']);
 
 /**
  * The root package.json of a new app, the monorepo root: name, workspaces, npm, its edition's dependencies with their runtime
