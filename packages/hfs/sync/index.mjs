@@ -10,7 +10,7 @@
 // and are listed in this module: the marked blocks of the root .gitignore and README.md, and .starciwork/.gitignore, which lives inside the
 // .starciwork directory slot. Every file is rendered with the app's hfs.json (both sides and their apps) and, for the Sonar
 // exclusions, the jest preset the app installs for its be side and the one coverage scope derived from the slot manifest
-// (scripts/hfs/coverage-scope.mjs: the be/jest.config.js scope, sonar.coverage.exclusions and the codecov.yml paths and components). `--check` compares the sha256 of the rendered content with the
+// (scripts/hfs/coverage-scope.mjs: the be/jest.config.js scope, sonar.coverage.exclusions and the codecov.yml paths, components and exclusions). `--check` compares the sha256 of the rendered content with the
 // file on disk and fails on any drift; `--write` rewrites the drifted files. `.gitignore` and README.md are shared files: only the marked
 // block is managed and the app's own lines around it are left alone. The root package.json is managed by its `scripts` block
 // only (mode scripts, compared as parsed JSON): the rest of the file (dependencies, the npm workspaces fe/apps/* and fe/packages/*,
@@ -328,6 +328,7 @@ export function variables(app, scope, presets, sonarKey, manifest = loadSlotMani
     // The coverage scope is the same in both editions: lite measures exactly what full measures (ruling:R212/case-1, amended by ruling:R212/case-4).
     jestCoverage: scope === 'be' ? jestCoverageSource(jestCoverage(manifest, providers)) : '',
     coverageExclusions: scope === APP_SCOPE ? sonarCoverageExclusions(manifest, providers).join(',') : '',
+    codecovExclusions: scope === APP_SCOPE ? sonarCoverageExclusions(manifest, providers).map(glob => `  - ${JSON.stringify(glob)}`).join('\n') : '',
     codecovPaths: scope === APP_SCOPE ? codecovPaths(manifest, providers).map(glob => `          - ${JSON.stringify(glob)}`).join('\n') : '',
     codecovComponents: scope === APP_SCOPE ? componentsYaml(coverageComponents(manifest, { ...source, apps: app.sides.be.apps, providers })) : '',
     codecovTarget: quality.codecov.target,

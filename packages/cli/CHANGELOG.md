@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.7.5 - 2026-10-18
+- Changed: pins @starci/hfs 4.7.5 for the managed Codecov coverage scope aligned with the native logic-file proof.
+
 ## 1.7.4 - 2026-10-18
 - Changed: pins @starci/hfs 4.7.4 for the managed Sonar analyzer heap property correction.
 
