@@ -14,7 +14,7 @@ flags:
   - {name: stamp, type: string, summary: fourteen-digit timestamp of the new baseline migration}
   - {name: map, type: string, summary: explicit old-to-new migration stamp map for restamp}
   - {name: apply, type: boolean, summary: apply baseline or restamp mutations after validation}
-  - {name: local, type: boolean, summary: inspect or repair the local Supabase database instead of the linked project}
+  - {name: local, type: boolean, summary: "inspect local state; migrate applies only pending active SQL against the app's existing local stack"}
   - {name: execute, type: boolean, summary: "migrate, post-cutover, reset: apply the plan (also needs STARCI_DB_ARMED=1); otherwise read-only"}
   - {name: linked, type: boolean, summary: "use the linked project; required explicitly for reset and one of the dump target choices"}
   - {name: url-env, type: string, summary: "migrate, post-cutover, dump: environment variable holding the connection string"}
@@ -35,8 +35,11 @@ conventions:
   - "reset keeps encrypted temporary recovery parts after a reset/restore failure and reports their directory; plaintext is always deleted"
   - baseline accepts --stamp; restamp requires --map; both preview without --apply
   - plan is always read-only and supports --json; it compares migrations, cron, queues and Vault names
-  - "migrate and post-cutover read the optional database block of application-stacks.yaml; both are dry runs without --execute"
-  - "migrate is idempotent: baseline plus forward on the remote prints nothing to do; held-back migrations are never applied by it"
+  - "linked/url-env migrate and post-cutover read application-stacks.yaml's database block and preview without --execute"
+  - "linked/url-env migrate skips an applied baseline and forward chain; held-back migrations belong to post-cutover"
+  - "migrate --local uses the app workdir/config, previews pending active SQL and refuses history gaps or unknown versions"
+  - "local migrate --execute needs STARCI_DB_ARMED=1; no history repair, baseline marking, reset, seed/role/Vault work or linked fallback"
+  - "local migrate refuses encrypted config/env values and dotenv interpolation or escapes before any child; it never decrypts"
   - "post-cutover applies held-back migrations after the read-only pg_proc preflight, an open time gate and STARCI_DB_ARMED=1"
 exit: {"0": preview or action completed with no drift, "1": database plan drift or failed tool/verification, "2": refusal or bad usage, "3": database mutation is not armed}
 json: flag
@@ -49,6 +52,8 @@ examples:
   - starci app db plan --json
   - starci app db plan --local
   - starci app db migrate --linked
+  - starci app db migrate --local
+  - starci app db migrate --local --execute
   - starci app db migrate --execute
   - starci app db post-cutover --green-at 2026-10-10T00:00:00Z
 editions: [full, lite]

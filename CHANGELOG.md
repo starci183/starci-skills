@@ -16,6 +16,8 @@ Hotfix of the red alpha.21 CI (run 39070215259) and the candidate CI flow: this 
 - The managed CI is sharded and parallel (NIVO v0.2.3: 20- and 45-minute jobs were cancelled at lint and at 670 of 904 unit suites): lint is a matrix over be and fe, the unit run a matrix of `ci.jobs.test.shards` (default 6) shards without the per-file threshold, and a coverage job merges their lcov (`starci app coverage merge`), proves 100 per file and uploads to Codecov; Sonar merges the per-side lint reports. Job timeouts come from `ci.jobs.<job>.timeoutMinutes` (defaults in the CI standard); the jest and build caches are keyed by the lockfile and saved always. R301 checks all of it.
 - `starci app ci local` runs the rendered CI jobs on this machine, in parallel, to predict the result while GitHub runs it; the cut releases the host lock while it waits for the candidate CI.
 - `starci release app-installs --source`: the registry-install scaffold proof against the checkout's packed @starci tarballs; `starci release scaffold-e2e` runs it (e2e/hfs-scaffold-app-installs.e2e.spec.mjs), so the runtime verify and the cut prove it before any publish.
+- `starci app db migrate --local` previews the pending SQL suffix on the existing local stack. Execution retains database arming, verifies unchanged inputs and the exact applied suffix, and refuses encrypted or ambiguous configuration before starting Supabase.
+- Grammar 0.10.0 exposes DataTable cell keyboard and drag interactions, DragItem, command-button pressed state and optional video captions through published component props.
 
 ### Changed
 - The cut no longer reads the latest main CI run (a red main needs no override before the next release); `starci app release gate` no longer reads the default-branch CI. The annotated tag is created after the candidate CI, not before it.
@@ -23,6 +25,8 @@ Hotfix of the red alpha.21 CI (run 39070215259) and the candidate CI flow: this 
 - examples.yml (owner-path commit) lints each example side with its own Sonar report and a 6 GB heap, as the rendered app CI does.
 
 ### Fixed
+- Translation usage analysis follows shorthand translator arguments, bounded dynamic keys and memoized forwarding properties, retaining live catalog entries while reporting unused keys.
+- The Supabase API owner launches the app-installed JavaScript CLI through Node on Windows, preserving shell-free arguments and refusing command shims that require a shell.
 - Codecov uses the same slot-derived coverage complement as Jest and Sonar in managed apps and the runtime's example flags and components. NIVO v0.2.5's merged shard report proved all 882 measured logic files at 100%, but incidental config, module and persistence imports broadened Codecov's denominator to 2011 files (98.24%); those files now follow the existing coverage scope while project, patch and component targets remain 100% with zero tolerance.
 - Sonar's JavaScript analyzer receives the existing 6144 MiB CI Node budget through `sonar.javascript.node.maxspace` in the managed app configuration and the runtime configuration producer, leaving memory for Java and the OS on the 8 GB runner. The unsupported `sonar.nodejs.maxspace` left the NIVO v0.2.4 tag scan at a 2240 MB limit, where analysis ran out of memory.
 - The NIVO v0.2.4 candidate's fast job exhausted Node's default heap during typecheck. Managed app CI, the examples workflow and the grammar package workflow now declare the CI standard's 6 GB heap on each typecheck step; R301 checks typecheck alongside the other heavy steps.
@@ -37,7 +41,7 @@ Hotfix of the red alpha.21 CI (run 39070215259) and the candidate CI flow: this 
 - Sharded coverage equals the unsharded run on lines and functions for every file (NIVO: 883 of 883), but a file may hold 1-2 more branch entries than the unsharded run (NIVO: 27 files): jest merges raw V8 across test files before it converts them, while shards convert apart. Extra entries can only add uncovered branches, never hide one. Exact branch equality (merging raw V8 across shards) is an alpha.23 follow-up.
 
 ### Evidence
-- Package versions for this cut: @starci/hfs 4.7.4, @starci/cli 1.7.4, @starci/jest-preset 2.3.2, @starci/eslint-canon-be 3.4.10, @starci/eslint-canon-fe 8.4.10 (bundled runtime copies); the earlier alpha.22 patch sets (hfs 4.7.0-4.7.3, cli 1.7.0-1.7.3, eslint-canon 3.4.5-3.4.9 / 8.4.5-8.4.9) were published; runtime 1.0.0-alpha.22.
+- The current candidate pins @starci/hfs 4.7.6, @starci/cli 1.7.6, @starci/jest-preset 2.3.2, @starci/eslint-canon-be 3.4.12, @starci/eslint-canon-fe 8.4.12 and @starci/grammar 0.10.0; runtime 1.0.0-alpha.22. Earlier published cohorts remain immutable.
 - The package phase was stopped after lint canons 3.4.8/8.4.8 reached npm and before HFS/CLI upload to repair the coverage prerequisites. Their published payloads stay immutable; lint canons 3.4.9/8.4.9 carried the replacement pins through the completed native package phase.
 - The NIVO v0.2.4 tag scan then exposed the unsupported Sonar heap key. HFS 4.7.4 and CLI 1.7.4 carry the correction, and lint canons 3.4.10/8.4.10 carry their matching bundled pins; the published HFS 4.7.3, CLI 1.7.3 and lint canons 3.4.9/8.4.9 stay immutable.
 

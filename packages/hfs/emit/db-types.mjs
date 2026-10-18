@@ -185,7 +185,7 @@ function requireCurrentDatabase(root, run) {
   const applied = appliedVersions(result);
   if (applied.size !== expected.size || [...expected].some((version) => !applied.has(version))) {
     const head = (versions) => [...versions].sort().at(-1) ?? 'none';
-    throw new DbTypesError(`the local database is at ${head(applied)}, the migrations folder at ${head(expected)}; run "npm run db:reset" then emit again`, { file: dbTypesPath }, 'HFS_EMIT_DB_TYPES_STALE');
+    throw new DbTypesError(`the local database is at ${head(applied)}, the migrations folder at ${head(expected)}; inspect "starci app db plan --local", preview "starci app db migrate --local", apply the reviewed local plan with --execute and STARCI_DB_ARMED=1, then run "starci app emit"`, { file: dbTypesPath }, 'HFS_EMIT_DB_TYPES_STALE');
   }
 }
 

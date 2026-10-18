@@ -40,6 +40,7 @@ const SLOT_FILES = [
 const CHECK_ENTRIES = [
   'scripts/hfs/check.mjs', 'scripts/hfs/architecture.mjs', 'scripts/hfs/secret.mjs', 'scripts/hfs/coverage-scope.mjs',
   'scripts/hfs/db-baseline-verb.mjs', 'scripts/hfs/db-restamp-verb.mjs', 'scripts/hfs/db-plan-verb.mjs',
+  'scripts/api/supabase/database-push.mjs',
   'scripts/hfs/app-wiring.mjs', 'scripts/hfs/coverage-from.mjs', 'scripts/hfs/example-secrets.mjs', 'scripts/hfs/stack-deploy-config.mjs',
 ];
 /** Static imports and `new URL(<relative>.yaml, import.meta.url)` reads (the framework-pinned knowledge file) are followed. */

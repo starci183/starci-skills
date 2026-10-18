@@ -168,8 +168,11 @@ Conventions:
 - reset keeps encrypted temporary recovery parts after a reset/restore failure and reports their directory; plaintext is always deleted
 - baseline accepts --stamp; restamp requires --map; both preview without --apply
 - plan is always read-only and supports --json; it compares migrations, cron, queues and Vault names
-- migrate and post-cutover read the optional database block of application-stacks.yaml; both are dry runs without --execute
-- migrate is idempotent: baseline plus forward on the remote prints nothing to do; held-back migrations are never applied by it
+- linked/url-env migrate and post-cutover read application-stacks.yaml's database block and preview without --execute
+- linked/url-env migrate skips an applied baseline and forward chain; held-back migrations belong to post-cutover
+- migrate --local uses the app workdir/config, previews pending active SQL and refuses history gaps or unknown versions
+- local migrate --execute needs STARCI_DB_ARMED=1; no history repair, baseline marking, reset, seed/role/Vault work or linked fallback
+- local migrate refuses encrypted config/env values and dotenv interpolation or escapes before any child; it never decrypts
 - post-cutover applies held-back migrations after the read-only pg_proc preflight, an open time gate and STARCI_DB_ARMED=1
 
 exit: 0 preview or action completed with no drift; 1 database plan drift or failed tool/verification; 2 refusal or bad usage; 3 database mutation is not armed
@@ -185,6 +188,8 @@ starci app db restamp --map restamp.yaml
 starci app db plan --json
 starci app db plan --local
 starci app db migrate --linked
+starci app db migrate --local
+starci app db migrate --local --execute
 starci app db migrate --execute
 starci app db post-cutover --green-at 2026-10-10T00:00:00Z
 ```

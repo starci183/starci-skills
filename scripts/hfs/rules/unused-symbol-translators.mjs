@@ -112,13 +112,19 @@ export function translationBindings(state, sources) {
 /** Namespaces of the translators a receiver can be: declared here, or handed in through arguments and props. */
 function receiverNamespaces(state, receiver) {
   const { ts, checker } = state;
-  const direct = state.translators.get(checker.getSymbolAtLocation(receiver));
-  if (direct !== undefined) return direct;
-  return valuesOf(state, receiver).flatMap(leaf => {
-    // A translator factory called in place as an argument: f(useTranslations("admin")).
-    if (ts.isCallExpression(leaf)) return translatorNamespace(state, leaf, translationFactories(ts, leaf.getSourceFile())) ?? [];
-    return ts.isIdentifier(leaf) ? state.translators.get(checker.getSymbolAtLocation(leaf)) ?? [] : [];
-  });
+  const resolving = state.resolvingReceivers ??= new Set();
+  if (resolving.has(receiver)) return [];
+  resolving.add(receiver);
+  try {
+    const direct = state.translators.get(checker.getSymbolAtLocation(receiver));
+    if (direct !== undefined) return direct;
+    return valuesOf(state, receiver).flatMap(leaf => {
+      // A translator factory called in place as an argument: f(useTranslations("admin")).
+      if (ts.isCallExpression(leaf)) return translatorNamespace(state, leaf, translationFactories(ts, leaf.getSourceFile())) ?? [];
+      if (isFunction(ts, leaf)) return forwardedNamespaces(state, leaf);
+      return ts.isIdentifier(leaf) ? state.translators.get(symbolAt(state, leaf)) ?? [] : [];
+    });
+  } finally { resolving.delete(receiver); }
 }
 
 function handedIn(state, receiver) {

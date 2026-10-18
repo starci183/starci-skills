@@ -216,7 +216,7 @@ function indirectArguments(state, argument, prefix, seen) {
 
 function templateArguments(state, template, prefix) {
   // A literal head or tail makes the template a key pattern; a template of holes only proves nothing.
-  if (prefix !== null && hasLiteral(template)) state.templates.push([`${prefix}${template.head.text}`, ...template.templateSpans.map(span => span.literal.text)]);
+  if (hasLiteral(template)) state.templates.push({ prefix, parts: [`${prefix ?? ''}${template.head.text}`, ...template.templateSpans.map(span => span.literal.text)] });
 }
 
 function catalogArguments(state, node, prefix, seen = new Set()) {
@@ -280,16 +280,19 @@ function looseRead(state, name) {
 function catalogRead(state, candidate, liveCodes) {
   if (candidate.name.startsWith('errors.') && liveCodes.has(candidate.name.slice(7))) return true;
   if (state.catalogReads.has(candidate.name) || looseRead(state, candidate.name)) return true;
-  return state.templates.some(parts => parts.some(Boolean) && (() => {
-    const tail = candidate.name;
-    let offset = 0;
-    for (const [index, part] of parts.entries()) {
-      const next = tail.indexOf(part, offset);
-      if (next < 0 || index === 0 && next !== 0) return false;
-      offset = next + part.length;
-    }
-    return tail.endsWith(parts.at(-1));
-  })());
+  return state.templates.some(({ prefix, parts }) => {
+    const segments = candidate.name.split('.');
+    const tails = prefix === null ? segments.map((_, index) => segments.slice(index).join('.')) : [candidate.name];
+    return tails.some(tail => {
+      let offset = 0;
+      for (const [index, part] of parts.entries()) {
+        const next = tail.indexOf(part, offset);
+        if (next < 0 || index === 0 && next !== 0) return false;
+        offset = next + part.length;
+      }
+      return tail.endsWith(parts.at(-1));
+    });
+  });
 }
 
 /** The same rule applies to lite and full. Analyze all tracked consumers before filtering findings to a fast-check scope. */

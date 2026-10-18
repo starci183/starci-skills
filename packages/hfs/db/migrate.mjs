@@ -17,6 +17,7 @@ import { STACKS_DIR } from '../stack/config.mjs';
 import { firstLine, tool } from '../stack/context.mjs';
 import { approvalMissing, failure, refusal } from '../stack/errors.mjs';
 import { readDeclaration, runVerb } from '../release/index.mjs';
+import { migrateLocalDatabase } from './local-migrate.mjs';
 
 const DATABASE_CODE = 'DB_CONFIG_INVALID';
 
@@ -353,12 +354,19 @@ async function migrateDatabase(ctx, decl, options = {}) {
   return { ok: true, lines: [...lines, `applied: ${pushed.length} forward migration(s) pushed; the remote history now holds ${final.size} version(s). Held back: ${model.held.join(', ') || 'nothing'}.`], data: dataOf(model, plan, remote, { executed: true, pushed, remoteCountAfter: final.size }) };
 }
 
-const SPEC = { boolean: ['--execute', '--json', '--linked'], value: ['--url-env'] };
+const SPEC = { boolean: ['--execute', '--json', '--linked', '--local'], value: ['--url-env'] };
 
-/** Entry of the verb: `starci app db migrate [--execute] [--linked | --url-env NAME] [--json]`. `io` is the app IO of src/main.mjs. */
+/** Entry of the verb: explicit local applies active SQL; linked/url-env retains the declared cutover plan. Execute requires database arming. */
 export function dbMigrateMain(argv, io = {}) {
   return runVerb({
     label: 'starci app db migrate', name: 'db migrate', code: 'DB_USAGE', io, argv, spec: SPEC,
-    run: (ctx, flags) => migrateDatabase(ctx, loadDatabase(ctx.cwd), { execute: flags.execute === true, linked: flags.linked === true, urlEnv: flags['url-env'] }),
+    run: (ctx, flags) => {
+      if (flags.local) {
+        if (flags.linked || flags['url-env'] !== undefined) throw refusal('DB_USAGE', '--local excludes --linked and --url-env');
+        if (flags.execute) requireArmed(ctx);
+        return migrateLocalDatabase(ctx, { execute: flags.execute === true });
+      }
+      return migrateDatabase(ctx, loadDatabase(ctx.cwd), { execute: flags.execute === true, linked: flags.linked === true, urlEnv: flags['url-env'] });
+    },
   });
 }

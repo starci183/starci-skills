@@ -6,14 +6,15 @@ import { unwrapCatalogExpression as unwrap } from '../../lib/ts-analysis.mjs';
 const ARRAY_CALLBACK = /^(?:map|flatMap|forEach|filter|find|some|every)$/u;
 
 export const symbolAt = (state, node) => {
-  const symbol = state.checker.getSymbolAtLocation(node);
+  const symbol = state.ts.isShorthandPropertyAssignment(node.parent) && node.parent.name === node
+    ? state.checker.getShorthandAssignmentValueSymbol(node.parent) : state.checker.getSymbolAtLocation(node);
   return symbol?.flags === state.ts.SymbolFlags.Alias ? state.checker.getAliasedSymbol(symbol) : symbol;
 };
 
 /** The expression bound to `name` in an object literal or a JSX attribute list. */
 function propertyValues(state, owner, name) {
   const { ts } = state;
-  if (ts.isObjectLiteralExpression(owner)) return owner.properties.filter(entry => ts.isPropertyAssignment(entry) && nameOf(ts, entry.name) === name).map(entry => entry.initializer);
+  if (ts.isObjectLiteralExpression(owner)) return owner.properties.filter(entry => (ts.isPropertyAssignment(entry) || ts.isShorthandPropertyAssignment(entry)) && nameOf(ts, entry.name) === name).map(entry => ts.isShorthandPropertyAssignment(entry) ? entry.name : entry.initializer);
   if (!ts.isJsxAttributes(owner)) return [];
   const attributes = owner.properties.filter(entry => ts.isJsxAttribute(entry) && entry.name.text === name && entry.initializer);
   return attributes.map(entry => ts.isJsxExpression(entry.initializer) ? entry.initializer.expression : entry.initializer).filter(Boolean);
@@ -72,6 +73,17 @@ function declarationValues(state, declaration, seen) {
   return declaration.initializer ? valuesOf(state, declaration.initializer, seen) : [];
 }
 
+/** Resolve local function and memo callback returns; an unknown call remains its own leaf. */
+function callValues(state, node, seen) {
+  const { ts } = state;
+  const declaration = symbolAt(state, node.expression)?.valueDeclaration;
+  const target = declaration && ts.isVariableDeclaration(declaration) ? unwrap(ts, declaration.initializer) : declaration;
+  const memo = ts.isIdentifier(node.expression) && node.expression.text === 'useMemo' ? unwrap(ts, node.arguments[0]) : null;
+  const fn = memo ?? target;
+  return fn && (ts.isArrowFunction(fn) || ts.isFunctionExpression(fn) || ts.isFunctionDeclaration(fn))
+    ? resolveAll(state, returnedExpressions(ts, fn), seen) : [node];
+}
+
 /** Leaf expressions `expression` may evaluate to. A translator variable and any unresolvable expression is its own leaf. */
 export function valuesOf(state, expression, visited = new Set()) {
   const { ts } = state;
@@ -79,6 +91,7 @@ export function valuesOf(state, expression, visited = new Set()) {
   if (!node || visited.has(node)) return [];
   const seen = new Set([...visited, node]);
   if (ts.isConditionalExpression(node)) return [...valuesOf(state, node.whenTrue, seen), ...valuesOf(state, node.whenFalse, seen)];
+  if (ts.isCallExpression(node)) return callValues(state, node, seen);
   if (ts.isPropertyAccessExpression(node)) return resolveAll(state, valuesOf(state, node.expression, seen).flatMap(owner => propertyValues(state, owner, node.name.text)), seen);
   if (ts.isElementAccessExpression(node)) return resolveAll(state, tableValues(state, node, seen), seen);
   if (!ts.isIdentifier(node)) return [node];

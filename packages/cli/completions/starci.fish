@@ -358,7 +358,7 @@ complete -c starci -n '__starci_using_command app db' -l backup -r -d 'reset: ex
 complete -c starci -n '__starci_using_command app db' -l stamp -r -d 'fourteen-digit timestamp of the new baseline migration'
 complete -c starci -n '__starci_using_command app db' -l map -r -d 'explicit old-to-new migration stamp map for restamp'
 complete -c starci -n '__starci_using_command app db' -l apply -d 'apply baseline or restamp mutations after validation'
-complete -c starci -n '__starci_using_command app db' -l local -d 'inspect or repair the local Supabase database instead of the linked project'
+complete -c starci -n '__starci_using_command app db' -l local -d 'inspect local state; migrate applies only pending active SQL against the app'\''s existing local stack'
 complete -c starci -n '__starci_using_command app db' -l execute -d 'migrate, post-cutover, reset: apply the plan (also needs STARCI_DB_ARMED=1); otherwise read-only'
 complete -c starci -n '__starci_using_command app db' -l linked -d 'use the linked project; required explicitly for reset and one of the dump target choices'
 complete -c starci -n '__starci_using_command app db' -l url-env -r -d 'migrate, post-cutover, dump: environment variable holding the connection string'
