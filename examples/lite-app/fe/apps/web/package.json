@@ -16,7 +16,7 @@
     "@heroui/styles": "3.2.6",
     "@hookform/resolvers": "5.4.0",
     "@reduxjs/toolkit": "2.11.2",
-    "@starci/grammar": "0.9.14",
+    "@starci/grammar": "0.10.0",
     "@starci/heroicons": "0.3.4",
     "@supabase/ssr": "0.12.7",
     "@supabase/supabase-js": "2.117.2",
