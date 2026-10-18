@@ -35,7 +35,8 @@ Hotfix of the red alpha.21 CI (run 39070215259) and the candidate CI flow: this 
 - Sharded coverage equals the unsharded run on lines and functions for every file (NIVO: 883 of 883), but a file may hold 1-2 more branch entries than the unsharded run (NIVO: 27 files): jest merges raw V8 across test files before it converts them, while shards convert apart. Extra entries can only add uncovered branches, never hide one. Exact branch equality (merging raw V8 across shards) is an alpha.23 follow-up.
 
 ### Evidence
-- Package versions: @starci/hfs 4.7.3, @starci/cli 1.7.3, @starci/jest-preset 2.3.2, @starci/eslint-canon-be 3.4.8, @starci/eslint-canon-fe 8.4.8 (bundled runtime copies); the earlier alpha.22 patch sets (hfs 4.7.0-4.7.2, cli 1.7.0-1.7.2, eslint-canon 3.4.5-3.4.7 / 8.4.5-8.4.7) were published; runtime 1.0.0-alpha.22.
+- Package versions: @starci/hfs 4.7.3, @starci/cli 1.7.3, @starci/jest-preset 2.3.2, @starci/eslint-canon-be 3.4.9, @starci/eslint-canon-fe 8.4.9 (bundled runtime copies); the earlier alpha.22 patch sets (hfs 4.7.0-4.7.2, cli 1.7.0-1.7.2, eslint-canon 3.4.5-3.4.8 / 8.4.5-8.4.8) were published; runtime 1.0.0-alpha.22.
+- The package phase was stopped after lint canons 3.4.8/8.4.8 reached npm and before HFS/CLI upload to repair the coverage prerequisites. Their published payloads stay immutable; lint canons 3.4.9/8.4.9 carry the final pins through a fresh native package phase.
 
 ## [1.0.0-alpha.21] — 2026-10-18
 
