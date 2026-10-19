@@ -283,9 +283,9 @@ async function startCoreApi({ app, entry, origin, databaseUrl }) {
 const propertiesOf = (text) => Object.fromEntries(text.split(/\r?\n/).filter((line) => line && !line.startsWith('#')).map((line) => [line.slice(0, line.indexOf('=')), line.slice(line.indexOf('=') + 1)]));
 
 /**
- * The coverage contract of a scaffolded app: sonar-project.properties imports the be lcov with exactly the services as its coverage
- * scope (no other coverage key), codecov.yml holds the same scope at 100 on the project and the patch with fe/ ignored, and the
- * managed CI uploads the same lcov with the CODECOV_TOKEN secret after the unit run.
+ * The coverage contract of a scaffolded app: Sonar imports the be lcov and excludes the slot-derived complement of measured logic.
+ * Codecov uses the same complement and measured roots at 100 on the project and patch; the managed CI merges the unit shards,
+ * proves coverage, then uploads that lcov from the coverage job with OIDC.
  */
 function assertCoverageContract(app) {
   const sonar = propertiesOf(fs.readFileSync(path.join(app, 'sonar-project.properties'), 'utf8'));
@@ -298,7 +298,7 @@ function assertCoverageContract(app) {
   for (const kind of ['project', 'patch']) {
     assert.deepEqual(codecov.coverage.status[kind].default, { target: '100%', threshold: '0%', paths: COVERAGE_SCOPE }, `codecov ${kind} status: the measured roots at 100`);
   }
-  assert.deepEqual(codecov.ignore, ['fe/**'], 'fe/ is outside coverage');
+  assert.deepEqual(codecov.ignore, sonarCoverageExclusions(MANIFEST), 'Codecov and Sonar exclude the same slot-derived complement of measured logic');
   assert.deepEqual(Object.keys(codecov.coverage.status).sort(), ['patch', 'project']);
   const workflow = parseYaml(fs.readFileSync(path.join(app, '.github', 'workflows', 'ci.yml'), 'utf8'));
   // The managed CI runs the CI standard's jobs (knowledge/hfs/ci-standard.yaml): the unit run is sharded in the test job, each shard uploads its lcov,
