@@ -1,5 +1,8 @@
 # Changelog
 
+## 8.4.16 - 2026-10-19
+- Changed: bundled canon pins follow the regenerated Stylelint vocabulary and the matching HFS and CLI cohort; front-end canon rules are unchanged.
+
 ## 8.4.15 - 2026-10-19
 - Changed: bundled canon pins follow @starci/hfs 4.7.9, @starci/cli 1.7.9 and the matching lint canon cohort for the lite development guidance update; front-end canon rules are unchanged.
 

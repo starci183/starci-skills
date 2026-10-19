@@ -1,5 +1,8 @@
 # Changelog
 
+## 4.7.10 - 2026-10-19
+- Changed: bundled canon pins follow the regenerated Stylelint vocabulary and the matching lint canon cohort; HFS command behavior is unchanged.
+
 ## 4.7.9 - 2026-10-19
 - Changed: the lite scaffold README explicitly starts the Docker engine before the Supabase CLI-managed local stack and keeps application startup in its declared development profile.
 
