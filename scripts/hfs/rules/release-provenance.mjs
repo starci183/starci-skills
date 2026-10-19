@@ -79,7 +79,7 @@ function refProof(value) {
   if (typeof value !== 'string') return 0;
   const expression = unwrap(workflowExpression(value));
   const alternatives = splitBoolean(expression, '||');
-  if (alternatives.length > 1) return alternatives.map(refProof).reduce((a, b) => a & b);
+  if (alternatives.length > 1) return alternatives.map(refProof).reduce((a, b) => a & b, RELEASE_REF);
   const conjuncts = splitBoolean(expression, '&&');
   if (conjuncts.length > 1) return conjuncts.map(refProof).reduce((a, b) => a | b, 0);
   if (/^startsWith\(\s*github\.ref\s*,\s*(['"])refs\/tags\/v\1\s*\)$/.test(expression)) return RELEASE_REF;

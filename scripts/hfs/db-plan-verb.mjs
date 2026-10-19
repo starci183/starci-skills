@@ -1,7 +1,7 @@
 // app db plan: compare migration-owned state without fetching commands or Vault values.
 import fs from 'node:fs';
 import path from 'node:path';
-import { createHash } from 'node:crypto';
+import { sha256 } from '../../engine/digest.mjs';
 import pg from 'libpg-query';
 import { parse as parseToml } from 'smol-toml';
 import { invocationDir } from '../lib/roots.mjs';
@@ -19,12 +19,11 @@ const PRESENCE_SQL = `select
   pg_catalog.to_regclass('vault.secrets') is not null as vault;`;
 const INVENTORIES = {
   migrations: 'select version from supabase_migrations.schema_migrations order by version;',
-  cron: 'select jobname as name, schedule, pg_catalog.md5(command) as "commandHash", active from cron.job order by jobid;',
+  cron: 'select jobname as name, schedule, pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(command, \'UTF8\')), \'hex\') as "commandHash", active from cron.job order by jobid;',
   queues: 'select queue_name as name from pgmq.meta order by queue_name;',
   vault: 'select name from vault.secrets order by name;',
 };
 const names = (nodes) => sqlStringParts(nodes).join('.');
-const hash = (command) => createHash('md5').update(command).digest('hex');
 const OWNERSHIP_CALLS = new Set(['pgmq.create', 'pgmq.drop_queue', 'cron.schedule', 'cron.unschedule', 'cron.schedule_in_database', 'cron.alter_job']);
 
 const parseSql = sqlParser(pg, () => { throw new DbVerbError('migration SQL could not be inventoried safely'); });
@@ -45,7 +44,7 @@ function inventoryCall(state, call) {
     const job = requiredLiteral(call, 0, ['job_name']);
     const schedule = requiredLiteral(call, 1, ['schedule']);
     const command = requiredLiteral(call, 2, ['command']);
-    state.cron.set(job, { schedule, commandHash: hash(command), active: true });
+    state.cron.set(job, { schedule, commandHash: sha256(command), active: true });
   } else if (name === 'cron.unschedule') {
     state.cron.delete(requiredLiteral(call, 0, ['job_name']));
   } else if (name === 'cron.schedule_in_database' || name === 'cron.alter_job') {
@@ -224,7 +223,7 @@ function compare(expected, actual, kind) {
   for (const row of actual) {
     const key = kind === 'migrations' ? row.version : row.name;
     if (key !== null && (typeof key !== 'string' || key.length === 0)) throw new DbVerbError('Supabase returned an invalid inventory identifier');
-    if (kind === 'cron' && (typeof row.schedule !== 'string' || !/^[a-f0-9]{32}$/.test(row.commandHash ?? '') || typeof row.active !== 'boolean')) throw new DbVerbError('Supabase returned invalid cron metadata');
+    if (kind === 'cron' && (typeof row.schedule !== 'string' || !/^[a-f0-9]{64}$/.test(row.commandHash ?? '') || typeof row.active !== 'boolean')) throw new DbVerbError('Supabase returned invalid cron metadata');
     if (!unmatched.delete(key)) unexpected += 1;
     else if (kind === 'cron') {
       const desired = expected.get(key);

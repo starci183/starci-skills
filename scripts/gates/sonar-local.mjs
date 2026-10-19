@@ -580,8 +580,9 @@ function gitRevision(cwd){
 
 // ---- the slice ------------------------------------------------------------------------------------------
 
-/** GET with the analysis token, retried with the admin token when the analysis user may not browse. */
-const read=(cfg,tokens,pathname)=>readWithTokens(call,cfg,tokens,pathname);
+/** GET with the supplied tokens; an absent attempt remains an explicit unavailable response. */
+const read=async(cfg,tokens,pathname)=>await readWithTokens(call,cfg,tokens,pathname)
+  ??{reachable:false,status:0,error:'no Sonar credential attempt produced a response'};
 
 const facet=(json,property)=>Object.fromEntries((json?.facets??[]).find(f=>f.property===property)?.values?.map(v=>[v.val,v.count])??[]);
 

@@ -19,4 +19,4 @@ exit:
 json: starci/supabase-start@1
 examples:
   - starci supabase start --cwd <app>
-editions: [full]
+editions: [full, lite]

@@ -173,7 +173,7 @@ function readmeBadgeText(text, manifestText) {
 
 /** Whole-file secret judgement exempts only declared public badge values and preserves original line numbers and every provider shape. */
 export function secretHitsInFile(file, fullText, { manifestText } = {}) {
-  const normalized = file.replace(/\\/g, '/');
+  const normalized = file.replaceAll('\\', '/');
   let text = fullText;
   if (/(?:^|\/)\.starcistacks\/application-stacks\.yaml$/.test(normalized)) text = manifestBadgeText(text);
   if (/(?:^|\/)README\.md$/.test(normalized)) text = readmeBadgeText(text, manifestText);

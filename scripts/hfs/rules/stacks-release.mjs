@@ -26,7 +26,7 @@ const DECLARATION = '.starcistacks/application-stacks.yaml';
 const MAX_BYTES = 1024 * 1024;
 const SOURCE = /^(?:be\/)?(?:src|apps)\/.*\.[cm]?[jt]s$/;
 const TEST = /(?:\.(?:spec|test)|-spec)\.[cm]?[jt]s$|\/(?:tests|__tests__)\//;
-const SECRET = /(?:^|\/)(?:secrets|\.claude|\.aws|\.codex)(?:\/|$)|(?:^|\/)\.env(?:\.|$)|\.(?:enc|pem|key|p12|pfx)$/i;
+const SECRET = /(?:(?:^|\/)(?:secrets|\.claude|\.aws|\.codex)(?:\/|$))|(?:(?:^|\/)\.env(?:\.|$))|(?:\.(?:enc|pem|key|p12|pfx)$)/i;
 const CLI_ENTRY = /^(?:be\/)?dist\/apps\/cli\/[A-Za-z0-9_./-]+\.(?:js|mjs|cjs)$/;
 const mapping = value => plain(value) ? value : {};
 const present = value => typeof value === 'string' && Boolean(value.trim());

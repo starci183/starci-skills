@@ -4,6 +4,7 @@ import path from 'node:path';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { parseYamlCached } from '../lib/yaml-cached.mjs';
 import { jsonClone } from '../lib/json-clone.mjs';
+import { byCodeUnit } from '../lib/list.mjs';
 import { isPlainObject } from '../../engine/plain-object.mjs';
 import { SEMVER } from './manifest-shape.mjs';
 import { enforcerJudgedInEdition, judgedInEdition, ruleEditionProblems } from './edition-slots.mjs';
@@ -39,7 +40,7 @@ function relativePathProblem(value, label, bad, anchor = false) {
   const parts = typeof value === 'string' ? value.split('#') : [];
   const file = parts[0];
   const valid = typeof value === 'string' && value.trim() === value && value.length > 0
-    && !/[\r\n\u0000\\]/.test(value) && !/^(?:\/|[a-z][a-z0-9+.-]*:)/i.test(value) && !file.includes(':')
+    && !value.includes('\0') && !/[\r\n\\]/.test(value) && !/^(?:\/|[a-z][a-z0-9+.-]*:)/i.test(value) && !file.includes(':')
     && !file.split('/').some((part) => ['', '.', '..'].includes(part))
     && (parts.length === 1 || (anchor && parts.length === 2 && /^[A-Za-z0-9][A-Za-z0-9_.:-]*$/.test(parts[1])));
   if (!valid) bad.push(`${label} must be a repository-relative path${anchor ? ' with an optional #anchor' : ''}`);
@@ -51,7 +52,7 @@ function unknownKeys(item, allowed, label, bad) {
 
 function nonEmptyList(value, label, bad) {
   if (!Array.isArray(value) || !value.length) { bad.push(`${label} must be a non-empty list`); return false; }
-  const normalized = value.map((value) => JSON.stringify(value, (_key, item) => isPlainObject(item) ? Object.fromEntries(Object.keys(item).sort().map((key) => [key, item[key]])) : item));
+  const normalized = value.map((value) => JSON.stringify(value, (_key, item) => isPlainObject(item) ? Object.fromEntries(Object.keys(item).sort(byCodeUnit).map((key) => [key, item[key]])) : item));
   if (new Set(normalized).size !== value.length) bad.push(`${label} repeats a value`);
   return true;
 }

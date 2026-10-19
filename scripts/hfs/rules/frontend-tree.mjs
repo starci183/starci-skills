@@ -37,7 +37,7 @@ function wireSchemaDigest(repoRoot, snapshots) {
   for (const snapshot of [...snapshots].sort(byCodeUnit)) {
     let source;
     try { source = fs.readFileSync(path.join(repoRoot, snapshot), 'utf8'); } catch { return null; }
-    hash.update(`${snapshot}\0${source.replace(/\r\n/g, '\n')}\0`);
+    hash.update(`${snapshot}\0${source.replaceAll('\r\n', '\n')}\0`);
   }
   return hash.digest('hex');
 }

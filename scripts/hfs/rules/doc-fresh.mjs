@@ -228,7 +228,7 @@ function injectionTokens(repoRoot, tracked) {
   const ts = loadTypescript(repoRoot, path.dirname(fileURLToPath(import.meta.url)));
   if (!ts) return tokens;
   for (const file of tracked) {
-    if (!/\.[cm]?[jt]sx?$/.test(file) || /(?:^|\/)(?:tests?|__tests__)\/|(?:\.(?:spec|test)|-spec)\.[cm]?[jt]sx?$/.test(file)) continue;
+    if (!/\.[cm]?[jt]sx?$/.test(file) || /(?:(?:^|\/)(?:tests?|__tests__)\/)|(?:(?:\.(?:spec|test)|-spec)\.[cm]?[jt]sx?$)/.test(file)) continue;
     const text = readText(repoRoot, file) ?? '';
     declaredTokens(ts, ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true), tokens);
   }

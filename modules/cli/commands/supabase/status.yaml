@@ -18,4 +18,4 @@ json: starci/supabase-status@1
 examples:
   - starci supabase status --cwd <app>
   - starci supabase status --cwd <app> --json
-editions: [full]
+editions: [full, lite]

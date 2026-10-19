@@ -8,7 +8,7 @@ const DEPLOY = /(?:^|\/)deploy\//;
 const SCRIPT = /(?:^|\/)scripts\//;
 const COMPOSE = /(?:^|\/)(?:docker-)?compose(?:[.-][^/]*)?\.ya?ml$/;
 const DOCKERFILE = /(?:^|\/)Dockerfile(?:\.[^/]*)?$/;
-const CREDENTIAL_FILE = /(?:^|\/)(?:secrets?\.env(?:\.[^/]*)?|\.env(?:\.[^/]*)?|secrets\/)|\.enc$/i;
+const CREDENTIAL_FILE = /(?:(?:^|\/)(?:secrets?\.env(?:\.[^/]*)?|\.env(?:\.[^/]*)?|secrets\/))|(?:\.enc$)/i;
 const HOST_CRON = /\b(?:crontab|anacron|crond|supercronic)\b|\/etc\/cron(?:\b|[./])|\bcron\.d\b|\/var\/spool\/cron\b|@(?:reboot|yearly|annually|monthly|weekly|daily|midnight|hourly)\b|\b[\w.@-]+\.timer\b|\bOn(?:Calendar|BootSec|UnitActiveSec|ActiveSec)\s*=|(?:^|[\s;|&"'])at\s+(?:(?:-[a-z]+\s+)*)((?:-[ft]\b)|now\b|tomorrow\b|\d{1,2}:\d{2}\b|midnight\b|noon\b)/im;
 const HOST_CRON_PATH = /(?:^|\/)(?:crontab(?:$|\/)|cron\.d(?:\/|$)|[^/]+\.(?:timer|crontab)$)/;
 const CRON_NUMERIC_FIELD = /^[\d*,/-]+$/;

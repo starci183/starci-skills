@@ -16,7 +16,7 @@ const mapping = value => plain(value) ? value : {};
 const present = value => typeof value === 'string' && Boolean(value.trim());
 const VERSION = /^[1-9][0-9]*$/;
 const VERSIONED_SECRET = /-v[1-9][0-9]*$/;
-const SENSITIVE_KEY = /password|passwd|secret|token|credential|private[_-]?key|api[_-]?key|service[_-]?role|(?:^|_)key$/i;
+const SENSITIVE_KEY = /password|passwd|secret|token|credential|private[_-]?key|api[_-]?key|service[_-]?role|(?:(?:^|_)key$)/i;
 const SOURCE = /^be\/(?:apps|src)\/.*\.[cm]?[jt]sx?$/;
 const TEST_SOURCE = /(?:\.(?:spec|test)|-spec)\.[cm]?[jt]sx?$|\/tests\//;
 const REALTIME_SOURCE = /^be\/src\/features\/realtime\/[^/]+\//;

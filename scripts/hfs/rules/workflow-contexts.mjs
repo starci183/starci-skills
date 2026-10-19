@@ -76,7 +76,7 @@ function expressions(value) {
 
 /** Source markers travel inside parsed scalar expressions, preserving flow maps, quoted keys and repeated values without matching comments. */
 export function workflowContextFindings({ path: file, text }) {
-  const marked = text.replace(/\$\{\{/g, (match, offset) => `${match} __hfs_context_line_${text.slice(0, offset).split('\n').length}__ `);
+  const marked = text.replaceAll('${{', (match, offset) => `${match} __hfs_context_line_${text.slice(0, offset).split('\n').length}__ `);
   const findings = [];
   function inspect(value, keys) {
     const allowed = allowedContexts(keys);

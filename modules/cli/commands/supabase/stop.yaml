@@ -21,4 +21,4 @@ json: starci/supabase-stop@1
 examples:
   - starci supabase stop --cwd <app>
   - starci supabase stop --cwd <app> --no-backup
-editions: [full]
+editions: [full, lite]

@@ -22,7 +22,7 @@ function checksumStep(checksum, value) {
 function checksumWords(prefix, words) {
   const codes = [...prefix].map((character) => character.codePointAt(0));
   const expanded = [...codes.map((code) => code >>> 5), 0, ...codes.map((code) => code & 31)];
-  return [...expanded, ...words].reduce(checksumStep, 1);
+  return [...expanded, ...words].reduce((checksum, value) => checksumStep(checksum, value), 1);
 }
 
 function convertBits(input, from, to, pad) {

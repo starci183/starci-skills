@@ -33,7 +33,10 @@ forbids is refused (R244).
 Tests: back-end unit specs are required exactly as in full (`ruleParams.be.unitRoles`, the logic roles at 100 per file, the
 `@starci/jest-preset` doubles and builders). R272 requires a lite wiring and boot proof that compiles the Nest module graph
 with doubles. R284 requires the declared pattern proofs in the integration-spec lane against
-the local Supabase CLI stack (`starci supabase start`), with no toxiproxy and no containers of their own. Lite may also have
+the local Supabase CLI stack (`starci supabase start`), with no toxiproxy and no containers of their own. The native
+`starci supabase start`, `status` and `stop` commands apply their declared lifecycle policies to both editions.
+An existing protected stack remains under its lifecycle owner; the application consumes its declared DB/Auth endpoints.
+Lite may also have
 contract specs in `tests/contract` and a `test:contract` script. The e2e world and workflow (slot `app.ci-e2e`), stack tests
 and browser runs remain full-only. The front end has no tests in either edition (R97).
 
