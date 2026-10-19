@@ -18,6 +18,7 @@ flags:
   - {name: execute, type: boolean, summary: "migrate, post-cutover, reset: apply the plan (also needs STARCI_DB_ARMED=1); otherwise read-only"}
   - {name: linked, type: boolean, summary: "use the linked project; required explicitly for reset and one of the dump target choices"}
   - {name: url-env, type: string, summary: "migrate, post-cutover, dump: environment variable holding the connection string"}
+  - {name: target-binding, type: string, summary: "migrate: public native endpoint assertion; constrains the target and grants no authority"}
   - {name: green-at, type: string, summary: "post-cutover: ISO time of the last green smoke; must be at least database.postCutover.minAgeHours (48) old"}
   - {name: owner-confirms-old-app-gone, type: boolean, summary: "post-cutover: the owner confirms the old app is gone (opens the time gate)"}
   - {name: json, type: boolean, summary: "plan, migrate, post-cutover, dump, reset: print the result as JSON"}

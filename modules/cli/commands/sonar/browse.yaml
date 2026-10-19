@@ -1,0 +1,24 @@
+group: sonar
+verb: browse
+owner: runtime
+summary: read declared Sonar project evidence through the selected Browse credential
+impl: {module: scripts/gates/sonar-manage.mjs, export: runSonarManage}
+effect: read
+roles: [worker, lead, coordinator, owner]
+positional: [{name: action, enum: [read], required: true, variadic: false}]
+operationPolicy:
+  read: {action: sonar.browse.read, effect: read, credentials: [browse], destination: none, checkpoints: []}
+flags:
+  - {name: target, type: string, required: true, summary: named operation target}
+  - {name: operation, type: string, summary: durable operation id}
+  - {name: execute, type: boolean, summary: execute the declared read operation}
+  - {name: reconcile, type: boolean, summary: refresh the prior operation's verification}
+  - {name: key, type: string, summary: exact declared project key}
+  - {name: branch, type: string, summary: exact declared branch to inspect}
+  - {name: revision, type: string, summary: expected processed source revision}
+conventions:
+  - project measures, processed revision, issue count and quality-gate results retain their separate verification outcomes
+exit: {"0": plan prepared or operation completed, "1": provider read failed or proof is incomplete, "2": policy or input refused}
+json: always
+examples: [starci sonar browse read --target quality --revision <sha>]
+editions: [full, lite]

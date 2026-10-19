@@ -260,6 +260,10 @@ approval:
     written against goalRev. The frozen record is the base all later diffs
     apply to — a goal that was never approved cannot be revised, only replaced
     upstream.
+  providerGrants: >-
+    goals.json.provisionGrants references exact prepared provider operations and their digests
+    for declared op ids. The owning define-goal input contract governs acceptance and revocation;
+    a goal without its typed grant approval carries no provider-effect grant.
   sources:
     - this file (approve, goalApprovalBlocks are its rules)
     - skills/starci/references/define-goal.md

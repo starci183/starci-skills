@@ -9,6 +9,7 @@ import { databasePush } from '../runtime/scripts/api/supabase/database-push.mjs'
 import { isMigrationName, migrationStamp } from '../runtime/scripts/hfs/rules/database-migrations.mjs';
 import { CONFIG_FILE, MIGRATIONS_DIR } from '../runtime/scripts/hfs/rules/database-constants.mjs';
 import { failure, refusal } from '../stack/errors.mjs';
+import { assertLocalDatabase, boundSupabaseLauncher, nativeDatabaseEnvironment } from '../stack/target-binding.mjs';
 
 const configError = (reason) => refusal('DB_CONFIG_INVALID', reason);
 const encrypted = (value) => typeof value === 'string' && value.includes('encrypted:');
@@ -96,7 +97,7 @@ function targetIdentity(config, env) {
 }
 
 /** Snapshot only in memory; no plaintext configuration, values or hashes reach the result. */
-function inputs(ctx) {
+function inputs(ctx, nativeTarget = null) {
   const root = path.resolve(ctx.cwd);
   requireDirectory(root);
   requireDirectory(path.join(root, 'supabase'));
@@ -111,6 +112,10 @@ function inputs(ctx) {
   requirePlainConfig(config);
   for (const value of Object.values(ctx.env)) if (encrypted(value)) throw configError('local migration does not decrypt encrypted environment values');
   const { values: env, files: envFiles } = projectEnvironment(root, ctx.env);
+  if (nativeTarget && (config.experimental?.stack === true
+    || env.SUPABASE_EXPERIMENTAL_STACK && !/^(?:0|false)$/i.test(env.SUPABASE_EXPERIMENTAL_STACK)
+    || env.SUPABASE_CLI_BINARY_OVERRIDE)) throw configError('the bound local target requires the declared legacy Supabase backend and installed launcher');
+  const launcher = nativeTarget ? boundSupabaseLauncher(root) : null;
   const target = targetIdentity(config, env);
   let names;
   try { names = fs.readdirSync(path.join(root, MIGRATIONS_DIR)).sort(byteOrder); } catch { throw configError('local migrations are not readable'); }
@@ -127,18 +132,25 @@ function inputs(ctx) {
     migrations.push([name, readFile(path.join(root, MIGRATIONS_DIR, name))]);
   }
   const digest = createHash('sha256').update(JSON.stringify({ root, appText, configText, envFiles, env, target, migrations })).digest('hex');
-  return { root, target, names: migrations.map(([name]) => name), digest };
+  return { root, target, names: migrations.map(([name]) => name), digest, nativeTarget, launcher };
 }
 
 function unchanged(ctx, snapshot) {
-  const current = inputs(ctx);
+  const current = inputs(ctx, snapshot.nativeTarget);
   if (current.digest !== snapshot.digest) throw failure('DB_FINAL_MISMATCH', 'local migration inputs changed during the operation');
   return current;
 }
 
 /** Only the specific Supabase owner can spawn; failures and malformed JSON never expose child output. */
 function push(ctx, snapshot, dryRun) {
-  const result = databasePush(snapshot.root, ['--local', '--skip-vault', '--workdir', snapshot.root, '--output-format', 'json', ...(dryRun ? ['--dry-run'] : ['--yes'])], { env: ctx.env, run: ctx.spawn });
+  const env = snapshot.nativeTarget ? nativeDatabaseEnvironment(ctx.env, snapshot.nativeTarget,
+    { 'SUPABASE_SERVICES_HOSTNAME': '127.0.0.1', 'SUPABASE_EXPERIMENTAL_STACK': '0' }) : ctx.env;
+  const run = snapshot.nativeTarget ? (file, args, options) => {
+    if (file !== process.execPath || args[0] !== snapshot.launcher) throw failure('DB_CLI_MISSING', 'the bound database launcher cannot fall back to a global tool');
+    return ctx.spawn(file, args, options);
+  } : ctx.spawn;
+  const result = databasePush(snapshot.root, ['--local', '--skip-vault', '--workdir', snapshot.root, '--output-format', 'json',
+    ...(snapshot.nativeTarget ? ['--profile', 'supabase'] : []), ...(dryRun ? ['--dry-run'] : ['--yes'])], { env, run });
   if (result?.error || result?.signal || result?.status !== 0) throw failure('DB_CLI_FAILED', 'the local Supabase migration command failed; database output was withheld');
   let payload;
   try { payload = JSON.parse(result.stdout); } catch { throw failure('DB_CLI_FAILED', 'the local migration command returned unreadable JSON'); }
@@ -156,8 +168,9 @@ function push(ctx, snapshot, dryRun) {
 }
 
 /** Preview by default; the caller admits execute only after the existing database arming check. No history repair, reset or linked fallback. */
-export function migrateLocalDatabase(ctx, { execute = false } = {}) {
-  const snapshot = inputs(ctx);
+export function migrateLocalDatabase(ctx, { execute = false, nativeTarget = null } = {}) {
+  const snapshot = inputs(ctx, nativeTarget);
+  assertLocalDatabase(nativeTarget, snapshot.target);
   const pending = push(ctx, snapshot, true);
   unchanged(ctx, snapshot);
   let applied = [];

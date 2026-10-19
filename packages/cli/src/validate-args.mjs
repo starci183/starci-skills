@@ -120,6 +120,16 @@ const defaultArgs = (locals, values) => {
   return args;
 };
 
+/** Select the catalogued action policy; a missing policy refuses before runtime or provider dispatch. */
+const operationPolicyOf = (verb, positionals) => {
+  if (verb.operationPolicy === undefined) return null;
+  const policy = verb.operationPolicy?.[positionals[0]];
+  if (!policy || typeof policy.action !== 'string' || !Array.isArray(policy.credentials)) {
+    throw new Error('the selected action has no executable operation policy');
+  }
+  return policy;
+};
+
 /**
  * Validate the arguments after a catalog group and verb.
  *
@@ -166,7 +176,8 @@ export function validateArgs(argv, verb, globalFlags = []) {
     requiredCheck(locals, values);
     checkPositionals(verb, positionals, passthrough);
     checkGlobals(verb, global);
-    return { ok: true, values, args: defaultArgs(locals, values), global, localArgs, positionals };
+    const operationPolicy = operationPolicyOf(verb, positionals);
+    return { ok: true, values, args: defaultArgs(locals, values), global, localArgs, positionals, operationPolicy };
   } catch (error) {
     return { ok: false, code: 2, error: String(error?.message ?? error) };
   }

@@ -15,7 +15,7 @@
 // What counts as an emitted code (see `emittedCodes`):
 //   UPPER  a quoted UPPER_SNAKE literal of two or more segments ('TARGET_MISSING'), except the names in the not-codes
 //          section of modules/kernel/allowlist.yaml (environment variables, Node/SQLite error names, key names)
-//          and any name the code itself reads as an env var;
+//          and any name the code itself reads as an env var; exact AST recognition sites also exclude closed CLI enums and boolean guards;
 //   KEBAB  a kebab-case literal with a hyphen in a code position: `code: 'x-y'`, `reason: 'x-y'`, `rejected: 'x-y'`,
 //          a reason template that starts with one (`reason: \`x-y:${...}\``), or the last string argument of refuse(...).
 import fs from 'node:fs';
@@ -28,6 +28,9 @@ import { createRequire } from 'node:module';
 import { isMain } from '../lib/is-main.mjs';
 import { byCodeUnit } from '../lib/list.mjs';
 import { CODE_FINDINGS, PLUGIN_ENFORCERS } from '../lib/failure-code-findings.mjs';
+import { loadCatalog } from '../cli/catalog.mjs';
+import { failureSourceIndex, ownedResultCodes } from '../lib/failure-code-owned-results.mjs';
+import { protocolEnumOffsets, environmentOffsets, catchRecognitionOffsets } from '../lib/failure-code-protocol-enums.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const CATALOG_FILE = 'modules/kernel/failure-codes.yaml';
@@ -147,11 +150,12 @@ function gitRevisionArgs(text) {
 }
 
 /** The codes one scanned source emits, pushed through `add`. */
-const upperCodeFindings = (rel, text, NOT_CODES, envNames, add) => {
+const upperCodeFindings = (rel, text, NOT_CODES, envNames, add, recognition) => {
   const revisions = rel.endsWith('.mjs') ? gitRevisionArgs(text) : new Set();
   for (const m of text.matchAll(UPPER_RE)) {
     const code = m[2];
     if (revisions.has(m.index)) continue;
+    if (recognition?.has(m.index)) continue;
     if (NOT_CODES.has(code) || NOT_CODE_PREFIX.test(code) || envNames.has(code)) continue;
     add(code, 'upper', rel, lineOf(text, m.index));
   }
@@ -173,10 +177,29 @@ const kebabCodeFindings = (rel, text, NOT_CODES, add) => {
   for (const re of KEBAB_RES) for (const m of text.matchAll(re)) addKebab(m[m.length - 1], m.index);
 };
 
-const fileEmittedCodes = (rel, text, { NOT_CODES, envNames, add }) => {
-  upperCodeFindings(rel, text, NOT_CODES, envNames, add);
+const fileEmittedCodes = (rel, text, { NOT_CODES, envNames, add, recognition }) => {
+  upperCodeFindings(rel, text, NOT_CODES, envNames, add, recognition);
   kebabCodeFindings(rel, text, NOT_CODES, add);
 };
+
+/** The validated CLI owner and field of each closed flag enum; a shared spelling alone never grants an exclusion. */
+function cliEnums(base) {
+  return loadCatalog(base).groups.flatMap(group => group.verbs.flatMap(verb => (verb.flags ?? [])
+    .filter(flag => flag.type === 'enum' && flag.enum.every(value => typeof value === 'string'))
+    .map(flag => ({module: verb.impl?.module ?? verb.impl?.script ?? null, name: flag.name, values: flag.enum}))));
+}
+
+/** Preserve the scanner's code spelling and not-code policy while adding finite values proved to reach code sinks. */
+function ownedCodeFindings(compiler, index, {NOT_CODES, envNames, add}) {
+  const upper = new RegExp(UPPER_RE.source), kebab = new RegExp(`^${KEBAB}$`);
+  for (const entry of ownedResultCodes(compiler, index)) {
+    let kind = null;
+    if (upper.exec(JSON.stringify(entry.code))?.[2] === entry.code) kind = 'upper';
+    else if (kebab.test(entry.code)) kind = 'kebab';
+    if (!kind || NOT_CODES.has(entry.code) || NOT_CODE_PREFIX.test(entry.code) || envNames.has(entry.code)) continue;
+    for (const site of entry.sites) add(entry.code, kind, site.file, site.line);
+  }
+}
 
 /** Every emitted code: {code, kind: 'upper'|'kebab', sites: [{file, line}]}. Sorted by code. */
 function emittedCodes(base = root) {
@@ -188,7 +211,18 @@ function emittedCodes(base = root) {
   };
   const NOT_CODES = readNotCodes(base);
   const { texts, envNames } = sourceTexts(base);
-  for (const [rel, text] of texts) fileEmittedCodes(rel, text, { NOT_CODES, envNames, add });
+  typescript ??= createRequire(import.meta.url)('typescript');
+  const index = failureSourceIndex(typescript, texts.filter(([rel]) => rel.endsWith('.mjs')));
+  const recognition = protocolEnumOffsets(typescript, index, cliEnums(base));
+  for (const classified of [environmentOffsets(typescript, index), catchRecognitionOffsets(typescript, index)]) {
+    for (const [file, offsets] of classified) {
+      const exact = recognition.get(file) ?? new Set();
+      for (const offset of offsets) exact.add(offset);
+      recognition.set(file, exact);
+    }
+  }
+  for (const [rel, text] of texts) fileEmittedCodes(rel, text, { NOT_CODES, envNames, add, recognition: recognition.get(rel) });
+  ownedCodeFindings(typescript, index, {NOT_CODES, envNames, add});
   for (const v of vocabularyCodes(base)) found.set(v.code, v);
   return [...found.values()].sort((a, b) => byCodeUnit(a.code, b.code));
 }

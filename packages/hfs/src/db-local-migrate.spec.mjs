@@ -93,6 +93,53 @@ test('an already-current local preview is a no-op even with ambient auto-yes', a
   assert.ok(f.calls[0].args.includes('--dry-run'));
 });
 
+test('a bound local target checks the effective project and port before any database child', async t => {
+  const f = fixture(t);
+  f.write('node_modules/supabase/dist/supabase.js', '// synthetic installed launcher');
+  const binding = { kind: 'supabase-db', mode: 'local', environment: 'development', localProject: 'other-project', port: 55432 };
+  assert.equal((await f.invoke(['--target-binding', JSON.stringify(binding)])).code, 2);
+  assert.equal(f.calls.length, 0);
+  binding.localProject = 'local-fixture';
+  binding.port = 55433;
+  assert.equal((await f.invoke(['--target-binding', JSON.stringify(binding)])).code, 2);
+  assert.equal(f.calls.length, 0);
+});
+
+test('the same local binding cannot bypass the existing database arming requirement', async t => {
+  const f = fixture(t, { env: { STARCI_DB_ARMED: undefined } });
+  f.write('node_modules/supabase/dist/supabase.js', '// synthetic installed launcher');
+  const binding = { kind: 'supabase-db', mode: 'local', environment: 'development', localProject: 'local-fixture', port: 55432 };
+  const result = await f.invoke(['--target-binding', JSON.stringify(binding), '--execute']);
+  assert.equal(result.code, 3);
+  assert.equal(f.calls.length, 0);
+});
+
+test('a bound local preview pins the installed launcher, builtin profile and legacy loopback routing', async t => {
+  const f = fixture(t, { env: { supabase_access_token: 'synthetic-token', pgservice: 'synthetic-service', SOPS_AGE_KEY: 'synthetic-key' } });
+  f.write('node_modules/supabase/dist/supabase.js', '// synthetic installed launcher');
+  const binding = { kind: 'supabase-db', mode: 'local', environment: 'development', localProject: 'local-fixture', port: 55432 };
+  const result = await f.invoke(['--target-binding', JSON.stringify(binding)]);
+  assert.equal(result.code, 0, result.stderr);
+  const call = f.calls[0];
+  assert.equal(call.file, process.execPath);
+  assert.equal(call.args[0], path.join(f.root, 'node_modules/supabase/dist/supabase.js'));
+  assert.equal(call.args[call.args.indexOf('--profile') + 1], 'supabase');
+  assert.equal(call.options.env.SUPABASE_SERVICES_HOSTNAME, '127.0.0.1');
+  assert.equal(call.options.env.SUPABASE_EXPERIMENTAL_STACK, '0');
+  assert.equal(call.options.env.supabase_access_token, undefined);
+  assert.equal(call.options.env.pgservice, undefined);
+  assert.equal(call.options.env.SOPS_AGE_KEY, undefined);
+});
+
+test('a bound local target refuses an experimental backend before invoking its installed tool', async t => {
+  const f = fixture(t);
+  f.write('node_modules/supabase/dist/supabase.js', '// synthetic installed launcher');
+  f.write('supabase/config.toml', `${CONFIG}[experimental]\nstack = true\n`);
+  const binding = { kind: 'supabase-db', mode: 'local', environment: 'development', localProject: 'local-fixture', port: 55432 };
+  assert.equal((await f.invoke(['--target-binding', JSON.stringify(binding)])).code, 2);
+  assert.equal(f.calls.length, 0);
+});
+
 for (const args of [['--linked'], ['--url-env', 'LOCAL_DATABASE']]) {
   test(`local target excludes ${args[0]} before any child`, async (t) => {
     const f = fixture(t);

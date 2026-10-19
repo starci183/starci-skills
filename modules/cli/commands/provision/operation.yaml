@@ -1,0 +1,20 @@
+group: provision
+verb: operation
+owner: runtime
+summary: inspect a prepared operation or bind its exact digest to trusted owner acceptance
+impl: {module: scripts/gates/provision-operation.mjs, export: runProvisionControl}
+effect: local-write
+roles: [owner]
+positional: [{name: action, enum: [plan, accept, status], required: true, variadic: false}]
+flags:
+  - {name: operation, type: string, required: true, summary: existing provider-prepared operation id}
+  - {name: digest, type: string, summary: exact immutable plan digest being accepted}
+conventions:
+  - a role spelling, approval reference or execute flag never manufactures an owner grant
+  - provider commands prepare plans; acceptance binds the exact action, target, configuration and custody references
+exit: {"0": plan or status read or owner acceptance recorded, "1": operation journal unavailable, "2": input or authority refused}
+json: always
+examples:
+  - starci provision operation plan --operation smtp-config
+  - starci provision operation status --operation smtp-config
+editions: [full, lite]

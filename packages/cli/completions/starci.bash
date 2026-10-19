@@ -8,11 +8,12 @@ _starci() {
     group="${COMP_WORDS[1]}"
     verb="${COMP_WORDS[2]}"
     if [ "$COMP_CWORD" -eq 1 ]; then
-        COMPREPLY=( $(compgen -W "app check connect debug docker gate git guard harness kernel lint machine npm orca reconciler release route runtime smoke supabase supervisor task typecheck uat work worker workflow help completion explain" -- "$cur") )
+        COMPREPLY=( $(compgen -W "access app check connect debug docker gate git guard harness kernel lint machine npm orca provision reconciler release route runtime smoke sonar supabase supervisor task typecheck uat work worker workflow help completion explain" -- "$cur") )
         return 0
     fi
     if [ "$COMP_CWORD" -eq 2 ]; then
         case "$group" in
+        access) COMPREPLY=( $(compgen -W "ci database registry stack workspace" -- "$cur") );;
         app) COMPREPLY=( $(compgen -W "add check ci coverage db emit explain hygiene lint new release scaffold secret stack sync upgrade" -- "$cur") );;
         check) COMPREPLY=( $(compgen -W "run" -- "$cur") );;
         connect) COMPREPLY=( $(compgen -W "ask-gateway telegram telegram-media tunnel" -- "$cur") );;
@@ -27,12 +28,14 @@ _starci() {
         machine) COMPREPLY=( $(compgen -W "decisions kernel-watchdog lessons op-metrics seam-policy worktrees worktrees-clean" -- "$cur") );;
         npm) COMPREPLY=( $(compgen -W "ci install" -- "$cur") );;
         orca) COMPREPLY=( $(compgen -W "terminal-read terminal-send" -- "$cur") );;
+        provision) COMPREPLY=( $(compgen -W "operation" -- "$cur") );;
         reconciler) COMPREPLY=( $(compgen -W "once reopen restart start status stop up" -- "$cur") );;
         release) COMPREPLY=( $(compgen -W "app-installs check ci-override ci-status clean-test cut images notes proof publish scaffold-e2e sync-runtime" -- "$cur") );;
         route) COMPREPLY=( $(compgen -W "op" -- "$cur") );;
         runtime) COMPREPLY=( $(compgen -W "architecture artefacts benchmark-snapshot check deploy derived-fields doctor example-secrets gen-catalog gen-ops housekeeping import-held-secret install ledger-hygiene link machine-db owner-claims-audit readme-blocks revision-scope status update validate verify version" -- "$cur") );;
         smoke) COMPREPLY=( $(compgen -W "scaffold" -- "$cur") );;
-        supabase) COMPREPLY=( $(compgen -W "start status stop" -- "$cur") );;
+        sonar) COMPREPLY=( $(compgen -W "analysis browse project release settings token user" -- "$cur") );;
+        supabase) COMPREPLY=( $(compgen -W "auth cloud start status stop" -- "$cur") );;
         supervisor) COMPREPLY=( $(compgen -W "actions bridge channel decide direct-commits gate-stability gc land lesson-actions notify owed poll push push-mains ram-cap report revision-ack start status stop telegram-bridge tell watchdog workers" -- "$cur") );;
         task) COMPREPLY=( $(compgen -W "list register show" -- "$cur") );;
         typecheck) COMPREPLY=( $(compgen -W "run" -- "$cur") );;
@@ -41,16 +44,97 @@ _starci() {
         worker) COMPREPLY=( $(compgen -W "close list read release show start stop" -- "$cur") );;
         workflow) COMPREPLY=( $(compgen -W "assess bias custody define purge start status stop" -- "$cur") );;
         completion) COMPREPLY=( $(compgen -W "bash zsh fish powershell" -- "$cur") );;
-        explain) COMPREPLY=( $(compgen -W "app check connect debug docker gate git guard harness kernel lint machine npm orca reconciler release route runtime smoke supabase supervisor task typecheck uat work worker workflow" -- "$cur") );;
+        explain) COMPREPLY=( $(compgen -W "access app check connect debug docker gate git guard harness kernel lint machine npm orca provision reconciler release route runtime smoke sonar supabase supervisor task typecheck uat work worker workflow" -- "$cur") );;
             *) COMPREPLY=();;
         esac
         return 0
+    fi
+    if [ "$COMP_CWORD" -eq 3 ] && [[ "$cur" != --* ]]; then
+        case "$group:$verb" in
+        access:ci) COMPREPLY=( $(compgen -W "secret-set" -- "$cur") ); return 0;;
+        access:database) COMPREPLY=( $(compgen -W "migrate inspect" -- "$cur") ); return 0;;
+        access:registry) COMPREPLY=( $(compgen -W "login" -- "$cur") ); return 0;;
+        access:stack) COMPREPLY=( $(compgen -W "deploy verify" -- "$cur") ); return 0;;
+        access:workspace) COMPREPLY=( $(compgen -W "ensure role" -- "$cur") ); return 0;;
+        app:add) COMPREPLY=( $(compgen -W "api webhook realtime saga job reactor queue projection cli table app" -- "$cur") ); return 0;;
+        app:ci) COMPREPLY=( $(compgen -W "secret var verify local" -- "$cur") ); return 0;;
+        app:coverage) COMPREPLY=( $(compgen -W "merge" -- "$cur") ); return 0;;
+        app:db) COMPREPLY=( $(compgen -W "baseline restamp plan migrate post-cutover dump reset" -- "$cur") ); return 0;;
+        app:new) COMPREPLY=( $(compgen -W "service image spec" -- "$cur") ); return 0;;
+        app:release) COMPREPLY=( $(compgen -W "gate push" -- "$cur") ); return 0;;
+        app:secret) COMPREPLY=( $(compgen -W "init set get unset rename remove materialize list verify" -- "$cur") ); return 0;;
+        app:stack) COMPREPLY=( $(compgen -W "up down status prepare doctor connect disconnect build-args render deploy converge verify rollback prune backup jobs task ingress retire build accept" -- "$cur") ); return 0;;
+        connect:ask-gateway) COMPREPLY=( $(compgen -W "start run status stop" -- "$cur") ); return 0;;
+        connect:telegram) COMPREPLY=( $(compgen -W "notify sweep discover-chat test" -- "$cur") ); return 0;;
+        connect:telegram-media) COMPREPLY=( $(compgen -W "settle" -- "$cur") ); return 0;;
+        connect:tunnel) COMPREPLY=( $(compgen -W "start run status stop dry-run" -- "$cur") ); return 0;;
+        debug:run) COMPREPLY=( $(compgen -W "orca-status runtime-status supervisor-status model-scorecard core-watch" -- "$cur") ); return 0;;
+        gate:env-health) COMPREPLY=( $(compgen -W "check serve status" -- "$cur") ); return 0;;
+        gate:sonar) COMPREPLY=( $(compgen -W "status ensure-project token scan dashboard up stop" -- "$cur") ); return 0;;
+        machine:decisions) COMPREPLY=( $(compgen -W "ring escalate-due supervisor" -- "$cur") ); return 0;;
+        machine:lessons) COMPREPLY=( $(compgen -W "list match tier result feedback tick export" -- "$cur") ); return 0;;
+        machine:seam-policy) COMPREPLY=( $(compgen -W "canon-plan canon-redispatch" -- "$cur") ); return 0;;
+        machine:worktrees) COMPREPLY=( $(compgen -W "counts gc resume" -- "$cur") ); return 0;;
+        provision:operation) COMPREPLY=( $(compgen -W "plan accept status" -- "$cur") ); return 0;;
+        runtime:machine-db) COMPREPLY=( $(compgen -W "init status ledgers register resolve" -- "$cur") ); return 0;;
+        sonar:analysis) COMPREPLY=( $(compgen -W "run" -- "$cur") ); return 0;;
+        sonar:browse) COMPREPLY=( $(compgen -W "read" -- "$cur") ); return 0;;
+        sonar:project) COMPREPLY=( $(compgen -W "ensure" -- "$cur") ); return 0;;
+        sonar:release) COMPREPLY=( $(compgen -W "gate" -- "$cur") ); return 0;;
+        sonar:settings) COMPREPLY=( $(compgen -W "read set" -- "$cur") ); return 0;;
+        sonar:token) COMPREPLY=( $(compgen -W "ensure rotate revoke" -- "$cur") ); return 0;;
+        sonar:user) COMPREPLY=( $(compgen -W "ensure create-or-reactivate" -- "$cur") ); return 0;;
+        supabase:auth) COMPREPLY=( $(compgen -W "user-ensure" -- "$cur") ); return 0;;
+        supabase:cloud) COMPREPLY=( $(compgen -W "smtp-set auth-provider-set secret-set project-ensure keys-capture" -- "$cur") ); return 0;;
+        supervisor:actions) COMPREPLY=( $(compgen -W "list record digest" -- "$cur") ); return 0;;
+        supervisor:bridge) COMPREPLY=( $(compgen -W "detect list bridge rewire transfer revise designate" -- "$cur") ); return 0;;
+        supervisor:channel) COMPREPLY=( $(compgen -W "register heartbeat inbox reply wait" -- "$cur") ); return 0;;
+        supervisor:lesson-actions) COMPREPLY=( $(compgen -W "land revert propose" -- "$cur") ); return 0;;
+        supervisor:owed) COMPREPLY=( $(compgen -W "ack unack acks" -- "$cur") ); return 0;;
+        supervisor:ram-cap) COMPREPLY=( $(compgen -W "status prioritize unprioritize" -- "$cur") ); return 0;;
+        supervisor:telegram-bridge) COMPREPLY=( $(compgen -W "start run status stop" -- "$cur") ); return 0;;
+        supervisor:workers) COMPREPLY=( $(compgen -W "create spawn stage report list cap show cancel ack cleanup" -- "$cur") ); return 0;;
+        task:register) COMPREPLY=( $(compgen -W "harness-app harness-tunnel reconciler" -- "$cur") ); return 0;;
+        task:show) COMPREPLY=( $(compgen -W "harness-app harness-tunnel reconciler" -- "$cur") ); return 0;;
+        uat:assisted-runner) COMPREPLY=( $(compgen -W "inspect start status wait signal run" -- "$cur") ); return 0;;
+        uat:slots) COMPREPLY=( $(compgen -W "status collect run" -- "$cur") ); return 0;;
+        work:asset-slot) COMPREPLY=( $(compgen -W "list check" -- "$cur") ); return 0;;
+        work:brand-direction) COMPREPLY=( $(compgen -W "status question apply" -- "$cur") ); return 0;;
+        work:draw-feedback) COMPREPLY=( $(compgen -W "brief status check classify" -- "$cur") ); return 0;;
+        work:draw-loop) COMPREPLY=( $(compgen -W "round status finish verify" -- "$cur") ); return 0;;
+        work:draw-review) COMPREPLY=( $(compgen -W "status question apply" -- "$cur") ); return 0;;
+        work:grammar-proposal) COMPREPLY=( $(compgen -W "list check" -- "$cur") ); return 0;;
+        work:graph) COMPREPLY=( $(compgen -W "show validate diff propose" -- "$cur") ); return 0;;
+        work:hygiene) COMPREPLY=( $(compgen -W "staged files" -- "$cur") ); return 0;;
+        work:layout-tree) COMPREPLY=( $(compgen -W "scan capture plan destinations lockup slot" -- "$cur") ); return 0;;
+        esac
     fi
     case "$prev" in
         --cwd) return 0;;
         --edition) COMPREPLY=( $(compgen -W "full lite" -- "$cur") ); return 0;;
     esac
     case "$group:$verb:$prev" in
+        access:ci:--target) return 0;;
+        access:ci:--operation) return 0;;
+        access:ci:--name) return 0;;
+        access:database:--target) return 0;;
+        access:database:--operation) return 0;;
+        access:registry:--target) return 0;;
+        access:registry:--operation) return 0;;
+        access:stack:--target) return 0;;
+        access:stack:--operation) return 0;;
+        access:workspace:--target) return 0;;
+        access:workspace:--operation) return 0;;
+        access:workspace:--workspace) return 0;;
+        access:workspace:--workspace-name) return 0;;
+        access:workspace:--owner-email) return 0;;
+        access:workspace:--owner-name) return 0;;
+        access:workspace:--manager-email) return 0;;
+        access:workspace:--manager-name) return 0;;
+        access:workspace:--staff-email) return 0;;
+        access:workspace:--staff-name) return 0;;
+        access:workspace:--member) return 0;;
+        access:workspace:--role) COMPREPLY=( $(compgen -W "owner manager staff" -- "$cur") ); return 0;;
         app:add:--event) return 0;;
         app:add:--from) return 0;;
         app:add:--service) return 0;;
@@ -75,6 +159,7 @@ _starci() {
         app:db:--stamp) return 0;;
         app:db:--map) return 0;;
         app:db:--url-env) return 0;;
+        app:db:--target-binding) return 0;;
         app:db:--green-at) return 0;;
         app:lint:--changed) return 0;;
         app:lint:--workspace) return 0;;
@@ -93,6 +178,7 @@ _starci() {
         app:stack:--env) return 0;;
         app:stack:--image) return 0;;
         app:stack:--source-sha) return 0;;
+        app:stack:--target-binding) return 0;;
         app:stack:--previous) return 0;;
         app:stack:--out) return 0;;
         app:stack:--release) return 0;;
@@ -592,6 +678,8 @@ _starci() {
         orca:terminal-send:--text) return 0;;
         orca:terminal-send:--text-file) return 0;;
         orca:terminal-send:--wait-submit) return 0;;
+        provision:operation:--operation) return 0;;
+        provision:operation:--digest) return 0;;
         reconciler:once:--controller) COMPREPLY=( $(compgen -W "job host gc resource workflow workers learning" -- "$cur") ); return 0;;
         reconciler:once:--key) return 0;;
         reconciler:up:--wait) return 0;;
@@ -662,6 +750,39 @@ _starci() {
         runtime:verify:--base) return 0;;
         runtime:verify:--root) return 0;;
         smoke:scaffold:--into) return 0;;
+        sonar:analysis:--target) return 0;;
+        sonar:analysis:--operation) return 0;;
+        sonar:analysis:--key) return 0;;
+        sonar:analysis:--revision) return 0;;
+        sonar:browse:--target) return 0;;
+        sonar:browse:--operation) return 0;;
+        sonar:browse:--key) return 0;;
+        sonar:browse:--branch) return 0;;
+        sonar:browse:--revision) return 0;;
+        sonar:project:--target) return 0;;
+        sonar:project:--operation) return 0;;
+        sonar:project:--key) return 0;;
+        sonar:project:--name) return 0;;
+        sonar:release:--target) return 0;;
+        sonar:release:--operation) return 0;;
+        sonar:release:--revision) return 0;;
+        sonar:settings:--target) return 0;;
+        sonar:settings:--operation) return 0;;
+        sonar:settings:--key) return 0;;
+        sonar:settings:--setting) return 0;;
+        sonar:token:--target) return 0;;
+        sonar:token:--operation) return 0;;
+        sonar:token:--key) return 0;;
+        sonar:token:--name) return 0;;
+        sonar:token:--login) return 0;;
+        sonar:token:--type) COMPREPLY=( $(compgen -W "USER_TOKEN PROJECT_ANALYSIS_TOKEN GLOBAL_ANALYSIS_TOKEN" -- "$cur") ); return 0;;
+        sonar:user:--target) return 0;;
+        sonar:user:--operation) return 0;;
+        sonar:user:--login) return 0;;
+        supabase:auth:--target) return 0;;
+        supabase:auth:--operation) return 0;;
+        supabase:cloud:--target) return 0;;
+        supabase:cloud:--operation) return 0;;
         supervisor:actions:--item) return 0;;
         supervisor:actions:--action) return 0;;
         supervisor:actions:--reason) return 0;;
@@ -968,6 +1089,8 @@ _starci() {
         workflow:define:--title) return 0;;
         workflow:define:--display-name) return 0;;
         workflow:define:--params) return 0;;
+        workflow:define:--provision-grants) return 0;;
+        workflow:define:--approve-provision-grants) return 0;;
         workflow:define:--revise) return 0;;
         workflow:define:--reason) return 0;;
         workflow:define:--approve-revision) return 0;;
@@ -990,11 +1113,16 @@ _starci() {
         workflow:stop:--by) COMPREPLY=( $(compgen -W "owner supervisor" -- "$cur") ); return 0;;
     esac
     case "$group:$verb" in
+        access:ci) COMPREPLY=( $(compgen -W "--target --operation --name --execute --reconcile --json --cwd --quiet --help --edition" -- "$cur") );;
+        access:database) COMPREPLY=( $(compgen -W "--target --operation --execute --reconcile --json --cwd --quiet --help --edition" -- "$cur") );;
+        access:registry) COMPREPLY=( $(compgen -W "--target --operation --execute --reconcile --json --cwd --quiet --help --edition" -- "$cur") );;
+        access:stack) COMPREPLY=( $(compgen -W "--target --operation --execute --reconcile --json --cwd --quiet --help --edition" -- "$cur") );;
+        access:workspace) COMPREPLY=( $(compgen -W "--target --operation --execute --reconcile --workspace --workspace-name --bootstrap-owner --owner-email --owner-name --manager-email --manager-name --staff-email --staff-name --member --role --json --cwd --quiet --help --edition" -- "$cur") );;
         app:add) COMPREPLY=( $(compgen -W "--event --from --service --connection --owner --failed --done --fe --no-types --json --cwd --quiet --help --edition" -- "$cur") );;
         app:check) COMPREPLY=( $(compgen -W "--fast --base --wiring --coverage-from --json --cwd --quiet --help --edition" -- "$cur") );;
         app:ci) COMPREPLY=( $(compgen -W "--env --dependabot --repo --value --execute --json --jobs --parallel --logs --dry-run --json --cwd --quiet --help --edition" -- "$cur") );;
         app:coverage) COMPREPLY=( $(compgen -W "--out --cwd --json --cwd --quiet --help --edition" -- "$cur") );;
-        app:db) COMPREPLY=( $(compgen -W "--out --schema-only --auth --storage --backup --stamp --map --apply --local --execute --linked --url-env --green-at --owner-confirms-old-app-gone --json --json --cwd --quiet --help --edition" -- "$cur") );;
+        app:db) COMPREPLY=( $(compgen -W "--out --schema-only --auth --storage --backup --stamp --map --apply --local --execute --linked --url-env --target-binding --green-at --owner-confirms-old-app-gone --json --json --cwd --quiet --help --edition" -- "$cur") );;
         app:emit) COMPREPLY=( $(compgen -W "--json --cwd --quiet --help --edition" -- "$cur") );;
         app:explain) COMPREPLY=( $(compgen -W "--json --cwd --quiet --help --edition" -- "$cur") );;
         app:hygiene) COMPREPLY=( $(compgen -W "--json --cwd --quiet --help --edition" -- "$cur") );;
@@ -1003,7 +1131,7 @@ _starci() {
         app:release) COMPREPLY=( $(compgen -W "--execute --source --tag-prefix --sonar --remote --json --json --cwd --quiet --help --edition" -- "$cur") );;
         app:scaffold) COMPREPLY=( $(compgen -W "--into --registry-visibility --json --cwd --quiet --help --edition" -- "$cur") );;
         app:secret) COMPREPLY=( $(compgen -W "--generate --to-file --reveal --execute --force-nonempty --json --cwd --quiet --help --edition" -- "$cur") );;
-        app:stack) COMPREPLY=( $(compgen -W "--stack --services --k3d --force --env --execute --image --source-sha --previous --out --release --since --timeout --retry --keep --app --ssh-cmd --extra-compose --allow-unpinned --init-swarm --owner-approved --fix-live-restore --project --push --swarm-state --skip-public --skip-internal --json --cwd --quiet --help --edition" -- "$cur") );;
+        app:stack) COMPREPLY=( $(compgen -W "--stack --services --k3d --force --env --execute --image --source-sha --target-binding --previous --out --release --since --timeout --retry --keep --app --ssh-cmd --extra-compose --allow-unpinned --init-swarm --owner-approved --fix-live-restore --project --push --swarm-state --skip-public --skip-internal --json --cwd --quiet --help --edition" -- "$cur") );;
         app:sync) COMPREPLY=( $(compgen -W "--check --write --json --cwd --quiet --help --edition" -- "$cur") );;
         app:upgrade) COMPREPLY=( $(compgen -W "--plan --json --cwd --quiet --help --edition" -- "$cur") );;
         check:run) COMPREPLY=( $(compgen -W "--level --changed --json --cwd --quiet --help --edition" -- "$cur") );;
@@ -1111,6 +1239,7 @@ _starci() {
         npm:install) COMPREPLY=( $(compgen -W "--dev --canon --json --cwd --quiet --help --edition" -- "$cur") );;
         orca:terminal-read) COMPREPLY=( $(compgen -W "--terminal --tail --limit --json --cwd --quiet --help --edition" -- "$cur") );;
         orca:terminal-send) COMPREPLY=( $(compgen -W "--terminal --text --text-file --no-enter --wait-submit --json --cwd --quiet --help --edition" -- "$cur") );;
+        provision:operation) COMPREPLY=( $(compgen -W "--operation --digest --json --cwd --quiet --help --edition" -- "$cur") );;
         reconciler:once) COMPREPLY=( $(compgen -W "--controller --key --apply --json --cwd --quiet --help --edition" -- "$cur") );;
         reconciler:reopen) COMPREPLY=( $(compgen -W "--json --cwd --quiet --help --edition" -- "$cur") );;
         reconciler:restart) COMPREPLY=( $(compgen -W "--json --cwd --quiet --help --edition" -- "$cur") );;
@@ -1156,6 +1285,15 @@ _starci() {
         runtime:verify) COMPREPLY=( $(compgen -W "--base --root --json --cwd --quiet --help --edition" -- "$cur") );;
         runtime:version) COMPREPLY=( $(compgen -W "--json --cwd --quiet --help --edition" -- "$cur") );;
         smoke:scaffold) COMPREPLY=( $(compgen -W "--into --keep --json --cwd --quiet --help --edition" -- "$cur") );;
+        sonar:analysis) COMPREPLY=( $(compgen -W "--target --operation --execute --reconcile --key --revision --json --cwd --quiet --help --edition" -- "$cur") );;
+        sonar:browse) COMPREPLY=( $(compgen -W "--target --operation --execute --reconcile --key --branch --revision --json --cwd --quiet --help --edition" -- "$cur") );;
+        sonar:project) COMPREPLY=( $(compgen -W "--target --operation --execute --reconcile --key --name --json --cwd --quiet --help --edition" -- "$cur") );;
+        sonar:release) COMPREPLY=( $(compgen -W "--target --operation --revision --execute --reconcile --json --cwd --quiet --help --edition" -- "$cur") );;
+        sonar:settings) COMPREPLY=( $(compgen -W "--target --operation --execute --reconcile --key --setting --json --cwd --quiet --help --edition" -- "$cur") );;
+        sonar:token) COMPREPLY=( $(compgen -W "--target --operation --execute --reconcile --key --name --login --type --json --cwd --quiet --help --edition" -- "$cur") );;
+        sonar:user) COMPREPLY=( $(compgen -W "--target --operation --execute --reconcile --login --json --cwd --quiet --help --edition" -- "$cur") );;
+        supabase:auth) COMPREPLY=( $(compgen -W "--target --operation --execute --reconcile --json --cwd --quiet --help --edition" -- "$cur") );;
+        supabase:cloud) COMPREPLY=( $(compgen -W "--target --operation --execute --reconcile --json --cwd --quiet --help --edition" -- "$cur") );;
         supabase:start) COMPREPLY=( $(compgen -W "--json --cwd --quiet --help --edition" -- "$cur") );;
         supabase:status) COMPREPLY=( $(compgen -W "--json --cwd --quiet --help --edition" -- "$cur") );;
         supabase:stop) COMPREPLY=( $(compgen -W "--no-backup --json --cwd --quiet --help --edition" -- "$cur") );;
@@ -1235,7 +1373,7 @@ _starci() {
         workflow:assess) COMPREPLY=( $(compgen -W "--repo --json --cwd --quiet --help --edition" -- "$cur") );;
         workflow:bias) COMPREPLY=( $(compgen -W "--normalize --json --cwd --quiet --help --edition" -- "$cur") );;
         workflow:custody) COMPREPLY=( $(compgen -W "--repo --workflow --apply --json --cwd --quiet --help --edition" -- "$cur") );;
-        workflow:define) COMPREPLY=( $(compgen -W "--repo --project --text --title --display-name --params --plan --revise --reason --approve-revision --defined-by --approved-by --bridge-id --routing-bias --json --cwd --quiet --help --edition" -- "$cur") );;
+        workflow:define) COMPREPLY=( $(compgen -W "--repo --project --text --title --display-name --params --provision-grants --approve-provision-grants --plan --revise --reason --approve-revision --defined-by --approved-by --bridge-id --routing-bias --json --cwd --quiet --help --edition" -- "$cur") );;
         workflow:purge) COMPREPLY=( $(compgen -W "--repo --workflow --plan --apply --ledger --expect --json --cwd --quiet --help --edition" -- "$cur") );;
         workflow:start) COMPREPLY=( $(compgen -W "--repo --goal --agent --launched-by --plan --json --cwd --quiet --help --edition" -- "$cur") );;
         workflow:status) COMPREPLY=( $(compgen -W "--repo --workflow --json --cwd --quiet --help --edition" -- "$cur") );;

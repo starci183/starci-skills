@@ -1,6 +1,81 @@
 // Accept one content-approved goal revision under the workflow's existing serialization boundary.
 import { SETTLED_JOB_STATUSES, insertGoal, postInbox, recordJobResult, setJobStatus, setInboxStatus, updateWorkflow } from '../../engine/db/ledger.mjs';
 import { withWorkflowLock } from './workflow-lock.mjs';
+import path from 'node:path';
+import { sha256 } from '../../engine/digest.mjs';
+import { canonicalJSON } from '../../engine/canonical-json.mjs';
+import { requireProvisionGrantOwner } from './provision-grants.mjs';
+
+/** Render the content-bound preview that the native revision transaction accepts unchanged. */
+export function goalRevisionPreview({ base, diff, chain, text, reviseWorkflowId, contentDigest, revisionReason,
+  routingBias, provisionGrants, provisionGrantsDigest, projectName, repo, title, provisionGrantsFile, entry }) {
+  const nextRevision = base.goal.revision + 1;
+  const grantDiff = { before: base.json?.provisionGrants ?? [], after: provisionGrants,
+    digest: provisionGrantsDigest, changed: canonicalJSON(base.json?.provisionGrants ?? []) !== canonicalJSON(provisionGrants) };
+  const approvalPayload = {
+    workflowId: reviseWorkflowId,
+    baseRevision: base.goal.revision,
+    nextRevision,
+    goalIdentity: base.goal.goal_identity,
+    contentDigest,
+    opChain: diff.after,
+    reason: revisionReason,
+    routingBias,
+    provisionGrants,
+    provisionGrantsDigest,
+  };
+  const approvalToken = `rev-${sha256(JSON.stringify(approvalPayload))}`;
+  const selectorArgs = projectName ? ['--project', projectName] : ['--repo', repo];
+  const approvalArgs = [
+    entry, ...selectorArgs, '--revise', reviseWorkflowId,
+    '--text', text, '--reason', revisionReason, '--approve-revision', approvalToken, '--json',
+  ];
+  if (title) approvalArgs.push('--title', title);
+  if (routingBias !== null) approvalArgs.push('--routing-bias', JSON.stringify(routingBias));
+  if (provisionGrantsFile) approvalArgs.push('--provision-grants', path.resolve(provisionGrantsFile));
+  return {
+    schema: 'starci/goal-revision-preview@1',
+    workflowId: reviseWorkflowId,
+    baseRevision: base.goal.revision,
+    nextRevision,
+    goalIdentity: base.goal.goal_identity,
+    preservesGoalIdentity: true,
+    proposedContentDigest: contentDigest,
+    reason: revisionReason,
+    scope: {
+      kind: chain?.scopeKind ?? null,
+      sameLedgerIsNotConflict: true,
+      otherLiveWorkflows: base.otherLiveWorkflows.map(w => ({ ...w, conflictInferred: false })),
+      note: 'Shared ledger custody is not path-overlap evidence; concrete owned paths and live effects decide conflicts.',
+    },
+    opChainDiff: diff,
+    provisionGrants: grantDiff,
+    planDivergence: diff.changed || grantDiff.changed ? {
+      action: 'approve-goal-revision',
+      added: diff.added,
+      removed: diff.removed,
+      reordered: diff.reordered,
+      providerGrantsChanged: grantDiff.changed,
+    } : null,
+    kernel: {
+      live: base.liveKernel,
+      resumeAllowed: false,
+      resumeCondition: `goals revision ${nextRevision} and its owner-approval receipt must be committed atomically`,
+    },
+    openOperationJobs: base.openOperationJobs,
+    checkpoint: {
+      queuedSupersedable: base.openOperationJobs.filter(job => job.status === 'queued').map(job => job.job_id),
+      mustSettleFirst: base.openOperationJobs.filter(job => job.status !== 'queued').map(job => ({ jobId: job.job_id, status: job.status })),
+      rule: 'owner-approved revision atomically cancels only queued no-effect jobs; leased/running/effect_unknown jobs must settle or reconcile first',
+    },
+    approval: {
+      required: true,
+      ownerReply: 'ok',
+      token: approvalToken,
+      command: { executable: process.execPath, args: approvalArgs },
+    },
+  };
+}
 
 /** Load the current goal row and prove the revision may still be applied, or report it already applied. */
 function revisableState({ ledger, workflowId, preview, approveRevision }) {
@@ -91,8 +166,10 @@ function supersedeOpenJobs({ ledger, workflowId, workflow, openNow, preview, app
 
 /** Persist the accepted revision and explicitly supersede only its older pending revision notifications. */
 export function acceptGoalRevision({ ledger, workflowId, preview, approveRevision, revisionBase, text, chain, derivedPlan,
-  routingBias, revisionReason, approvedBy, supervisorProvenance, bridgeId, now }) {
+  routingBias, provisionGrants, provisionGrantsApproval, grantAdmissionRoot, revisionReason, approvedBy, supervisorProvenance, bridgeId, now }) {
   return withWorkflowLock({ ledger, db: ledger.db, env: process.env }, { workflowId }, () => {
+    requireProvisionGrantOwner({ ledger, grants: provisionGrants, priorGrants: revisionBase.json?.provisionGrants ?? [],
+      root: grantAdmissionRoot, provisional: Boolean(approvedBy) });
     return ledger.transaction(() => {
       const state = revisableState({ ledger, workflowId, preview, approveRevision });
       if (state.alreadyApplied) return { alreadyApplied: true, supersededJobs: [] };
@@ -104,6 +181,8 @@ export function acceptGoalRevision({ ledger, workflowId, preview, approveRevisio
         opChain: chain,
         derivedPlan: derivedPlan,
         routing_bias: routingBias ?? revisionBase.json?.routing_bias ?? null,
+        provisionGrants,
+        provisionGrantsApproval,
         revision: amendment,
       };
       const supersededJobs = openNow.map(job => job.job_id);

@@ -1,0 +1,24 @@
+group: access
+verb: ci
+owner: runtime
+summary: set one declared GitHub CI secret through the existing application custody guard
+impl: {module: scripts/gates/provision-ci.mjs, export: runProvisionCi}
+effect: remote
+roles: [worker, lead, coordinator, owner]
+positional: [{name: action, enum: [secret-set], required: true, variadic: false}]
+operationPolicy:
+  secret-set: {action: ci.secret.set, effect: remote, credentials: [principal, source], destination: none, checkpoints: [account-authority]}
+flags:
+  - {name: target, type: string, required: true, summary: named GitHub target with a declared repository and secret store}
+  - {name: operation, type: string, summary: durable operation id}
+  - {name: name, type: string, required: true, summary: exact secret name accepted by the application's existing CI declaration}
+  - {name: execute, type: boolean, summary: execute the exact accepted secret-set plan}
+  - {name: reconcile, type: boolean, summary: inspect prior acknowledgement and public secret-name presence without repeating the write}
+conventions:
+  - the existing declared-secret and sealed-app-secret guards run before private custody is opened
+  - the bound principal authenticates the fixed GitHub target; source values reach the existing secret owner through private stdin only
+  - write acknowledgement and secret-name presence do not prove the stored value or a consumer workflow
+exit: {"0": plan prepared or the declared secret write was acknowledged, "1": write failed or remains uncertain, "2": policy or input refused}
+json: always
+examples: [starci access ci secret-set --target repository-ci --name SONAR_TOKEN --operation analysis-ci-secret]
+editions: [full, lite]

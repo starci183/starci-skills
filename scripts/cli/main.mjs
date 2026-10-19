@@ -9,6 +9,11 @@ import { currentRole, requireRole } from './roles.mjs';
 import { logRefusal } from '../guards/refusals.mjs';
 import { RUNTIME_CHANGE_CODE } from '../machine/runtime-change.mjs';
 import { credentialPreflight } from './lib/credential-preflight.mjs';
+import { boundIdentityOf } from '../guards/rights.mjs';
+import { callerOf } from '../guards/op-caller.mjs';
+import { confirmOwnerPlan } from '../api/process/confirm-owner-plan.mjs';
+import { starciLocalRoot } from '../../engine/runtime-root.mjs';
+import { guardsRoot } from '../guards/guards-root.mjs';
 
 const defaultRuntimeRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const cliModule = (file) => importModule(pathToFileURL(path.join(defaultRuntimeRoot, 'packages', 'cli', 'src', file)).href);
@@ -58,6 +63,39 @@ const runModule = async ({ command, ctx, root, importModuleFn, wantsJson, stdout
     return verbFailure(stderr, group, verb, error?.message ?? error);
   }
 };
+
+/** Attach native admission and context callbacks; command arguments cannot supply their identities. */
+function attachProvisionContext(ctx, { env, root, operationPolicy, acceptsPlan }) {
+  const provisionCaller = ({ db, file } = {}) => ({
+    ...boundIdentityOf(env.ORCA_TERMINAL_HANDLE, { root, env }), terminal: env.ORCA_TERMINAL_HANDLE,
+    classification: callerOf(db, env, { file, root }),
+  });
+  if (operationPolicy || acceptsPlan) ctx.provisionCaller = provisionCaller;
+  if (operationPolicy) {
+    // Native consumers receive the same host context as admission; no target declaration can choose it.
+    ctx.provisionNativeContext = () => ({
+      schema: 'starci/native-provision-context@1', terminal: env.ORCA_TERMINAL_HANDLE ?? null,
+      stateRoot: starciLocalRoot(env, root), guardsRoot: guardsRoot(root, env),
+    });
+  }
+  if (acceptsPlan) {
+    // The normal role gate is not a human acceptance receipt; the owner terminal must confirm the frozen plan.
+    ctx.confirmProvisionPlan = async (request, binding) => {
+      try {
+        const ownerNow = () => {
+          const identity = provisionCaller(binding);
+          return currentRole({ env }) === 'owner' && !identity.guard && !identity.seat
+            && identity.classification.role === 'owner' && identity.classification.via === 'unbound';
+        };
+        if (!ownerNow()) return { accepted: false, code: 'owner-terminal-required' };
+        // Redirected input cannot supply the separate native terminal checkpoint.
+        const confirmation = await confirmOwnerPlan(request);
+        return confirmation.accepted === true && !ownerNow()
+          ? { accepted: false, code: 'owner-terminal-required' } : confirmation;
+      } catch { return { accepted: false, code: 'owner-terminal-required' }; }
+    };
+  }
+}
 
 /** Runtime-side catalog dispatcher. */
 export function main(argv = process.argv.slice(2), io = {}) {
@@ -119,8 +157,12 @@ export function main(argv = process.argv.slice(2), io = {}) {
         cwd,
         io: ctxIo,
         role,
+        command: { group: split.group, verb: split.verb },
+        operationPolicy: checked.operationPolicy,
         now: typeof io.now === 'function' ? io.now() : (io.now ?? Date.now()),
       };
+      attachProvisionContext(ctx, { env, root, operationPolicy: checked.operationPolicy,
+        acceptsPlan: split.group === 'provision' && split.verb === 'operation' && checked.positionals[0] === 'accept' });
       return runModule({
         command,
         ctx,

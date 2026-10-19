@@ -1,0 +1,25 @@
+group: access
+verb: database
+owner: runtime
+summary: migrate or inspect the exact declared application database through its native owner
+impl: {module: scripts/gates/provision-native.mjs, export: runNativeDatabase}
+effect: remote
+roles: [worker, lead, coordinator, owner]
+positional: [{name: action, enum: [migrate, inspect], required: true, variadic: false}]
+operationPolicy:
+  migrate: {action: db.migrate, effect: remote, credentials: [], destination: none, checkpoints: [account-authority, database-arming]}
+  inspect: {action: db.inspect, effect: remote, credentials: [], destination: none, checkpoints: [account-authority]}
+flags:
+  - {name: target, type: string, required: true, summary: "named database with exact local, linked or URL-env native endpoint"}
+  - {name: operation, type: string, summary: durable operation id}
+  - {name: execute, type: boolean, summary: invoke the native database owner under the exact accepted plan}
+  - {name: reconcile, type: boolean, summary: inspect the prior outcome without replaying migration}
+conventions:
+  - public declaration checks precede custody; the native owner compares any private URL endpoint after resolution and before network access
+  - URL-env mode requires the declared database-url role bound to the selected public environment key; no ambient URL supplies a fallback
+  - migration retains the existing owner-controlled database arming requirement and never sets it automatically
+  - reset, teardown, post-cutover and arbitrary child arguments are outside these commands
+exit: {"0": plan prepared or native database result verified, "1": native failure or uncertain outcome, "2": "policy, arming or target refused"}
+json: always
+examples: [starci access database inspect --target local-database --operation local-database-inspect]
+editions: [full, lite]

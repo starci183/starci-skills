@@ -1,0 +1,4 @@
+group: provision
+summary: inspect and accept immutable plans for declared provider operations
+owner: runtime
+runtimeSide: host

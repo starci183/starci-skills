@@ -105,6 +105,8 @@ properties:
       status: {enum: [deferred, supported]}
       reason: {type: string, minLength: 1}
   ci: {$ref: '#/$defs/ciDeclaration'}
+  operations:
+    $ref: provision-operation.schema.yaml
   services:
     description: >-
       The delivery, quality and platform services this repository's code and CI use - NOT Compose

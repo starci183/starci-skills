@@ -38,6 +38,8 @@ const JSON_RE = /^(always|flag|none|starci\/\S+@\d+)$/;
 const NAME_RE = /^[a-z][a-z0-9-]*$/;
 const EXPORT_RE = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
 const MODULE_ROOTS = ['scripts/', 'ui/'];
+const OPERATION_KEYS = new Set(['action', 'effect', 'credentials', 'destination', 'checkpoints']);
+const CHECKPOINTS = new Set(['consent', 'mfa', 'captcha', 'account-authority', 'billing', 'private-input', 'unrecoverable-output', 'database-arming']);
 
 const err = (errors, file, msg) => errors.push(`${file}: ${msg}`);
 
@@ -100,6 +102,56 @@ const checkVerbPolicy = (errors, file, doc, moduleImpl) => {
   if (doc.effect !== undefined && doc.effect !== 'read' && (!Array.isArray(doc.conventions) || doc.conventions.length === 0)) {
     err(errors, file, `effect ${doc.effect} requires at least one convention`);
   }
+};
+
+const operationPolicyHeaderFindings = (errors, file, doc) => {
+  if (!doc.impl?.module || doc.owner !== 'runtime') err(errors, file, 'operationPolicy requires a runtime module implementation');
+  const actions = doc.positional?.[0]?.enum;
+  if (!Array.isArray(actions) || !actions.length) err(errors, file, 'operationPolicy requires a first positional action enum');
+  return actions;
+};
+
+const operationPolicyFieldFindings = (errors, file, name, policy) => {
+  unknownKeys(errors, file, policy, OPERATION_KEYS, 'operation policy');
+  for (const key of OPERATION_KEYS) if (!Object.hasOwn(policy, key)) err(errors, file, `operationPolicy.${name} is missing ${key}`);
+  if (typeof policy.action !== 'string' || !/^[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)+$/u.test(policy.action)) err(errors, file, `operationPolicy.${name}.action must be a stable dotted id`);
+  if (!EFFECT_SET.has(policy.effect)) err(errors, file, `operationPolicy.${name}.effect is unknown`);
+  if (!['none', 'optional', 'required'].includes(policy.destination)) err(errors, file, `operationPolicy.${name}.destination must be none, optional or required`);
+};
+
+const operationPolicyListFindings = (errors, file, name, policy) => {
+  if (checkStringList(errors, file, policy.credentials, `operationPolicy.${name}.credentials`)) {
+    for (const role of policy.credentials) if (!NAME_RE.test(role)) err(errors, file, `operationPolicy.${name} has an invalid credential role`);
+  }
+  if (checkStringList(errors, file, policy.checkpoints, `operationPolicy.${name}.checkpoints`)) {
+    for (const checkpoint of policy.checkpoints) if (!CHECKPOINTS.has(checkpoint)) err(errors, file, `operationPolicy.${name} has an unknown checkpoint`);
+  }
+};
+
+const operationPolicyEntryFindings = (errors, file, actions, name, policy) => {
+  if (!actions?.includes(name)) err(errors, file, `operationPolicy names undeclared action ${name}`);
+  if (!policy || typeof policy !== 'object' || Array.isArray(policy)) {
+    err(errors, file, `operationPolicy.${name} must be a map`);
+    return;
+  }
+  operationPolicyFieldFindings(errors, file, name, policy);
+  operationPolicyListFindings(errors, file, name, policy);
+};
+
+const operationPolicyFindings = (errors, file, doc) => {
+  if (doc.operationPolicy === undefined) return;
+  const actions = operationPolicyHeaderFindings(errors, file, doc);
+  const policies = doc.operationPolicy;
+  if (!policies || typeof policies !== 'object' || Array.isArray(policies)) {
+    err(errors, file, 'operationPolicy must map each positional action to its execution policy');
+    return;
+  }
+  for (const action of actions ?? []) if (!Object.hasOwn(policies, action)) err(errors, file, `operationPolicy is missing action ${action}`);
+  for (const [name, policy] of Object.entries(policies)) {
+    operationPolicyEntryFindings(errors, file, actions, name, policy);
+  }
+  const flags = new Set((doc.flags ?? []).map((flag) => flag.name));
+  for (const flag of ['target', 'operation', 'execute', 'reconcile']) if (!flags.has(flag)) err(errors, file, `operationPolicy requires --${flag}`);
 };
 
 const summaryFindings = (errors, file, doc) => {
@@ -206,6 +258,7 @@ const checkVerb = (errors, file, groupName, doc) => {
   verbHeaderFindings(errors, file, groupName, doc);
   const moduleImpl = implementationFindings(errors, file, doc);
   checkVerbPolicy(errors, file, doc, moduleImpl);
+  operationPolicyFindings(errors, file, doc);
   if ('flags' in doc) checkFlags(errors, file, doc.flags, `verb ${doc.verb}`);
   if (doc.positional !== undefined) positionalFindings(errors, file, doc.positional);
   if (doc.internalFlags !== undefined) internalFlagFindings(errors, file, doc);

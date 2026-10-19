@@ -1,0 +1,29 @@
+group: supabase
+verb: cloud
+owner: runtime
+summary: apply declared Supabase Cloud project, Auth and secret configuration
+impl: {module: scripts/gates/supabase-cloud.mjs, export: runSupabaseCloud}
+effect: remote
+roles: [worker, lead, coordinator, owner]
+positional:
+  - {name: action, enum: [smtp-set, auth-provider-set, secret-set, project-ensure, keys-capture], required: true, variadic: false}
+operationPolicy:
+  smtp-set: {action: supabase.cloud.smtp-set, effect: remote, credentials: [management, username, source], destination: none, checkpoints: [account-authority]}
+  auth-provider-set: {action: supabase.cloud.auth-provider-set, effect: remote, credentials: [management, source], destination: none, checkpoints: [account-authority, consent]}
+  secret-set: {action: supabase.cloud.secret-set, effect: remote, credentials: [management, source], destination: none, checkpoints: [account-authority]}
+  project-ensure: {action: supabase.cloud.project-ensure, effect: remote, credentials: [management, database-password], destination: none, checkpoints: [account-authority, billing]}
+  keys-capture: {action: supabase.cloud.keys-capture, effect: local-write, credentials: [management], destination: required, checkpoints: [account-authority]}
+flags:
+  - {name: target, type: string, required: true, summary: named operation target in the application stack declaration}
+  - {name: operation, type: string, summary: durable operation id to prepare or resume}
+  - {name: execute, type: boolean, summary: consume existing content-bound authority and execute the prepared operation}
+  - {name: reconcile, type: boolean, summary: inspect a prior uncertain effect without repeating its write}
+conventions:
+  - source values, provider administration credentials and output destinations are separate custody roles
+  - secret-set addresses the declared Edge Functions secret store only when an existing Edge Function consumer is declared
+exit: {"0": plan prepared or operation completed, "1": provider effect failed or remains uncertain, "2": policy or input refused}
+json: always
+examples:
+  - starci supabase cloud smtp-set --target hosted-auth --operation smtp-config
+  - starci supabase cloud auth-provider-set --target hosted-auth --operation oauth-config
+editions: [full, lite]

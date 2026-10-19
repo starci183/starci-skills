@@ -7,6 +7,7 @@ import { stackContext } from './context.mjs';
 import { loadDeployConfig } from './config.mjs';
 import { withDockerTransport } from './docker-transport.mjs';
 import { StackError, EXIT, refusal } from './errors.mjs';
+import { parseTargetBinding, bindStackTarget, nativeToolEnvironment } from './target-binding.mjs';
 
 /** The actions that drive the docker CLI of the operator machine (pointed at the manager by docker-transport.mjs when the key is sealed). */
 const DOCKER_ACTIONS = new Set(['deploy', 'accept', 'converge', 'verify', 'rollback', 'prune']);
@@ -14,7 +15,7 @@ const DOCKER_ACTIONS = new Set(['deploy', 'accept', 'converge', 'verify', 'rollb
 export const ACTIONS = Object.freeze(['prepare', 'doctor', 'connect', 'disconnect', 'build-args', 'render', 'deploy', 'converge', 'verify', 'rollback', 'prune', 'backup', 'jobs', 'task', 'ingress', 'retire', 'build', 'accept']);
 
 const BOOLEAN = new Set(['--execute', '--json', '--swarm-state', '--init-swarm', '--owner-approved', '--fix-live-restore', '--skip-public', '--skip-internal', '--allow-unpinned', '--push']);
-const VALUE = new Set(['--env', '--image', '--source-sha', '--previous', '--out', '--release', '--since', '--timeout', '--retry', '--keep', '--app', '--ssh-cmd', '--extra-compose', '--project']);
+const VALUE = new Set(['--env', '--image', '--source-sha', '--previous', '--out', '--release', '--since', '--timeout', '--retry', '--keep', '--app', '--ssh-cmd', '--extra-compose', '--project', '--target-binding']);
 const REPEAT = new Set(['--image', '--keep', '--extra-compose', '--project']);
 
 /** Splits argv into { flags, positional }; an unknown flag or a flag without its value is a refusal. */
@@ -107,6 +108,12 @@ function print(ctx, action, flags, result) {
   else for (const line of result.lines ?? []) ctx.stdout(`${line}\n`);
 }
 
+function nativeToolContext(ctx, binding) {
+  if (!binding) return ctx;
+  return Object.create(ctx, { spawn: { value: (command, args, options = {}) => ctx.spawn(command, args,
+    { ...options, env: nativeToolEnvironment(options.env ?? ctx.env) }) } });
+}
+
 /** Runs one action; returns the exit code. `io.importer` lets a spec load fake action modules. */
 export async function stackMain(argv, io = {}) {
   const ctx = stackContext(io);
@@ -114,12 +121,16 @@ export async function stackMain(argv, io = {}) {
     const { flags, positional } = parseFlags(argv.slice(1));
     const action = argv[0];
     if (!ACTIONS.includes(action)) throw refusal('STACK_USAGE', `starci app stack takes ${[...ACTIONS, 'up', 'down', 'status'].join(', ')}`);
-    const config = loadDeployConfig({ repoRoot: ctx.cwd, env: flags.env ?? 'production' });
+    const binding = parseTargetBinding(flags['target-binding'], 'docker-swarm');
+    if (binding && (!['deploy', 'verify'].includes(action) || flags['ssh-cmd'] || flags['skip-public'] || flags['skip-internal']))
+      throw refusal('STACK_USAGE', 'the bound native consumer supports only complete deploy or verify');
+    const config = bindStackTarget(ctx, loadDeployConfig({ repoRoot: ctx.cwd, env: flags.env ?? 'production' }), binding);
     const options = OPTIONS[action]({ flags, positional, cwd: ctx.cwd });
     const handler = await handlerOf(action, io.importer ?? ((file) => import(file)));
     const sshCmd = flags['ssh-cmd'] ?? null;
     const call = (context) => handler(context, config, { ...options, sshCmd });
-    const result = DOCKER_ACTIONS.has(action) ? await withDockerTransport(ctx, config, { sshCmd }, call) : await call(ctx);
+    const toolContext = nativeToolContext(ctx, binding);
+    const result = DOCKER_ACTIONS.has(action) ? await withDockerTransport(toolContext, config, { sshCmd }, call) : await call(toolContext);
     print(ctx, action, flags, result);
     return result.ok ? EXIT.ok : EXIT.failed;
   } catch (error) {

@@ -1,0 +1,152 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: urn:starci:provision-operation:1
+title: Target-bound provider operations
+description: Public target and custody references for executable provider adapters; values never enter this declaration.
+type: object
+additionalProperties: false
+required: [targets]
+properties:
+  targets:
+    type: object
+    minProperties: 1
+    additionalProperties: {$ref: '#/$defs/target'}
+$defs:
+  goalGrants:
+    type: object
+    additionalProperties: false
+    required: [schema, grants]
+    properties:
+      schema: {const: 'starci/provision-grants@1'}
+      grants:
+        type: array
+        items:
+          type: object
+          additionalProperties: false
+          required: [op, operation, digest]
+          properties:
+            op: {type: string, pattern: '^[a-z][a-z0-9-]*(\.[a-z][a-z0-9-]*)+$'}
+            operation: {type: string, pattern: '^[a-zA-Z0-9][a-zA-Z0-9-]{0,127}$'}
+            digest: {type: string, pattern: '^[a-f0-9]{64}$'}
+  credential:
+    oneOf:
+      - {$ref: '#/$defs/serviceCredential'}
+      - {$ref: '#/$defs/hostCredential'}
+  serviceCredential:
+    $ref: application-stacks.schema.yaml#/$defs/serviceCredential
+  hostCredential:
+    type: object
+    additionalProperties: false
+    required: [id, hostConnection]
+    properties:
+      id: {const: admin}
+      hostConnection: {const: sonar-selfhost-admin}
+  target:
+    type: object
+    additionalProperties: false
+    required: [provider, context, resource, credentials]
+    oneOf:
+      - required: [origin]
+        properties:
+          provider: {enum: [supabase-cloud, supabase-auth, sonar-server, sonar-community, sonar-cloud, app, github, ghcr]}
+          endpoint: false
+      - required: [endpoint]
+        properties:
+          provider: {const: app-stack}
+          origin: false
+          endpoint: {$ref: '#/$defs/swarmEndpoint'}
+      - required: [endpoint]
+        properties:
+          provider: {const: app-db}
+          origin: false
+          endpoint: {$ref: '#/$defs/databaseEndpoint'}
+        oneOf:
+          - properties:
+              context: {const: local}
+              endpoint:
+                properties:
+                  mode: {const: local}
+          - properties:
+              endpoint:
+                properties:
+                  mode: {enum: [linked, url-env]}
+    properties:
+      provider:
+        enum: [supabase-cloud, supabase-auth, sonar-server, sonar-community, sonar-cloud, app, github, ghcr, app-stack, app-db]
+      context:
+        enum: [local, development, staging, production]
+      origin:
+        type: string
+        pattern: '^https?://[^\s]+$'
+        description: Auth-free origin; the resolver permits HTTP only for an explicitly local loopback target.
+      endpoint:
+        type: object
+        description: Closed native endpoint selected by app-stack or app-db; public declaration checks precede custody and the effective private endpoint is compared before network access.
+      resource:
+        type: object
+        description: Adapter-owned public configuration; each adapter refuses fields outside its action contract.
+      credentials:
+        type: array
+        items: {$ref: '#/$defs/credential'}
+        description: Named roles using the existing service credential contract; ids become the execution role map.
+      optionalCredentials:
+        type: array
+        uniqueItems: true
+        items: {type: string, pattern: '^[a-z][a-z0-9-]*$'}
+        description: Declared roles whose absence may be inspected without substituting another credential.
+      destination:
+        $ref: '#/$defs/credential'
+      actions:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        items: {type: string, pattern: '^[a-z][a-z0-9-]*(\.[a-z][a-z0-9-]*)+$'}
+        description: Exact action ids allowed for this target; the catalog and execution owner enforce the selected action.
+  swarmEndpoint:
+    type: object
+    additionalProperties: false
+    required: [kind, environment, stack, host, user, port]
+    properties:
+      kind: {const: docker-swarm}
+      environment: {type: string, pattern: '^[a-z][a-z0-9-]*$'}
+      stack: {type: string, pattern: '^[a-z][a-z0-9-]*$'}
+      host: {type: string, pattern: '^[a-zA-Z0-9][a-zA-Z0-9.-]*$'}
+      user: {type: string, pattern: '^[a-zA-Z0-9_][a-zA-Z0-9_.-]*$'}
+      port: {const: 22}
+  databaseEndpoint:
+    type: object
+    additionalProperties: false
+    required: [kind, mode, environment]
+    oneOf:
+      - required: [localProject, port]
+        properties:
+          mode: {const: local}
+          projectRef: false
+          urlEnv: false
+          host: false
+          database: false
+          user: false
+      - required: [projectRef]
+        properties:
+          mode: {const: linked}
+          localProject: false
+          port: false
+          urlEnv: false
+          host: false
+          database: false
+          user: false
+      - required: [urlEnv, host, port, database, user]
+        properties:
+          mode: {const: url-env}
+          localProject: false
+          projectRef: false
+    properties:
+      kind: {const: supabase-db}
+      mode: {enum: [local, linked, url-env]}
+      environment: {type: string, pattern: '^[a-z][a-z0-9-]*$'}
+      localProject: {type: string, pattern: '^[a-zA-Z0-9_][a-zA-Z0-9_.-]*$'}
+      projectRef: {type: string, pattern: '^[a-z0-9]{20}$'}
+      urlEnv: {type: string, pattern: '^[A-Z][A-Z0-9_]*$'}
+      host: {type: string, pattern: '^[a-zA-Z0-9][a-zA-Z0-9.-]*$'}
+      port: {type: integer, minimum: 1, maximum: 65535}
+      database: {type: string, pattern: '^[a-zA-Z0-9_][a-zA-Z0-9_.-]*$'}
+      user: {type: string, pattern: '^[a-zA-Z0-9_][a-zA-Z0-9_.-]*$'}

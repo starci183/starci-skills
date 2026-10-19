@@ -1,0 +1,22 @@
+group: supabase
+verb: auth
+owner: runtime
+summary: ensure one declared Supabase Auth identity without resetting an existing account
+impl: {module: scripts/gates/supabase-auth.mjs, export: runSupabaseAuth}
+effect: remote
+roles: [worker, lead, coordinator, owner]
+positional: [{name: action, enum: [user-ensure], required: true, variadic: false}]
+operationPolicy:
+  user-ensure: {action: supabase.auth.user-ensure, effect: remote, credentials: [service-role], destination: none, checkpoints: [account-authority, consent]}
+flags:
+  - {name: target, type: string, required: true, summary: named explicit Auth target}
+  - {name: operation, type: string, summary: durable operation id}
+  - {name: execute, type: boolean, summary: execute under existing accepted operation scope}
+  - {name: reconcile, type: boolean, summary: inspect a prior uncertain creation}
+conventions:
+  - database login roles, Auth identities and application workspace roles have separate owners
+  - local targets retain the native Supabase stack's port and project ownership policy
+exit: {"0": plan prepared or operation completed, "1": provider effect failed or remains uncertain, "2": policy or input refused}
+json: always
+examples: [starci supabase auth user-ensure --target local-auth --operation developer-account]
+editions: [full, lite]

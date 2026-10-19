@@ -40,7 +40,7 @@ import { pathToFileURL, fileURLToPath } from 'node:url';
 import { putBlob as storeBlob, blobPath, getBlob } from './blob.mjs'; import { EVENT_LIMITS } from './event-compact.mjs';
 import { redactBytes, redactData, redactText } from '../../scripts/lib/redact.mjs'; import { isMain } from '../../scripts/lib/is-main.mjs';
 import { isSpecRun, readEnv } from '../../scripts/lib/env.mjs';
-import { pathKey } from '../../scripts/lib/path-key.mjs'; import { pidAlive } from '../../scripts/lib/pid-alive.mjs';
+import { pathKey } from '../../scripts/lib/path-key.mjs'; import { pidAlive } from '../../scripts/lib/pid-alive.mjs'; import { releaseObservedProvisionLock, renewProvisionLock, releaseProvisionLock } from './provision-lock.mjs';
 import { insertRowWith } from '../../scripts/lib/sqlite.mjs';
 import { need as refuseUnless } from '../refuse.mjs';
 import { sha256 } from '../digest.mjs';
@@ -840,11 +840,11 @@ const closeTerminal = (m, handle, { by = null, verified = false } = {}) => m.db.
  * Take a host lock (replaces connectors/*.lock and *.starting.json): succeeds when free, released, expired, or already
  * ours. Returns {ok, holder?}.
  */
-function acquireHostLock(m, { name, holder = null, pid = process.pid, ttlMs = 60000, processRunId = null, state = 'held' }) {
+function acquireHostLock(m, { name, holder = null, pid = process.pid, ttlMs = 60000, processRunId = null, state = 'held', retainExpired = false }) {
   return m.transaction((db) => {
     const at = m.now();
     const cur = db.prepare('SELECT * FROM host_locks WHERE name=?').get(name);
-    if (cur && cur.state !== 'released' && cur.expires_at > at && cur.holder_pid !== pid) return { ok: false, holder: cur };
+    if (cur && cur.state !== 'released' && (cur.expires_at > at || (retainExpired && name.startsWith('provision:'))) && (cur.holder_pid !== pid || (retainExpired && name.startsWith('provision:') && cur.holder !== holder))) return { ok: false, holder: cur };
     upsertRow(db, 'host_locks', { name, holder_pid: pid, holder, process_run_id: processRunId, started_at: cur && cur.holder_pid === pid && cur.state !== 'released' ? cur.started_at : at,
       heartbeat_at: at, expires_at: at + ttlMs, handed_over_from: cur && cur.holder_pid !== pid && cur.state !== 'released' ? cur.holder_pid : null, state }, ['name']);
     return { ok: true };
@@ -1271,7 +1271,7 @@ const API = {
   actionIntent, actionRunning, actionFinish, markStaleActionsUnknown, actionOf, actions, actionStep,
   controllerModes, setControllerMode, modeChanges, openSlaEpisode, markSlaViolated, markSlaReported, clearSla, openSla, recordViolation, clearViolation,
   setService, recordProbe, services, serviceEvents, upsertSeat, seatOf, seats, recordDelivery, recordSeatInput, startSeatTurn, endSeatTurn, seatTranscriptSnapshot,
-  upsertTerminal, closeTerminal, acquireHostLock, renewHostLock, releaseHostLock, hostLock, hostLocks,
+  upsertTerminal, closeTerminal, acquireHostLock, renewHostLock, releaseHostLock, releaseObservedProvisionLock, renewProvisionLock, releaseProvisionLock, hostLock, hostLocks,
   claimResource, releaseClaim, sweptClaim, liveClaims, upsertAgentSession,
   throttleState, setThrottle, throttleEvents, recordThrottleDecision, releaseThrottleDecision, recordHostSample, hostSamples,
   setProviderHealth, providerHealth, poolBackoff, setPoolBackoff, clearPoolBackoff, setQuota, quotas,

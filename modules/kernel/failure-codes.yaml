@@ -5112,7 +5112,7 @@ RT_CODE_UNCATALOGUED:
   causes_vi:
     - "Thêm một mã mới trong mã nguồn mà không ghi vào danh mục"
     - "Một chuỗi giống mã nhưng thật ra là tên biến môi trường hoặc khóa"
-  nextStep_vi: "Người giám sát thêm mục (title, title_vi, meaning_vi, causes_vi, nextStep_vi, owner, kind) vào danh mục, hoặc đưa tên không phải mã vào failure-codes.not-codes, qua một lane đã land."
+  nextStep_vi: "Catalog owner khai báo mã thực sự được phát ra với đủ trường bắt buộc. Tên môi trường thuộc env catalog; enum hoặc dữ liệu giao thức bị nhận nhầm cần sửa chính xác bộ phân loại ở source owner, giữ các vị trí phát lỗi thật và không mở rộng allowlist."
   owner: supervisor
   kind: check-finding
 
@@ -19570,3 +19570,2463 @@ SONAR_UNREACHABLE:
   nextStep_vi: "Kiem tra host va dich vu Sonar; chi bat services.sonar.optional neu cho phep bo qua khi mat ket noi."
   owner: op-retry
   kind: verb-refusal
+
+APP_ACCESS_ACCOUNTS_MUST_DIFFER:
+  title: "Workspace account identities overlap"
+  title_vi: "Tài khoản workspace bị trùng"
+  meaning_vi: "Email owner, manager và staff trùng nhau sau chuẩn hóa."
+  causes_vi:
+    - "Nhiều vai trò trỏ cùng email."
+  nextStep_vi: "Sửa các email công khai thành ba danh tính khác nhau."
+  owner: op-retry
+  kind: input-invalid
+
+APP_ACCESS_ACCOUNT_INPUT_INVALID:
+  title: "Workspace account input is invalid"
+  title_vi: "Thông tin tài khoản workspace không hợp lệ"
+  meaning_vi: "Email, tên hoặc tổ hợp tham số không đúng workspace action contract."
+  causes_vi:
+    - "Email hoặc tên sai dạng, quá giới hạn, hay lẫn tham số action khác."
+  nextStep_vi: "Sửa public account input rồi chuẩn bị lại plan."
+  owner: op-retry
+  kind: input-invalid
+
+APP_ACCESS_ACTION_INVALID:
+  title: "Workspace action is invalid"
+  title_vi: "Action workspace không hợp lệ"
+  meaning_vi: "Gate không nhận workspace action được yêu cầu."
+  causes_vi:
+    - "Action không phải ensure hoặc role."
+  nextStep_vi: "Chọn action workspace đã khai báo."
+  owner: op-retry
+  kind: input-invalid
+
+APP_ACCESS_ACTION_REFUSED:
+  title: "Native workspace action is refused"
+  title_vi: "Native workspace từ chối action"
+  meaning_vi: "Process owner không nhận action hoặc timeout để gọi fixed App entry."
+  causes_vi:
+    - "Action ngoài ensure/role/verify hoặc timeout không phải số nguyên dương."
+  nextStep_vi: "Sửa adapter hoặc public timeout trước khi mở private input."
+  owner: runtime-core
+  kind: verb-refusal
+
+APP_ACCESS_AUTH_ORIGIN_MISMATCH:
+  title: "Workspace auth origin differs from target"
+  title_vi: "Auth origin khác target"
+  meaning_vi: "Public SUPABASE_URL khác accepted target origin."
+  causes_vi:
+    - "Public environment trỏ Supabase origin khác."
+  nextStep_vi: "Sửa public binding và target cho cùng origin rồi prepare plan mới."
+  owner: op-retry
+  kind: input-invalid
+
+APP_ACCESS_BUILD_DRIFT:
+  title: "Compiled workspace entry changed"
+  title_vi: "Compiled workspace entry đã đổi"
+  meaning_vi: "Compiled fixed App CLI digest khác digest được chấp nhận."
+  causes_vi:
+    - "Entry đã được build lại hoặc thay thế sau khi đóng plan."
+  nextStep_vi: "Review entry hiện tại và chuẩn bị plan mới với digest thực tế."
+  owner: op-retry
+  kind: input-invalid
+
+APP_ACCESS_BUILD_IDENTITY_REQUIRED:
+  title: "Compiled workspace identity is required"
+  title_vi: "Thiếu định danh compiled workspace entry"
+  meaning_vi: "Resource không có SHA256 hợp lệ của fixed compiled App CLI entry."
+  causes_vi:
+    - "entrySha256 thiếu hoặc sai dạng."
+  nextStep_vi: "Thu digest entry đã build và khai báo vào public resource."
+  owner: op-retry
+  kind: input-invalid
+
+APP_ACCESS_BUILD_UNAVAILABLE:
+  title: "Compiled workspace entry is unavailable"
+  title_vi: "Không có compiled workspace entry hợp lệ"
+  meaning_vi: "Fixed App CLI entry không phải tệp build thường để chạy."
+  causes_vi:
+    - "Build chưa tạo entry hoặc entry không phải regular file."
+  nextStep_vi: "Hoàn tất native App build trước khi chuẩn bị operation."
+  owner: runtime-core
+  kind: verb-refusal
+
+APP_ACCESS_DESTINATION_REFUSED:
+  title: "Workspace custody destination is refused"
+  title_vi: "Workspace không nhận custody destination"
+  meaning_vi: "Workspace target khai báo output destination ngoài contract."
+  causes_vi:
+    - "Action workspace không hỗ trợ destination."
+  nextStep_vi: "Bỏ destination ngoài contract rồi chuẩn bị lại plan."
+  owner: op-retry
+  kind: input-invalid
+
+APP_ACCESS_ENV_BINDING_REFUSED:
+  title: "Workspace environment binding is refused"
+  title_vi: "Binding môi trường workspace bị từ chối"
+  meaning_vi: "Env binding trùng, sai dạng hoặc đụng loader/runtime names được bảo vệ."
+  causes_vi:
+    - "Public/private names trùng hoặc dùng reserved environment name."
+  nextStep_vi: "Sửa declaration names; không mở hoặc in private values."
+  owner: op-retry
+  kind: input-invalid
+
+APP_ACCESS_ENV_BINDING_REQUIRED:
+  title: "Workspace credential environment binding is required"
+  title_vi: "Thiếu credential env binding"
+  meaning_vi: "Credential ngoài input roles chưa khai báo env name cho fixed App child."
+  causes_vi:
+    - "Credential reference thiếu trường env."
+  nextStep_vi: "Khai báo env name của role, giữ value trong custody."
+  owner: op-retry
+  kind: input-invalid
+
+APP_ACCESS_LINK_REFUSED:
+  title: "Linked workspace entry is refused"
+  title_vi: "Workspace entry có symlink bị từ chối"
+  meaning_vi: "Đường dẫn fixed compiled App CLI có symbolic link."
+  causes_vi:
+    - "Entry hoặc thư mục build bị chuyển hướng."
+  nextStep_vi: "Dùng native build trong đúng repository và kiểm entry."
+  owner: runtime-core
+  kind: verb-refusal
+
+APP_ACCESS_PRINCIPAL_REQUIRED:
+  title: "Workspace principal is required"
+  title_vi: "Thiếu workspace principal"
+  meaning_vi: "Action thiếu principal token hoặc owner-password theo private role contract."
+  causes_vi:
+    - "Selected custody không cung cấp principal role cần thiết."
+  nextStep_vi: "Owner chuẩn bị role qua native custody, không gửi value cho agent."
+  owner: owner
+  kind: verb-refusal
+
+APP_ACCESS_PROCESS_UNKNOWN:
+  title: "Workspace process outcome is unknown"
+  title_vi: "Chưa biết kết quả workspace process"
+  meaning_vi: "Child lỗi, timeout hoặc nonzero; domain effects có thể đã xảy ra."
+  causes_vi:
+    - "Process không trả completion hợp lệ."
+  nextStep_vi: "Giữ unknown và reconcile domain readback; không replay write tự động."
+  owner: runtime-core
+  kind: check-status
+
+APP_ACCESS_PUBLIC_READBACK:
+  title: "Workspace public readback is verified"
+  title_vi: "Đã xác minh workspace public readback"
+  meaning_vi: "Fixed App CLI trả đúng closed receipt, workspace identity và session cleanup."
+  causes_vi:
+    - "Schema/action/workspace/public readback và cleanup đều hợp lệ."
+  nextStep_vi: "Giữ receipt đúng operation; kiểm consumer và full goal riêng."
+  owner: runtime-core
+  kind: check-status
+
+APP_ACCESS_PUBLIC_SECRET_REFUSED:
+  title: "Public workspace environment contains secret material"
+  title_vi: "Public environment chứa bí mật"
+  meaning_vi: "Public environment name hoặc content bị nhận diện là secret."
+  causes_vi:
+    - "Credential được đặt nhầm trong public declaration."
+  nextStep_vi: "Chuyển credential sang declared private custody."
+  owner: op-retry
+  kind: input-invalid
+
+APP_ACCESS_RECEIPT_UNKNOWN:
+  title: "Workspace receipt is unverified"
+  title_vi: "Chưa xác minh workspace receipt"
+  meaning_vi: "Child kết thúc nhưng không có đúng một public receipt hợp lệ."
+  causes_vi:
+    - "Receipt thiếu, sai shape/action hoặc cleanup chưa đúng."
+  nextStep_vi: "Giữ unknown và reconcile domain state, không replay write."
+  owner: runtime-core
+  kind: check-status
+
+APP_ACCESS_ROLE_INPUT_INVALID:
+  title: "Workspace role input is invalid"
+  title_vi: "Tham số workspace role không hợp lệ"
+  meaning_vi: "Role action thiếu valid workspace/member UUID, role, hoặc lẫn bootstrap input."
+  causes_vi:
+    - "Tham số không đúng contract đổi membership role."
+  nextStep_vi: "Sửa public selectors và role rồi prepare plan mới."
+  owner: op-retry
+  kind: input-invalid
+
+APP_ACCESS_SOURCE_DRIFT:
+  title: "Workspace source revision changed"
+  title_vi: "Source revision workspace đã đổi"
+  meaning_vi: "App HEAD khác revision đóng trong target resource."
+  causes_vi:
+    - "Source đổi sau khi đóng plan hoặc trước child launch."
+  nextStep_vi: "Đóng lại source input và chuẩn bị plan trên revision mới."
+  owner: op-retry
+  kind: input-invalid
+
+APP_ACCESS_TARGET_INVALID:
+  title: "Workspace target is invalid"
+  title_vi: "Workspace target không hợp lệ"
+  meaning_vi: "Resource có trường lạ hoặc thiếu revision/public environment/timeout hợp lệ."
+  causes_vi:
+    - "Target không đúng closed workspace resource contract."
+  nextStep_vi: "Sửa public target declaration rồi chuẩn bị lại plan."
+  owner: op-retry
+  kind: input-invalid
+
+APP_ACCESS_WORKSPACE_INVALID:
+  title: "Workspace selector is invalid"
+  title_vi: "Workspace selector không hợp lệ"
+  meaning_vi: "Workspace UUID hoặc tên không đúng dạng và giới hạn."
+  causes_vi:
+    - "UUID sai hoặc tên trống/quá dài."
+  nextStep_vi: "Sửa public workspace UUID hoặc name."
+  owner: op-retry
+  kind: input-invalid
+
+APP_ACCESS_WORKSPACE_REQUIRED:
+  title: "One workspace selector is required"
+  title_vi: "Cần đúng một workspace selector"
+  meaning_vi: "Ensure phải chọn đúng một workspace UUID hoặc workspace name."
+  causes_vi:
+    - "Cả hai selector thiếu hoặc cùng được cung cấp."
+  nextStep_vi: "Chọn một UUID hoặc một tên workspace."
+  owner: op-retry
+  kind: input-invalid
+
+CI_ACCESS_ACK_AND_NAME_VERIFIED:
+  title: "CI write acknowledgement and name are verified"
+  title_vi: "Đã xác minh ACK ghi CI và tên"
+  meaning_vi: "Native write có ACK và provider metadata có đúng secret name; secret value không được đọc lại."
+  causes_vi:
+    - "ACK đã lưu và name metadata đã xác nhận."
+  nextStep_vi: "Giữ receipt; kiểm consumer riêng, không coi name là value equality."
+  owner: runtime-core
+  kind: check-status
+
+CI_ACCESS_CLEANUP_HELD:
+  title: "CI private configuration cleanup is held"
+  title_vi: "Chưa dọn xong private CI config"
+  meaning_vi: "Operation chưa dọn được temporary private GH config; write có thể đã ACK."
+  causes_vi:
+    - "Cleanup thư mục operation sở hữu thất bại."
+  nextStep_vi: "Giữ state và xử lý cleanup qua native owner; không replay write."
+  owner: runtime-core
+  kind: check-status
+
+CI_ACCESS_CREDENTIAL_BINDING_INVALID:
+  title: "CI credential binding is invalid"
+  title_vi: "CI credential binding không hợp lệ"
+  meaning_vi: "Target không có đúng hai nonoptional project custody roles principal/source."
+  causes_vi:
+    - "Role thiếu, thừa, optional hoặc dùng host connection ngoài contract."
+  nextStep_vi: "Sửa reference metadata của hai role, không mở value."
+  owner: op-retry
+  kind: input-invalid
+
+CI_ACCESS_GUARD_REFUSED:
+  title: "Native CI admission is refused"
+  title_vi: "Native CI guard từ chối bridge"
+  meaning_vi: "Empty-stdin preflight không trả exact native empty-value refusal."
+  causes_vi:
+    - "Exit/output native khác admission contract."
+  nextStep_vi: "Sửa native binding/guard mismatch; không mở custody hoặc bypass."
+  owner: runtime-core
+  kind: verb-refusal
+
+CI_ACCESS_GUARD_UNAVAILABLE:
+  title: "Native CI admission is unavailable"
+  title_vi: "Không chạy được native CI preflight"
+  meaning_vi: "Fixed native preflight process không khởi chạy được."
+  causes_vi:
+    - "Tool/process runner không sẵn sàng."
+  nextStep_vi: "Khôi phục native tool boundary rồi chạy public preflight."
+  owner: runtime-core
+  kind: verb-refusal
+
+CI_ACCESS_INPUT_INVALID:
+  title: "CI secret input is invalid"
+  title_vi: "CI secret input không hợp lệ"
+  meaning_vi: "Action hoặc secret name không đúng bounded CLI contract."
+  causes_vi:
+    - "Action sai, tên rỗng/quá dài hoặc chứa newline."
+  nextStep_vi: "Sửa action/name công khai trước khi prepare plan."
+  owner: op-retry
+  kind: input-invalid
+
+CI_ACCESS_MASKED_VALUE_UNRECONCILED:
+  title: "Masked CI value cannot reconcile a lost acknowledgement"
+  title_vi: "Chưa reconcile được CI value bị che"
+  meaning_vi: "Không có saved write ACK; cùng secret name không chứng minh value đã được ghi."
+  causes_vi:
+    - "Provider chỉ trả metadata, không trả private value."
+  nextStep_vi: "Giữ unknown và reconcile bằng supported proof; không suy ra value equality."
+  owner: runtime-core
+  kind: check-status
+
+CI_ACCESS_NATIVE_DRIFT:
+  title: "Native CI identity changed"
+  title_vi: "Native CI identity đã đổi"
+  meaning_vi: "Installed CLI/HFS identity khác snapshot đóng trong plan."
+  causes_vi:
+    - "Native package/entry đã đổi."
+  nextStep_vi: "Review native identity mới rồi prepare plan mới."
+  owner: op-retry
+  kind: input-invalid
+
+CI_ACCESS_PRINCIPAL_REQUIRED:
+  title: "CI principal credential is required"
+  title_vi: "Thiếu CI principal credential"
+  meaning_vi: "Private principal callback không cung cấp token không rỗng."
+  causes_vi:
+    - "Declared principal custody không có usable value."
+  nextStep_vi: "Owner chuẩn bị role qua native custody; không in token."
+  owner: owner
+  kind: verb-refusal
+
+CI_ACCESS_READBACK_HELD:
+  title: "CI name readback is held after acknowledgement"
+  title_vi: "Chưa xác minh tên CI sau ACK"
+  meaning_vi: "Write đã ACK nhưng metadata chưa xác nhận đúng name."
+  causes_vi:
+    - "Metadata readback lỗi hoặc chưa thấy name."
+  nextStep_vi: "Giữ partial và reconcile metadata; không lặp write."
+  owner: runtime-core
+  kind: check-status
+
+CI_ACCESS_SCOPE_INVALID:
+  title: "CI secret scope is invalid"
+  title_vi: "CI secret scope không hợp lệ"
+  meaning_vi: "Scope environment thiếu valid environment hoặc scope khác mang environment thừa."
+  causes_vi:
+    - "Scope và environment không khớp contract."
+  nextStep_vi: "Sửa public scope/environment và prepare plan mới."
+  owner: op-retry
+  kind: input-invalid
+
+CI_ACCESS_SOURCE_DRIFT:
+  title: "CI operation source input changed"
+  title_vi: "CI source input đã đổi"
+  meaning_vi: "App revision, runtime revision hoặc declaration khác input đóng trong plan."
+  causes_vi:
+    - "Source/declaration đổi trước write hoặc reconcile."
+  nextStep_vi: "Prepare plan mới trên source/declaration thực tế đã review."
+  owner: op-retry
+  kind: input-invalid
+
+CI_ACCESS_SOURCE_REQUIRED:
+  title: "CI source credential is required"
+  title_vi: "Thiếu CI source credential"
+  meaning_vi: "Private callback chưa có value để chuyển qua native stdin."
+  causes_vi:
+    - "Declared source member không có chuỗi không rỗng."
+  nextStep_vi: "Owner chuẩn bị source member qua native custody, không đưa value ra output."
+  owner: owner
+  kind: verb-refusal
+
+CI_ACCESS_TARGET_INVALID:
+  title: "CI target resource is invalid"
+  title_vi: "CI target resource không hợp lệ"
+  meaning_vi: "Resource sai revision/repository/scope/timeout hoặc có trường lạ."
+  causes_vi:
+    - "Resource không đúng closed CI declaration."
+  nextStep_vi: "Sửa public resource rồi prepare lại plan."
+  owner: op-retry
+  kind: input-invalid
+
+CI_ACCESS_TARGET_REFUSED:
+  title: "CI target origin or destination is refused"
+  title_vi: "CI origin hoặc destination bị từ chối"
+  meaning_vi: "Adapter chỉ nhận selected GitHub API origin và không nhận output destination."
+  causes_vi:
+    - "Origin khác contract hoặc có destination thừa."
+  nextStep_vi: "Sửa public provider target, không đổi routing để lách guard."
+  owner: op-retry
+  kind: input-invalid
+
+CI_ACCESS_WRITE_UNKNOWN:
+  title: "CI write outcome is unknown"
+  title_vi: "Chưa biết kết quả ghi CI"
+  meaning_vi: "Native write không có completion ACK; provider có thể đã nhận write."
+  causes_vi:
+    - "Process lỗi, timeout hoặc exit khác 0 sau intent."
+  nextStep_vi: "Giữ unknown và reconcile, không replay write vì thiếu ACK."
+  owner: runtime-core
+  kind: check-status
+
+GHCR_ACTION_REFUSED:
+  title: "Registry action is refused"
+  title_vi: "Registry action bị từ chối"
+  meaning_vi: "Registry gate chỉ nhận login."
+  causes_vi:
+    - "CLI action không phải login."
+  nextStep_vi: "Chọn registry login action đã khai báo."
+  owner: op-retry
+  kind: input-invalid
+
+GHCR_CREDENTIAL_REFUSED:
+  title: "Registry credential contract is refused"
+  title_vi: "Registry credential contract bị từ chối"
+  meaning_vi: "Target cần đúng một required registry-password reference."
+  causes_vi:
+    - "Role thiếu/thừa hoặc optional."
+  nextStep_vi: "Sửa public reference metadata; không mở credential value."
+  owner: op-retry
+  kind: input-invalid
+
+GHCR_DOCKER_CONFIG_REFUSED:
+  title: "Native Docker configuration is refused"
+  title_vi: "Native Docker config bị từ chối"
+  meaning_vi: "Directory/config không có canonical identity và shape hợp lệ."
+  causes_vi:
+    - "Path khác canonical, config là symlink hoặc JSON sai dạng."
+  nextStep_vi: "Sửa existing native Docker config qua owner của nó."
+  owner: runtime-core
+  kind: verb-refusal
+
+GHCR_DOCKER_CONFIG_REQUIRED:
+  title: "Explicit Docker configuration is required"
+  title_vi: "Cần Docker config directory rõ ràng"
+  meaning_vi: "Target chưa chọn absolute native Docker config directory."
+  causes_vi:
+    - "dockerConfig thiếu hoặc không absolute."
+  nextStep_vi: "Khai báo existing native directory, không tạo credential store thứ hai."
+  owner: op-retry
+  kind: input-invalid
+
+GHCR_LOCAL_DAEMON_REQUIRED:
+  title: "A local Docker daemon endpoint is required"
+  title_vi: "Cần local Docker daemon endpoint"
+  meaning_vi: "Adapter chỉ nhận supported local named pipe hoặc Unix socket."
+  causes_vi:
+    - "dockerEndpoint không đúng local native contract."
+  nextStep_vi: "Khai báo local daemon endpoint đã chọn; không chuyển sang remote daemon."
+  owner: op-retry
+  kind: input-invalid
+
+GHCR_LOGIN_NATIVE_READBACK:
+  title: "Registry login has native custody readback"
+  title_vi: "Registry login đã có native custody readback"
+  meaning_vi: "Docker login có ACK và existing helper privately trả matching identity/credential."
+  causes_vi:
+    - "Login ACK và helper private equality đều khớp."
+  nextStep_vi: "Giữ public receipt; kiểm consumer riêng, không in helper values."
+  owner: runtime-core
+  kind: check-status
+
+GHCR_LOGIN_READBACK_UNCONFIRMED:
+  title: "Registry login readback is unconfirmed"
+  title_vi: "Chưa xác minh registry login readback"
+  meaning_vi: "Login đã ACK nhưng native identity hoặc helper readback chưa khớp."
+  causes_vi:
+    - "Config/tool identity đổi hoặc helper entry chưa khớp."
+  nextStep_vi: "Giữ partial và reconcile native custody; không login lại tự động."
+  owner: runtime-core
+  kind: check-status
+
+GHCR_LOGIN_UNCONFIRMED:
+  title: "Registry login outcome is unconfirmed"
+  title_vi: "Chưa xác minh registry login outcome"
+  meaning_vi: "Không có native login ACK hoặc reconcile chưa thấy retained entry."
+  causes_vi:
+    - "Login process không hoàn tất rõ ràng hoặc entry chưa được quan sát."
+  nextStep_vi: "Giữ unknown và reconcile existing helper; không replay login."
+  owner: runtime-core
+  kind: check-status
+
+GHCR_NATIVE_CONFLICT:
+  title: "Native registry credential conflicts"
+  title_vi: "Native registry credential bị xung đột"
+  meaning_vi: "Existing helper entry khác selected username hoặc credential."
+  causes_vi:
+    - "Private entry đã có không khớp accepted identity/value."
+  nextStep_vi: "Giữ entry hiện có, đưa conflict về owner; không overwrite."
+  owner: owner
+  kind: check-status
+
+GHCR_NATIVE_CREDENTIAL_REUSED:
+  title: "Matching native registry credential is retained"
+  title_vi: "Đã giữ matching native registry credential"
+  meaning_vi: "Helper entry đã có khớp identity và private selected credential, không login lại."
+  causes_vi:
+    - "Private equality readback khớp."
+  nextStep_vi: "Giữ verified receipt và kiểm consumer riêng."
+  owner: runtime-core
+  kind: check-status
+
+GHCR_NATIVE_CUSTODY_HELD:
+  title: "Native registry custody cannot be resolved"
+  title_vi: "Native registry custody đang held"
+  meaning_vi: "Helper list/get không cho một entry rõ ràng để quyết định write."
+  causes_vi:
+    - "Output lỗi, alias mơ hồ hoặc shape không hợp lệ."
+  nextStep_vi: "Giữ custody và reconcile qua native owner; không in output hoặc overwrite."
+  owner: runtime-core
+  kind: check-status
+
+GHCR_NATIVE_HELPER_MISMATCH:
+  title: "Native registry helper differs from target"
+  title_vi: "Native registry helper khác target"
+  meaning_vi: "Docker config chọn helper khác target chấp nhận."
+  causes_vi:
+    - "credsStore/credHelpers khác declared helper."
+  nextStep_vi: "Review declaration/native config và chuẩn bị plan mới."
+  owner: op-retry
+  kind: input-invalid
+
+GHCR_NATIVE_IDENTITY_DRIFT:
+  title: "Native registry identity changed"
+  title_vi: "Native registry identity đã đổi"
+  meaning_vi: "Docker/helper/config/environment snapshot khác accepted plan."
+  causes_vi:
+    - "Tool, config hoặc selected environment đổi trước effect."
+  nextStep_vi: "Đóng identity mới và chuẩn bị plan lại, không tiếp tục bằng snapshot cũ."
+  owner: op-retry
+  kind: input-invalid
+
+GHCR_NATIVE_TOOL_REFUSED:
+  title: "Native registry executable is refused"
+  title_vi: "Native registry executable bị từ chối"
+  meaning_vi: "Executable không phải regular canonical file hoặc sai Windows executable shape."
+  causes_vi:
+    - "Tool có symlink, canonical path khác hoặc extension sai."
+  nextStep_vi: "Dùng native Docker/helper install hợp lệ."
+  owner: runtime-core
+  kind: verb-refusal
+
+GHCR_NATIVE_TOOL_UNAVAILABLE:
+  title: "Native registry executable is unavailable"
+  title_vi: "Không tìm được native registry executable"
+  meaning_vi: "Không resolve được Docker và selected credential helper."
+  causes_vi:
+    - "Native tool thiếu trên selected host tool path."
+  nextStep_vi: "Host owner khôi phục native tool; không thay bằng shell wrapper."
+  owner: supervisor
+  kind: verb-refusal
+
+GHCR_PASSWORD_INVALID:
+  title: "Registry password material is invalid"
+  title_vi: "Registry password material không hợp lệ"
+  meaning_vi: "Private credential trống hoặc chứa newline/null."
+  causes_vi:
+    - "Selected custody value không đúng native login shape."
+  nextStep_vi: "Owner sửa member qua native custody, không in hoặc copy value."
+  owner: owner
+  kind: verb-refusal
+
+GHCR_PLAINTEXT_AUTH_REFUSED:
+  title: "Plaintext Docker authentication is refused"
+  title_vi: "Plaintext Docker auth bị từ chối"
+  meaning_vi: "Selected registry entry có plaintext auth/token fields trong config."
+  causes_vi:
+    - "auths chứa auth/identitytoken/registrytoken ngoài helper custody."
+  nextStep_vi: "Owner dùng supported existing native helper; không mở/in auth values."
+  owner: owner
+  kind: verb-refusal
+
+GHCR_TARGET_INVALID:
+  title: "Registry target resource is invalid"
+  title_vi: "Registry target resource không hợp lệ"
+  meaning_vi: "Target không có fixed GHCR origin và valid username/helper/timeout/resource."
+  causes_vi:
+    - "Resource hoặc destination sai closed registry contract."
+  nextStep_vi: "Sửa public target declaration rồi prepare lại plan."
+  owner: op-retry
+  kind: input-invalid
+
+credential-custody-unavailable:
+  title: "Selected credential custody is unavailable"
+  title_vi: "Không mở được selected credential custody"
+  meaning_vi: "Native owner không resolve/decrypt được structured member đã chọn."
+  causes_vi:
+    - "Identity prerequisite, ciphertext hoặc native SOPS owner không sẵn sàng."
+  nextStep_vi: "Owner khôi phục declared custody; giữ secret kín, không fallback ambient credential."
+  owner: owner
+  kind: verb-refusal
+
+operation-checkpoint:
+  title: "Operation effect checkpoint is recorded"
+  title_vi: "Đã ghi operation checkpoint"
+  meaning_vi: "Operation đã lưu phase metadata trước provider write acknowledgement."
+  causes_vi:
+    - "Adapter checkpoint phase trước hoặc trong operation."
+  nextStep_vi: "Giữ checkpoint cho recovery; chưa coi là write ACK hoặc full goal completion."
+  owner: runtime-core
+  kind: check-status
+
+owner-plan-accepted:
+  title: "Owner accepted the exact public plan"
+  title_vi: "Owner đã chấp nhận đúng public plan"
+  meaning_vi: "Interactive response khớp full plan digest; native caller authority được kiểm riêng."
+  causes_vi:
+    - "Owner nhập exact acceptance digest trong real terminal."
+  nextStep_vi: "Chỉ thực hiện accepted plan đúng input và authority."
+  owner: owner
+  kind: check-status
+
+owner-plan-not-accepted:
+  title: "Owner did not accept the public plan"
+  title_vi: "Owner chưa chấp nhận public plan"
+  meaning_vi: "Interactive response không khớp exact acceptance digest."
+  causes_vi:
+    - "Owner không nhập acceptance được yêu cầu."
+  nextStep_vi: "Giữ operation chưa được chấp nhận; không tự trả lời hoặc thực hiện effects."
+  owner: owner
+  kind: verb-refusal
+
+owner-terminal-required:
+  title: "An interactive owner terminal is required"
+  title_vi: "Cần interactive owner terminal"
+  meaning_vi: "Checkpoint thiếu input/output TTY hoặc full digest hợp lệ."
+  causes_vi:
+    - "Execution không interactive hoặc digest sai dạng."
+  nextStep_vi: "Owner mở native checkpoint; không dùng flag hay redirected stdin để giả acceptance."
+  owner: owner
+  kind: verb-refusal
+
+provider-operation-failed:
+  title: "Provider operation failed safely"
+  title_vi: "Provider operation dừng với public failure"
+  meaning_vi: "Operation trả closed failure code thay exception/provider body; effect state được giữ riêng."
+  causes_vi:
+    - "Adapter lỗi hoặc exception không thuộc trusted refusal vocabulary."
+  nextStep_vi: "Đọc public state và reconcile nếu unknown/partial; không suy ra effects chưa xảy ra."
+  owner: runtime-core
+  kind: runtime-fault
+
+provider-response:
+  title: "Bounded provider response was received"
+  title_vi: "Đã nhận provider response trong giới hạn"
+  meaning_vi: "HTTP transport nhận successful bounded response; body không rỗng được parse JSON, body rỗng được phép; semantic verification thuộc adapter."
+  causes_vi:
+    - "Response2xx với body rỗng hoặc JSON parse thành công."
+  nextStep_vi: "Để adapter kiểm identity/readback; transport success chưa phải consumer proof."
+  owner: runtime-core
+  kind: check-status
+
+provider-write-acknowledged:
+  title: "Provider write acknowledgement is recorded"
+  title_vi: "Đã ghi provider write ACK"
+  meaning_vi: "Write ACK đã được lưu trước các bước verify còn lại."
+  causes_vi:
+    - "Native/provider write đã acknowledge."
+  nextStep_vi: "Giữ ACK, tiếp tục readback đúng operation và không replay write."
+  owner: runtime-core
+  kind: check-status
+
+provision-native-caller-unverified:
+  title: "Native provisioning caller is unverified"
+  title_vi: "Chưa xác minh native provisioning caller"
+  meaning_vi: "Native binding không chứng minh unbound owner hoặc exact admitted op history."
+  causes_vi:
+    - "Caller provider thiếu, identity sai hoặc native history không đủ."
+  nextStep_vi: "Khôi phục native caller context; không dùng role/env/flag thay authority."
+  owner: runtime-core
+  kind: verb-refusal
+
+provision-native-placement-unverified:
+  title: "Native provisioning placement is unverified"
+  title_vi: "Chưa xác minh native provisioning placement"
+  meaning_vi: "Registry không gắn exact workflow worktree với workflow/ledger/repository hiện tại."
+  causes_vi:
+    - "Placement thiếu, removed hoặc identity không khớp."
+  nextStep_vi: "Dùng registered placement đúng workflow; không tự rebind registry."
+  owner: runtime-core
+  kind: verb-refusal
+
+provision-owner-checkpoint-required:
+  title: "A history-aware owner checkpoint is required"
+  title_vi: "Cần owner checkpoint với native history hợp lệ"
+  meaning_vi: "Issue/retain/revoke grant hoặc standalone acceptance cần actual unbound owner được history xác minh."
+  causes_vi:
+    - "Caller managed/provisional/unknown hoặc thiếu owner checkpoint capability."
+  nextStep_vi: "Owner dùng native checkpoint; agent không tạo hoặc giữ grant thay owner."
+  owner: owner
+  kind: verb-refusal
+
+sonar-analysis-processed:
+  title: "Sonar analysis is processed and verified"
+  title_vi: "Sonar analysis đã xử lý và xác minh"
+  meaning_vi: "Adapter đã gắn processed analysis với requested revision và applicable browse proof."
+  causes_vi:
+    - "CE/readback và selected quality conditions đã đạt."
+  nextStep_vi: "Giữ proof đúng revision; consumer/full release proof theo contract riêng."
+  owner: runtime-core
+  kind: check-status
+
+sonar-release-declaration-refused:
+  title: "Native Sonar release declaration is refused"
+  title_vi: "Native Sonar release declaration bị từ chối"
+  meaning_vi: "Required service, roles, clean source hoặc scanner/native routing không khớp operation."
+  causes_vi:
+    - "Declaration hoặc installed native input không đúng release contract."
+  nextStep_vi: "Sửa public declaration/native install và prepare lại trước custody."
+  owner: runtime-core
+  kind: verb-refusal
+
+sonar-release-processed:
+  title: "Native Sonar release analysis is processed"
+  title_vi: "Native Sonar release analysis đã xử lý"
+  meaning_vi: "Adapter xác minh native L4/tag/log identities cùng processed CE, exact analysis, QG và issues proof."
+  causes_vi:
+    - "Native record và provider readback khớp analysis operation."
+  nextStep_vi: "Giữ scoped proof; remote push và full goal completion được kiểm riêng."
+  owner: runtime-core
+  kind: check-status
+
+sonar-user-create-only-unsupported:
+  title: "Sonar create-only user action is unsupported"
+  title_vi: "Sonar không hỗ trợ create-only user flow đã chọn"
+  meaning_vi: "Selected server không cung cấp create-only guarantee operation yêu cầu."
+  causes_vi:
+    - "Capability/API không đáp ứng user-create contract."
+  nextStep_vi: "Chọn supported declared action hoặc sửa owning integration; không đổi protocol để ép chạy."
+  owner: runtime-core
+  kind: verb-refusal
+
+supabase-destination-required:
+  title: "Supabase sealed destination is required"
+  title_vi: "Cần Supabase sealed destination"
+  meaning_vi: "Action tạo credential thiếu declared sealed destination."
+  causes_vi:
+    - "Target không chọn destination bắt buộc."
+  nextStep_vi: "Khai báo named sealed destination đúng custody scope trước acceptance."
+  owner: op-retry
+  kind: input-invalid
+
+supabase-project-ref-invalid:
+  title: "Supabase project reference is invalid"
+  title_vi: "Supabase project ref không hợp lệ"
+  meaning_vi: "Project ref không đúng bounded identifier của target contract."
+  causes_vi:
+    - "Project ref thiếu hoặc sai dạng."
+  nextStep_vi: "Sửa public project ref theo declaration."
+  owner: op-retry
+  kind: input-invalid
+
+supabase-resource-invalid:
+  title: "Supabase resource declaration is invalid"
+  title_vi: "Supabase resource declaration không hợp lệ"
+  meaning_vi: "Resource thiếu hoặc có trường/giá trị ngoài closed action contract."
+  causes_vi:
+    - "Action và resource shape không khớp."
+  nextStep_vi: "Sửa public resource; không fallback ambient target."
+  owner: op-retry
+  kind: input-invalid
+
+supabase-target-invalid:
+  title: "Supabase target is invalid"
+  title_vi: "Supabase target không hợp lệ"
+  meaning_vi: "Target/origin/action không đúng selected Supabase contract."
+  causes_vi:
+    - "Provider scope của target không hợp lệ."
+  nextStep_vi: "Sửa public target declaration theo owning integration."
+  owner: op-retry
+  kind: input-invalid
+
+credential-custody-missing:
+  title: "Credential custody missing"
+  title_vi: "Thiếu selected custody member"
+  meaning_vi: "Declared encrypted custody member bắt buộc không tồn tại."
+  causes_vi:
+    - "Selected reference trỏ member chưa được chuẩn bị."
+  nextStep_vi: "Owner chuẩn bị member qua native custody; không chuyển sang ambient credential."
+  owner: owner
+  kind: verb-refusal
+
+credential-custody-scope-refused:
+  title: "Credential custody scope refused"
+  title_vi: "Custody scope bị từ chối"
+  meaning_vi: "Reference không giữ trong declared repository .starcistacks secrets boundary hoặc có link/shape bị cấm."
+  causes_vi:
+    - "Reference thoát scope, có symlink/hardlink hoặc sai member path."
+  nextStep_vi: "Sửa reference metadata trong đúng declared scope; không mở value hoặc đổi guard."
+  owner: runtime-core
+  kind: verb-refusal
+
+credential-destination-aliases-input:
+  title: "Credential destination aliases input"
+  title_vi: "Output custody trùng administrative input"
+  meaning_vi: "Generated output destination trỏ cùng member/key với một protected input credential."
+  causes_vi:
+    - "Destination aliases selected administrative/source/password/principal input."
+  nextStep_vi: "Chọn named output member riêng trước khi chấp nhận plan."
+  owner: runtime-core
+  kind: verb-refusal
+
+credential-destination-format-refused:
+  title: "Credential destination format refused"
+  title_vi: "Output custody path sai dạng"
+  meaning_vi: "Generated output destination không có supported environment/secrets member shape."
+  causes_vi:
+    - "Destination không phải named .enc member đúng contract."
+  nextStep_vi: "Sửa public destination reference theo native custody format."
+  owner: runtime-core
+  kind: verb-refusal
+
+credential-destination-key-refused:
+  title: "Credential destination key refused"
+  title_vi: "Output custody key sai scope"
+  meaning_vi: "Seal request không chứa đúng một key mà destination khai báo."
+  causes_vi:
+    - "Output map thiếu, thừa hoặc khác selected key."
+  nextStep_vi: "Sửa adapter/output binding, không sửa input credential."
+  owner: runtime-core
+  kind: verb-refusal
+
+credential-host-owner-required:
+  title: "Credential host owner required"
+  title_vi: "Thiếu native host credential owner"
+  meaning_vi: "Host connection reference được chọn nhưng callback không có native credential owner."
+  causes_vi:
+    - "Adapter chưa gắn native host-connection resolver."
+  nextStep_vi: "Wire đúng native owner trước khi prepare effects."
+  owner: runtime-core
+  kind: verb-refusal
+
+credential-host-owner-unavailable:
+  title: "Credential host owner unavailable"
+  title_vi: "Native host credential chưa sẵn sàng"
+  meaning_vi: "Native host owner không trả usable credential cho selected declared role."
+  causes_vi:
+    - "Selected host connection không có usable value."
+  nextStep_vi: "Owner chuẩn bị host connection qua native route, không đưa value cho agent."
+  owner: owner
+  kind: verb-refusal
+
+credential-member-missing:
+  title: "Credential member missing"
+  title_vi: "Thiếu key trong custody member"
+  meaning_vi: "Selected encrypted structured member không cung cấp required key/value."
+  causes_vi:
+    - "Key thiếu, rỗng hoặc không đúng scalar string contract."
+  nextStep_vi: "Owner sửa named member qua native custody, giữ value kín."
+  owner: owner
+  kind: verb-refusal
+
+credential-reference-invalid:
+  title: "Credential reference invalid"
+  title_vi: "Credential reference không hợp lệ"
+  meaning_vi: "Reference thiếu required structured key hoặc sai metadata shape."
+  causes_vi:
+    - "Credential role chưa có valid reference."
+  nextStep_vi: "Sửa public reference metadata trước khi mở custody."
+  owner: runtime-core
+  kind: verb-refusal
+
+credential-seal-failed:
+  title: "Credential seal failed"
+  title_vi: "Chưa xác minh sealed credential output"
+  meaning_vi: "Native owner không xác nhận đã seal generated value vào selected destination."
+  causes_vi:
+    - "SOPS/native storage operation thất bại."
+  nextStep_vi: "Giữ actual effect state và reconcile named destination qua native owner; không mint/replay tự động."
+  owner: runtime-core
+  kind: verb-refusal
+
+provider-operation-partial:
+  title: "Provider operation partial"
+  title_vi: "Provider operation chỉ hoàn tất một phần"
+  meaning_vi: "Adapter báo partial outcome; writeAck, publicReadback, consumerVerified và proof thực tế vẫn là các trường độc lập."
+  causes_vi:
+    - "Selected adapter chưa báo một kết quả hoàn tất theo contract."
+  nextStep_vi: "Giữ receipt/ACK và reconcile phần còn thiếu; không replay write."
+  owner: runtime-core
+  kind: check-status
+
+provider-outcome-unknown:
+  title: "Provider outcome unknown"
+  title_vi: "Chưa biết provider outcome"
+  meaning_vi: "Operation không đủ bằng chứng xác định effects đã hoàn tất hay chưa."
+  causes_vi:
+    - "Provider/process completion không rõ ràng."
+  nextStep_vi: "Giữ unknown và reconcile đúng operation; không suy ra no-effect."
+  owner: runtime-core
+  kind: check-status
+
+provider-result-verified:
+  title: "Provider result verified"
+  title_vi: "Adapter báo provider result verified"
+  meaning_vi: "Mã fallback cho verified outcome mà adapter báo; riêng mã này không chứng minh đã có proof, publicReadback hoặc consumerVerified."
+  causes_vi:
+    - "Adapter chọn verified outcome nhưng không có selected result code thuộc closed vocabulary."
+  nextStep_vi: "Đọc actual proof, writeAck, publicReadback và consumerVerified của đúng operation; consumer/full goal proof theo contract riêng."
+  owner: runtime-core
+  kind: check-status
+
+provider-write-applied:
+  title: "Provider write applied"
+  title_vi: "Provider write đã được áp dụng"
+  meaning_vi: "Adapter trả applied outcome; ACK/readback/consumer flags vẫn được giữ riêng."
+  causes_vi:
+    - "Selected write flow hoàn tất theo adapter."
+  nextStep_vi: "Giữ scoped result, kiểm proof/consumer còn yêu cầu riêng."
+  owner: runtime-core
+  kind: check-status
+
+provision-accept-state-refused:
+  title: "Provision accept state refused"
+  title_vi: "Operation state chưa nhận acceptance"
+  meaning_vi: "Journal không cho accept operation từ state hiện tại."
+  causes_vi:
+    - "Operation state không nằm trong accepted transition contract."
+  nextStep_vi: "Đọc recorded state và chọn supported recovery/control action; không sửa journal."
+  owner: runtime-core
+  kind: verb-refusal
+
+provision-acceptance-required:
+  title: "Provision acceptance required"
+  title_vi: "Cần exact operation acceptance"
+  meaning_vi: "Operation chưa có acceptance áp dụng cho selected frozen plan."
+  causes_vi:
+    - "Owner hoặc filed goal grant chưa chấp nhận plan hiện tại."
+  nextStep_vi: "Owner dùng native checkpoint cho exact public plan; không giả acceptance."
+  owner: owner
+  kind: verb-refusal
+
+provision-action-policy-mismatch:
+  title: "Provision action policy mismatch"
+  title_vi: "Action không khớp operation policy"
+  meaning_vi: "Selected adapter action khác actual CLI operation policy."
+  causes_vi:
+    - "Wiring hoặc declaration chọn sai action."
+  nextStep_vi: "Sửa owning contract/adapter binding trước khi prepare effects."
+  owner: runtime-core
+  kind: verb-refusal
+
+provision-adapter-result-invalid:
+  title: "Provision adapter result invalid"
+  title_vi: "Adapter result không hợp lệ"
+  meaning_vi: "Adapter trả outcome ngoài closed result contract hoặc result shape không hợp lệ."
+  causes_vi:
+    - "Adapter chưa trả supported outcome."
+  nextStep_vi: "Sửa adapter result shape và kiểm lại scoped behavior, giữ effect history."
+  owner: runtime-core
+  kind: runtime-fault
+
+provision-checkpoint-invalid:
+  title: "Provision checkpoint invalid"
+  title_vi: "Operation checkpoint không hợp lệ"
+  meaning_vi: "Checkpoint metadata không đáp ứng closed public proof contract."
+  causes_vi:
+    - "Adapter ghi checkpoint sai shape hoặc chứa dữ liệu bị cấm."
+  nextStep_vi: "Sửa adapter checkpoint; không ghi private/provider payload vào evidence."
+  owner: runtime-core
+  kind: verb-refusal
+
+provision-cleanup-recovery-required:
+  title: "Provision cleanup recovery required"
+  title_vi: "Operation cleanup cần recovery"
+  meaning_vi: "Native cleanup chưa được xác minh nên operation giữ recovery boundary."
+  causes_vi:
+    - "Owned cleanup hoặc lock release chưa hoàn tất rõ ràng."
+  nextStep_vi: "Khôi phục cleanup qua native owner trước khi tiếp tục; không sửa receipts."
+  owner: runtime-core
+  kind: verb-refusal
+
+provision-control-unavailable:
+  title: "Provision control unavailable"
+  title_vi: "Không thực hiện được operation control"
+  meaning_vi: "Native control entry không đọc hoặc cập nhật được operation theo contract."
+  causes_vi:
+    - "Control/journal prerequisites không sẵn sàng."
+  nextStep_vi: "Khôi phục native control prerequisites rồi đọc lại state; không sửa DB tay."
+  owner: runtime-core
+  kind: verb-refusal
+
+provision-credential-role-required:
+  title: "Provision credential role required"
+  title_vi: "Thiếu declared credential role"
+  meaning_vi: "Policy yêu cầu credential role nonoptional nhưng spec chưa cung cấp."
+  causes_vi:
+    - "Credential reference thiếu hoặc được đánh optional."
+  nextStep_vi: "Sửa public role declaration trước plan acceptance."
+  owner: runtime-core
+  kind: verb-refusal
+
+provision-destination-required:
+  title: "Provision destination required"
+  title_vi: "Thiếu declared output destination"
+  meaning_vi: "Operation policy yêu cầu sealed output destination nhưng spec chưa có."
+  causes_vi:
+    - "Adapter/target thiếu destination reference."
+  nextStep_vi: "Khai báo named output destination đúng custody scope."
+  owner: runtime-core
+  kind: verb-refusal
+
+provision-executor-stale:
+  title: "Provision executor stale"
+  title_vi: "Operation executor đã stale"
+  meaning_vi: "Journal không chấp nhận write từ executor/generation hiện tại."
+  causes_vi:
+    - "Executor ownership hoặc generation đã thay đổi."
+  nextStep_vi: "Đọc actual state và phục hồi qua native owner, không tiếp tục bằng executor cũ."
+  owner: runtime-core
+  kind: verb-refusal
+
+provision-filed-contract-unverified:
+  title: "Provision filed contract unverified"
+  title_vi: "Chưa xác minh filed operation contract"
+  meaning_vi: "Native admission chưa chứng minh filed contract đúng current attempt và action scope."
+  causes_vi:
+    - "Filed contract thiếu, sai identity hoặc không đáp ứng current grant."
+  nextStep_vi: "Khôi phục exact admitted contract/caller context; không thay bằng role flag."
+  owner: runtime-core
+  kind: verb-refusal
+
+provision-goal-grant-missing:
+  title: "Provision goal grant missing"
+  title_vi: "Thiếu accepted goal grant"
+  meaning_vi: "Current accepted goal không có grant mà operation yêu cầu."
+  causes_vi:
+    - "Grant cho selected action/target chưa được ghi nhận."
+  nextStep_vi: "Owner xem exact public grant request qua native goal authority."
+  owner: owner
+  kind: verb-refusal
+
+provision-goal-grant-refused:
+  title: "Provision goal grant refused"
+  title_vi: "Goal grant không cho phép operation"
+  meaning_vi: "Selected goal grant không bao phủ requested action/target/custody scope."
+  causes_vi:
+    - "Grant scope không khớp operation."
+  nextStep_vi: "Giữ refused scope, đưa public scope change về owner nếu thực sự cần."
+  owner: owner
+  kind: verb-refusal
+
+provision-goal-grant-stale:
+  title: "Provision goal grant stale"
+  title_vi: "Goal grant đã stale"
+  meaning_vi: "Grant không còn gắn current accepted goal revision/input."
+  causes_vi:
+    - "Goal hoặc grant identity đã thay đổi."
+  nextStep_vi: "Owner dùng native revision checkpoint; không reuse grant cũ."
+  owner: owner
+  kind: verb-refusal
+
+provision-goal-grant-unaccepted:
+  title: "Provision goal grant unaccepted"
+  title_vi: "Goal grant chưa được chấp nhận"
+  meaning_vi: "Grant chưa có actual accepted owner authority cho current goal."
+  causes_vi:
+    - "Goal/grant chưa có acceptance hợp lệ."
+  nextStep_vi: "Owner dùng native goal checkpoint, không suy ra approval từ plan hoặc tool pass."
+  owner: owner
+  kind: verb-refusal
+
+provision-goal-grant-unsupported:
+  title: "Provision goal grant unsupported"
+  title_vi: "Goal grant không được hỗ trợ"
+  meaning_vi: "Grant request không đúng supported capability/shape của native authority."
+  causes_vi:
+    - "Action/grant metadata ngoài contract."
+  nextStep_vi: "Sửa owning grant declaration trước khi yêu cầu acceptance."
+  owner: runtime-core
+  kind: verb-refusal
+
+provision-journal-recovery-required:
+  title: "Provision journal recovery required"
+  title_vi: "Provision journal cần recovery"
+  meaning_vi: "Journal không đủ trạng thái nhất quán để tiếp tục operation an toàn."
+  causes_vi:
+    - "Previous operation persistence hoặc recovery chưa hoàn tất."
+  nextStep_vi: "Đọc native recovery state, giữ effects unknown nếu chưa rõ; không sửa journal tay."
+  owner: runtime-core
+  kind: verb-refusal
+
+provision-native-attempt-stale:
+  title: "Provision native attempt stale"
+  title_vi: "Native attempt đã stale"
+  meaning_vi: "Caller attempt không còn current incarnation được admitted."
+  causes_vi:
+    - "Attempt/dispatch hiện tại khác binding đã ghi."
+  nextStep_vi: "Dùng current native admitted attempt; không reuse stale caller."
+  owner: runtime-core
+  kind: verb-refusal
+
+provision-native-attempt-unverified:
+  title: "Provision native attempt unverified"
+  title_vi: "Chưa xác minh native attempt"
+  meaning_vi: "Native admission không chứng minh exact current attempt identity."
+  causes_vi:
+    - "Attempt/dispatch/workflow metadata thiếu hoặc không khớp."
+  nextStep_vi: "Khôi phục native caller binding trước operation."
+  owner: runtime-core
+  kind: verb-refusal
+
+provision-operation-id-invalid:
+  title: "Provision operation ID invalid"
+  title_vi: "Operation ID không hợp lệ"
+  meaning_vi: "Operation selector không đúng required identity format."
+  causes_vi:
+    - "ID thiếu hoặc sai dạng."
+  nextStep_vi: "Dùng operation ID do native prepare/status trả về."
+  owner: runtime-core
+  kind: verb-refusal
+
+provision-operation-intent-conflict:
+  title: "Provision operation intent conflict"
+  title_vi: "Operation ID xung đột intent"
+  meaning_vi: "Cùng operation identity bị dùng cho frozen intent khác."
+  causes_vi:
+    - "Action/target/plan không khớp recorded operation."
+  nextStep_vi: "Đọc original intent; chuẩn bị operation riêng cho plan khác, không overwrite history."
+  owner: runtime-core
+  kind: verb-refusal
+
+provision-operation-unknown:
+  title: "Provision operation unknown"
+  title_vi: "Không tìm thấy operation"
+  meaning_vi: "Native journal không có requested operation identity."
+  causes_vi:
+    - "ID sai hoặc không thuộc selected ledger/target."
+  nextStep_vi: "Kiểm public operation selector/context bằng native status."
+  owner: runtime-core
+  kind: verb-refusal
+
+provision-plan-digest-mismatch:
+  title: "Provision plan digest mismatch"
+  title_vi: "Plan digest không khớp"
+  meaning_vi: "Digest owner/control cung cấp khác frozen operation plan."
+  causes_vi:
+    - "Acceptance selector dùng stale hoặc sai digest."
+  nextStep_vi: "Đọc public plan hiện tại và chỉ chấp nhận exact full digest."
+  owner: owner
+  kind: verb-refusal
+
+provision-plan-input-drift:
+  title: "Provision plan input drift"
+  title_vi: "Frozen plan input đã đổi"
+  meaning_vi: "Current declaration/source input khác identity đóng trong operation plan."
+  causes_vi:
+    - "Input đổi sau prepare hoặc trước control/effect."
+  nextStep_vi: "Chuẩn bị plan mới trên current reviewed inputs; không refresh proof bằng assertion."
+  owner: runtime-core
+  kind: verb-refusal
+
+provision-proof-invalid:
+  title: "Provision proof invalid"
+  title_vi: "Operation proof không hợp lệ"
+  meaning_vi: "Proof metadata không qua closed public evidence validation."
+  causes_vi:
+    - "Adapter cung cấp proof sai shape hoặc private data."
+  nextStep_vi: "Sửa proof producer theo contract, không hand-edit retained evidence."
+  owner: runtime-core
+  kind: verb-refusal
+
+provision-reconcile-required:
+  title: "Provision reconcile required"
+  title_vi: "Operation cần reconcile"
+  meaning_vi: "State unknown/partial không cho replay write như một execution mới."
+  causes_vi:
+    - "Effects trước chưa được xác minh đầy đủ."
+  nextStep_vi: "Chạy supported native reconciliation cho đúng operation, giữ ACK và history."
+  owner: runtime-core
+  kind: verb-refusal
+
+provision-reconcile-unsupported:
+  title: "Provision reconcile unsupported"
+  title_vi: "Operation chưa có reconcile hỗ trợ"
+  meaning_vi: "Requested recovery cần reconcile nhưng adapter không cung cấp path đó."
+  causes_vi:
+    - "Adapter thiếu reconciliation callback."
+  nextStep_vi: "Sửa owning adapter recovery contract trước khi tiếp tục."
+  owner: runtime-core
+  kind: verb-refusal
+
+provision-state-invalid:
+  title: "Provision state invalid"
+  title_vi: "Provision state transition không hợp lệ"
+  meaning_vi: "Requested journal state không thuộc closed transition contract."
+  causes_vi:
+    - "Caller hoặc adapter yêu cầu transition không hợp lệ."
+  nextStep_vi: "Sửa native state flow, không sửa DB hoặc stamp pass tay."
+  owner: runtime-core
+  kind: runtime-fault
+
+provision-target-action-refused:
+  title: "Provision target action refused"
+  title_vi: "Target không cho phép action"
+  meaning_vi: "Selected declaration không bao phủ requested operation action."
+  causes_vi:
+    - "Action ngoài target.actions đã khai báo."
+  nextStep_vi: "Giữ scope hiện tại; sửa public declaration trong authority được phép nếu cần."
+  owner: runtime-core
+  kind: verb-refusal
+
+provision-target-busy:
+  title: "Provision target busy"
+  title_vi: "Provision target đang được giữ"
+  meaning_vi: "Một native operation khác đang giữ target lock."
+  causes_vi:
+    - "Target đang có active executor."
+  nextStep_vi: "Chờ native holder hoàn tất và đọc lại state, không chiếm lock hay launch trùng."
+  owner: runtime-core
+  kind: verb-refusal
+
+provision-target-lock-lost:
+  title: "Provision target lock lost"
+  title_vi: "Provision target lock đã mất"
+  meaning_vi: "Current executor không còn live custody của target lock."
+  causes_vi:
+    - "Holder identity hoặc lock generation đã đổi."
+  nextStep_vi: "Dừng effects, giữ unknown nếu cần và phục hồi qua native owner."
+  owner: runtime-core
+  kind: verb-refusal
+
+provision-target-reconciliation-held:
+  title: "Provision target reconciliation held"
+  title_vi: "Target đang held để reconcile"
+  meaning_vi: "Một operation unknown/partial giữ target khỏi write intent mới."
+  causes_vi:
+    - "Previous effects chưa có conclusive reconciliation."
+  nextStep_vi: "Reconcile original operation trước khi tạo write khác cho target."
+  owner: runtime-core
+  kind: verb-refusal
+
+credential-native-context-unverified:
+  title: "Credential native context unverified"
+  title_vi: "Ngữ cảnh native của credential chưa xác minh"
+  meaning_vi: "Bridge custody không xác minh được schema, đường dẫn hoặc terminal thực của ngữ cảnh native trước khi truyền credential cho child."
+  causes_vi:
+    - "Ngữ cảnh native thiếu hoặc không khớp với runtime/terminal đang được admission."
+  nextStep_vi: "Khôi phục binding native hợp lệ qua owner CLI rồi chạy preflight lại; không tự đặt identity hoặc đọc credential để lách kiểm tra."
+  owner: runtime-core
+  kind: input-invalid
+
+supabase-action-invalid:
+  title: "Supabase action invalid"
+  title_vi: "Supabase action không hợp lệ"
+  meaning_vi: "Action không thuộc supported Supabase cloud action contract."
+  causes_vi:
+    - "Selected action không có handler hợp lệ."
+  nextStep_vi: "Sửa action công khai trước khi prepare plan."
+  owner: op-retry
+  kind: input-invalid
+
+supabase-action-policy-unavailable:
+  title: "Supabase action policy unavailable"
+  title_vi: "Thiếu Supabase action policy"
+  meaning_vi: "Selected action không có policy mà gate cần để đóng authority."
+  causes_vi:
+    - "CLI policy/action binding chưa sẵn sàng."
+  nextStep_vi: "Sửa owning policy binding trước effects."
+  owner: runtime-core
+  kind: verb-refusal
+
+supabase-api-key-captured:
+  title: "Supabase API key captured"
+  title_vi: "Đã capture Supabase API key vào custody"
+  meaning_vi: "Selected provider key đã được đọc riêng và selected custody write có ACK; chưa consumer verification."
+  causes_vi:
+    - "Provider key identity và native seal ACK đã được kiểm."
+  nextStep_vi: "Giữ public receipt/reference; xác minh consumer riêng, không in key."
+  owner: runtime-core
+  kind: check-status
+
+supabase-api-key-custody-failed:
+  title: "Supabase API key custody failed"
+  title_vi: "Supabase API key custody chưa được xác nhận"
+  meaning_vi: "Local seal đã được thử nhưng không trả ok=true; provider key đã được đọc riêng."
+  causes_vi:
+    - "Native seal result không xác nhận success."
+  nextStep_vi: "Giữ partial state và reconcile selected sink; không blind-repeat seal/capture."
+  owner: runtime-core
+  kind: check-status
+
+supabase-api-key-custody-matches:
+  title: "Supabase API key custody matches"
+  title_vi: "Supabase API key khớp selected custody"
+  meaning_vi: "Reconcile privately so sánh provider value với current selected sink và thấy khớp, không reseal."
+  causes_vi:
+    - "Private equality được native owner xác minh."
+  nextStep_vi: "Giữ scoped equality receipt; consumer delivery vẫn kiểm riêng."
+  owner: runtime-core
+  kind: check-status
+
+supabase-api-key-custody-unknown:
+  title: "Supabase API key custody unknown"
+  title_vi: "Chưa biết Supabase API key custody outcome"
+  meaning_vi: "Local seal throw sau khi đã chọn provider key; custody write có thể đã xảy ra."
+  causes_vi:
+    - "Native seal không có conclusive completion."
+  nextStep_vi: "Giữ partial và reconcile named sink, không capture/seal lại tự động."
+  owner: runtime-core
+  kind: check-status
+
+supabase-api-key-custody-unresolved:
+  title: "Supabase API key custody unresolved"
+  title_vi: "Chưa reconcile được Supabase API key custody"
+  meaning_vi: "Private provider/sink comparison thiếu, mismatch hoặc unavailable."
+  causes_vi:
+    - "Selected sink không có confirmed private equality."
+  nextStep_vi: "Giữ unknown và reconcile qua native custody owner, không reseal tự động."
+  owner: runtime-core
+  kind: check-status
+
+supabase-api-key-list-invalid:
+  title: "Supabase API key list invalid"
+  title_vi: "Danh sách Supabase API key không hợp lệ"
+  meaning_vi: "Provider key-list response không có supported array shape."
+  causes_vi:
+    - "API trả shape không đáp ứng key selection contract."
+  nextStep_vi: "Kiểm provider capability/permissions bằng native owner trước capture."
+  owner: runtime-core
+  kind: check-status
+
+supabase-auth-action-invalid:
+  title: "Supabase auth action invalid"
+  title_vi: "Supabase Auth action không hợp lệ"
+  meaning_vi: "Auth action không đúng supported create/ensure contract."
+  causes_vi:
+    - "Action selector ngoài closed Auth surface."
+  nextStep_vi: "Sửa public Auth action."
+  owner: op-retry
+  kind: input-invalid
+
+supabase-auth-request-failed:
+  title: "Supabase auth request failed"
+  title_vi: "Supabase Auth request thất bại"
+  meaning_vi: "Auth adapter không nhận successful request result; prior effect/ACK giữ riêng."
+  causes_vi:
+    - "Provider request lỗi hoặc từ chối."
+  nextStep_vi: "Đọc recorded outcome và reconcile nếu effects chưa rõ, không suy ra no-effect."
+  owner: runtime-core
+  kind: check-status
+
+supabase-auth-target-invalid:
+  title: "Supabase auth target invalid"
+  title_vi: "Supabase Auth target không hợp lệ"
+  meaning_vi: "Selected Auth target/resource không đáp ứng closed declaration contract."
+  causes_vi:
+    - "Public target hoặc origin/resource shape sai."
+  nextStep_vi: "Sửa public Auth target trước prepare."
+  owner: op-retry
+  kind: input-invalid
+
+supabase-auth-target-unavailable:
+  title: "Supabase auth target unavailable"
+  title_vi: "Supabase Auth target chưa sẵn sàng"
+  meaning_vi: "Native declaration resolver chưa chọn được required Auth target."
+  causes_vi:
+    - "Target thiếu hoặc không resolve được."
+  nextStep_vi: "Khôi phục declared target context, không fallback ambient server."
+  owner: op-retry
+  kind: verb-refusal
+
+supabase-config-applied-consumer-unverified:
+  title: "Supabase config applied consumer unverified"
+  title_vi: "Supabase config có ACK và public readback"
+  meaning_vi: "PATCH có ACK và selected public config khớp; masked password/client-secret và consumer chưa verified."
+  causes_vi:
+    - "Provider ACK và public fields readback khớp."
+  nextStep_vi: "Giữ scoped proof; kiểm private-value binding/consumer riêng."
+  owner: runtime-core
+  kind: check-status
+
+supabase-config-readback-mismatch:
+  title: "Supabase config readback mismatch"
+  title_vi: "Supabase config readback chưa khớp"
+  meaning_vi: "Selected public config không khớp expected values; prior write ACK/outcome được giữ."
+  causes_vi:
+    - "Readback khác selected config hoặc chưa ổn định."
+  nextStep_vi: "Giữ uncertainty/partial theo receipt và reconcile, không replay PATCH tự động."
+  owner: runtime-core
+  kind: check-status
+
+supabase-config-reconcile-unresolved:
+  title: "Supabase config reconcile unresolved"
+  title_vi: "Chưa reconcile được Supabase config"
+  meaning_vi: "Reconcile không có confirmed selected config/readback và không replay write."
+  causes_vi:
+    - "Public readback chưa đáp ứng expected config."
+  nextStep_vi: "Giữ unknown, reconcile đúng operation bằng supported proof."
+  owner: runtime-core
+  kind: check-status
+
+supabase-created-user-unresolved:
+  title: "Supabase created user unresolved"
+  title_vi: "Chưa resolve được Supabase user vừa tạo"
+  meaning_vi: "Create response không cho identity đủ rõ để tiếp tục verified readback."
+  causes_vi:
+    - "Provider có thể đã tạo user nhưng response identity chưa hợp lệ."
+  nextStep_vi: "Giữ write uncertainty và reconcile exact declared user; không create lại."
+  owner: runtime-core
+  kind: check-status
+
+supabase-credential-unavailable:
+  title: "Supabase credential unavailable"
+  title_vi: "Thiếu usable Supabase credential"
+  meaning_vi: "Selected private role không có usable credential cho action."
+  causes_vi:
+    - "Required declared custody role chưa cung cấp value."
+  nextStep_vi: "Owner chuẩn bị credential qua native custody; không gửi value cho agent."
+  owner: owner
+  kind: verb-refusal
+
+supabase-declared-consumer-unavailable:
+  title: "Supabase declared consumer unavailable"
+  title_vi: "Declared Supabase consumer không sẵn sàng"
+  meaning_vi: "Target chưa có consumer binding cần để mô tả/cấp selected config."
+  causes_vi:
+    - "Consumer reference thiếu hoặc không resolve được."
+  nextStep_vi: "Sửa public consumer declaration theo owning contract trước effects."
+  owner: op-retry
+  kind: input-invalid
+
+supabase-edge-secret-present-consumer-unverified:
+  title: "Supabase edge secret present consumer unverified"
+  title_vi: "Đã quan sát tên Supabase edge secret"
+  meaning_vi: "Normal apply có POST ACK và unique secret name được liệt kê; reconcile vẫn unknown chỉ từ name, không có value equality."
+  causes_vi:
+    - "Selected name hiện diện trong provider metadata."
+  nextStep_vi: "Giữ actual outcome/ACK flags; kiểm consumer riêng, không coi name là private-value proof."
+  owner: runtime-core
+  kind: check-status
+
+supabase-edge-secret-readback-mismatch:
+  title: "Supabase edge secret readback mismatch"
+  title_vi: "Supabase edge-secret metadata chưa khớp"
+  meaning_vi: "Secret name readback không khớp expected unique name; write ACK có thể đã được ghi."
+  causes_vi:
+    - "Provider metadata thiếu hoặc không duy nhất."
+  nextStep_vi: "Giữ partial/unknown theo receipt và reconcile names, không replay secret write."
+  owner: runtime-core
+  kind: check-status
+
+supabase-new-user-password-required:
+  title: "Supabase new user password required"
+  title_vi: "Cần password custody cho Supabase user mới"
+  meaning_vi: "Selected create-user flow chưa có required private password role."
+  causes_vi:
+    - "New user password chưa được declared custody cung cấp."
+  nextStep_vi: "Owner chuẩn bị password qua native custody; không đặt public input hoặc output."
+  owner: owner
+  kind: verb-refusal
+
+supabase-project-create-unresolved:
+  title: "Supabase project create unresolved"
+  title_vi: "Chưa reconcile được Supabase project create"
+  meaning_vi: "Reconcile chưa quan sát confirmed project tương ứng và không tạo lại."
+  causes_vi:
+    - "Project expected chưa có conclusive identity/readback."
+  nextStep_vi: "Giữ unknown và reconcile project selection; không replay create."
+  owner: runtime-core
+  kind: check-status
+
+supabase-project-created-identity-unresolved:
+  title: "Supabase project created identity unresolved"
+  title_vi: "Supabase project create có identity chưa rõ"
+  meaning_vi: "Create đã ACK nhưng returned project identity không khớp required configuration."
+  causes_vi:
+    - "Provider create response chưa có matching project identity."
+  nextStep_vi: "Giữ partial và reconcile declared project, không tạo project mới."
+  owner: runtime-core
+  kind: check-status
+
+supabase-project-created-readback:
+  title: "Supabase project created readback"
+  title_vi: "Supabase project mới có exact readback"
+  meaning_vi: "Create ACK và later readback khớp expected config cùng project identity."
+  causes_vi:
+    - "Provider ACK và exact project readback đã có."
+  nextStep_vi: "Giữ scoped proof; credentials/consumer behavior vẫn kiểm riêng."
+  owner: runtime-core
+  kind: check-status
+
+supabase-project-identity-ambiguous:
+  title: "Supabase project identity ambiguous"
+  title_vi: "Supabase project identity không duy nhất"
+  meaning_vi: "Project listing có nhiều candidate khớp selection."
+  causes_vi:
+    - "Declared identity selector chưa phân biệt duy nhất project."
+  nextStep_vi: "Sửa public selector hoặc xử lý conflict qua owner, không tự chọn candidate."
+  owner: op-retry
+  kind: verb-refusal
+
+supabase-project-identity-mismatch:
+  title: "Supabase project identity mismatch"
+  title_vi: "Supabase project identity không khớp"
+  meaning_vi: "Observed project không khớp declared identity/configuration."
+  causes_vi:
+    - "Existing project khác expected target."
+  nextStep_vi: "Giữ target và sửa public binding/conflict trước write."
+  owner: op-retry
+  kind: verb-refusal
+
+supabase-project-list-invalid:
+  title: "Supabase project list invalid"
+  title_vi: "Supabase project list không hợp lệ"
+  meaning_vi: "Provider project listing không có supported identity/list shape."
+  causes_vi:
+    - "Response shape không đáp ứng bounded project selection."
+  nextStep_vi: "Kiểm actual provider contract/permissions bằng native owner."
+  owner: runtime-core
+  kind: check-status
+
+supabase-project-present:
+  title: "Supabase project present"
+  title_vi: "Đã quan sát matching Supabase project"
+  meaning_vi: "Existing project khớp declared identity/config, không cần tạo lại."
+  causes_vi:
+    - "Public project readback khớp."
+  nextStep_vi: "Giữ readback receipt; consumer proof vẫn riêng."
+  owner: runtime-core
+  kind: check-status
+
+supabase-project-readback-mismatch:
+  title: "Supabase project readback mismatch"
+  title_vi: "Supabase project readback không khớp"
+  meaning_vi: "Readback sau create không khớp exact project identity/config; write ACK giữ riêng."
+  causes_vi:
+    - "Observed project hoặc config khác expected."
+  nextStep_vi: "Giữ partial và reconcile project, không replay create."
+  owner: runtime-core
+  kind: check-status
+
+supabase-public-config-matches-secret-unverified:
+  title: "Supabase public config matches secret unverified"
+  title_vi: "Public Supabase config khớp nhưng secret chưa verified"
+  meaning_vi: "Reconcile thấy public fields khớp nhưng masked private fields không chứng minh intended secret accepted."
+  causes_vi:
+    - "Provider che password/client-secret values."
+  nextStep_vi: "Giữ unknown và kiểm supported private binding/consumer proof riêng."
+  owner: runtime-core
+  kind: check-status
+
+supabase-readback-unavailable:
+  title: "Supabase readback unavailable"
+  title_vi: "Supabase readback không sẵn sàng"
+  meaning_vi: "Adapter không lấy được required provider readback; prior write ACK được giữ riêng."
+  causes_vi:
+    - "Readback request thất bại hoặc unsupported shape."
+  nextStep_vi: "Reconcile actual operation state, không lặp write vì readback thiếu."
+  owner: runtime-core
+  kind: check-status
+
+supabase-request-failed:
+  title: "Supabase request failed"
+  title_vi: "Supabase request thất bại"
+  meaning_vi: "Cloud adapter không có successful provider request result; actual effect classification giữ riêng."
+  causes_vi:
+    - "Provider trả lỗi hoặc transport không hoàn tất."
+  nextStep_vi: "Dùng recorded outcome/ACK để recovery; không suy ra effects chưa xảy ra."
+  owner: runtime-core
+  kind: check-status
+
+supabase-selected-api-key-unavailable:
+  title: "Supabase selected API key unavailable"
+  title_vi: "Không có selected Supabase API key hợp lệ"
+  meaning_vi: "Key list không có đúng một selected ID với supported key material."
+  causes_vi:
+    - "ID selection thiếu/mơ hồ hoặc key format không được hỗ trợ."
+  nextStep_vi: "Sửa selected key identity/contract qua native owner, không đoán value."
+  owner: op-retry
+  kind: verb-refusal
+
+supabase-target-unavailable:
+  title: "Supabase target unavailable"
+  title_vi: "Supabase target không sẵn sàng"
+  meaning_vi: "Resolver chưa có required declared Supabase target."
+  causes_vi:
+    - "Target chưa được khai báo hoặc không resolve được."
+  nextStep_vi: "Sửa public target context; không dùng ambient target."
+  owner: op-retry
+  kind: verb-refusal
+
+supabase-user-confirmation-mismatch:
+  title: "Supabase user confirmation mismatch"
+  title_vi: "Supabase user confirmation không khớp"
+  meaning_vi: "Existing user không đáp ứng selected identity/confirmation contract."
+  causes_vi:
+    - "User readback khác declared confirmation state."
+  nextStep_vi: "Giữ existing account và xử lý declaration/conflict qua owner trước write."
+  owner: op-retry
+  kind: verb-refusal
+
+supabase-user-create-unknown:
+  title: "Supabase user create unknown"
+  title_vi: "Chưa biết Supabase user create outcome"
+  meaning_vi: "Create request không có conclusive acknowledgement và có thể đã tạo account."
+  causes_vi:
+    - "Transport/provider completion không rõ."
+  nextStep_vi: "Giữ unknown và reconcile exact account, không replay create."
+  owner: runtime-core
+  kind: check-status
+
+supabase-user-create-unresolved:
+  title: "Supabase user create unresolved"
+  title_vi: "Chưa reconcile được Supabase user create"
+  meaning_vi: "Reconcile chưa quan sát required user và không tạo lại."
+  causes_vi:
+    - "Account expected chưa có conclusive readback."
+  nextStep_vi: "Giữ unknown và tiếp tục supported reconciliation."
+  owner: runtime-core
+  kind: check-status
+
+supabase-user-created-login-unverified:
+  title: "Supabase user created login unverified"
+  title_vi: "Supabase user đã tạo, login chưa verified"
+  meaning_vi: "Create ACK và exact account/confirmation readback đã có; chưa sign-in hoặc app memberships proof."
+  causes_vi:
+    - "Provider account readback khớp sau create."
+  nextStep_vi: "Giữ account proof; kiểm login/domain memberships riêng, không claim consumer delivery."
+  owner: runtime-core
+  kind: check-status
+
+supabase-user-identity-ambiguous:
+  title: "Supabase user identity ambiguous"
+  title_vi: "Supabase user identity không duy nhất"
+  meaning_vi: "Bounded user list có nhiều identity khớp declared selector."
+  causes_vi:
+    - "Provider có duplicate matching candidate."
+  nextStep_vi: "Giữ ambiguity và đưa identity conflict về owner; không tự chọn."
+  owner: op-retry
+  kind: verb-refusal
+
+supabase-user-list-incomplete:
+  title: "Supabase user list incomplete"
+  title_vi: "Supabase user listing chưa đầy đủ"
+  meaning_vi: "Bounded pagination chưa chứng minh đã liệt kê đủ để chọn account an toàn."
+  causes_vi:
+    - "Provider paging chưa có conclusive completion trong bound."
+  nextStep_vi: "Giữ selection held, kiểm paging/declared target trước create."
+  owner: runtime-core
+  kind: check-status
+
+supabase-user-list-invalid:
+  title: "Supabase user list invalid"
+  title_vi: "Supabase user list không hợp lệ"
+  meaning_vi: "User list response không đúng supported array/pagination shape."
+  causes_vi:
+    - "Provider trả malformed hoặc unsupported listing."
+  nextStep_vi: "Kiểm provider API contract qua native owner trước user write."
+  owner: runtime-core
+  kind: check-status
+
+supabase-user-present:
+  title: "Supabase user present"
+  title_vi: "Đã quan sát matching Supabase user"
+  meaning_vi: "Existing user khớp declared account/confirmation; không có new create ACK."
+  causes_vi:
+    - "Public account readback khớp selected contract."
+  nextStep_vi: "Giữ account proof; chưa sign-in hoặc app-membership proof."
+  owner: runtime-core
+  kind: check-status
+
+supabase-user-readback-mismatch:
+  title: "Supabase user readback mismatch"
+  title_vi: "Supabase user readback không khớp"
+  meaning_vi: "Readback sau create không khớp exact returned account/confirmation; ACK giữ riêng."
+  causes_vi:
+    - "Observed user identity/confirmation khác expected."
+  nextStep_vi: "Giữ partial và reconcile account, không replay create."
+  owner: runtime-core
+  kind: check-status
+
+supabase-user-readback-unavailable:
+  title: "Supabase user readback unavailable"
+  title_vi: "Supabase user readback chưa sẵn sàng"
+  meaning_vi: "Required user readback không thành công; prior effect state vẫn được giữ."
+  causes_vi:
+    - "Provider readback lỗi hoặc không có supported result."
+  nextStep_vi: "Reconcile actual account state trước mọi write tiếp theo."
+  owner: runtime-core
+  kind: check-status
+
+supabase-write-unknown:
+  title: "Supabase write unknown"
+  title_vi: "Chưa biết Supabase write outcome"
+  meaning_vi: "Write request có thể đã đến provider nhưng không có conclusive result."
+  causes_vi:
+    - "Transport timeout/error sau write intent."
+  nextStep_vi: "Giữ unknown và reconcile đúng operation; không replay tự động."
+  owner: runtime-core
+  kind: check-status
+
+sonar-action-unsupported:
+  title: "Sonar action unsupported"
+  title_vi: "Sonar action không được hỗ trợ"
+  meaning_vi: "Selected action không thuộc supported server/provider contract."
+  causes_vi:
+    - "Action hoặc capability chưa được provider hỗ trợ."
+  nextStep_vi: "Sửa owning integration/action declaration trước effects."
+  owner: op-retry
+  kind: verb-refusal
+
+sonar-analysis-not-verified:
+  title: "Sonar analysis not verified"
+  title_vi: "Sonar analysis chưa được xác minh"
+  meaning_vi: "Applicable analysis/readback chưa đáp ứng required quality proof."
+  causes_vi:
+    - "Analysis hoặc quality evidence chưa đạt selected contract."
+  nextStep_vi: "Giữ non-pass và thu exact analysis/QG/issues/coverage proof trước completion."
+  owner: runtime-core
+  kind: check-status
+
+sonar-analysis-readback-unreconciled:
+  title: "Sonar analysis readback unreconciled"
+  title_vi: "Chưa reconcile được Sonar analysis readback"
+  meaning_vi: "Prior scan/effect chưa có conclusive matching analysis readback."
+  causes_vi:
+    - "CE/task hoặc analysis evidence chưa đủ rõ."
+  nextStep_vi: "Reconcile exact existing task/revision, không scan lại tự động."
+  owner: runtime-core
+  kind: check-status
+
+sonar-analysis-revision-mismatch:
+  title: "Sonar analysis revision mismatch"
+  title_vi: "Sonar analysis revision không khớp"
+  meaning_vi: "Observed analysis revision khác requested source revision."
+  causes_vi:
+    - "Provider analysis không thuộc exact selected SHA."
+  nextStep_vi: "Thu proof cho đúng revision; không gắn analysis khác làm pass."
+  owner: runtime-core
+  kind: check-status
+
+sonar-analysis-revision-required:
+  title: "Sonar analysis revision required"
+  title_vi: "Cần exact Sonar source revision"
+  meaning_vi: "Analysis action chưa có required revision identity hợp lệ."
+  causes_vi:
+    - "Revision thiếu hoặc không đúng requested contract."
+  nextStep_vi: "Khai báo exact reviewed source SHA trước operation."
+  owner: op-retry
+  kind: input-invalid
+
+sonar-analysis-source-mismatch:
+  title: "Sonar analysis source mismatch"
+  title_vi: "Sonar source không khớp revision"
+  meaning_vi: "Local source identity không khớp selected analysis revision."
+  causes_vi:
+    - "HEAD/tree thay đổi so với requested source input."
+  nextStep_vi: "Đóng lại source và prepare plan mới trước scanner effects."
+  owner: op-retry
+  kind: verb-refusal
+
+sonar-browse-incomplete:
+  title: "Sonar browse incomplete"
+  title_vi: "Sonar Browse proof chưa đầy đủ"
+  meaning_vi: "Browse response thiếu required analysis/quality/issue/metric fields."
+  causes_vi:
+    - "Required provider data missing, không phải giá trị0."
+  nextStep_vi: "Giữ non-pass và thu đủ required fields qua supported native Browse."
+  owner: runtime-core
+  kind: check-status
+
+sonar-browse-read:
+  title: "Sonar browse read"
+  title_vi: "Đã đọc scoped Sonar Browse proof"
+  meaning_vi: "Selected Browse credential đã được dùng và scoped public readback được xác minh."
+  causes_vi:
+    - "Required Browse operation hoàn tất."
+  nextStep_vi: "Giữ readback đúng action/revision; không coi là full goal completion."
+  owner: runtime-core
+  kind: check-status
+
+sonar-browse-unavailable:
+  title: "Sonar browse unavailable"
+  title_vi: "Sonar Browse chưa sẵn sàng"
+  meaning_vi: "Selected Browse requests không cung cấp usable readback."
+  causes_vi:
+    - "Provider/permission/capability chưa trả required response."
+  nextStep_vi: "Khôi phục declared Browse route; không thay bằng credential presence."
+  owner: runtime-core
+  kind: check-status
+
+sonar-local-users-readback:
+  title: "Sonar local users readback"
+  title_vi: "Đã xác minh local Sonar user readback"
+  meaning_vi: "Provider metadata xác nhận required local user identity theo selected action."
+  causes_vi:
+    - "User readback khớp expected public identity."
+  nextStep_vi: "Giữ scoped account proof; token/login/consumer proof vẫn riêng."
+  owner: runtime-core
+  kind: check-status
+
+sonar-new-user-password-required:
+  title: "Sonar new user password required"
+  title_vi: "Cần private password cho Sonar user mới"
+  meaning_vi: "Supported local user create chưa có required password role."
+  causes_vi:
+    - "Declared private password role chưa cung cấp usable value."
+  nextStep_vi: "Owner chuẩn bị role qua native custody, không in password."
+  owner: owner
+  kind: verb-refusal
+
+sonar-project-api-unsupported:
+  title: "Sonar project API unsupported"
+  title_vi: "Sonar project API không được hỗ trợ"
+  meaning_vi: "Provider chưa có supported API/capability cho selected project action."
+  causes_vi:
+    - "Server contract không đáp ứng project operation."
+  nextStep_vi: "Chọn supported declared provider action, không đổi protocol để ép chạy."
+  owner: runtime-core
+  kind: verb-refusal
+
+sonar-project-conflict:
+  title: "Sonar project conflict"
+  title_vi: "Sonar project bị xung đột identity"
+  meaning_vi: "Existing project không khớp selected public project identity/config."
+  causes_vi:
+    - "Project cùng selector mang thuộc tính khác expected."
+  nextStep_vi: "Giữ existing project, xử lý declaration/conflict trước write."
+  owner: op-retry
+  kind: verb-refusal
+
+sonar-project-create-unreconciled:
+  title: "Sonar project create unreconciled"
+  title_vi: "Chưa reconcile được Sonar project create"
+  meaning_vi: "Previous create intent chưa có matching project proof."
+  causes_vi:
+    - "Project state sau write chưa conclusive."
+  nextStep_vi: "Reconcile exact selected project, không replay create."
+  owner: runtime-core
+  kind: check-status
+
+sonar-project-exists:
+  title: "Sonar project exists"
+  title_vi: "Đã quan sát matching Sonar project"
+  meaning_vi: "Existing project khớp selected identity, không cần create lại."
+  causes_vi:
+    - "Project public readback khớp."
+  nextStep_vi: "Giữ scoped readback; analysis/consumer proof vẫn riêng."
+  owner: runtime-core
+  kind: check-status
+
+sonar-project-not-observed:
+  title: "Sonar project not observed"
+  title_vi: "Chưa quan sát được Sonar project"
+  meaning_vi: "Expected project chưa có conclusive provider observation."
+  causes_vi:
+    - "Provider listing/readback chưa thấy matching project."
+  nextStep_vi: "Giữ actual outcome/ACK và reconcile selected project."
+  owner: runtime-core
+  kind: check-status
+
+sonar-project-read-unavailable:
+  title: "Sonar project read unavailable"
+  title_vi: "Sonar project readback chưa sẵn sàng"
+  meaning_vi: "Required project read request không cho supported result."
+  causes_vi:
+    - "Provider request/capability/permission chưa đáp ứng."
+  nextStep_vi: "Khôi phục native readback trước project write hoặc completion."
+  owner: runtime-core
+  kind: check-status
+
+sonar-project-readback:
+  title: "Sonar project readback"
+  title_vi: "Đã xác minh Sonar project readback"
+  meaning_vi: "Selected project identity/config được provider readback xác nhận."
+  causes_vi:
+    - "Required project fields khớp expected."
+  nextStep_vi: "Giữ scoped project proof, kiểm analysis và consumer riêng."
+  owner: runtime-core
+  kind: check-status
+
+sonar-setting-api-unsupported:
+  title: "Sonar setting API unsupported"
+  title_vi: "Sonar setting API hoặc shape không hỗ trợ"
+  meaning_vi: "Selected setting definition/action không có supported scalar contract."
+  causes_vi:
+    - "Provider definition/API không đáp ứng selected setting shape."
+  nextStep_vi: "Sửa owning integration selection; không đổi provider enum hoặc suppress finding."
+  owner: runtime-core
+  kind: verb-refusal
+
+sonar-setting-read-unavailable:
+  title: "Sonar setting read unavailable"
+  title_vi: "Sonar setting readback chưa sẵn sàng"
+  meaning_vi: "Required setting read request không cho usable metadata."
+  causes_vi:
+    - "Provider setting API chưa trả supported result."
+  nextStep_vi: "Khôi phục declared readback route trước write/completion."
+  owner: runtime-core
+  kind: check-status
+
+sonar-setting-readback:
+  title: "Sonar setting readback"
+  title_vi: "Đã quan sát Sonar setting readback"
+  meaning_vi: "Public setting fields khớp expected; secret values masked không tự thành private equality proof."
+  causes_vi:
+    - "Provider readback khớp phần có thể kiểm."
+  nextStep_vi: "Giữ actual outcome/ACK và privateValuesVerified flags; kiểm consumer riêng."
+  owner: runtime-core
+  kind: check-status
+
+sonar-setting-readback-mismatch:
+  title: "Sonar setting readback mismatch"
+  title_vi: "Sonar setting readback không khớp"
+  meaning_vi: "Observed public setting value không khớp selected expected value."
+  causes_vi:
+    - "Provider state khác accepted public setting."
+  nextStep_vi: "Giữ uncertainty/ACK và reconcile, không replay setting write tự động."
+  owner: runtime-core
+  kind: check-status
+
+sonar-setting-write-unreconciled:
+  title: "Sonar setting write unreconciled"
+  title_vi: "Chưa reconcile được Sonar setting write"
+  meaning_vi: "Previous setting write chưa có conclusive accepted value proof."
+  causes_vi:
+    - "Readback hoặc masked private value không giải quyết được write state."
+  nextStep_vi: "Giữ unknown/partial theo receipt và reconcile đúng operation."
+  owner: runtime-core
+  kind: check-status
+
+sonar-token-absent:
+  title: "Sonar token absent"
+  title_vi: "Đã quan sát Sonar token vắng mặt"
+  meaning_vi: "Selected token name không còn hiện diện trong provider metadata."
+  causes_vi:
+    - "Token absence được readback xác nhận."
+  nextStep_vi: "Giữ absence proof cùng actual ACK flags; không suy ra token value hoặc full goal."
+  owner: runtime-core
+  kind: check-status
+
+sonar-token-api-unsupported:
+  title: "Sonar token API unsupported"
+  title_vi: "Sonar token API không được hỗ trợ"
+  meaning_vi: "Provider capability chưa đáp ứng selected token action/scope."
+  causes_vi:
+    - "Required token API không được supported server công bố."
+  nextStep_vi: "Sửa selected contract/capability trước token effects."
+  owner: runtime-core
+  kind: verb-refusal
+
+sonar-token-existing-credential-unverified:
+  title: "Sonar token existing credential unverified"
+  title_vi: "Existing Sonar token credential chưa verified"
+  meaning_vi: "Token metadata tồn tại nhưng usable credential binding chưa được chứng minh."
+  causes_vi:
+    - "Provider không đọc lại one-time token value hoặc custody chưa có proof."
+  nextStep_vi: "Giữ existing token, kiểm declared custody/auth binding; không mint thay thế tự động."
+  owner: runtime-core
+  kind: check-status
+
+sonar-token-generate-unreconciled:
+  title: "Sonar token generate unreconciled"
+  title_vi: "Chưa reconcile được Sonar token generation"
+  meaning_vi: "Previous mint intent chưa có conclusive matching token/custody proof."
+  causes_vi:
+    - "Generation outcome hoặc binding chưa rõ."
+  nextStep_vi: "Reconcile existing name/custody, không mint lại vì thiếu response."
+  owner: runtime-core
+  kind: check-status
+
+sonar-token-generated-auth-unverified:
+  title: "Sonar token generated auth unverified"
+  title_vi: "Token đã mint nhưng auth chưa verified"
+  meaning_vi: "Provider đã generate token nhưng same-call auth verification chưa đạt."
+  causes_vi:
+    - "Generated value chưa được credential validation xác nhận."
+  nextStep_vi: "Giữ partial mint effect và reconcile/cleanup qua native owner; không mint lại."
+  owner: runtime-core
+  kind: check-status
+
+sonar-token-generated-identity-unverified:
+  title: "Sonar token generated identity unverified"
+  title_vi: "Token đã mint nhưng identity chưa verified"
+  meaning_vi: "Generated token chưa chứng minh đúng expected principal/scope identity."
+  causes_vi:
+    - "Auth/readback identity không khớp selected token target."
+  nextStep_vi: "Giữ partial effect, xử lý identity qua native owner trước seal/completion."
+  owner: runtime-core
+  kind: check-status
+
+sonar-token-generation-not-observed:
+  title: "Sonar token generation not observed"
+  title_vi: "Chưa quan sát được generated Sonar token"
+  meaning_vi: "Expected generated token chưa có matching provider metadata."
+  causes_vi:
+    - "Token listing/readback chưa xác nhận mint result."
+  nextStep_vi: "Giữ actual ACK/uncertainty và reconcile existing operation."
+  owner: runtime-core
+  kind: check-status
+
+sonar-token-read-unavailable:
+  title: "Sonar token read unavailable"
+  title_vi: "Sonar token metadata chưa sẵn sàng"
+  meaning_vi: "Required token readback không cho usable metadata."
+  causes_vi:
+    - "Provider request/capability chưa đáp ứng."
+  nextStep_vi: "Khôi phục native metadata readback, không dùng token presence làm auth proof."
+  owner: runtime-core
+  kind: check-status
+
+sonar-token-revocation-not-observed:
+  title: "Sonar token revocation not observed"
+  title_vi: "Chưa quan sát được Sonar token revocation"
+  meaning_vi: "Expected token absence sau revoke chưa được provider xác nhận."
+  causes_vi:
+    - "Selected token vẫn hiện diện hoặc absence readback chưa rõ."
+  nextStep_vi: "Giữ ACK/partial state và reconcile revocation trước completion."
+  owner: runtime-core
+  kind: check-status
+
+sonar-token-revoke-unreconciled:
+  title: "Sonar token revoke unreconciled"
+  title_vi: "Chưa reconcile được Sonar token revoke"
+  meaning_vi: "Previous revoke intent chưa có conclusive absence proof."
+  causes_vi:
+    - "Provider state sau revoke chưa rõ."
+  nextStep_vi: "Reconcile selected token name, không replay effect từ receipt thiếu."
+  owner: runtime-core
+  kind: check-status
+
+sonar-token-revoked:
+  title: "Sonar token revoked"
+  title_vi: "Đã xác minh Sonar token revocation"
+  meaning_vi: "Selected token absence đã được readback xác nhận; write ACK được giữ riêng."
+  causes_vi:
+    - "Required post-revoke absence observation đã đạt."
+  nextStep_vi: "Giữ scoped revocation proof, không coi là full workflow completion."
+  owner: runtime-core
+  kind: check-status
+
+sonar-token-rotation-old-revoke-unreconciled:
+  title: "Sonar token rotation old revoke unreconciled"
+  title_vi: "Token rotation chưa xong revoke token cũ"
+  meaning_vi: "New token flow đã tiến triển nhưng old token revocation chưa được xác minh."
+  causes_vi:
+    - "Old token revoke/absence proof còn thiếu."
+  nextStep_vi: "Giữ new custody cùng old revoke state, reconcile phần còn lại không mint lại."
+  owner: runtime-core
+  kind: check-status
+
+sonar-token-rotation-source-missing:
+  title: "Sonar token rotation source missing"
+  title_vi: "Thiếu tên token cũ cho rotation"
+  meaning_vi: "Rotate request thiếu token.previousName công khai để xác định token cũ trước khi generate token mới."
+  causes_vi:
+    - "Public token resource chưa khai báo previousName cho action rotate."
+  nextStep_vi: "Sửa public token resource với đúng previousName và prepare lại exact plan; không mở hoặc thay credential để xử lý lỗi tên này."
+  owner: op-retry
+  kind: input-invalid
+
+sonar-token-scope-conflict:
+  title: "Sonar token scope conflict"
+  title_vi: "Sonar token scope bị xung đột"
+  meaning_vi: "Existing token metadata không khớp selected type/project/principal scope."
+  causes_vi:
+    - "Named token thuộc scope khác accepted target."
+  nextStep_vi: "Giữ token hiện có, xử lý public scope conflict trước effects."
+  owner: op-retry
+  kind: verb-refusal
+
+sonar-token-seal-unreconciled:
+  title: "Sonar token seal unreconciled"
+  title_vi: "Chưa reconcile được Sonar token seal"
+  meaning_vi: "Generated token/custody seal không có conclusive persisted binding proof."
+  causes_vi:
+    - "Native seal hoặc readback chưa được xác nhận."
+  nextStep_vi: "Giữ mint/ACK state và reconcile named destination, không mint lại."
+  owner: runtime-core
+  kind: check-status
+
+sonar-token-sealed:
+  title: "Sonar token sealed"
+  title_vi: "Đã seal generated Sonar token"
+  meaning_vi: "Same-call generate, auth/identity validation và selected custody seal đã đạt; consumer chưa verified."
+  causes_vi:
+    - "Generated value được native owner giữ và seal trực tiếp."
+  nextStep_vi: "Giữ reference/public receipt; xác minh intended consumer riêng, không in token."
+  owner: runtime-core
+  kind: check-status
+
+sonar-token-value-binding-unverified:
+  title: "Sonar token value binding unverified"
+  title_vi: "Sonar token value binding chưa verified"
+  meaning_vi: "Metadata/reference chưa chứng minh selected custody value gắn đúng generated token."
+  causes_vi:
+    - "One-time value binding chưa có conclusive proof."
+  nextStep_vi: "Giữ held state và dùng supported native validation, không suy ra equality từ tên."
+  owner: runtime-core
+  kind: check-status
+
+sonar-token-value-unrecoverable:
+  title: "Sonar token value unrecoverable"
+  title_vi: "Sonar token value không đọc lại được"
+  meaning_vi: "One-time generated token value không còn usable để hoàn tất selected sink."
+  causes_vi:
+    - "Provider không cho đọc lại generated secret sau response mất."
+  nextStep_vi: "Giữ recorded effects và xử lý bounded recovery/cleanup qua owner; không mint lại tự động."
+  owner: runtime-core
+  kind: check-status
+
+sonar-user-api-unsupported:
+  title: "Sonar user API unsupported"
+  title_vi: "Sonar user API không được hỗ trợ"
+  meaning_vi: "Selected server không đáp ứng required local-user API contract."
+  causes_vi:
+    - "Required user capability/API không supported."
+  nextStep_vi: "Chọn supported declared user action trước effects."
+  owner: runtime-core
+  kind: verb-refusal
+
+sonar-user-conflict:
+  title: "Sonar user conflict"
+  title_vi: "Sonar user identity bị xung đột"
+  meaning_vi: "Existing user không khớp selected login/email/identity contract."
+  causes_vi:
+    - "Selector trỏ existing account khác expected."
+  nextStep_vi: "Giữ existing account và xử lý public identity conflict trước write."
+  owner: op-retry
+  kind: verb-refusal
+
+sonar-user-create-unreconciled:
+  title: "Sonar user create unreconciled"
+  title_vi: "Chưa reconcile được Sonar user create"
+  meaning_vi: "Previous create intent chưa có conclusive matching user readback."
+  causes_vi:
+    - "User state sau create chưa rõ."
+  nextStep_vi: "Reconcile exact declared user, không replay create."
+  owner: runtime-core
+  kind: check-status
+
+sonar-user-inactive:
+  title: "Sonar user inactive"
+  title_vi: "Sonar user hiện inactive"
+  meaning_vi: "Matching user không active; adapter không coi là account create mới."
+  causes_vi:
+    - "Existing account bị inactive."
+  nextStep_vi: "Owner xử lý lifecycle đúng provider contract, không tự tạo account thay thế."
+  owner: owner
+  kind: verb-refusal
+
+sonar-user-not-observed:
+  title: "Sonar user not observed"
+  title_vi: "Chưa quan sát được Sonar user"
+  meaning_vi: "Expected local user chưa có conclusive metadata readback."
+  causes_vi:
+    - "Provider listing/readback chưa xác nhận account."
+  nextStep_vi: "Giữ actual outcome/ACK và reconcile selected user."
+  owner: runtime-core
+  kind: check-status
+
+sonar-user-read-unavailable:
+  title: "Sonar user read unavailable"
+  title_vi: "Sonar user readback chưa sẵn sàng"
+  meaning_vi: "Required user lookup không có supported provider result."
+  causes_vi:
+    - "Provider request/capability/permission chưa đáp ứng."
+  nextStep_vi: "Khôi phục native user readback trước write/completion."
+  owner: runtime-core
+  kind: check-status
+
+sonar-release-native-record-unverified:
+  title: "Sonar release native record unverified"
+  title_vi: "Native Sonar release record chưa verified"
+  meaning_vi: "Reconcile chưa chứng minh exact native L4/tag/log/task identity ghi trong operation."
+  causes_vi:
+    - "Native record/hash/tag hoặc CE task metadata không khớp."
+  nextStep_vi: "Giữ native effects và reconcile exact recorded identities, không chạy lại gate."
+  owner: runtime-core
+  kind: check-status
+
+sonar-release-native-unknown:
+  title: "Sonar release native unknown"
+  title_vi: "Chưa biết native Sonar release outcome"
+  meaning_vi: "Native completion hoặc source identity chưa conclusive; kết quả có thể đã giữ valid L4/tag/task proof và ACK nhưng process báo lỗi hoặc source sau chạy bị drift."
+  causes_vi:
+    - "Native record/task thiếu hoặc chưa mới, process chưa thành công, hoặc source sau chạy không còn khớp exact revision."
+  nextStep_vi: "Giữ actual native proof và ACK cùng unknown/partial; reconcile đúng recorded identity/provider task, không replay gate."
+  owner: runtime-core
+  kind: check-status
+
+sonar-release-process-unknown:
+  title: "Sonar release process unknown"
+  title_vi: "Native Sonar release process chưa xác minh đóng"
+  meaning_vi: "Process tree chưa được chứng minh closure; L4/tag có thể đã được tạo."
+  causes_vi:
+    - "Native child lifecycle chưa conclusive."
+  nextStep_vi: "Khôi phục owned process closure trước reconcile, không launch gate trùng."
+  owner: runtime-core
+  kind: check-status
+
+sonar-release-readback-held:
+  title: "Sonar release readback held"
+  title_vi: "Native Sonar release provider proof đang held"
+  meaning_vi: "Native effects được giữ nhưng exact CE/analysis/QG/issues/revision readback chưa đủ."
+  causes_vi:
+    - "Provider task hoặc latest analysis/metrics chưa khớp expected proof."
+  nextStep_vi: "Reconcile exact native task/analysis, không thay bằng latest unrelated green."
+  owner: runtime-core
+  kind: check-status
+
+sonar-release-source-drift:
+  title: "Sonar release source drift"
+  title_vi: "Native Sonar release source đã đổi"
+  meaning_vi: "Exact clean App revision/configuration không còn khớp accepted operation."
+  causes_vi:
+    - "Source/declaration/native gate inputs thay đổi."
+  nextStep_vi: "Đóng lại source và prepare plan mới trước native launch."
+  owner: op-retry
+  kind: verb-refusal
+
+NATIVE_APP_PATH_OUTSIDE_INSTALLATION:
+  title: "Native app path outside installation"
+  title_vi: "Native package path thoát installation"
+  meaning_vi: "Internal native inspector thấy selected path ngoài app node_modules boundary trước custody."
+  causes_vi:
+    - "Resolved native package/entry không nằm trong selected installation."
+  nextStep_vi: "Sửa native install qua owner; adapter chỉ trả public refusal, không expose raw internal payload."
+  owner: runtime-core
+  kind: verb-refusal
+
+NATIVE_APP_LINK_REFUSED:
+  title: "Native app link refused"
+  title_vi: "Native package có link bị từ chối"
+  meaning_vi: "Internal inspector từ chối symlink ở installation/package/entry path trước custody."
+  causes_vi:
+    - "Logical path bị chuyển hướng bằng link."
+  nextStep_vi: "Dùng regular native install đúng app; giữ private diagnostic trong owning adapter."
+  owner: runtime-core
+  kind: verb-refusal
+
+NATIVE_APP_PACKAGE_RESOLUTION_REFUSED:
+  title: "Native app package resolution refused"
+  title_vi: "Native package resolution bị từ chối"
+  meaning_vi: "Logical package location không khớp resolved canonical package trong selected installation."
+  causes_vi:
+    - "Resolution đi qua linked hoặc khác installation package."
+  nextStep_vi: "Khôi phục exact installed package pair, không bypass path inspection."
+  owner: runtime-core
+  kind: verb-refusal
+
+NATIVE_APP_PACKAGE_INVALID:
+  title: "Native app package invalid"
+  title_vi: "Native package identity không hợp lệ"
+  meaning_vi: "Internal inspector không có expected package name và supported version shape."
+  causes_vi:
+    - "Package manifest không đúng selected native package."
+  nextStep_vi: "Cài đúng reviewed native CLI/HFS pair trước custody."
+  owner: runtime-core
+  kind: verb-refusal
+
+NATIVE_APP_PACKAGE_BOUND:
+  title: "Native app package bound"
+  title_vi: "Native package inspection vượt bound"
+  meaning_vi: "Package tree có nonregular file hoặc vượt finite file/byte inspection bound."
+  causes_vi:
+    - "Installed package không qua bounded regular-file identity scan."
+  nextStep_vi: "Kiểm native installation qua owner; không tăng bound để bỏ finding."
+  owner: runtime-core
+  kind: verb-refusal
+
+NATIVE_APP_REQUIRED_OWNER_INVALID:
+  title: "Native app required owner invalid"
+  title_vi: "Required native owner metadata không hợp lệ"
+  meaning_vi: "Source caller chưa đưa supported fixed capability files và SHA256 expectations."
+  causes_vi:
+    - "requiredHfsFiles shape/path/digest sai contract."
+  nextStep_vi: "Sửa source-owned capability declaration, không để target chọn arbitrary executable files."
+  owner: runtime-core
+  kind: verb-refusal
+
+NATIVE_APP_OWNER_VERSION_REQUIRED:
+  title: "Native app owner version required"
+  title_vi: "Native owner bytes chưa đúng Source capability"
+  meaning_vi: "Installed HFS capability file digest khác expected current Source owner bytes trước custody."
+  causes_vi:
+    - "Installed native package chưa có matching required capability."
+  nextStep_vi: "Cài matching reviewed native package rồi prepare lại; Sonar public mapping là native-upgrade-required."
+  owner: runtime-core
+  kind: verb-refusal
+
+NATIVE_APP_PACKAGE_PAIR_INVALID:
+  title: "Native app package pair invalid"
+  title_vi: "Native package pair không hợp lệ"
+  meaning_vi: "Installed CLI/HFS pair hoặc fixed Supabase wrapper/platform pair không khớp version, dependency, bin hay OS/CPU contract."
+  causes_vi:
+    - "CLI/HFS dependency hoặc Supabase wrapper/platform version, optionalDependency, bin và OS/CPU identity khác fixed native contract."
+  nextStep_vi: "Khôi phục đúng reviewed installed native pair mà selected action yêu cầu: CLI/HFS hoặc Supabase wrapper cùng platform package."
+  owner: runtime-core
+  kind: verb-refusal
+
+NATIVE_APP_ENTRY_UNAVAILABLE:
+  title: "Native app entry unavailable"
+  title_vi: "Native App CLI entry không sẵn sàng"
+  meaning_vi: "Fixed installed CLI entry không phải regular file để chạy."
+  causes_vi:
+    - "Native install thiếu hoặc sai entry."
+  nextStep_vi: "Cài đúng native package; owning adapter giữ raw diagnostic riêng."
+  owner: runtime-core
+  kind: verb-refusal
+
+NATIVE_CONSUMER_DECLARATION_REFUSED:
+  title: "Native consumer declaration refused"
+  title_vi: "Native consumer declaration bị từ chối"
+  meaning_vi: "Internal preflight không chứng minh exact endpoint/source/public files/custody/native package prerequisites."
+  causes_vi:
+    - "Public declaration hoặc fixed native input ngoài contract."
+  nextStep_vi: "Sửa owning declaration; public mapping là native-consumer-prerequisite-refused trước launch."
+  owner: runtime-core
+  kind: verb-refusal
+
+NATIVE_CONSUMER_ACTION_REFUSED:
+  title: "Native consumer action refused"
+  title_vi: "Native consumer action bị từ chối"
+  meaning_vi: "Process owner không chọn fixed native stack/db action theo supported family."
+  causes_vi:
+    - "Family/action ngoài fixed CLI command contract."
+  nextStep_vi: "Sửa native adapter action mapping trước launch."
+  owner: runtime-core
+  kind: verb-refusal
+
+NATIVE_CONSUMER_IDENTITY_DRIFT:
+  title: "Native consumer identity drift"
+  title_vi: "Native consumer identity đã đổi"
+  meaning_vi: "Prelaunch native identity/revision/bounds không khớp accepted snapshot."
+  causes_vi:
+    - "Installed native pair hoặc selected run metadata đã thay đổi."
+  nextStep_vi: "Prepare operation mới trên fixed native identity; không tiếp tục bằng snapshot cũ."
+  owner: runtime-core
+  kind: verb-refusal
+
+native-consumer-outcome-unknown:
+  title: "Native consumer outcome unknown"
+  title_vi: "Chưa biết native consumer outcome"
+  meaning_vi: "Native child output/exit không cho conclusive closed stack/db result; effects có thể đã xảy ra."
+  causes_vi:
+    - "Output mất/không hoàn chỉnh hoặc shape không hợp lệ."
+  nextStep_vi: "Giữ unknown/ACK theo native receipt và reconcile read-only, không replay deploy/migrate."
+  owner: runtime-core
+  kind: check-status
+
+native-stack-health-only:
+  title: "Native stack health only"
+  title_vi: "Native stack chỉ có health proof"
+  meaning_vi: "Native verify xác nhận health hiện tại nhưng không chứng minh exact lost rollout đã được nhận."
+  causes_vi:
+    - "Reconcile health không có own deploy ACK/release identity."
+  nextStep_vi: "Giữ partial health receipt; không coi health green là exact deployment completion."
+  owner: runtime-core
+  kind: check-status
+
+native-stack-deploy-verified:
+  title: "Native stack deploy verified"
+  title_vi: "Native stack deploy đã verified"
+  meaning_vi: "Native deploy có exact required steps, accepted release identity và successful verify; no rollback/pending accept."
+  causes_vi:
+    - "Native rollout/accept/readback đã đạt selected contract."
+  nextStep_vi: "Giữ scoped rollout proof; full goal và remote CI proof vẫn riêng."
+  owner: runtime-core
+  kind: check-status
+
+native-database-current:
+  title: "Native database current"
+  title_vi: "Native database history đã current"
+  meaning_vi: "Native owner chứng minh selected migration history current hoặc successful executed migration final history."
+  causes_vi:
+    - "Native inspected/done hoặc executed final history đã được kiểm."
+  nextStep_vi: "Giữ actual executed/ACK flags và history proof; không suy ra application UAT."
+  owner: runtime-core
+  kind: check-status
+
+native-database-pending:
+  title: "Native database pending"
+  title_vi: "Native database còn pending"
+  meaning_vi: "Native owner trả public migration history nhưng chưa current theo selected action."
+  causes_vi:
+    - "Selected migration plan/history chưa hoàn tất."
+  nextStep_vi: "Giữ partial status; migrate chỉ khi existing arming/acceptance cho phép."
+  owner: runtime-core
+  kind: check-status
+
+native-consumer-source-drift:
+  title: "Native consumer source drift"
+  title_vi: "Native consumer source/config đã đổi"
+  meaning_vi: "Exact clean source hoặc public configuration khác accepted snapshot trước/sau native operation."
+  causes_vi:
+    - "Source/declaration/image/native custody metadata đã thay đổi."
+  nextStep_vi: "Giữ actual ACK/effect state và prepare/reconcile đúng identity, không replay write."
+  owner: runtime-core
+  kind: check-status
+
+native-database-not-armed:
+  title: "Native database not armed"
+  title_vi: "Native database chưa được armed"
+  meaning_vi: "Migrate yêu cầu existing STARCI_DB_ARMED=1 nhưng selected invocation không có."
+  causes_vi:
+    - "Native irreversible-operation second key chưa được owner cấp."
+  nextStep_vi: "Owner dùng existing native arming route; adapter không tự set key."
+  owner: owner
+  kind: verb-refusal
+
+native-consumer-prerequisite-refused:
+  title: "Native consumer prerequisite refused"
+  title_vi: "Native consumer prerequisites bị từ chối"
+  meaning_vi: "Gate không prepare/launch vì endpoint, clean source, fixed native capability hoặc custody declaration chưa hợp lệ."
+  causes_vi:
+    - "Public declaration/native prerequisite inspection thất bại."
+  nextStep_vi: "Sửa exact declared prerequisites trước custody; không dùng raw DB/deploy bypass."
+  owner: runtime-core
+  kind: verb-refusal
+
+sonar-release-native-upgrade-required:
+  title: "Sonar release native upgrade required"
+  title_vi: "Cần matching native Sonar release capability"
+  meaning_vi: "Installed native HFS owner chưa khớp required Source capability trước custody."
+  causes_vi:
+    - "Shared native inspector báo owner-version-required."
+  nextStep_vi: "Cài reviewed matching native package trước prepare Sonar release gate."
+  owner: runtime-core
+  kind: verb-refusal
+
+native-stack-reconcile-held:
+  title: "Native stack reconcile held"
+  title_vi: "Đối soát stack giữ nguyên hiệu ứng"
+  meaning_vi: "Đối soát khai báo stack có bước exec hoặc HTTP có thể ghi nên giữ kết quả chưa xác định; không chạy lại bước có thể tạo hiệu ứng."
+  causes_vi:
+    - "Khai báo verify/deploy có lệnh exec hoặc HTTP ngoài GET/HEAD nên đọc health không chứng minh được lần triển khai cũ."
+  nextStep_vi: "Giữ nguyên receipt và ACK đã có; thu proof của lần chạy được chỉ định hoặc yêu cầu owner quyết định trước một lần apply mới."
+  owner: runtime-core
+  kind: check-status
+
+decisions-first:
+  title: "Blocking decisions must be resolved first"
+  title_vi: "Cần xử lý decision đang chặn trước"
+  meaning_vi: "Runtime từ chối route, enqueue hoặc dispatch khi workflow còn Decision Item của Kernel đang mở, chưa claim và đã quá thời gian chờ."
+  causes_vi:
+    - "Kernel chưa ghi quyết định cho DI còn liên quan tới công việc đang chờ."
+  nextStep_vi: "Đọc starci kernel decisions của đúng workflow, thực hiện lệnh giải quyết mà native trả về và resolve DI; không giả actor hoặc tự đặt child env để bỏ guard."
+  owner: runtime-core
+  kind: dispatch-refusal
+
+kernel-rev-stale:
+  title: "Kernel runtime acknowledgement is stale"
+  title_vi: "Kernel đang giữ runtime acknowledgement cũ"
+  meaning_vi: "Op contract đã thay đổi giữa runtime revision Kernel đã đọc và revision hiện tại nên native giữ enqueue hoặc dispatch."
+  causes_vi:
+    - "Runtime đã chuyển revision có thay đổi các file thuộc contract của op này."
+  nextStep_vi: "Đọc đúng file trong revision notice, dùng kernel-ack-rev --plan rồi attest exact revision và readToken native cung cấp trước khi thực hiện lại."
+  owner: runtime-core
+  kind: dispatch-refusal
+
+kernel-rev-unknown:
+  title: "Kernel runtime revision could not be verified"
+  title_vi: "Chưa xác minh được runtime revision của Kernel"
+  meaning_vi: "Native không so sánh được READ revision hoặc revision được attest không phải current deployed revision."
+  causes_vi:
+    - "Revision thiếu, không resolve được, đã thay đổi hoặc READ comparison không khả dụng."
+  nextStep_vi: "Khôi phục thông tin revision từ runtime owner, đọc lại bundle và plan hiện tại rồi attest bằng exact native revision/digest; không tự stamp acknowledgement."
+  owner: runtime-core
+  kind: verb-refusal
+
+prepared-settlement-withdrawn:
+  title: "Obsolete prepared settlement was withdrawn"
+  title_vi: "Prepared settlement cũ đã được thu hồi"
+  meaning_vi: "Native thu hồi receipt chuẩn bị settlement vì reset target của receipt không còn là live workflow gate base; report phải được đánh giá lại."
+  causes_vi:
+    - "Workflow gate base đã đổi sau khi receipt chuẩn bị preserve được ghi."
+  nextStep_vi: "Giữ sự kiện thu hồi cùng indexRestored hoặc indexError thực tế; để native settlement đánh giá report hiện tại, không coi receipt thu hồi là pass hoặc tự reset tree."
+  owner: runtime-core
+  kind: check-status
+
+sonar-managed-execution-failed:
+  title: "Managed Sonar operation did not complete normally"
+  title_vi: "Lệnh Sonar managed chưa hoàn tất bình thường"
+  meaning_vi: "Managed entry bắt lỗi ngoài kết quả đã đóng và trả safe refusal; mã này không tự chứng minh rằng provider hoặc custody chưa có hiệu ứng."
+  causes_vi:
+    - "Declaration, target, action, native prerequisite hoặc execution path không trả kết quả theo contract."
+  nextStep_vi: "Kiểm public operation receipt/status và effect history trước mọi retry; sửa metadata hoặc native prerequisite cần thiết mà không mở credential hoặc in payload nội bộ."
+  owner: runtime-core
+  kind: runtime-fault

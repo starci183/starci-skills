@@ -1,0 +1,24 @@
+group: access
+verb: stack
+owner: runtime
+summary: deploy or verify the exact declared application stack through its native owner
+impl: {module: scripts/gates/provision-native.mjs, export: runNativeStack}
+effect: remote
+roles: [worker, lead, coordinator, owner]
+positional: [{name: action, enum: [deploy, verify], required: true, variadic: false}]
+operationPolicy:
+  deploy: {action: stack.deploy, effect: remote, credentials: [], destination: none, checkpoints: [account-authority]}
+  verify: {action: stack.verify, effect: remote, credentials: [], destination: none, checkpoints: [account-authority]}
+flags:
+  - {name: target, type: string, required: true, summary: named application stack and exact native endpoint}
+  - {name: operation, type: string, summary: durable operation id}
+  - {name: execute, type: boolean, summary: invoke the native owner under the exact accepted plan}
+  - {name: reconcile, type: boolean, summary: inspect the prior outcome without replaying deployment}
+conventions:
+  - public declaration checks precede custody; the native owner compares the effective private SSH account before sessions or network access
+  - the accepted plan freezes the application revision and exact deployment image inputs; arbitrary child arguments are refused
+  - native custody and execution locks retain their existing owners; health checks alone do not prove an exact lost deployment
+exit: {"0": plan prepared or native result verified, "1": native failure or uncertain outcome, "2": policy or target refused}
+json: always
+examples: [starci access stack verify --target staging-stack --operation staging-stack-verify]
+editions: [full, lite]

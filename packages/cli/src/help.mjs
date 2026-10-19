@@ -69,6 +69,7 @@ export function verbHelp(catalog, groupName, verbName) {
     ...(local.length ? ['', 'Options:', rows(local)] : []),
     ...(verb.effect ? ['', `Effect: ${verb.effect}`] : []),
     ...(verb.roles?.length ? [`Roles: ${verb.roles.join(', ')}`] : []),
+    ...(verb.operationPolicy ? ['', 'Action policies:', rows(Object.entries(verb.operationPolicy).map(([action, policy]) => [action, `${policy.action}; ${policy.effect}; credentials: ${policy.credentials.join(', ') || 'none'}; destination: ${policy.destination}`]))] : []),
     ...(verb.conventions?.length ? ['', 'Conventions:', ...verb.conventions.map((line) => `  - ${line}`)] : []),
     ...(exits.length ? ['', 'Exit codes:', rows(exits)] : []),
     ...(verb.json ? ['', `JSON: ${verb.json}`] : []),

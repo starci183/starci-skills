@@ -6,7 +6,6 @@ import {createHash} from 'node:crypto';
 import { isMain } from '../lib/is-main.mjs';
 import {isPlainObject as plain} from '../../engine/plain-object.mjs';
 import {skillRoot} from '../../engine/runtime-root.mjs';
-import {sopsIdentityEnv} from '../../engine/secrets.mjs';
 import {parseYaml} from '../../engine/yaml.mjs';
 import {safeRemove} from '../api/fs/safe-remove.mjs'; import {runNode} from '../api/node/run-node.mjs';
 import { artifactHoldReason } from '../machine/artifact-hold.mjs';
@@ -31,12 +30,13 @@ import {inspectOwnerConfig,specsSettings} from '../../engine/config.mjs';
 import {createRequire} from 'node:module';
 import { isSpecRun } from '../lib/env.mjs';
 import { readProperties } from '../lib/properties.mjs';
+import {mintSonarToken} from './sonar-token-recovery.mjs';
 import { makeTempDir } from '../api/fs/make-temp-dir.mjs'; import { tempPath } from '../api/fs/temp-path.mjs';
 
 /**
  * Sonar analysis reads the selected server from explicit options, the shared runtime environment or
  * the governing stack declaration. The owner supplies SONAR_TOKEN locally; analysis never retrieves
- * or mints an encrypted fallback. Status and explicit project provisioning own separate admin custody.
+ * or mints an encrypted fallback. Status only inspects; explicit project provisioning owns separate admin custody.
  *
  *   status                                   server, container, custody and token validity
  *   ensure-project --key K [--with-token]    admin token -> create the project (and its token) when missing
@@ -85,7 +85,7 @@ import { makeTempDir } from '../api/fs/make-temp-dir.mjs'; import { tempPath } f
  */
 export const SCHEMA='starci/sonar-local@1';
 const SCAN_SCHEMA='starci/sonar-local-scan@3';
-const DEFAULT_HOST='http://localhost:9010';
+export const DEFAULT_HOST='http://localhost:9010';
 const PUBLIC_HOST='https://sonar.starci.org';
 const CONTAINER='starci-sonarqube';
 const ANALYSIS_TOKEN='sonarqube-analysis-token.txt';
@@ -172,7 +172,7 @@ const declaredProjectsOf=sonar=>{
  *   ci and ownerAction, passed through.
  * Returns null when the declaration carries no Sonar service.
  */
-function readSonarDeclaration(file,repoRoot=path.dirname(path.dirname(path.resolve(file)))){
+export function readSonarDeclaration(file,repoRoot=path.dirname(path.dirname(path.resolve(file)))){
   const doc=parseYaml(fs.readFileSync(file,'utf8'));
   const sonar=[doc?.services?.sonar,doc?.quality?.sonar,doc?.services?.quality?.sonar].find(plain);
   if(!sonar)return null;
@@ -261,7 +261,8 @@ export function resolveConfig(options={},env=process.env){
 
 /** The custody entry without its value - what a report may carry. */
 const custodyView=entry=>({name:entry.name,present:entry.present,...(entry.via?{via:entry.via}:{}),...(entry.reminted?{reminted:true}:{}),
-  ...(entry.rejected?{rejected:true}:{}),...(entry.refusal?{refusal:entry.refusal}:{}),...(entry.identityRefusal?{identityRefusal:entry.identityRefusal}:{}),...(entry.reason?{reason:entry.reason}:{})});
+  ...(entry.rejected?{rejected:true}:{}),...(entry.refusal?{refusal:entry.refusal}:{}),...(entry.identityRefusal?{identityRefusal:entry.identityRefusal}:{}),
+  ...(entry.effect?{effect:entry.effect}:{}),...(entry.minted?{minted:entry.minted}:{}),...(entry.compensation?{compensation:entry.compensation}:{}),...(entry.reason?{reason:entry.reason}:{})});
 
 /** The custody member a minted project analysis token lives in: runtime/files/sonarqube-KEY-token.key. */
 const projectTokenRef=key=>`runtime/files/sonarqube-${String(key).replace(/[^A-Za-z0-9_.-]/g,'_')}-token.key`;
@@ -316,22 +317,7 @@ const inStack=(cfg,ref)=>{
   return stackRootOf(file)!==null;
 };
 
-/**
- * The one mint path: the admin token generates a token of `type` (for `projectKey` when given) and the
- * stack-secret tool stores it encrypted at `ref`; a value that cannot be stored is revoked again.
- */
-async function mintToken(cfg,{admin,ref,type,projectKey=null,label}){
-  const selected=sopsIdentityEnv(sonarAnalysisEnvironment(cfg),{identity:cfg.identity});
-  if(selected.error)return {present:false,name:ref,identityRefusal:selected.error.identityRefusal,reason:selected.error.message};
-  const name=`sonar-local-${label}-${Date.now().toString(36)}`.slice(0,100);
-  const generated=await call(cfg,'POST','/api/user_tokens/generate',{token:admin.value,form:{name,type,...(projectKey?{projectKey}:{})}});
-  const value=generated.status===200?remember(String(generated.json?.token??'')):'';
-  if(!value)return {present:false,name:ref,reason:`token generate for ${label} failed: HTTP ${generated.status} ${generated.text??generated.error??''}`};
-  const stored=writeCustody(cfg,ref,value,{env:selected.env});
-  if(stored.ok)return {present:true,value,via:'minted',name:ref,minted:name};
-  await call(cfg,'POST','/api/user_tokens/revoke',{token:admin.value,form:{name}});
-  return {present:false,name:ref,...(stored.identityRefusal?{identityRefusal:stored.identityRefusal}:{}),reason:`minted ${name} but could not store it (${stored.reason}); revoked it`};
-}
+const mintToken=(cfg,options)=>mintSonarToken(cfg,options,{call,writeCustody,remember});
 
 /**
  * One Supervisor audit event (machine.sqlite sup_events) per re-mint; never a value. cfg.record replaces the
@@ -367,6 +353,7 @@ async function genericToken(cfg,{admin=null}={}){
       await recordRemint(cfg,{role:'analysis',ref:stale.name,minted:minted.minted,type:'GLOBAL_ANALYSIS_TOKEN'});
       return {...minted,reminted:true};
     }
+    if(minted.effect==='unknown')return minted;
     if(minted.identityRefusal)return minted;
     misses.push(minted.reason);
   }
@@ -399,6 +386,7 @@ async function mintProjectToken(cfg,{key,admin,stale}){
     await recordRemint(cfg,{role:'project',projectKey:key,ref,minted:minted.minted,type:'PROJECT_ANALYSIS_TOKEN'});
     return {token:{...minted,reminted:true}};
   }
+  if(minted.effect==='unknown')return {token:minted};
   if(minted.identityRefusal)return {token:minted};
   return {miss:minted.reason};
 }
@@ -486,8 +474,8 @@ export async function status(cfg){
   const admin=readCustody(cfg,cfg.adminToken,{remember});
   tokens.admin=custodyView(admin);
   if(admin.present&&up)tokens.admin.valid=await tokenAccepted(cfg,admin.value)===true;
-  // A generic analysis token the server rejects is re-minted here when the admin token is valid.
-  const analysis=up?await genericToken(cfg,{admin:tokens.admin.valid?admin:null}):readCustody(cfg,cfg.analysisToken,{remember});
+  // Inspection does not receive administrative mint authority, even when admin custody is valid.
+  const analysis=up?await genericToken(cfg):readCustody(cfg,cfg.analysisToken,{remember});
   tokens.analysis=custodyView(analysis);
   if(up&&(analysis.present||analysis.rejected))tokens.analysis.valid=analysis.via==='minted'||analysis.accepted===true;
   const report={schema:SCHEMA,command:'status',host:cfg.host,publicHost:cfg.publicHost,stack:cfg.stackDir,declaration:cfg.declaration,
@@ -512,9 +500,13 @@ async function ensureProject(cfg,{key,name}={}){
   if(existing)return {...base,outcome:'ok',created:false,projectName:existing.name,dashboardUrl:`${cfg.host}/dashboard?id=${encodeURIComponent(key)}`,publicDashboardUrl:`${cfg.publicHost}/dashboard?id=${encodeURIComponent(key)}`};
   const projectName=name||key;
   const created=await call(cfg,'POST','/api/projects/create',{token:admin.value,form:{project:key,name:projectName}});
-  const raced=created.status===400&&/already exists/i.test(created.text);
-  if(created.status!==200&&!raced)return {...base,outcome:'blocked',message:`project create failed: HTTP ${created.status} ${created.text}`};
-  return {...base,outcome:'ok',created:!raced,projectName,dashboardUrl:`${cfg.host}/dashboard?id=${encodeURIComponent(key)}`,publicDashboardUrl:`${cfg.publicHost}/dashboard?id=${encodeURIComponent(key)}`};
+  // A create response or an already-exists race is not the project identity readback.
+  const readback=await call(cfg,'GET',`/api/projects/search?projects=${encodeURIComponent(key)}`,{token:admin.value});
+  const actual=readback.status===200&&(readback.json?.components??[]).find(component=>component.key===key);
+  if(!actual)return {...base,outcome:'blocked',effect:created.reachable?'unverified':'unknown',
+    message:`project create could not be reconciled by exact key (create HTTP ${created.status}, readback HTTP ${readback.status}); inspect this key before retrying`};
+  return {...base,outcome:'ok',created:created.status===200,projectName:actual.name,verified:true,
+    dashboardUrl:`${cfg.host}/dashboard?id=${encodeURIComponent(key)}`,publicDashboardUrl:`${cfg.publicHost}/dashboard?id=${encodeURIComponent(key)}`};
 }
 
 // ---- scan -----------------------------------------------------------------------------------------------

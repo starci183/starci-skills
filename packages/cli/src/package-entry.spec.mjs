@@ -6,6 +6,8 @@ import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { main } from './main.mjs';
+import { validateArgs } from './validate-args.mjs';
+import { verbHelp } from './help.mjs';
 
 const bin = fileURLToPath(new URL('../bin/starci.mjs', import.meta.url));
 const manifest = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
@@ -70,6 +72,35 @@ test('the published binary refuses unknown commands and invalid flags', () => {
   const invalid = run('app', 'check', '--package-entry-unknown');
   assert.equal(invalid.status, 2);
   assert.match(invalid.stderr, /unknown (?:flag|option)/);
+});
+
+test('managed action validation binds its policy and refuses an action without one before runtime dispatch', async () => {
+  const policy = { action: 'fixture.settings.set', effect: 'remote', credentials: ['admin'], destination: 'none', checkpoints: [] };
+  const command = { owner: 'runtime', summary: 'managed fixture', json: 'always', editions: ['full', 'lite'],
+    impl: { module: 'scripts/gates/fixture.mjs', export: 'run' },
+    positional: [{ name: 'action', enum: ['read', 'set'], required: true }],
+    flags: [{ name: 'target', type: 'string', required: true }, { name: 'operation', type: 'string' }, { name: 'execute', type: 'boolean' }],
+    operationPolicy: { set: policy } };
+  const valid = validateArgs(['set', '--target', 'declared', '--operation', 'existing', '--execute'], command);
+  assert.equal(valid.ok, true);
+  assert.deepEqual(valid.operationPolicy, policy);
+  assert.equal(Object.hasOwn(valid, 'authority'), false);
+  let dispatched = false;
+  const code = await main(['fixture', 'settings', 'read', '--target', 'declared'], {
+    catalog: { global: [], groups: { fixture: { owner: 'runtime', verbs: { settings: command } } } },
+    stdout: () => {}, stderr: () => {}, locateRuntime: () => { dispatched = true; return null; },
+  });
+  assert.equal(code, 2);
+  assert.equal(dispatched, false);
+  const help = verbHelp({ groups: { fixture: { verbs: { settings: command } } } }, 'fixture', 'settings');
+  assert.match(help, /fixture\.settings\.set; remote; credentials: admin; destination: none/u);
+});
+
+test('managed provider commands reject secret values in command arguments', () => {
+  const result = run('sonar', 'token', 'ensure', '--target', 'quality', '--token', 'fixture-private-value');
+  assert.equal(result.status, 2);
+  assert.match(result.stderr, /unknown option --token/u);
+  assert.doesNotMatch(result.stderr, /fixture-private-value/u);
 });
 
 test('the package dispatcher preserves app arguments, cwd and owner exit status', async () => {

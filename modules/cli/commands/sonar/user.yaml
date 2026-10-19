@@ -1,0 +1,26 @@
+group: sonar
+verb: user
+owner: runtime
+summary: inspect a local Sonar user or explicitly create or reactivate it
+impl: {module: scripts/gates/sonar-manage.mjs, export: runSonarManage}
+effect: remote
+roles: [worker, lead, coordinator, owner]
+positional: [{name: action, enum: [ensure, create-or-reactivate], required: true, variadic: false}]
+operationPolicy:
+  ensure: {action: sonar.user.ensure, effect: read, credentials: [admin], destination: none, checkpoints: []}
+  create-or-reactivate: {action: sonar.user.create-or-reactivate, effect: remote, credentials: [admin], destination: none, checkpoints: [account-authority, consent, private-input]}
+flags:
+  - {name: target, type: string, required: true, summary: named operation target}
+  - {name: operation, type: string, summary: durable operation id}
+  - {name: execute, type: boolean, summary: execute under existing accepted operation scope}
+  - {name: reconcile, type: boolean, summary: reconcile a prior uncertain creation}
+  - {name: login, type: string, summary: exact local user selected from the target allowlist}
+conventions:
+  - existing accounts are inspected without resetting passwords; external identities belong to their declared identity-provider adapter
+  - create-or-reactivate explicitly includes possible reactivation and password replacement; the target and accepted plan must name that exact effect
+exit: {"0": plan prepared or operation completed, "1": provider effect failed or remains uncertain, "2": policy or input refused}
+json: always
+examples:
+  - starci sonar user ensure --target quality --login reviewer
+  - starci sonar user create-or-reactivate --target quality --login reviewer --operation reviewer-account
+editions: [full, lite]

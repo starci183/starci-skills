@@ -23,11 +23,14 @@ const telegramAction = (action, args, selected) => {
 };
 
 function selectedAction({ group, verb, command, args, positionals }) {
+  // Managed operations load only the selected target's refs in their execution owner; host credentials cannot fill them.
+  if (command.operationPolicy) return null;
   const action = positionals[0] ?? null, key = group + ' ' + verb;
   const selected = (services = []) => ({ services });
   // Custody reads decrypt too; all three modes need the canonical identity environment.
   switch (key) {
     case 'gate custody-exec': return selected();
+    case 'provision operation': return null;
     case 'reconciler up': return selectedFor(command, args.check !== true, () => selected(HOST_SERVICES));
     case 'reconciler start':
     case 'reconciler restart': return selectedFor(command, true, () => selected(HOST_SERVICES));

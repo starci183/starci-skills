@@ -1,0 +1,27 @@
+group: sonar
+verb: token
+owner: runtime
+summary: ensure, rotate or revoke a declared Sonar token without exposing its value
+impl: {module: scripts/gates/sonar-manage.mjs, export: runSonarManage}
+effect: remote
+roles: [worker, lead, coordinator, owner]
+positional: [{name: action, enum: [ensure, rotate, revoke], required: true, variadic: false}]
+operationPolicy:
+  ensure: {action: sonar.token.ensure, effect: remote, credentials: [admin], destination: required, checkpoints: [account-authority, unrecoverable-output]}
+  rotate: {action: sonar.token.rotate, effect: remote, credentials: [admin], destination: required, checkpoints: [account-authority, unrecoverable-output]}
+  revoke: {action: sonar.token.revoke, effect: remote, credentials: [admin], destination: none, checkpoints: [account-authority]}
+flags:
+  - {name: target, type: string, required: true, summary: named operation target}
+  - {name: operation, type: string, summary: durable operation id}
+  - {name: execute, type: boolean, summary: execute under existing accepted operation scope}
+  - {name: reconcile, type: boolean, summary: "reconcile prior mint, custody or revocation effects"}
+  - {name: key, type: string, summary: exact declared project key}
+  - {name: name, type: string, summary: exact declared provider token name}
+  - {name: login, type: string, summary: exact declared token owner login}
+  - {name: type, type: enum, enum: [USER_TOKEN, PROJECT_ANALYSIS_TOKEN, GLOBAL_ANALYSIS_TOKEN], summary: exact declared token scope}
+conventions:
+  - token mint and custody outcomes stay separate; an uncertain mint is reconciled before another write
+exit: {"0": plan prepared or operation completed, "1": provider effect failed or remains uncertain, "2": policy or input refused}
+json: always
+examples: [starci sonar token ensure --target quality --name analysis --operation analysis-token]
+editions: [full, lite]

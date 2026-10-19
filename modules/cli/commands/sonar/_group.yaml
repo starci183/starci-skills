@@ -1,0 +1,4 @@
+group: sonar
+summary: execute declared Sonar administration, analysis and read operations
+owner: runtime
+runtimeSide: host

@@ -70,6 +70,14 @@ input:
     The content-bound token from revisionPreview.approval. It may be supplied
     only after the owner replies exact `ok` to that preview. A missing, stale or
     mismatched token refuses the revision before opening a write transaction.
+  provision_grants: >-
+    A public starci/provision-grants@1 JSON file names prepared immutable provider plans by
+    operation id and digest, each bound to one op in this derived chain. The plan displays their
+    action, target and grant-list digest. Initial owner persistence requires that exact digest
+    through --approve-provision-grants; a revision includes the selected list in its native
+    approval token. An explicit empty list revokes grants. Supervisor and provisional entries
+    cannot issue grants. Execution separately verifies current goal revision, filed native
+    attempt/dispatch identity and exact prepared plan through scripts/gates/provision-authority.mjs.
 
 derives:
   goal_markdown: the goal statement rendered from the prompt

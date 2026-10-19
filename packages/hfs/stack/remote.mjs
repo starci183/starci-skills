@@ -14,6 +14,7 @@ import { tool } from './context.mjs';
 import { restrictToUser, writePrivate } from './private-file.mjs';
 import { refusal } from './errors.mjs';
 import { createSshSession, sessionDirectory } from './ssh-session.mjs';
+import { assertStackAccount } from './target-binding.mjs';
 
 const ACCOUNT = /^[A-Za-z0-9._@-]+$/u;
 const CI_VARIABLES = ['VPS_SSH_KEY', 'VPS_KNOWN_HOSTS', 'VPS_HOST', 'VPS_USER'];
@@ -92,9 +93,12 @@ function writeWithMode(file, text, mode) {
 export function openSealedSession(ctx, config) {
   const { sealed } = config.remote;
   const account = opsAccount(ctx, config);
+  if (config.nativeTarget && account !== `${config.nativeTarget.user}@${config.nativeTarget.host}`)
+    throw refusal('STACK_REMOTE_OPS', 'the sealed SSH account differs from the accepted native target');
   const key = binaryMember(ctx, config, sealed.sshKey, ['privateKey', 'key']);
   if (!key.includes('PRIVATE KEY')) throw refusal('STACK_REMOTE_KEY', `${sealed.sshKey} does not hold a PEM private key`);
   const known = binaryMember(ctx, config, sealed.knownHosts, ['knownHosts', 'known_hosts']).trim();
+  assertStackAccount(config.nativeTarget, account, known);
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'stack-ssh-'));
   const keyFile = path.join(dir, 'id');
   const knownFile = path.join(dir, 'known_hosts');
@@ -113,13 +117,14 @@ export function openSealedSession(ctx, config) {
     throw error;
   }
   const notes = known ? [] : ['owner-machine session without known_hosts: the host key is accepted on first contact (accept-new); verify it, CI never does this'];
-  return { account, dir, keyFile, knownFile, strict: known ? 'yes' : 'accept-new', notes, cleanup };
+  return { account, dir, keyFile, knownFile, strict: known ? 'yes' : 'accept-new', notes, cleanup,
+    ...(config.nativeTarget ? { port: config.nativeTarget.port } : {}) };
 }
 
 /** The owner-machine runner over that session. */
 function sealedRunner(ctx, config) {
   const session = openSealedSession(ctx, config);
-  const argv = ['ssh', '-T', '-i', session.keyFile, '-o', 'IdentitiesOnly=yes', '-o', `UserKnownHostsFile=${session.knownFile}`, '-o', `StrictHostKeyChecking=${session.strict}`, '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=20', session.account];
+  const argv = ['ssh', '-T', ...(session.port ? ['-p', String(session.port)] : []), '-i', session.keyFile, '-o', 'IdentitiesOnly=yes', '-o', `UserKnownHostsFile=${session.knownFile}`, '-o', `StrictHostKeyChecking=${session.strict}`, '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=20', session.account];
   return sessionRunner(ctx, argv, session.dir, session.cleanup, session.notes);
 }
 
@@ -143,6 +148,7 @@ function sshRunner(ctx, config, { sshCmd = null } = {}) {
  */
 function withOwnerTransport(ctx, config, { sshCmd = null } = {}) {
   const { sealed } = config.remote;
+  if (config.nativeTarget) return Object.create(ctx, { env: { value: { ...ctx.env, STARCI_STACK_SEALED_SSH: '1' }, enumerable: true } });
   if (sshCmd || !sealed || ctx.env.GITHUB_ACTIONS === 'true' || ctx.env.STARCI_STACK_SEALED_SSH !== undefined) return ctx;
   const present = [sealed.ops, sealed.sshKey, sealed.knownHosts].every((slug) => fs.existsSync(path.join(config.secretsDir, `${slug}.enc`)));
   if (!present) return ctx;

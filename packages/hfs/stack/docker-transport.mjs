@@ -17,6 +17,7 @@ const controlLines = (controlPath) => controlSettings(configPath(controlPath)).m
 
 /** True when the operator's docker CLI has to be pointed at the manager by this module. */
 function needed(ctx, config, sshCmd) {
+  if (config.nativeTarget) return true;
   if (sshCmd || ctx.env.DOCKER_HOST || ctx.env.GITHUB_ACTIONS === 'true' || ctx.env.STARCI_STACK_SEALED_SSH === '0') return false;
   const { sealed } = config.remote;
   if (!sealed) return false;
@@ -27,6 +28,7 @@ function sshConfig(session, controlPath, windows) {
   const at = session.account.lastIndexOf('@');
   return [
     `Host ${ALIAS}`, `  HostName ${session.account.slice(at + 1)}`, `  User ${session.account.slice(0, at)}`,
+    ...(session.port ? [`  Port ${session.port}`] : []),
     `  IdentityFile ${configPath(session.keyFile)}`, '  IdentitiesOnly yes', `  UserKnownHostsFile ${configPath(session.knownFile)}`,
     `  StrictHostKeyChecking ${session.strict}`, '  BatchMode yes', '  ConnectTimeout 20',
     ...(windows ? [] : controlLines(controlPath)), '',
@@ -102,7 +104,7 @@ export async function withDockerTransport(ctx, config, { sshCmd = null } = {}, b
     const baseEnv = session ? dockerEnvironment(ctx, session, controlPath) : ctx.env;
     const { env, executable } = privateSshEnvironment(ctx, baseEnv, dir, controlPath);
     const configFile = path.join(env.HOME ?? '', '.ssh', 'config');
-    const options = ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=20'];
+    const options = ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=20', ...(session?.port ? ['-p', String(session.port)] : [])];
     const argv = session || executable !== 'ssh' ? [executable, ...options, '-F', configFile, '--', alias] : ['ssh', ...options, '--', alias];
     connection = createSshSession(ctx, { argv, env, controlPath, cleanup });
     const spawn = dockerSpawn(ctx, connection, env, alias);

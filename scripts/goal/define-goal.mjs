@@ -2,7 +2,8 @@
 // Goal definition and revision follow modules/goal/define-goal.yaml.
 // The persisted inbox is the Kernel's claim boundary; docs/ledger-db.md owns storage placement.
 import fs from 'node:fs';
-import { acceptGoalRevision } from './accept-revision.mjs';
+import { acceptGoalRevision, goalRevisionPreview } from './accept-revision.mjs';
+import { prepareProvisionGrants, requireProvisionGrantOwner } from './provision-grants.mjs';
 import path from 'node:path';
 import { runNode } from '../api/node/run-node.mjs';
 import { fileURLToPath } from 'node:url';
@@ -32,6 +33,8 @@ const displayNameArg = argvValue(process.argv, 'display-name');
 const reviseWorkflowId = argvValue(process.argv, 'revise');
 const revisionReason = argvValue(process.argv, 'reason', 'owner-approved plan-divergence correction');
 const approveRevision = argvValue(process.argv, 'approve-revision');
+const provisionGrantsFile = argvValue(process.argv, 'provision-grants');
+const approveProvisionGrants = argvValue(process.argv, 'approve-provision-grants');
 const routingBias = (()=>{
   const raw=argvValue(process.argv,'routing-bias');
   if(raw==null)return null;
@@ -73,7 +76,7 @@ const supervisorProvenance = bridgeId ? { by: 'supervisor', provisional: true, b
 // row, the inbox entry and the goal-defined event (e.g. a relaunch the owner ordered in chat).
 const ownerDefinition = !definedBy && !reviseWorkflowId && argvValue(process.argv, 'reason') != null
   ? { by: 'owner', source: 'owner-chat', reason: String(argvValue(process.argv, 'reason')), assurance: 'conversation-context-not-authenticated' } : null;
-const usage = `usage: define-goal.mjs (--repo <path> | --project <name>) --text "<owner prompt>" [--title <slug>] [--display-name "<Product> · <what>"] [--reason <owner chat ref>] [--params '{"<op>":{"<name>":<value>}}'] [--json] [--plan] [--revise <workflow-id> [--reason <text>] [--approve-revision <preview-token>]] [--defined-by supervisor --bridge-id <id> [--reason <text>]] [--approve-revision <preview-token> --approved-by supervisor --bridge-id <id>]`;
+const usage = `usage: define-goal.mjs (--repo <path> | --project <name>) --text "<owner prompt>" [--title <slug>] [--display-name "<Product> · <what>"] [--reason <owner chat ref>] [--params '{"<op>":{"<name>":<value>}}'] [--provision-grants <public-json-file> [--approve-provision-grants <preview-digest>]] [--json] [--plan] [--revise <workflow-id> [--reason <text>] [--approve-revision <preview-token>]] [--defined-by supervisor --bridge-id <id> [--reason <text>]] [--approve-revision <preview-token> --approved-by supervisor --bridge-id <id>]`;
 if (projectName && repoArg) { console.error(`--project and --repo are mutually exclusive\n${usage}`); process.exit(2); }
 if (!text) { console.error(usage); process.exit(2); }
 // A goal text carrying an unrendered value ("original goal: null") is never an owner's words (scripts/goal/goal-text.mjs).
@@ -263,6 +266,12 @@ const revisionBase = (() => {
   catch (error) { console.error(error.message); process.exit(2); }
 })();
 
+const { provisionGrants, provisionGrantsDigest, provisionGrantPlans, provisionGrantsApproval } = (() => {
+  try { return prepareProvisionGrants({ provisionGrantsFile, revisionBase, skillRoot, chain, repo,
+    planOnly, reviseWorkflowId, definedBy, approvedBy, approveProvisionGrants }); }
+  catch (error) { console.error(error.message); process.exit(2); }
+})();
+
 function revisionDiff(base, proposedChain) {
   const before = chainOps(base.json?.opChain);
   const after = chainOps(proposedChain);
@@ -279,70 +288,9 @@ function revisionDiff(base, proposedChain) {
   };
 }
 
-function revisionPreview(base) {
-  const nextRevision = base.goal.revision + 1;
-  const diff = revisionDiff(base, chain);
-  const approvalPayload = {
-    workflowId: reviseWorkflowId,
-    baseRevision: base.goal.revision,
-    nextRevision,
-    goalIdentity: base.goal.goal_identity,
-    contentDigest,
-    opChain: diff.after,
-    reason: revisionReason,
-    routingBias,
-  };
-  const approvalToken = `rev-${sha256(JSON.stringify(approvalPayload))}`;
-  const selectorArgs = projectName ? ['--project', projectName] : ['--repo', repo];
-  const approvalArgs = [
-    fileURLToPath(import.meta.url), ...selectorArgs, '--revise', reviseWorkflowId,
-    '--text', text, '--reason', revisionReason, '--approve-revision', approvalToken, '--json',
-  ];
-  if (title) approvalArgs.push('--title', title);
-  if (routingBias !== null) approvalArgs.push('--routing-bias', JSON.stringify(routingBias));
-  return {
-    schema: 'starci/goal-revision-preview@1',
-    workflowId: reviseWorkflowId,
-    baseRevision: base.goal.revision,
-    nextRevision,
-    goalIdentity: base.goal.goal_identity,
-    preservesGoalIdentity: true,
-    proposedContentDigest: contentDigest,
-    reason: revisionReason,
-    scope: {
-      kind: chain?.scopeKind ?? null,
-      sameLedgerIsNotConflict: true,
-      otherLiveWorkflows: base.otherLiveWorkflows.map(w => ({ ...w, conflictInferred: false })),
-      note: 'Shared ledger custody is not path-overlap evidence; concrete owned paths and live effects decide conflicts.',
-    },
-    opChainDiff: diff,
-    planDivergence: diff.changed ? {
-      action: 'approve-goal-revision',
-      added: diff.added,
-      removed: diff.removed,
-      reordered: diff.reordered,
-    } : null,
-    kernel: {
-      live: base.liveKernel,
-      resumeAllowed: false,
-      resumeCondition: `goals revision ${nextRevision} and its owner-approval receipt must be committed atomically`,
-    },
-    openOperationJobs: base.openOperationJobs,
-    checkpoint: {
-      queuedSupersedable: base.openOperationJobs.filter(job => job.status === 'queued').map(job => job.job_id),
-      mustSettleFirst: base.openOperationJobs.filter(job => job.status !== 'queued').map(job => ({ jobId: job.job_id, status: job.status })),
-      rule: 'owner-approved revision atomically cancels only queued no-effect jobs; leased/running/effect_unknown jobs must settle or reconcile first',
-    },
-    approval: {
-      required: true,
-      ownerReply: 'ok',
-      token: approvalToken,
-      command: { executable: process.execPath, args: approvalArgs },
-    },
-  };
-}
-
-const preview = revisionBase ? revisionPreview(revisionBase) : null;
+const preview = revisionBase ? goalRevisionPreview({ base: revisionBase, diff: revisionDiff(revisionBase, chain),
+  chain, text, reviseWorkflowId, contentDigest, revisionReason, routingBias, provisionGrants, provisionGrantsDigest,
+  projectName, repo, title, provisionGrantsFile, entry: fileURLToPath(import.meta.url) }) : null;
 const willWrite = revisionBase
   ? [`goals row (revision ${preview.nextRevision}, same workflow + identity)`, 'queued no-effect operation jobs superseded atomically', 'inbox row (kind=goal-revision, status=pending)', 'goal-revised event']
   : ['workflows row (phase=queued)', 'goals row (revision 0)', 'inbox row (kind=goal, status=pending)', 'goal-defined event'];
@@ -381,10 +329,18 @@ if (planOnly) {
     kernelRoute: 'precedence: --agent flag > config.yaml kernel pin or group > route-model',
     ledger: ledgerFileFor(repo),
     revisionPreview: preview ?? undefined,
+    provisionGrants: provisionGrantPlans,
+    provisionGrantsDigest: provisionGrants.length ? provisionGrantsDigest : undefined,
+    provisionGrantsAcceptance: !revisionBase && provisionGrants.length ? { flag: '--approve-provision-grants', digest: provisionGrantsDigest } : undefined,
   };
   if (asJson) { console.log(JSON.stringify(out, null, 2)); process.exit(0); }
   const planHead = revisionBase ? `revise ${reviseWorkflowId} to rev ${preview.nextRevision}` : `goal "${out.title}"`;
   const lines = [`PLAN — ${planHead}`, ...(out.displayName ? [`  name: ${out.displayName}`] : []), `  identity: ${out.goalIdentity}${revisionBase ? ' (preserved)' : ''}`];
+  if (provisionGrantPlans.length) {
+    lines.push('PROVIDER GRANTS:', ...provisionGrantPlans.map(grant => `  ${grant.op}: ${grant.action} on ${grant.target} — ${grant.operation} @ ${grant.digest}`),
+      `  grant digest: ${provisionGrantsDigest}`);
+  }
+  if (preview?.provisionGrants.changed && !provisionGrantPlans.length) lines.push('PROVIDER GRANTS: revoke the prior grant list');
   lines.push(project
     ? `  scope: project '${project.project}' → ${project.ownerRepo}`
     : `  scope: repo ${repo}`, 'STATE (cold scan):');
@@ -460,7 +416,8 @@ if (revisionBase) {
   const ledger = openLedger({ file: revisionBase.file });
   try {
     const { alreadyApplied, supersededJobs } = acceptGoalRevision({ ledger, workflowId: reviseWorkflowId, preview, approveRevision,
-      revisionBase, text, chain, derivedPlan: derivedPlanOf(chain), routingBias, revisionReason, approvedBy, supervisorProvenance, bridgeId, now });
+      revisionBase, text, chain, derivedPlan: derivedPlanOf(chain), routingBias, provisionGrants, provisionGrantsApproval,
+      grantAdmissionRoot: skillRoot, revisionReason, approvedBy, supervisorProvenance, bridgeId, now });
     const out = {
       workflowId: reviseWorkflowId,
       goalRevision: preview.nextRevision,
@@ -484,17 +441,24 @@ if (revisionBase) {
 
 const ledger = openLedger({ file: ledgerFileFor(repo) });
 try {
+  requireProvisionGrantOwner({ ledger, grants: provisionGrants, root: skillRoot, provisional: Boolean(definedBy) });
   ledger.transaction(() => {
     // The owner's exact-ok (or the Supervisor's bridge) is the approval: the workflow is born queued.
     const by = definedBy ? 'supervisor' : 'owner';
     createWorkflow(ledger.db, { workflowId, phase: 'queued', by, reason: 'define-goal', title: title || text.slice(0, 80), displayName, ledgerMode: 'durable', sourceRoots: [repo], goalIdentity, at: now });
-    insertGoal(ledger.db, { workflowId, revision: 0, goalIdentity, markdown: text, approvedBy: by, approvalRef: bridgeId ?? null, createdAt: now,
-      goal: { derivedFrom: definedBy ? 'supervisor-bridge' : 'owner-prompt', ...(definedBy ? { definedBy: 'supervisor', provisional: true, bridge: supervisorProvenance } : {}), ...(ownerDefinition ? { ownerApproval: ownerDefinition } : {}), opChain: chain, ...(chain ? { derivedPlan: derivedPlanOf(chain) } : {}), ...(underivable ? { underivable } : {}), routing_bias: routingBias } });
+    insertGoal(ledger.db, { workflowId, revision: 0, goalIdentity, markdown: text, approvedBy: by,
+      approvalRef: bridgeId ?? (provisionGrants.length ? provisionGrantsDigest : null), createdAt: now,
+      goal: { derivedFrom: definedBy ? 'supervisor-bridge' : 'owner-prompt', ...(definedBy ? { definedBy: 'supervisor', provisional: true, bridge: supervisorProvenance } : {}), ...(ownerDefinition ? { ownerApproval: ownerDefinition } : {}), opChain: chain, ...(chain ? { derivedPlan: derivedPlanOf(chain) } : {}), ...(underivable ? { underivable } : {}), routing_bias: routingBias,
+        ...(provisionGrants.length ? { provisionGrants, provisionGrantsApproval } : {}) } });
     postInbox(ledger.db, { workflowId, kind: 'goal', key: workflowId, fromRef: by, createdAt: now,
-      payload: { prompt: text, title: title || null, routing_bias: routingBias, ...(definedBy ? { definedBy: 'supervisor', provisional: true, bridgeId } : {}), ...(ownerDefinition ? { ownerApproval: ownerDefinition } : {}), at: now } });
-    ledger.appendEvent({ workflowId, entityType: 'goal', entityId: workflowId, kind: 'goal-defined', payload: { revision: 0, goalIdentity, legs: chain?.legs?.length ?? null, ...(definedBy ? { definedBy: 'supervisor', provisional: true, bridgeId } : {}), ...(ownerDefinition ? { ownerApproval: ownerDefinition } : {}) } });
+      payload: { prompt: text, title: title || null, routing_bias: routingBias, ...(definedBy ? { definedBy: 'supervisor', provisional: true, bridgeId } : {}), ...(ownerDefinition ? { ownerApproval: ownerDefinition } : {}), ...(provisionGrants.length ? { provisionGrantsDigest } : {}), at: now } });
+    ledger.appendEvent({ workflowId, entityType: 'goal', entityId: workflowId, kind: 'goal-defined', payload: { revision: 0, goalIdentity, legs: chain?.legs?.length ?? null, ...(definedBy ? { definedBy: 'supervisor', provisional: true, bridgeId } : {}), ...(ownerDefinition ? { ownerApproval: ownerDefinition } : {}), ...(provisionGrants.length ? { provisionGrantsDigest } : {}) } });
   });
   const out = { workflowId, displayName, goalRevision: 0, goalIdentity, opChain: chain?.legs?.map(l => l.op) ?? null, queued: true, ledger: ledgerFileFor(repo), ...(ownerDefinition ? { ownerApproval: ownerDefinition } : {}), ...(definedBy ? { definedBy: 'supervisor', provisional: true, bridgeId } : {}) };
   const chainText = chain ? `, ${chain.legs.length} legs` : ', chain: underivable';
   console.log(asJson ? JSON.stringify(out, null, 2) : `queued ${workflowId} "${displayName}" (goal rev 0, ${goalIdentity}${chainText})`);
+} catch (error) {
+  if (error.code !== 'provision-owner-checkpoint-required') throw error;
+  console.error(error.message);
+  process.exitCode = 2;
 } finally { ledger.close(); }

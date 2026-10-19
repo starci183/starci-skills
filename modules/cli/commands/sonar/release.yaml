@@ -1,0 +1,23 @@
+group: sonar
+verb: release
+owner: runtime
+summary: run the native application release gate with declared Sonar analysis and Browse roles
+impl: {module: scripts/gates/sonar-release.mjs, export: runSonarRelease}
+effect: remote
+roles: [worker, lead, coordinator, owner]
+positional: [{name: action, enum: [gate], required: true, variadic: false}]
+operationPolicy:
+  gate: {action: sonar.release.gate, effect: remote, credentials: [analysis, browse], destination: none, checkpoints: [account-authority]}
+flags:
+  - {name: target, type: string, required: true, summary: named application release and Sonar target}
+  - {name: operation, type: string, summary: durable operation id}
+  - {name: revision, type: string, required: true, summary: exact clean application source revision admitted to the native gate}
+  - {name: execute, type: boolean, summary: execute the exact accepted native release-gate plan}
+  - {name: reconcile, type: boolean, summary: inspect native release and Sonar outcomes without rerunning an uncertain gate}
+conventions:
+  - the plan includes native release records and local tag effects; remote publication remains a separate release action
+  - analysis and Browse roles remain separate; native checks and processed Sonar evidence must both pass
+exit: {"0": plan prepared or the native gate and required Sonar evidence passed, "1": gate failed or an effect remains uncertain, "2": policy or input refused}
+json: always
+examples: [starci sonar release gate --target application-quality --operation release-check --revision <sha>]
+editions: [full, lite]

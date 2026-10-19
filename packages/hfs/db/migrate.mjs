@@ -18,6 +18,7 @@ import { firstLine, tool } from '../stack/context.mjs';
 import { approvalMissing, failure, refusal } from '../stack/errors.mjs';
 import { readDeclaration, runVerb } from '../release/index.mjs';
 import { migrateLocalDatabase } from './local-migrate.mjs';
+import { parseTargetBinding, assertUrlDatabase, assertBoundCustody, boundSupabaseLauncher, boundLinkedDatabaseUrl, nativeDatabaseEnvironment } from '../stack/target-binding.mjs';
 
 const DATABASE_CODE = 'DB_CONFIG_INVALID';
 
@@ -182,17 +183,20 @@ function parseConnection(value) {
   } catch { return null; }
 }
 
-function urlTarget(ctx, name) {
+function urlTarget(ctx, name, binding = null) {
   if (!KEY.test(name)) throw refusal('DB_USAGE', '--url-env must name an UPPER_CASE environment variable');
   const value = ctx.env[name];
   if (typeof value !== 'string' || value === '') throw refusal('DB_URL_ENV_MISSING', `${name} is not set`);
+  if (binding && (binding.mode !== 'url-env' || name !== binding.urlEnv)) throw refusal('DB_WRONG_PROJECT', 'the URL selector differs from the accepted native target');
+  assertUrlDatabase(binding, value);
   const parsed = parseConnection(value);
   if (!parsed) throw refusal('DB_URL_INVALID', `${name} is not a postgres connection URL`);
   const secrets = [value, parsed.password].filter(Boolean);
-  return { kind: 'url', how: `connection string from ${name}`, url: parsed.url, env: parsed.password ? { PGPASSWORD: parsed.password } : {}, secrets };
+  return { kind: 'url', how: `connection string from ${name}`, url: parsed.url, env: parsed.password ? { PGPASSWORD: parsed.password } : {}, secrets, nativeTarget: binding, privateInputEnv: name };
 }
 
-function sealedPassword(ctx, spec) {
+function sealedPassword(ctx, spec, binding = null) {
+  if (binding) assertBoundCustody(ctx.cwd, path.join(ctx.cwd, STACKS_DIR, spec.env, 'secrets', `${spec.member}.enc`));
   let map;
   try { map = readMap(path.join(ctx.cwd, STACKS_DIR, spec.env, 'secrets', `${spec.member}.enc`), ctx.sops); } catch { throw refusal('DB_PASSWORD_UNREADABLE', `the sealed member ${spec.member} cannot be opened`); }
   if (typeof map[spec.key] !== 'string' || map[spec.key] === '') throw refusal('DB_PASSWORD_UNREADABLE', `the sealed member ${spec.member} has no value for ${spec.key}`);
@@ -200,24 +204,45 @@ function sealedPassword(ctx, spec) {
 }
 
 /** The database password for the linked CLI: SUPABASE_DB_PASSWORD from the environment, else the declared sealed value, else none (the CLI mints a login). */
-function linkedPassword(ctx, decl) {
+function linkedPassword(ctx, decl, binding = null) {
+  if (binding) {
+    if (!decl.password || decl.password.env !== binding.environment || ctx.env.SUPABASE_DB_PASSWORD !== undefined)
+      throw refusal('DB_PASSWORD_UNREADABLE', 'the bound linked target requires its declared sealed password without an ambient override');
+    return sealedPassword(ctx, decl.password, binding);
+  }
   const given = ctx.env.SUPABASE_DB_PASSWORD;
   if (typeof given === 'string' && given !== '') return given;
   return decl.password === null ? null : sealedPassword(ctx, decl.password);
 }
 
-function linkedTarget(ctx, decl) {
+function linkedTarget(ctx, decl, binding = null) {
+  if (binding && (binding.mode !== 'linked' || decl.projectRef !== binding.projectRef || !decl.password || decl.password.env !== binding.environment))
+    throw refusal('DB_WRONG_PROJECT', 'the linked project and sealed password must match the accepted native target');
   let ref;
+  if (binding) assertBoundCustody(ctx.cwd, path.join(ctx.cwd, 'supabase', '.temp', 'project-ref'));
   try { ref = fs.readFileSync(path.join(ctx.cwd, 'supabase', '.temp', 'project-ref'), 'utf8').trim(); } catch { throw refusal('DB_NOT_LINKED', 'no linked project (supabase/.temp/project-ref): run supabase link first'); }
   if (decl.projectRef !== null && ref !== decl.projectRef) throw refusal('DB_WRONG_PROJECT', `the app is linked to ${ref}, not the declared project ${decl.projectRef}`);
-  const password = linkedPassword(ctx, decl);
-  return { kind: 'linked', how: `linked project ${ref}`, ref, url: null, env: password ? { SUPABASE_DB_PASSWORD: password } : {}, secrets: password ? [password] : [] };
+  if (binding && ref !== binding.projectRef) throw refusal('DB_WRONG_PROJECT', 'the linked project differs from the accepted native target');
+  let nativeUrl;
+  if (binding) {
+    const saved = path.join(ctx.cwd, 'supabase', '.temp', 'pooler-url');
+    const stat = fs.lstatSync(saved, { throwIfNoEntry: false });
+    if (stat) {
+      assertBoundCustody(ctx.cwd, saved);
+      if (stat.size > 8192) throw refusal('DB_WRONG_PROJECT', 'the saved native pooler endpoint exceeds its public bound');
+    }
+    nativeUrl = boundLinkedDatabaseUrl(binding, stat ? fs.readFileSync(saved, 'utf8') : null);
+  }
+  const password = linkedPassword(ctx, decl, binding);
+  if (binding) return { kind: 'url', logicalKind: 'linked', how: `linked project ${ref}`, ref, url: nativeUrl,
+    env: { PGPASSWORD: password }, secrets: [password], nativeTarget: binding };
+  return { kind: 'linked', how: `linked project ${ref}`, ref, url: null, env: password ? { SUPABASE_DB_PASSWORD: password } : {}, secrets: password ? [password] : [], nativeTarget: binding };
 }
 
 /** { kind, how, env, secrets, url }: the linked project of the app (default) or the connection string in the named environment variable. */
 export function resolveTarget(ctx, decl, options) {
   if (options.linked === true && options.urlEnv !== undefined) throw refusal('DB_USAGE', '--linked and --url-env exclude each other');
-  return options.urlEnv === undefined ? linkedTarget(ctx, decl) : urlTarget(ctx, options.urlEnv);
+  return options.urlEnv === undefined ? linkedTarget(ctx, decl, options.nativeTarget) : urlTarget(ctx, options.urlEnv, options.nativeTarget);
 }
 
 /** CLI arguments that select the database and the local supabase folder. */
@@ -228,7 +253,8 @@ export function requireArmed(ctx) {
   if (ctx.env.STARCI_DB_ARMED !== '1') throw approvalMissing('DB_NOT_ARMED', 'set STARCI_DB_ARMED=1 to apply database changes');
 }
 
-const supabaseCommand = (root) => {
+const supabaseCommand = (root, bound) => {
+  if (bound) return [process.execPath, boundSupabaseLauncher(root)];
   const script = path.join(root, 'node_modules', 'supabase', 'dist', 'supabase.js');
   return fs.existsSync(script) ? [process.execPath, script] : ['supabase'];
 };
@@ -236,15 +262,41 @@ const supabaseCommand = (root) => {
 /** Runs the Supabase CLI through the seam; a failure names the first stderr line with every secret scrubbed. Returns { stdout, text } (text = stdout plus stderr). */
 export function runCli(session, args) {
   const { ctx, target } = session;
-  const [command, ...lead] = supabaseCommand(ctx.cwd);
-  const run = tool(ctx, command, [...lead, ...args], { cwd: ctx.cwd, env: { ...ctx.env, ...target.env } });
+  const [command, ...lead] = supabaseCommand(ctx.cwd, target.nativeTarget);
+  const env = target.nativeTarget ? nativeDatabaseEnvironment(ctx.env, target.nativeTarget, target.env, [target.privateInputEnv]) : { ...ctx.env, ...target.env };
+  const workdir = target.nativeTarget ? args[args.indexOf('--workdir') + 1] : ctx.cwd;
+  if (target.nativeTarget && !session.nativeWorkdirs?.has(workdir)) throw refusal('DB_CONFIG_INVALID', 'the bound database command requires its clean public scratch project');
+  const run = tool(ctx, command, [...lead, ...args, ...(target.nativeTarget ? ['--profile', 'supabase', '--output-format', 'json', '--agent', 'no'] : [])], { cwd: workdir, env });
   if (run.error) throw failure('DB_CLI_MISSING', `cannot run the Supabase CLI (${scrub(run.error.message, target.secrets)})`);
   if (run.status !== 0) throw failure('DB_CLI_FAILED', `supabase ${args.slice(0, 2).join(' ')} failed: ${scrub(firstLine(run.stderr), target.secrets)}`);
   return { stdout: run.stdout ?? '', text: `${run.stdout ?? ''}${run.stderr ?? ''}` };
 }
 
-/** The remote history as a Set of versions (read-only). */
-export const listRemote = (session) => parseMigrationList(runCli(session, ['migration', 'list', ...targetArgs(session.target, session.ctx.cwd)]).text).remote;
+/** A bound consumer requires the native machine result; unreadable output cannot become an empty database history. */
+function boundRemoteVersions(stdout) {
+  let data;
+  try { data = JSON.parse(stdout); } catch { throw failure('DB_CLI_FAILED', 'the bound migration history is not readable JSON'); }
+  if (!Array.isArray(data?.migrations) || data.migrations.some(item => !plain(item)
+    || typeof item.local !== 'string' || typeof item.remote !== 'string'
+    || item.local !== '' && !STAMP.test(item.local) || item.remote !== '' && !STAMP.test(item.remote)
+    || !item.local && !item.remote))
+    throw failure('DB_CLI_FAILED', 'the bound migration history has an unexpected shape');
+  return new Set(data.migrations.map(item => item.remote).filter(Boolean));
+}
+
+/** The remote history as a Set of versions; bound callers require noninteractive structured output. */
+export function listRemote(session) {
+  if (!session.target.nativeTarget) return parseMigrationList(runCli(session, ['migration', 'list', ...targetArgs(session.target, session.ctx.cwd)]).text).remote;
+  const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-db-'));
+  try {
+    const { model } = session;
+    buildScratch(session, scratch, model.push.map(file => ({ from: path.join(model.root, model.decl.migrationsDir, file), name: file })));
+    return boundRemoteVersions(runCli(session, ['migration', 'list', ...targetArgs(session.target, scratch)]).stdout);
+  } finally {
+    session.nativeWorkdirs?.delete(scratch);
+    fs.rmSync(scratch, { recursive: true, force: true });
+  }
+}
 
 /* ---- the plan */
 
@@ -288,12 +340,13 @@ const dataOf = (model, plan, remote, extra) => ({
 
 /* ---- applying */
 
-/** A scratch supabase project holding exactly the given migration files; the link state of the app is copied so --linked works from it. */
+/** Public scratch SQL/config only for bound URLs; ordinary linked commands retain their native link state. */
 function buildScratch(session, dir, copies) {
   fs.mkdirSync(path.join(dir, 'supabase', 'migrations'), { recursive: true });
   fs.writeFileSync(path.join(dir, 'supabase', 'config.toml'), 'project_id = "starci-db-scratch"\n');
   for (const copy of copies) fs.copyFileSync(copy.from, path.join(dir, 'supabase', 'migrations', copy.name));
   if (session.target.kind === 'linked') fs.cpSync(path.join(session.ctx.cwd, 'supabase', '.temp'), path.join(dir, 'supabase', '.temp'), { recursive: true });
+  if (session.target.nativeTarget) (session.nativeWorkdirs ??= new Set()).add(dir);
 }
 
 const repair = (session, status, versions, dir) => runCli(session, ['migration', 'repair', '--status', status, ...versions, ...targetArgs(session.target, dir)]);
@@ -334,6 +387,7 @@ function applyPlan(session, plan) {
  * STARCI_DB_ARMED=1) applies it. Already baseline + forward: `nothing to do`, no mutating call, ok.
  */
 async function migrateDatabase(ctx, decl, options = {}) {
+  if (options.nativeTarget) boundSupabaseLauncher(ctx.cwd);
   const model = buildModel(ctx.cwd, decl);
   const session = { ctx, model, target: resolveTarget(ctx, decl, options) };
   const remote = listRemote(session);
@@ -354,19 +408,22 @@ async function migrateDatabase(ctx, decl, options = {}) {
   return { ok: true, lines: [...lines, `applied: ${pushed.length} forward migration(s) pushed; the remote history now holds ${final.size} version(s). Held back: ${model.held.join(', ') || 'nothing'}.`], data: dataOf(model, plan, remote, { executed: true, pushed, remoteCountAfter: final.size }) };
 }
 
-const SPEC = { boolean: ['--execute', '--json', '--linked', '--local'], value: ['--url-env'] };
+const SPEC = { boolean: ['--execute', '--json', '--linked', '--local'], value: ['--url-env', '--target-binding'] };
 
 /** Entry of the verb: explicit local applies active SQL; linked/url-env retains the declared cutover plan. Execute requires database arming. */
 export function dbMigrateMain(argv, io = {}) {
   return runVerb({
     label: 'starci app db migrate', name: 'db migrate', code: 'DB_USAGE', io, argv, spec: SPEC,
     run: (ctx, flags) => {
+      const nativeTarget = parseTargetBinding(flags['target-binding'], 'supabase-db');
+      if (nativeTarget && (nativeTarget.mode === 'local' ? !flags.local : nativeTarget.mode === 'linked' ? !flags.linked : flags['url-env'] !== nativeTarget.urlEnv))
+        throw refusal('DB_USAGE', 'the native database selector differs from its accepted binding');
       if (flags.local) {
         if (flags.linked || flags['url-env'] !== undefined) throw refusal('DB_USAGE', '--local excludes --linked and --url-env');
         if (flags.execute) requireArmed(ctx);
-        return migrateLocalDatabase(ctx, { execute: flags.execute === true });
+        return migrateLocalDatabase(ctx, { execute: flags.execute === true, nativeTarget });
       }
-      return migrateDatabase(ctx, loadDatabase(ctx.cwd), { execute: flags.execute === true, linked: flags.linked === true, urlEnv: flags['url-env'] });
+      return migrateDatabase(ctx, loadDatabase(ctx.cwd), { execute: flags.execute === true, linked: flags.linked === true, urlEnv: flags['url-env'], nativeTarget });
     },
   });
 }

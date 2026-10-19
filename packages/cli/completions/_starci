@@ -4,6 +4,7 @@ _starci() {
   local -a groups
   local prev
   groups=(
+    'access:execute declared application account and membership operations'
     'app:product application scaffolding, checks, managed output and local test infrastructure'
     'check:select existing runtime and app checks by test ladder level'
     'connect:operate owner connectors and their delivery services'
@@ -18,11 +19,13 @@ _starci() {
     'machine:inspect and maintain host machine state'
     'npm:install exact dependencies in one owned worktree under the host lock'
     'orca:call the runtime-owned Orca host boundary'
+    'provision:inspect and accept immutable plans for declared provider operations'
     'reconciler:control and inspect the host reconciler engine'
     'release:prove, inspect and perform runtime release operations'
     'route:resolve runtime operations from structured routing inputs'
     'runtime:install, update and check the StarCi runtime tree'
     'smoke:prove published StarCi behavior in isolated scratch applications'
+    'sonar:execute declared Sonar administration, analysis and read operations'
     'supabase:operate one app'\''s isolated local Supabase stack'
     'supervisor:inspect, start or stop the one StarCi Supervisor seat'
     'task:register and inspect the runtime'\''s per-user Windows scheduled tasks'
@@ -39,6 +42,7 @@ _starci() {
     _describe 'group' groups
   elif (( CURRENT == 3 )); then
     case "$words[2]" in
+      access) _values 'verbs' 'ci[set one declared GitHub CI secret through the existing application custody guard]' 'database[migrate or inspect the exact declared application database through its native owner]' 'registry[authenticate the declared GHCR principal into its native Docker credential helper]' 'stack[deploy or verify the exact declared application stack through its native owner]' 'workspace[ensure workspace accounts or change a member role through the application'\''s own CLI]' ;;
       app) _values 'verbs' 'add[add one canonical backend capability and register its patterns]' 'check[judge the app tree, managed output, contracts, formatting and architecture]' 'ci[set declared GitHub CI secrets and variables, verify their custody, or run the managed CI locally]' 'coverage[merge the coverage of the sharded unit run into one lcov report]' 'db[preview or apply database migrations, encrypted backups and guarded linked resets]' 'emit[emit backend GraphQL, operation and event contract snapshots]' 'explain[explain which HFS slot owns one app-relative path]' 'hygiene[judge staged worktree metadata, stack files and plaintext secrets]' 'lint[lint both app sides and report repository, ESLint and stylelint findings together]' 'new[create a canonical service, unit spec or app image definition]' 'release[run the release gates and write the L4 record and tag, or push branch and tag atomically]' 'scaffold[create a full or lite StarCi app, including an empty unborn main Git repository]' 'secret[initialize, seal, edit, materialize and verify app secrets]' 'stack[Swarm deploy tooling of an app (prepare to rollback) and the full edition test-world infrastructure]' 'sync[compare or write every managed app file from its canonical template]' 'upgrade[upgrade a lite app to the full edition (--edition full); a full app is already current]' ;;
       check) _values 'verbs' 'run[run changed-scope checks or the full structural check set]' ;;
       connect) _values 'verbs' 'ask-gateway[operate the local owner-ask HTTP gateway]' 'telegram[deliver and maintain owner Telegram notifications]' 'telegram-media[deliver settled operation media through Telegram]' 'tunnel[operate the Cloudflare owner-ask tunnel]' ;;
@@ -53,12 +57,14 @@ _starci() {
       machine) _values 'verbs' 'decisions[inspect and act on runtime and Supervisor decision items]' 'kernel-watchdog[inspect or repair one running workflow Kernel seat]' 'lessons[inspect and update Supervisor learning records]' 'op-metrics[report operation health metrics across managed ledgers]' 'seam-policy[plan canon cuts or redispatch a blocked canon slice]' 'worktrees[inspect, collect or resume runtime worktrees]' 'worktrees-clean[remove clean lane worktrees already merged into local main]' ;;
       npm) _values 'verbs' 'ci[install a clean lockfile into this worktree under the host lock]' 'install[install exact dependencies and move StarCi pins with the target CLI]' ;;
       orca) _values 'verbs' 'terminal-read[read an Orca terminal screen and staged draft]' 'terminal-send[send text or Enter to an Orca terminal]' ;;
+      provision) _values 'verbs' 'operation[inspect a prepared operation or bind its exact digest to trusted owner acceptance]' ;;
       reconciler) _values 'verbs' 'once[run one reconcile pass of the controllers in memory, shadow unless --apply]' 'reopen[put a quarantined service or seat back to declared with a clean restart history]' 'restart[stop the reconciler engine and ensure a new leader]' 'start[ensure the reconciler engine has a healthy leader]' 'status[print reconciler leader, queue, mode and violation status]' 'stop[stop the current reconciler engine leader]' 'up[bring the host services and seats up, or check them read-only, and print the checklist]' ;;
       release) _values 'verbs' 'app-installs[verify a scaffolded app against fresh registry installs]' 'check[run the one read-only release readiness gate]' 'ci-override[the owner accepts a red candidate CI for one SHA (emergency path) and records who and why]' 'ci-status[the verdict of the GitHub ci workflow, Codecov and Sonar for a release; red is recorded for Debug]' 'clean-test[test published packages from fresh isolated installs]' 'cut[cut the release, the only way the runtime'\''s remote main and a release tag move]' 'images[build, run, health-check and tear down the shipped application images]' 'notes[print or write the release notes of a tag, its CHANGELOG section]' 'proof[build the release proof attached before publish or deploy effects]' 'publish[plan or perform the owner-run package publication sequence]' 'scaffold-e2e[run the scaffold end-to-end proof (full and lite scaffolds installed, built and run for real)]' 'sync-runtime[refresh or check package runtime copies and optionally prepare grammar]' ;;
       route) _values 'verbs' 'op[resolve the operation that serves a structured routing request]' ;;
       runtime) _values 'verbs' 'architecture[check one repository against the runtime architecture rules]' 'artefacts[judge or migrate the artefacts the runtime installs outside its tree]' 'benchmark-snapshot[append one model-pool snapshot file under benchmark/snapshots]' 'check[judge the runtime tree — node --check, the runtime HFS check, the retained self-checks]' 'deploy[carry a checked runtime revision onto the running host and verify the engine on it]' 'derived-fields[regenerate or check the derived fields of the knowledge pattern files]' 'doctor[verify installed payload, public entry custody and local runtime capabilities]' 'example-secrets[run a command in a disposable copy of an example with freshly generated sealed members]' 'gen-catalog[write or check the generated CLI catalog outputs, docs and shell completions]' 'gen-ops[regenerate or check the generated operation registry]' 'housekeeping[inspect or apply the host housekeeping sweeps]' 'import-held-secret[move one sealed member of the old tracked custody from git history into secret.env]' 'install[install the StarCi runtime — fetch the pinned package, then init or update <cwd>/.claude]' 'ledger-hygiene[report orphan ledgers]' 'link[point the per-user StarCi launcher at a live runtime checkout]' 'machine-db[inspect or maintain the host machine database]' 'owner-claims-audit[audit owner-decision claims and owner-gates in runtime ledgers]' 'readme-blocks[regenerate or check the generated blocks of knowledge/hfs/README.md]' 'revision-scope[show what a deploy of the runtime tree asks of each role between two revisions]' 'status[the runtime'\''s version, tree root and manifest drift — a read-only summary]' 'update[bring an installed .claude tree to this package'\''s payload version]' 'validate[read-only Work record/tree validation — structure, consistency, artifacts, schemas]' 'verify[verify a commit - the check, package clean-test and scaffold e2e on one commit, one receipt]' 'version[print the runtime package version]' ;;
       smoke) _values 'verbs' 'scaffold[scaffold and prove one full or lite app in an isolated scratch directory]' ;;
-      supabase) _values 'verbs' 'start[start the app'\''s Supabase stack after enforcing its isolated port block]' 'status[show the app'\''s Supabase endpoints and key names without secret values]' 'stop[stop only the app'\''s configured Supabase project]' ;;
+      sonar) _values 'verbs' 'analysis[run native analysis with the selected target'\''s analysis credential]' 'browse[read declared Sonar project evidence through the selected Browse credential]' 'project[ensure a declared Sonar project through its provider adapter]' 'release[run the native application release gate with declared Sonar analysis and Browse roles]' 'settings[read or set declared Sonar settings with private credential references]' 'token[ensure, rotate or revoke a declared Sonar token without exposing its value]' 'user[inspect a local Sonar user or explicitly create or reactivate it]' ;;
+      supabase) _values 'verbs' 'auth[ensure one declared Supabase Auth identity without resetting an existing account]' 'cloud[apply declared Supabase Cloud project, Auth and secret configuration]' 'start[start the app'\''s Supabase stack after enforcing its isolated port block]' 'status[show the app'\''s Supabase endpoints and key names without secret values]' 'stop[stop only the app'\''s configured Supabase project]' ;;
       supervisor) _values 'verbs' 'actions[list, record, or preview the Supervisor'\''s owed-action audit trail]' 'bridge[inspect and govern cross-workflow dependencies and shared ownership]' 'channel[register, inspect, and answer the Supervisor owner-message channel]' 'decide[answer one item of the Supervisor'\''s menu with one typed choice]' 'direct-commits[find runtime main commits that bypassed the exclusive land gate]' 'gate-stability[compare explicitly selected current gates against accepted work in live workflows]' 'gc[inspect or collect leftover workers, shells, lanes, temp data, leases, and logs]' 'land[run the in-runtime land gate; it fast-forwards local main and never pushes]' 'lesson-actions[land, revert, or propose changes from the Supervisor self-learning loop]' 'notify[deliver a durable Supervisor ruling to one workflow Kernel]' 'owed[inspect and acknowledge work that running workflows owe the Supervisor]' 'poll[stream or print a read-only Supervisor digest of workflow progress and blockers]' 'push[run full repository suites and push clean main branches]' 'push-mains[scan and push main for the configured product repositories (not the runtime)]' 'ram-cap[inspect or override RAM-aware workflow dispatch priorities]' 'report[render or send the owner'\''s detailed workflow progress report]' 'revision-ack[read the files a runtime revision change sends to the Supervisor and attest them]' 'start[enable and start the one long-lived Supervisor seat]' 'status[print the Supervisor seat status and its menu of open judgment points]' 'stop[disable the Supervisor seat, stop its worker and release it]' 'telegram-bridge[start, run, inspect, or stop the Supervisor Telegram bridge]' 'tell[send a desktop message to the Supervisor or read its recent replies]' 'watchdog[run one reconciler-owned Supervisor seat liveness pass]' 'workers[create, launch, inspect, report, and clean up Supervisor repair workers]' ;;
       task) _values 'verbs' 'list[list state, runs, results and actions for registered runtime tasks]' 'register[print or apply one runtime scheduled-task registration]' 'show[show state, runs, result and action for one runtime scheduled task]' ;;
       typecheck) _values 'verbs' 'run[check changed runtime modules or affected TypeScript projects]' ;;
@@ -68,15 +74,96 @@ _starci() {
       workflow) _values 'verbs' 'assess[cold-scan repositories for goal-definition evidence]' 'bias[normalize a routing bias or extract one from the owner'\''s text]' 'custody[show a workflow tree against its branch and preserved work; --apply moves it onto them]' 'define[define a goal — assess the prompt, plan the op chain, queue it in the ledger inbox]' 'purge[remove what an archived workflow left on the host (plan by default)]' 'start[ensure the host, then claim an approved goal and boot its Kernel]' 'status[the workflow projection — phase, frontier, leases and pending owner asks]' 'stop[stop a workflow — archive it, drop open jobs and retire its asks (the owner stop)]' ;;
       completion) _values 'shells' 'bash' 'zsh' 'fish' 'powershell' ;;
       help) return 0 ;;
-      explain) _values 'groups' 'app' 'check' 'connect' 'debug' 'docker' 'gate' 'git' 'guard' 'harness' 'kernel' 'lint' 'machine' 'npm' 'orca' 'reconciler' 'release' 'route' 'runtime' 'smoke' 'supabase' 'supervisor' 'task' 'typecheck' 'uat' 'work' 'worker' 'workflow' ;;
+      explain) _values 'groups' 'access' 'app' 'check' 'connect' 'debug' 'docker' 'gate' 'git' 'guard' 'harness' 'kernel' 'lint' 'machine' 'npm' 'orca' 'provision' 'reconciler' 'release' 'route' 'runtime' 'smoke' 'sonar' 'supabase' 'supervisor' 'task' 'typecheck' 'uat' 'work' 'worker' 'workflow' ;;
     esac
   else
+    if (( CURRENT == 4 )) && [[ "$words[CURRENT]" != --* ]]; then
+      case "$words[2]:$words[3]" in
+      'access:ci') _values 'actions' 'secret-set'; return 0 ;;
+      'access:database') _values 'actions' 'migrate' 'inspect'; return 0 ;;
+      'access:registry') _values 'actions' 'login'; return 0 ;;
+      'access:stack') _values 'actions' 'deploy' 'verify'; return 0 ;;
+      'access:workspace') _values 'actions' 'ensure' 'role'; return 0 ;;
+      'app:add') _values 'actions' 'api' 'webhook' 'realtime' 'saga' 'job' 'reactor' 'queue' 'projection' 'cli' 'table' 'app'; return 0 ;;
+      'app:ci') _values 'actions' 'secret' 'var' 'verify' 'local'; return 0 ;;
+      'app:coverage') _values 'actions' 'merge'; return 0 ;;
+      'app:db') _values 'actions' 'baseline' 'restamp' 'plan' 'migrate' 'post-cutover' 'dump' 'reset'; return 0 ;;
+      'app:new') _values 'actions' 'service' 'image' 'spec'; return 0 ;;
+      'app:release') _values 'actions' 'gate' 'push'; return 0 ;;
+      'app:secret') _values 'actions' 'init' 'set' 'get' 'unset' 'rename' 'remove' 'materialize' 'list' 'verify'; return 0 ;;
+      'app:stack') _values 'actions' 'up' 'down' 'status' 'prepare' 'doctor' 'connect' 'disconnect' 'build-args' 'render' 'deploy' 'converge' 'verify' 'rollback' 'prune' 'backup' 'jobs' 'task' 'ingress' 'retire' 'build' 'accept'; return 0 ;;
+      'connect:ask-gateway') _values 'actions' 'start' 'run' 'status' 'stop'; return 0 ;;
+      'connect:telegram') _values 'actions' 'notify' 'sweep' 'discover-chat' 'test'; return 0 ;;
+      'connect:telegram-media') _values 'actions' 'settle'; return 0 ;;
+      'connect:tunnel') _values 'actions' 'start' 'run' 'status' 'stop' 'dry-run'; return 0 ;;
+      'debug:run') _values 'actions' 'orca-status' 'runtime-status' 'supervisor-status' 'model-scorecard' 'core-watch'; return 0 ;;
+      'gate:env-health') _values 'actions' 'check' 'serve' 'status'; return 0 ;;
+      'gate:sonar') _values 'actions' 'status' 'ensure-project' 'token' 'scan' 'dashboard' 'up' 'stop'; return 0 ;;
+      'machine:decisions') _values 'actions' 'ring' 'escalate-due' 'supervisor'; return 0 ;;
+      'machine:lessons') _values 'actions' 'list' 'match' 'tier' 'result' 'feedback' 'tick' 'export'; return 0 ;;
+      'machine:seam-policy') _values 'actions' 'canon-plan' 'canon-redispatch'; return 0 ;;
+      'machine:worktrees') _values 'actions' 'counts' 'gc' 'resume'; return 0 ;;
+      'provision:operation') _values 'actions' 'plan' 'accept' 'status'; return 0 ;;
+      'runtime:machine-db') _values 'actions' 'init' 'status' 'ledgers' 'register' 'resolve'; return 0 ;;
+      'sonar:analysis') _values 'actions' 'run'; return 0 ;;
+      'sonar:browse') _values 'actions' 'read'; return 0 ;;
+      'sonar:project') _values 'actions' 'ensure'; return 0 ;;
+      'sonar:release') _values 'actions' 'gate'; return 0 ;;
+      'sonar:settings') _values 'actions' 'read' 'set'; return 0 ;;
+      'sonar:token') _values 'actions' 'ensure' 'rotate' 'revoke'; return 0 ;;
+      'sonar:user') _values 'actions' 'ensure' 'create-or-reactivate'; return 0 ;;
+      'supabase:auth') _values 'actions' 'user-ensure'; return 0 ;;
+      'supabase:cloud') _values 'actions' 'smtp-set' 'auth-provider-set' 'secret-set' 'project-ensure' 'keys-capture'; return 0 ;;
+      'supervisor:actions') _values 'actions' 'list' 'record' 'digest'; return 0 ;;
+      'supervisor:bridge') _values 'actions' 'detect' 'list' 'bridge' 'rewire' 'transfer' 'revise' 'designate'; return 0 ;;
+      'supervisor:channel') _values 'actions' 'register' 'heartbeat' 'inbox' 'reply' 'wait'; return 0 ;;
+      'supervisor:lesson-actions') _values 'actions' 'land' 'revert' 'propose'; return 0 ;;
+      'supervisor:owed') _values 'actions' 'ack' 'unack' 'acks'; return 0 ;;
+      'supervisor:ram-cap') _values 'actions' 'status' 'prioritize' 'unprioritize'; return 0 ;;
+      'supervisor:telegram-bridge') _values 'actions' 'start' 'run' 'status' 'stop'; return 0 ;;
+      'supervisor:workers') _values 'actions' 'create' 'spawn' 'stage' 'report' 'list' 'cap' 'show' 'cancel' 'ack' 'cleanup'; return 0 ;;
+      'task:register') _values 'actions' 'harness-app' 'harness-tunnel' 'reconciler'; return 0 ;;
+      'task:show') _values 'actions' 'harness-app' 'harness-tunnel' 'reconciler'; return 0 ;;
+      'uat:assisted-runner') _values 'actions' 'inspect' 'start' 'status' 'wait' 'signal' 'run'; return 0 ;;
+      'uat:slots') _values 'actions' 'status' 'collect' 'run'; return 0 ;;
+      'work:asset-slot') _values 'actions' 'list' 'check'; return 0 ;;
+      'work:brand-direction') _values 'actions' 'status' 'question' 'apply'; return 0 ;;
+      'work:draw-feedback') _values 'actions' 'brief' 'status' 'check' 'classify'; return 0 ;;
+      'work:draw-loop') _values 'actions' 'round' 'status' 'finish' 'verify'; return 0 ;;
+      'work:draw-review') _values 'actions' 'status' 'question' 'apply'; return 0 ;;
+      'work:grammar-proposal') _values 'actions' 'list' 'check'; return 0 ;;
+      'work:graph') _values 'actions' 'show' 'validate' 'diff' 'propose'; return 0 ;;
+      'work:hygiene') _values 'actions' 'staged' 'files'; return 0 ;;
+      'work:layout-tree') _values 'actions' 'scan' 'capture' 'plan' 'destinations' 'lockup' 'slot'; return 0 ;;
+      esac
+    fi
     prev="$words[CURRENT-1]"
     case "$prev" in
     --cwd) return 0 ;;
     --edition) _values 'values' 'full' 'lite'; return 0 ;;
     esac
     case "$words[2]:$words[3]:$prev" in
+    'access:ci:--target') return 0 ;;
+    'access:ci:--operation') return 0 ;;
+    'access:ci:--name') return 0 ;;
+    'access:database:--target') return 0 ;;
+    'access:database:--operation') return 0 ;;
+    'access:registry:--target') return 0 ;;
+    'access:registry:--operation') return 0 ;;
+    'access:stack:--target') return 0 ;;
+    'access:stack:--operation') return 0 ;;
+    'access:workspace:--target') return 0 ;;
+    'access:workspace:--operation') return 0 ;;
+    'access:workspace:--workspace') return 0 ;;
+    'access:workspace:--workspace-name') return 0 ;;
+    'access:workspace:--owner-email') return 0 ;;
+    'access:workspace:--owner-name') return 0 ;;
+    'access:workspace:--manager-email') return 0 ;;
+    'access:workspace:--manager-name') return 0 ;;
+    'access:workspace:--staff-email') return 0 ;;
+    'access:workspace:--staff-name') return 0 ;;
+    'access:workspace:--member') return 0 ;;
+    'access:workspace:--role') _values 'values' 'owner' 'manager' 'staff'; return 0 ;;
     'app:add:--event') return 0 ;;
     'app:add:--from') return 0 ;;
     'app:add:--service') return 0 ;;
@@ -101,6 +188,7 @@ _starci() {
     'app:db:--stamp') return 0 ;;
     'app:db:--map') return 0 ;;
     'app:db:--url-env') return 0 ;;
+    'app:db:--target-binding') return 0 ;;
     'app:db:--green-at') return 0 ;;
     'app:lint:--changed') return 0 ;;
     'app:lint:--workspace') return 0 ;;
@@ -119,6 +207,7 @@ _starci() {
     'app:stack:--env') return 0 ;;
     'app:stack:--image') return 0 ;;
     'app:stack:--source-sha') return 0 ;;
+    'app:stack:--target-binding') return 0 ;;
     'app:stack:--previous') return 0 ;;
     'app:stack:--out') return 0 ;;
     'app:stack:--release') return 0 ;;
@@ -618,6 +707,8 @@ _starci() {
     'orca:terminal-send:--text') return 0 ;;
     'orca:terminal-send:--text-file') return 0 ;;
     'orca:terminal-send:--wait-submit') return 0 ;;
+    'provision:operation:--operation') return 0 ;;
+    'provision:operation:--digest') return 0 ;;
     'reconciler:once:--controller') _values 'values' 'job' 'host' 'gc' 'resource' 'workflow' 'workers' 'learning'; return 0 ;;
     'reconciler:once:--key') return 0 ;;
     'reconciler:up:--wait') return 0 ;;
@@ -688,6 +779,39 @@ _starci() {
     'runtime:verify:--base') return 0 ;;
     'runtime:verify:--root') return 0 ;;
     'smoke:scaffold:--into') return 0 ;;
+    'sonar:analysis:--target') return 0 ;;
+    'sonar:analysis:--operation') return 0 ;;
+    'sonar:analysis:--key') return 0 ;;
+    'sonar:analysis:--revision') return 0 ;;
+    'sonar:browse:--target') return 0 ;;
+    'sonar:browse:--operation') return 0 ;;
+    'sonar:browse:--key') return 0 ;;
+    'sonar:browse:--branch') return 0 ;;
+    'sonar:browse:--revision') return 0 ;;
+    'sonar:project:--target') return 0 ;;
+    'sonar:project:--operation') return 0 ;;
+    'sonar:project:--key') return 0 ;;
+    'sonar:project:--name') return 0 ;;
+    'sonar:release:--target') return 0 ;;
+    'sonar:release:--operation') return 0 ;;
+    'sonar:release:--revision') return 0 ;;
+    'sonar:settings:--target') return 0 ;;
+    'sonar:settings:--operation') return 0 ;;
+    'sonar:settings:--key') return 0 ;;
+    'sonar:settings:--setting') return 0 ;;
+    'sonar:token:--target') return 0 ;;
+    'sonar:token:--operation') return 0 ;;
+    'sonar:token:--key') return 0 ;;
+    'sonar:token:--name') return 0 ;;
+    'sonar:token:--login') return 0 ;;
+    'sonar:token:--type') _values 'values' 'USER_TOKEN' 'PROJECT_ANALYSIS_TOKEN' 'GLOBAL_ANALYSIS_TOKEN'; return 0 ;;
+    'sonar:user:--target') return 0 ;;
+    'sonar:user:--operation') return 0 ;;
+    'sonar:user:--login') return 0 ;;
+    'supabase:auth:--target') return 0 ;;
+    'supabase:auth:--operation') return 0 ;;
+    'supabase:cloud:--target') return 0 ;;
+    'supabase:cloud:--operation') return 0 ;;
     'supervisor:actions:--item') return 0 ;;
     'supervisor:actions:--action') return 0 ;;
     'supervisor:actions:--reason') return 0 ;;
@@ -994,6 +1118,8 @@ _starci() {
     'workflow:define:--title') return 0 ;;
     'workflow:define:--display-name') return 0 ;;
     'workflow:define:--params') return 0 ;;
+    'workflow:define:--provision-grants') return 0 ;;
+    'workflow:define:--approve-provision-grants') return 0 ;;
     'workflow:define:--revise') return 0 ;;
     'workflow:define:--reason') return 0 ;;
     'workflow:define:--approve-revision') return 0 ;;
@@ -1016,11 +1142,16 @@ _starci() {
     'workflow:stop:--by') _values 'values' 'owner' 'supervisor'; return 0 ;;
     esac
     case "$words[2]:$words[3]" in
+    'access:ci') _values 'flags' '--target' '--operation' '--name' '--execute' '--reconcile' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
+    'access:database') _values 'flags' '--target' '--operation' '--execute' '--reconcile' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
+    'access:registry') _values 'flags' '--target' '--operation' '--execute' '--reconcile' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
+    'access:stack') _values 'flags' '--target' '--operation' '--execute' '--reconcile' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
+    'access:workspace') _values 'flags' '--target' '--operation' '--execute' '--reconcile' '--workspace' '--workspace-name' '--bootstrap-owner' '--owner-email' '--owner-name' '--manager-email' '--manager-name' '--staff-email' '--staff-name' '--member' '--role' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'app:add') _values 'flags' '--event' '--from' '--service' '--connection' '--owner' '--failed' '--done' '--fe' '--no-types' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'app:check') _values 'flags' '--fast' '--base' '--wiring' '--coverage-from' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'app:ci') _values 'flags' '--env' '--dependabot' '--repo' '--value' '--execute' '--json' '--jobs' '--parallel' '--logs' '--dry-run' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'app:coverage') _values 'flags' '--out' '--cwd' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
-    'app:db') _values 'flags' '--out' '--schema-only' '--auth' '--storage' '--backup' '--stamp' '--map' '--apply' '--local' '--execute' '--linked' '--url-env' '--green-at' '--owner-confirms-old-app-gone' '--json' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
+    'app:db') _values 'flags' '--out' '--schema-only' '--auth' '--storage' '--backup' '--stamp' '--map' '--apply' '--local' '--execute' '--linked' '--url-env' '--target-binding' '--green-at' '--owner-confirms-old-app-gone' '--json' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'app:emit') _values 'flags' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'app:explain') _values 'flags' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'app:hygiene') _values 'flags' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
@@ -1029,7 +1160,7 @@ _starci() {
     'app:release') _values 'flags' '--execute' '--source' '--tag-prefix' '--sonar' '--remote' '--json' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'app:scaffold') _values 'flags' '--into' '--registry-visibility' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'app:secret') _values 'flags' '--generate' '--to-file' '--reveal' '--execute' '--force-nonempty' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
-    'app:stack') _values 'flags' '--stack' '--services' '--k3d' '--force' '--env' '--execute' '--image' '--source-sha' '--previous' '--out' '--release' '--since' '--timeout' '--retry' '--keep' '--app' '--ssh-cmd' '--extra-compose' '--allow-unpinned' '--init-swarm' '--owner-approved' '--fix-live-restore' '--project' '--push' '--swarm-state' '--skip-public' '--skip-internal' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
+    'app:stack') _values 'flags' '--stack' '--services' '--k3d' '--force' '--env' '--execute' '--image' '--source-sha' '--target-binding' '--previous' '--out' '--release' '--since' '--timeout' '--retry' '--keep' '--app' '--ssh-cmd' '--extra-compose' '--allow-unpinned' '--init-swarm' '--owner-approved' '--fix-live-restore' '--project' '--push' '--swarm-state' '--skip-public' '--skip-internal' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'app:sync') _values 'flags' '--check' '--write' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'app:upgrade') _values 'flags' '--plan' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'check:run') _values 'flags' '--level' '--changed' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
@@ -1137,6 +1268,7 @@ _starci() {
     'npm:install') _values 'flags' '--dev' '--canon' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'orca:terminal-read') _values 'flags' '--terminal' '--tail' '--limit' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'orca:terminal-send') _values 'flags' '--terminal' '--text' '--text-file' '--no-enter' '--wait-submit' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
+    'provision:operation') _values 'flags' '--operation' '--digest' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'reconciler:once') _values 'flags' '--controller' '--key' '--apply' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'reconciler:reopen') _values 'flags' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'reconciler:restart') _values 'flags' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
@@ -1182,6 +1314,15 @@ _starci() {
     'runtime:verify') _values 'flags' '--base' '--root' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'runtime:version') _values 'flags' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'smoke:scaffold') _values 'flags' '--into' '--keep' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
+    'sonar:analysis') _values 'flags' '--target' '--operation' '--execute' '--reconcile' '--key' '--revision' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
+    'sonar:browse') _values 'flags' '--target' '--operation' '--execute' '--reconcile' '--key' '--branch' '--revision' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
+    'sonar:project') _values 'flags' '--target' '--operation' '--execute' '--reconcile' '--key' '--name' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
+    'sonar:release') _values 'flags' '--target' '--operation' '--revision' '--execute' '--reconcile' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
+    'sonar:settings') _values 'flags' '--target' '--operation' '--execute' '--reconcile' '--key' '--setting' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
+    'sonar:token') _values 'flags' '--target' '--operation' '--execute' '--reconcile' '--key' '--name' '--login' '--type' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
+    'sonar:user') _values 'flags' '--target' '--operation' '--execute' '--reconcile' '--login' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
+    'supabase:auth') _values 'flags' '--target' '--operation' '--execute' '--reconcile' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
+    'supabase:cloud') _values 'flags' '--target' '--operation' '--execute' '--reconcile' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'supabase:start') _values 'flags' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'supabase:status') _values 'flags' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'supabase:stop') _values 'flags' '--no-backup' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
@@ -1261,7 +1402,7 @@ _starci() {
     'workflow:assess') _values 'flags' '--repo' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'workflow:bias') _values 'flags' '--normalize' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'workflow:custody') _values 'flags' '--repo' '--workflow' '--apply' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
-    'workflow:define') _values 'flags' '--repo' '--project' '--text' '--title' '--display-name' '--params' '--plan' '--revise' '--reason' '--approve-revision' '--defined-by' '--approved-by' '--bridge-id' '--routing-bias' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
+    'workflow:define') _values 'flags' '--repo' '--project' '--text' '--title' '--display-name' '--params' '--provision-grants' '--approve-provision-grants' '--plan' '--revise' '--reason' '--approve-revision' '--defined-by' '--approved-by' '--bridge-id' '--routing-bias' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'workflow:purge') _values 'flags' '--repo' '--workflow' '--plan' '--apply' '--ledger' '--expect' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'workflow:start') _values 'flags' '--repo' '--goal' '--agent' '--launched-by' '--plan' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'workflow:status') _values 'flags' '--repo' '--workflow' '--json' '--cwd' '--quiet' '--help' '--edition' ;;

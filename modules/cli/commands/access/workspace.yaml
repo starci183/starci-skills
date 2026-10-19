@@ -1,0 +1,36 @@
+group: access
+verb: workspace
+owner: runtime
+summary: ensure workspace accounts or change a member role through the application's own CLI
+impl: {module: scripts/gates/provision-workspace.mjs, export: runWorkspaceAccess}
+effect: remote
+roles: [worker, lead, coordinator, owner]
+positional: [{name: action, enum: [ensure, role], required: true, variadic: false}]
+operationPolicy:
+  ensure: {action: app.workspace.ensure, effect: remote, credentials: [], destination: none, checkpoints: [account-authority, private-input]}
+  role: {action: app.workspace.member.role, effect: remote, credentials: [principal], destination: none, checkpoints: [account-authority]}
+flags:
+  - {name: target, type: string, required: true, summary: named application CLI target}
+  - {name: operation, type: string, summary: durable operation id}
+  - {name: execute, type: boolean, summary: execute under existing accepted operation scope}
+  - {name: reconcile, type: boolean, summary: inspect a prior uncertain application effect}
+  - {name: workspace, type: string, summary: existing workspace UUID}
+  - {name: workspace-name, type: string, summary: exact name of a workspace to ensure for the authenticated owner}
+  - {name: bootstrap-owner, type: boolean, summary: include first owner account creation in the prepared ensure plan}
+  - {name: owner-email, type: string, summary: declared owner account email}
+  - {name: owner-name, type: string, summary: declared owner display name}
+  - {name: manager-email, type: string, summary: declared manager account email}
+  - {name: manager-name, type: string, summary: declared manager display name}
+  - {name: staff-email, type: string, summary: declared staff account email}
+  - {name: staff-name, type: string, summary: declared staff display name}
+  - {name: member, type: string, summary: exact existing workspace member UUID}
+  - {name: role, type: enum, enum: [owner, manager, staff], summary: application role to request from its member service}
+conventions:
+  - the application derives the actor from the authenticated principal and owns all membership decisions
+  - rerunning ensure preserves existing passwords; account creation credentials stay in the private child input
+exit: {"0": plan prepared or operation completed, "1": application effect failed or remains uncertain, "2": policy or input refused}
+json: always
+examples:
+  - starci access workspace ensure --target developer-app --workspace-name Development --owner-email <email> --owner-name <name> --manager-email <email> --manager-name <name> --staff-email <email> --staff-name <name> --operation developer-access
+  - starci access workspace role --target developer-app --workspace <uuid> --member <uuid> --role staff
+editions: [full, lite]

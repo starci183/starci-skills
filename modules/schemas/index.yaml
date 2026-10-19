@@ -21,6 +21,19 @@ about:
 
 schemas:
 
+  - id: urn:starci:provision-operation:1
+    file: modules/schemas/provision-operation.schema.yaml
+    dialect: json-schema
+    subsystem: gate
+    governs: Public provider target configuration and custody references bound to one executable operation
+    binds: .starcistacks/application-stacks.yaml operations
+    usedBy: [scripts/gates/provision-target.mjs, scripts/goal/define-goal.mjs]
+    business:
+      question: Which declared target and credential roles may this operation consume?
+      whenNeeded: Before preparing or executing a managed provider action.
+      whenNot: It carries no secret values and grants no authority to perform an effect.
+      selectedBy: The provider command's named target.
+
   # --------------------------------------------------------------------------
   # WORK TREE — .starciwork record kinds (the product's canonical Work)
   # --------------------------------------------------------------------------

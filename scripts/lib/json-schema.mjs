@@ -3,6 +3,7 @@ import {isPlainObject} from '../../engine/plain-object.mjs';
 
 // A minimal draft-2020-12 walker over the keywords op.schema.yaml uses. ajv is
 // a devDependency; the runtime has no npm dependencies, so the walker is here.
+/** Validate the supported schema keywords, including exact-one and at-least-one alternatives, without mutating input. */
 export function validateAgainstSchema(value, schema) {
   const errors = [];
   const resolve = (ref) => String(ref).replace(/^#\//, '').split('/')
@@ -50,9 +51,37 @@ export function validateAgainstSchema(value, schema) {
       else if (isPlainObject(shape.additionalProperties)) walk(child, shape.additionalProperties, where);
     }
   };
+  const validateAlternatives = (node, shape, at, walk) => {
+    for (const keyword of ['anyOf', 'oneOf']) {
+      if (!Object.hasOwn(shape, keyword)) continue;
+      const branches = shape[keyword];
+      if (!Array.isArray(branches) || branches.length === 0) { errors.push(`${at}: ${keyword} needs a nonempty schema list`); continue; }
+      const outcomes = branches.map((branch) => {
+        const start = errors.length;
+        walk(node, branch, at);
+        return errors.splice(start);
+      });
+      const matched = outcomes.filter((findings) => findings.length === 0).length;
+      if (keyword === 'oneOf' && matched > 1) errors.push(`${at}: oneOf matches more than one alternative`);
+      else if (matched === 0) {
+        errors.push(`${at}: ${keyword} matches no alternative`);
+        // The nearest branch explains a refusal without mixing findings from mutually exclusive shapes.
+        const nearest = outcomes.reduce((best, findings) => findings.length < best.length ? findings : best);
+        errors.push(...nearest);
+      }
+    }
+  };
   const walk = (node, shape, at) => {
-    if (!isPlainObject(shape)) return;
-    if (shape.$ref) { walk(node, resolve(shape.$ref), at); return; }
+    if (shape === true) return;
+    if (shape === false) { errors.push(`${at}: schema refuses this value`); return; }
+    if (!isPlainObject(shape)) { errors.push(`${at}: schema is invalid`); return; }
+    if (shape.$ref) {
+      const referenced = String(shape.$ref).startsWith('#/') ? resolve(shape.$ref) : undefined;
+      if (referenced === undefined) { errors.push(`${at}: schema reference is unresolved`); return; }
+      walk(node, referenced, at);
+      return;
+    }
+    validateAlternatives(node, shape, at, walk);
     if (!validateType(node, shape, at)) return;
     validateScalar(node, shape, at);
     if (Array.isArray(node)) {

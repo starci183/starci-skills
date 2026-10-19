@@ -71,7 +71,8 @@ function sonarGate(services, env) {
   const organization = sonar.organization ?? (sonar.organizationVar ? env[sonar.organizationVar] : null);
   if (organization) command.push(`-Dsonar.organization=${organization}`);
   if (!command.every((word) => TOKEN.test(word))) throw refusal('RELEASE_SONAR_UNAVAILABLE', 'Sonar host and organization must be plain command arguments');
-  return { name: 'sonar', command, summary: null, env: { SONAR_TOKEN: env[tokenName] }, provider: sonar };
+  return { name: 'sonar', command, summary: null, env: { SONAR_TOKEN: env[tokenName] }, provider: sonar,
+    credentialNames: [...new Set(['SONAR_TOKEN', tokenName])] };
 }
 
 function gateProblems(entry, at, seen) {
@@ -128,7 +129,7 @@ export function normalizeRelease(block, scripts = {}, services = {}, options = {
 
 /** Runs git in the app root; a missing git or (unless allowFail) a non-zero exit is a failure whose message names the first stderr line. */
 export function git(ctx, args, { allowFail = false } = {}) {
-  const run = tool(ctx, 'git', args, { cwd: ctx.cwd });
+  const run = tool(ctx, 'git', args, { cwd: ctx.cwd, env: ctx.env });
   if (run.error) throw failure('RELEASE_GIT_MISSING', `cannot run git (${run.error.message})`);
   if (run.status !== 0 && !allowFail) throw failure('RELEASE_GIT_FAILED', `git ${args.slice(0, 2).join(' ')}: ${firstLine(run.stderr)}`);
   return { code: run.status, stdout: String(run.stdout ?? '').trim(), stderr: String(run.stderr ?? '') };
@@ -236,11 +237,18 @@ async function runAvailableGate(ctx, gate, options) {
     summary: null, log: path.resolve(log), logSha256: sha256(log), env: Object.keys(gate.env) };
 }
 
-function runGate(ctx, gate, { dir, platform }) {
+const withoutCredentials = (values, credentialNames) => {
+  const selected = new Set(credentialNames);
+  return Object.fromEntries(Object.entries(values ?? {}).filter(([key]) => !selected.has(key.toUpperCase())));
+};
+
+function runGate(ctx, gate, { dir, platform, credentialNames }) {
   const log = path.join(dir, `${gate.name}.log`);
   const started = ctx.now();
   const [command, args] = launch(gate.command, platform);
-  const run = tool(ctx, command, args, { cwd: ctx.cwd, env: { ...ctx.env, ...gate.env } });
+  // The native scanner alone consumes Sonar credentials; ordinary gates cannot inherit or reintroduce them.
+  const env = { ...ctx.env, ...(gate.provider ? gate.env : withoutCredentials(gate.env, credentialNames)) };
+  const run = tool(ctx, command, args, { cwd: ctx.cwd, env });
   const output = `${run.stdout ?? ''}${run.stderr ?? ''}`;
   const text = gate.name === 'sonar' && gate.env.SONAR_TOKEN ? output.replaceAll(gate.env.SONAR_TOKEN, '[REDACTED]') : output;
   fs.writeFileSync(log, text);
@@ -345,6 +353,8 @@ function summaryOf(result) {
  */
 export async function releaseGate(ctx, config, options = {}) {
   if (options.sonar) config = { ...config, gates: [...config.gates.filter((gate) => gate.name !== 'sonar'), sonarGate(config.services, ctx.env)] };
+  const credentialNames = config.gates.find(gate => gate.provider)?.credentialNames ?? ['SONAR_TOKEN', config.services?.sonar?.token].filter(Boolean);
+  ctx = Object.create(ctx, {env: {value: withoutCredentials(ctx.env, credentialNames)}});
   // The CI verdict of a release is the candidate run of its own sha, judged by `starci app release push` (candidate-ci.mjs, OWNER RULING candidate-ci 2026-10-18):
   // the gate no longer refuses over the latest default-branch run.
   const facts = inspect(ctx, config, options);
@@ -355,7 +365,7 @@ export async function releaseGate(ctx, config, options = {}) {
   const base = { head: facts.head, tag: facts.chosen.tag, record: recordPath, gates: config.gates.map((gate) => gate.name) };
   if (facts.red.length > 0) return { ok: false, lines: [...plan, ...facts.red.map((item) => `RED: ${item}`), 'nothing was run.'], data: { ...base, red: facts.red, executed: false } };
   if (options.execute !== true) return { ok: true, lines: [...plan, '', 'dry run: no gate was run, nothing written. preconditions OK.'], data: { ...base, red: [], executed: false } };
-  const results = await runAll(ctx, config, { dir, platform: options.platform ?? process.platform });
+  const results = await runAll(ctx, config, { dir, platform: options.platform ?? process.platform, credentialNames });
   const report = results.map(summaryOf);
   const failed = results.filter((result) => !result.pass && !result.skipped);
   if (failed.length > 0) return { ok: false, lines: [...plan, ...report, `gate(s) red: ${failed.map((item) => item.name).join(', ')}. No L4 record, no tag.`], data: { ...base, executed: true, results } };

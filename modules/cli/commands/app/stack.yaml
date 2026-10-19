@@ -15,6 +15,7 @@ flags:
   - {name: execute, type: boolean, summary: perform the effects; without it every effectful action is a dry run}
   - {name: image, type: list, summary: "render, deploy: service=registry/name@sha256:digest, repeatable or comma-separated"}
   - {name: source-sha, type: string, summary: "render, deploy: the git commit the images were built from"}
+  - {name: target-binding, type: string, summary: "deploy, verify: public native endpoint assertion; constrains the target and grants no authority"}
   - {name: previous, type: string, summary: "render: the previous accepted release id (16 hex)"}
   - {name: out, type: string, summary: "render, deploy: directory that receives stack.yaml, stack.generated.yaml and release.json"}
   - {name: release, type: string, summary: "rollback: release id (16 lowercase hex) to deploy again; default the previous accepted release"}

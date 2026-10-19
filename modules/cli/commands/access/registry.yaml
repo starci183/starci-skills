@@ -1,0 +1,23 @@
+group: access
+verb: registry
+owner: runtime
+summary: authenticate the declared GHCR principal into its native Docker credential helper
+impl: {module: scripts/gates/provision-registry.mjs, export: runRegistryLogin}
+effect: remote
+roles: [worker, lead, coordinator, owner]
+positional: [{name: action, enum: [login], required: true, variadic: false}]
+operationPolicy:
+  login: {action: registry.ghcr.login, effect: remote, credentials: [registry-password], destination: none, checkpoints: [account-authority]}
+flags:
+  - {name: target, type: string, required: true, summary: named fixed GHCR target and native credential-helper configuration}
+  - {name: operation, type: string, summary: durable operation id}
+  - {name: execute, type: boolean, summary: execute the exact accepted native registry-login plan}
+  - {name: reconcile, type: boolean, summary: inspect credential-helper state without replaying a prior login}
+conventions:
+  - the adapter authenticates only ghcr.io and uses the declared native Docker credential helper
+  - an identical helper entry is reused; conflicting or uncertain state stays held without overwrite or plaintext fallback
+  - login acknowledgement and helper readback are separate outcomes; an uncertain write requires reconciliation
+exit: {"0": plan prepared or declared native helper custody verified, "1": login failed or custody remains uncertain, "2": policy or input refused}
+json: always
+examples: [starci access registry login --target image-registry --operation image-registry-login]
+editions: [full, lite]

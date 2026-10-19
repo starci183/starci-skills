@@ -1,0 +1,4 @@
+group: access
+summary: execute declared application account and membership operations
+owner: runtime
+runtimeSide: host

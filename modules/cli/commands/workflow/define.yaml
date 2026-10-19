@@ -24,6 +24,12 @@ flags:
   - name: params
     type: string
     summary: "JSON owner tunables bound to the derived operation legs"
+  - name: provision-grants
+    type: string
+    summary: public JSON references to prepared provider plans bound to exact operation legs
+  - name: approve-provision-grants
+    type: string
+    summary: exact grant-list digest from the owner-approved initial goal plan
   - name: plan
     type: boolean
     summary: print the derived plan without persisting anything

@@ -1,0 +1,24 @@
+group: sonar
+verb: settings
+owner: runtime
+summary: read or set declared Sonar settings with private credential references
+impl: {module: scripts/gates/sonar-manage.mjs, export: runSonarManage}
+effect: remote
+roles: [worker, lead, coordinator, owner]
+positional: [{name: action, enum: [read, set], required: true, variadic: false}]
+operationPolicy:
+  read: {action: sonar.settings.read, effect: read, credentials: [admin], destination: none, checkpoints: []}
+  set: {action: sonar.settings.set, effect: remote, credentials: [admin], destination: none, checkpoints: [account-authority]}
+flags:
+  - {name: target, type: string, required: true, summary: named operation target}
+  - {name: operation, type: string, summary: durable operation id}
+  - {name: execute, type: boolean, summary: execute under existing accepted operation scope}
+  - {name: reconcile, type: boolean, summary: reconcile a prior uncertain effect}
+  - {name: key, type: string, summary: exact declared project key}
+  - {name: setting, type: string, summary: one exact declared setting key; omission selects the declared set}
+conventions:
+  - setting values and secret roles come from the selected target; masked readback is not secret-value verification
+exit: {"0": plan prepared or operation completed, "1": provider effect failed or remains uncertain, "2": policy or input refused}
+json: always
+examples: [starci sonar settings set --target quality --operation quality-settings]
+editions: [full, lite]

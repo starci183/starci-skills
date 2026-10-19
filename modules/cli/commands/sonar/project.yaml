@@ -1,0 +1,23 @@
+group: sonar
+verb: project
+owner: runtime
+summary: ensure a declared Sonar project through its provider adapter
+impl: {module: scripts/gates/sonar-manage.mjs, export: runSonarManage}
+effect: remote
+roles: [worker, lead, coordinator, owner]
+positional: [{name: action, enum: [ensure], required: true, variadic: false}]
+operationPolicy:
+  ensure: {action: sonar.project.ensure, effect: remote, credentials: [admin], destination: none, checkpoints: [account-authority]}
+flags:
+  - {name: target, type: string, required: true, summary: named operation target in the application stack declaration}
+  - {name: operation, type: string, summary: durable operation id to prepare or resume}
+  - {name: execute, type: boolean, summary: consume existing content-bound authority and apply the prepared operation}
+  - {name: reconcile, type: boolean, summary: inspect an uncertain prior effect without repeating its write}
+  - {name: key, type: string, summary: exact declared project key}
+  - {name: name, type: string, summary: exact declared project display name}
+conventions:
+  - a target and existing accepted operation scope bind provider effects; execute grants no authority
+exit: {"0": plan prepared or operation completed, "1": provider effect failed or remains uncertain, "2": policy or input refused}
+json: always
+examples: [starci sonar project ensure --target quality --operation project-bootstrap]
+editions: [full, lite]
