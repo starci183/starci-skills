@@ -1,5 +1,8 @@
 # Changelog
 
+## 4.7.12 - 2026-10-19
+- Fixed: bundled source analysis uses explicit nullable contracts, unary callback arguments and grouped regular-expression alternatives while preserving refusal paths; canon pins follow the matching package cohort.
+
 ## 4.7.11 - 2026-10-19
 - Changed: app release and Sonar adapters use native target binding, with local database migration and Docker transport preserving the declared stack target.
 

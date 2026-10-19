@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.7.12 - 2026-10-19
+- Fixed: the generated runtime installer selects 1.0.0-alpha.23 and the Supabase lifecycle catalog admits Lite applications; pins @starci/hfs 4.7.12 for the repaired bundled source checks.
+
 ## 1.7.11 - 2026-10-19
 - Added: catalogued access, provisioning, Supabase and Sonar command surfaces with argument validation and help; pins @starci/hfs 4.7.11 for the matching app adapters.
 

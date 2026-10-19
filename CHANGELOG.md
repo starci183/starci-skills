@@ -14,9 +14,11 @@ until every S* row in `docs/goal.md` holds with fresh evidence, then `1.0.0` fre
 
 ### Changed
 - The CLI and HFS app adapters share native target binding for stack, local database and release operations.
-- Candidate package pins select HFS 4.7.11, CLI 1.7.11, back-end canon 3.4.17 and front-end canon 8.4.17; CLI depends exactly on its matching HFS package.
+- Candidate package pins select HFS 4.7.12, CLI 1.7.12, back-end canon 3.4.18 and front-end canon 8.4.18; CLI depends exactly on its matching HFS package.
 
 ### Fixed
+- Source analysis preserves nullable contracts, refusal behavior and explicit iterator arguments; regular-expression alternatives retain their intended anchor scope.
+- The generated CLI installer selects alpha.23, Lite Supabase lifecycle commands use the declared application scope, and runtime Sonar coverage excludes the source-only runtime under its existing no-runtime-specs policy.
 - Runtime provisioning records share the canonical SQL schema and compatibility initialization, and every new database source has a declared runtime slot.
 - Environment and failure-code checks retain their source analysis behind the permitted dependency direction; email validation has one shared owner.
 

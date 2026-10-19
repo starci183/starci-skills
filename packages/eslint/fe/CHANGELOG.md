@@ -1,5 +1,8 @@
 # Changelog
 
+## 8.4.18 - 2026-10-19
+- Fixed: bundled runtime source analysis retains nullable contracts and explicit callback arguments; canon pins follow the matching HFS and CLI cohort.
+
 ## 8.4.17 - 2026-10-19
 - Changed: bundled canon pins follow the native CLI and HFS provisioning cohort; front-end lint rules are unchanged.
 
