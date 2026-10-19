@@ -6,6 +6,20 @@ until every S* row in `docs/goal.md` holds with fresh evidence, then `1.0.0` fre
 
 ## [Unreleased]
 
+## [1.0.0-alpha.23] — 2026-10-19
+
+### Added
+- Native CLI access and provisioning commands bind operations to reviewed workspace, target and authority identities, with durable operation and lock records.
+- Catalogued Supabase and Sonar commands expose scoped provider actions through their existing process and HTTP owners.
+
+### Changed
+- The CLI and HFS app adapters share native target binding for stack, local database and release operations.
+- Candidate package pins select HFS 4.7.11, CLI 1.7.11, back-end canon 3.4.17 and front-end canon 8.4.17; CLI depends exactly on its matching HFS package.
+
+### Fixed
+- Runtime provisioning records share the canonical SQL schema and compatibility initialization, and every new database source has a declared runtime slot.
+- Environment and failure-code checks retain their source analysis behind the permitted dependency direction; email validation has one shared owner.
+
 ## [1.0.0-alpha.22] — 2026-10-19
 
 Hotfix of the red alpha.21 CI (run 39070215259) and the candidate CI flow: this release is the first cut through it.

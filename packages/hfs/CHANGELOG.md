@@ -1,5 +1,8 @@
 # Changelog
 
+## 4.7.11 - 2026-10-19
+- Changed: app release and Sonar adapters use native target binding, with local database migration and Docker transport preserving the declared stack target.
+
 ## 4.7.10 - 2026-10-19
 - Changed: bundled canon pins follow the regenerated Stylelint vocabulary and the matching lint canon cohort; HFS command behavior is unchanged.
 

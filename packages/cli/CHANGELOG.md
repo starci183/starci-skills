@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.7.11 - 2026-10-19
+- Added: catalogued access, provisioning, Supabase and Sonar command surfaces with argument validation and help; pins @starci/hfs 4.7.11 for the matching app adapters.
+
 ## 1.7.10 - 2026-10-19
 - Changed: pins @starci/hfs 4.7.10 for the canon cohort carrying the regenerated Stylelint vocabulary.
 
