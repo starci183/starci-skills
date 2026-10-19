@@ -12,7 +12,7 @@ import {redactData,redactText} from '../../scripts/lib/redact.mjs';
 import {isBusyError,newSpanId,newTraceId,withMachine} from './machine.mjs';
 import {projectsRootFor,repoRootKey,resolveLedgerFile,ledgerFixtureInit,assertOperationalLedger} from './ledger-paths.mjs';
 import { hasTable, insertRowWith } from '../../scripts/lib/sqlite.mjs';
-import { PROVISION_SQL, provisionWrites } from './provision-operations.mjs'; export { provisionOperation, priorProvisionOperations, isProvisionOperationFailure } from './provision-operations.mjs';
+import { provisionWrites } from './provision-operations.mjs'; export { provisionOperation, priorProvisionOperations, isProvisionOperationFailure } from './provision-operations.mjs';
 // The machine-side path helpers have one definition (engine/db/machine.mjs); re-exported for the ledger's callers.
 export {isUnderTempDir,machineFileFor,starciLocalRoot,TEST_REGISTRY_ENV} from './machine.mjs';
 const require=createRequire(import.meta.url);
@@ -96,7 +96,7 @@ export const ledgerFileFor=(repoRoot,{env=process.env}={})=>{
 // Connection policy (DBTREE header "PRAGMA at open", RESEARCH-STORAGE §3)
 // ---------------------------------------------------------------------------------------------------------
 const INIT_SQL_FILE=new URL('./schema/runtime.sql',import.meta.url);
-const INIT_SQL=fs.readFileSync(INIT_SQL_FILE,'utf8')+PROVISION_SQL;
+const INIT_SQL=fs.readFileSync(INIT_SQL_FILE,'utf8');
 const LEDGER_BUSY_TIMEOUT_MS=15000;
 /**
  * Writer pragmas. wal_autocheckpoint=0 on EVERY connection except the one checkpointer (openLedger({checkpointer:true}),
@@ -975,7 +975,7 @@ export function deleteWorkflowRows(db,{workflowId}){
 }
 
 /** Every typed write, for the handle's `write` namespace. */
-const LEDGER_WRITES=Object.freeze({...provisionWrites,recordBlob,storeBlob,appendEvent,createWorkflow,ensureWorkflow,changeWorkflowPhase,updateWorkflow,insertGoal,recordGoalInput,
+const LEDGER_WRITES=Object.freeze({...provisionWrites(INIT_SQL),recordBlob,storeBlob,appendEvent,createWorkflow,ensureWorkflow,changeWorkflowPhase,updateWorkflow,insertGoal,recordGoalInput,
   createUnit,setUnitState,reopenUnit,raiseTryBudget,addUnitEdge,recordGraphVersion,enqueueJob,setJobStatus,updateJob,startAttempt,updateAttempt,endRejectedAttempt,writeContract,
   declareResource,acquireLease,renewLeases,releaseLeases,idempotent,recordFailedRequest,fileReport,markReportConsumed,recordCheckRun,recordArtifact,attachToReport,
   recordArtifactProof,citeBlob,recordTranscriptSnapshot,setAttemptTranscript,recordLlmUsage,recordAttemptUsage,markAttemptUsageUnavailable,recordKernelUsage,appendLog,setLogCursor,setCondition,openIncident,updateIncident,resolveIncident,

@@ -24,6 +24,7 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { runCheckCli } from '../lib/check-cli.mjs';
 import { envFacts } from '../lib/env-source-facts.mjs';
+import { parseSource, ts } from '../hfs/runtime-rules/source-ast.mjs';
 
 export const CATALOG_FILE = 'modules/schemas/env.yaml';
 const FAILURE_CODES_FILE = 'modules/kernel/failure-codes.yaml';
@@ -80,7 +81,7 @@ function envFindings(files, catalog, failureCodes = new Set(), exampleNames = nu
   const seen = new Set();
   for (const { rel, text } of files) {
     if (!rel.endsWith('.mjs') || isSpec(rel) || !ENV_ROOTS.some((r) => rel.startsWith(`${r}/`))) continue;
-    fileEnvFindings(envFacts(text, rel), { rel, owner: rel === catalog.reader, known, seen, failureCodes, catalog, findings });
+    fileEnvFindings(envFacts(ts(), parseSource(text, rel)), { rel, owner: rel === catalog.reader, known, seen, failureCodes, catalog, findings });
   }
   for (const [name, entry] of Object.entries(catalog.variables)) {
     if (!seen.has(name.toUpperCase())) findings.push({ code: 'RT_ENV_STALE_ENTRY', path: CATALOG_FILE, line: 1, message: `${name} is in ${CATALOG_FILE} but no production source reads or names it: delete the entry` });

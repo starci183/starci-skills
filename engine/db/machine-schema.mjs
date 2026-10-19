@@ -27,7 +27,19 @@ function sqlIdentity(sql) {
   for (const at of [2, 3]) if (normalized.slice(at, at + 3).join(' ') === 'if not exists') normalized.splice(at, 3);
   return JSON.stringify(normalized);
 }
-const objects = db => db.prepare("SELECT type,name,sql FROM sqlite_master WHERE name NOT GLOB 'sqlite_*' ORDER BY type,name").all();
+/** Canonical object identities include attached indexes and triggers, regardless of their names. */
+export const readSchemaObjects = db => db.prepare("SELECT type,name,tbl_name,sql FROM sqlite_master WHERE name NOT GLOB 'sqlite_*' ORDER BY type,name")
+  .all().map(row => ({ ...row, identity: sqlIdentity(row.sql) }));
+
+/** Describe canonical DDL in an isolated reference; no project or host store is opened. */
+export function describeSchema(sql) {
+  const { DatabaseSync } = require('node:sqlite'), reference = new DatabaseSync(':memory:');
+  try {
+    reference.exec(sql);
+    return { objects: readSchemaObjects(reference),
+      blobRefs: reference.prepare('SELECT table_name,column_name FROM blob_ref_columns ORDER BY table_name,column_name').all() };
+  } finally { reference.close(); }
+}
 function rollbackSchema(db, error) {
   try { db.exec('ROLLBACK'); }
   catch (rollbackError) { throw new AggregateError([error, rollbackError], 'machine schema failed and rollback failed', { cause: error }); }
@@ -39,12 +51,8 @@ export function machineSchemaMethods({ schema: MACHINE_SCHEMA, version: MACHINE_
   let requiredObjects;
   function expectedObjects() {
     if (requiredObjects) return requiredObjects;
-    const { DatabaseSync } = require('node:sqlite'), reference = new DatabaseSync(':memory:');
-    try {
-      reference.exec(fs.readFileSync(INIT_SQL_FILE, 'utf8'));
-      requiredObjects = objects(reference).map(row => ({ ...row, identity: sqlIdentity(row.sql) }));
-      return requiredObjects;
-    } finally { reference.close(); }
+    requiredObjects = describeSchema(fs.readFileSync(INIT_SQL_FILE, 'utf8')).objects;
+    return requiredObjects;
   }
   /** Refuse any store that is not exactly the current schema, leaving it unchanged; the operator replaces it with a fresh store. */
   function refuseOld(file, why) {
@@ -59,7 +67,7 @@ export function machineSchemaMethods({ schema: MACHINE_SCHEMA, version: MACHINE_
     if (version !== MACHINE_VERSION) refuseOld(file, 'is user_version '+version);
   }
   function checkObjects(db, file, expected) {
-    const rows = objects(db), actual = new Map(rows.map(row => [row.type+':'+row.name, sqlIdentity(row.sql)]));
+    const rows = readSchemaObjects(db), actual = new Map(rows.map(row => [row.type+':'+row.name, row.identity]));
     for (const row of expected) if (actual.get(row.type+':'+row.name) !== row.identity)
       refuseOld(file, 'has a missing or changed '+row.type+" '"+row.name+"'");
     const names = new Set(expected.map(row => row.type+':'+row.name));

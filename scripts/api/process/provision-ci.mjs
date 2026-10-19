@@ -1,7 +1,5 @@
-import fs from 'node:fs';
-import { makeTempDir } from '../fs/make-temp-dir.mjs';
+import path from 'node:path';
 import { runProgram } from './run-program.mjs';
-import { preflightCiProvision } from './preflight-ci-provision.mjs';
 import { ciNativeArguments, ciChildEnvironment } from '../../lib/provision-ci-contract.mjs';
 
 const held = (code, writeAck = false, publicReadback = false, name) => ({
@@ -52,34 +50,23 @@ function metadataOutcome(input, env, run, writeAck, reconcile) {
     proof: { name: input.name, credentialAccepted: true, valueToNameBindingVerified: false } };
 }
 
-function removeConfigDirectory(directory) {
-  if (!directory) return true;
-  try { fs.rmSync(directory, { recursive: true, force: true }); return true; }
-  catch { return false; }
-}
-
 /**
- * Preserve native HFS admission and stdin custody. A successful set is acknowledged before metadata
+ * Run admitted native CI work in the caller-owned configuration directory. A successful set is acknowledged before metadata
  * readback. GitHub never returns a secret value: a matching name cannot reconcile a lost write ACK,
  * and this bridge never claims consumer behavior or value equality from masked metadata.
  */
-export function provisionCi(input, { principal, source, checkpoint, acknowledge, reconcile = false, priorWriteAck = false }, { run = runProgram } = {}) {
-  preflightCiProvision(input, { run });
-  let configDirectory, outcome, writeAck = reconcile && priorWriteAck;
-  try {
-    const token = principal();
-    if (typeof token !== 'string' || !token.length) throw new Error('CI_ACCESS_PRINCIPAL_REQUIRED');
-    configDirectory = fs.realpathSync(makeTempDir('starci-ci-private-', { env: input.parentEnv }));
-    const env = { ...ciChildEnvironment(input.parentEnv), 'GH_TOKEN': token, 'GH_HOST': 'github.com', 'GH_PROMPT_DISABLED': '1', 'GH_CONFIG_DIR': configDirectory };
-    if (!reconcile) {
-      const written = writeSecret(input, { source, checkpoint, acknowledge: () => {
-        writeAck = true; acknowledge();
-      } }, env, run);
-      if (!written) outcome = held('CI_ACCESS_WRITE_UNKNOWN');
-    }
-    if (!outcome) outcome = metadataOutcome(input, env, run, writeAck, reconcile);
-  } finally {
-    if (!removeConfigDirectory(configDirectory)) outcome = held('CI_ACCESS_CLEANUP_HELD', writeAck, false, input.name);
+export function provisionCi(input, { principal, source, checkpoint, acknowledge, configDirectory, reconcile = false, priorWriteAck = false }, { run = runProgram } = {}) {
+  if (typeof configDirectory !== 'string' || !path.isAbsolute(configDirectory))
+    throw new TypeError('an absolute owned configuration directory is required');
+  const token = principal();
+  if (typeof token !== 'string' || !token.length) throw new Error('CI_ACCESS_PRINCIPAL_REQUIRED');
+  const env = { ...ciChildEnvironment(input.parentEnv), 'GH_TOKEN': token, 'GH_HOST': 'github.com', 'GH_PROMPT_DISABLED': '1', 'GH_CONFIG_DIR': configDirectory };
+  let writeAck = reconcile && priorWriteAck;
+  if (!reconcile) {
+    const written = writeSecret(input, { source, checkpoint, acknowledge: () => {
+      writeAck = true; acknowledge();
+    } }, env, run);
+    if (!written) return held('CI_ACCESS_WRITE_UNKNOWN');
   }
-  return outcome;
+  return metadataOutcome(input, env, run, writeAck, reconcile);
 }

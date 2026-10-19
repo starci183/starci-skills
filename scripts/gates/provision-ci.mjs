@@ -1,11 +1,14 @@
 import { canonicalJSON } from '../../engine/canonical-json.mjs';
 import { isPlainObject } from '../../engine/plain-object.mjs';
 import { skillRoot } from '../../engine/runtime-root.mjs';
+import { makeTempDir } from '../api/fs/make-temp-dir.mjs';
+import { safeRemove } from '../api/fs/safe-remove.mjs';
 import { revParse } from '../api/git/rev-parse.mjs';
 import { provisionCi } from '../api/process/provision-ci.mjs';
 import { inspectCiProvisionCli } from '../api/process/inspect-ci-provision-cli.mjs';
 import { preflightCiProvision } from '../api/process/preflight-ci-provision.mjs';
 import { argThrow } from '../lib/cli-arg.mjs';
+import { artifactHoldReason } from '../machine/artifact-hold.mjs';
 import { resolveProvisionTarget } from './provision-target.mjs';
 import { runProvisionOperation } from './provision-operation.mjs';
 
@@ -26,6 +29,24 @@ function publicResource(target) {
   if (Object.keys(target.credentials).length !== 2 || !target.credentials.principal || !target.credentials.source
     || Object.values(target.credentials).some(ref => ref.optional === true || ref.hostConnection !== undefined)) argThrow('CI_ACCESS_CREDENTIAL_BINDING_INVALID');
   return { ...resource };
+}
+
+function withOwnedConfiguration(input, callbacks) {
+  preflightCiProvision(input);
+  const configDirectory = makeTempDir('starci-ci-private-', { env: input.parentEnv });
+  let outcome;
+  try {
+    outcome = provisionCi(input, { ...callbacks, configDirectory });
+  } finally {
+    let removed = false;
+    try {
+      removed = safeRemove(configDirectory, { hold: directory => artifactHoldReason(directory, { env: input.parentEnv }) }).ok;
+    } catch { removed = false; }
+    if (!removed && outcome) outcome = { outcome: outcome.writeAck ? 'partial' : 'unknown',
+      code: 'CI_ACCESS_CLEANUP_HELD', writeAck: outcome.writeAck, publicReadback: false, consumerVerified: false,
+      proof: { name: input.name, valueToNameBindingVerified: false } };
+  }
+  return outcome;
 }
 
 /** One fixed accepted operation bridges declared sealed custody into the existing native CI owner. */
@@ -54,13 +75,13 @@ export async function runProvisionCi(ctx) {
       reconcile: 'metadata-only-without-write-replay' },
     apply: ({ credentials, checkpoint, acknowledge }) => {
       current();
-      return provisionCi(input, { principal: () => credentials.principal, source: () => credentials.source,
+      return withOwnedConfiguration(input, { principal: () => credentials.principal, source: () => credentials.source,
         checkpoint: () => { current(); checkpoint({ phase: 'ci-secret-set' }); },
         acknowledge: () => acknowledge({ phase: 'ci-secret-set-acknowledged' }) });
     },
     reconcile: ({ credentials, operation }) => {
       current();
-      return provisionCi(input, { principal: () => credentials.principal, reconcile: true,
+      return withOwnedConfiguration(input, { principal: () => credentials.principal, reconcile: true,
         priorWriteAck: operation.writeAck === true });
     },
   });

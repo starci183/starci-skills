@@ -24,13 +24,13 @@ import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { readAllowlist } from '../lib/allowlist.mjs';
 import { FAILURE_CODE_VIETNAMESE_FIELDS } from '../lib/language.mjs';
-import { createRequire } from 'node:module';
 import { isMain } from '../lib/is-main.mjs';
 import { byCodeUnit } from '../lib/list.mjs';
 import { CODE_FINDINGS, PLUGIN_ENFORCERS } from '../lib/failure-code-findings.mjs';
 import { loadCatalog } from '../cli/catalog.mjs';
 import { failureSourceIndex, ownedResultCodes } from '../lib/failure-code-owned-results.mjs';
 import { protocolEnumOffsets, environmentOffsets, catchRecognitionOffsets } from '../lib/failure-code-protocol-enums.mjs';
+import { parseSource, ts as sourceTs } from '../hfs/runtime-rules/source-ast.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const CATALOG_FILE = 'modules/kernel/failure-codes.yaml';
@@ -97,11 +97,9 @@ function vocabularyCodes(base = root) {
 
 const lineOf = (text, index) => text.slice(0, index).split('\n').length;
 
-let typescript = null;
 /** Offsets of the `[` of every element access, array literal or computed key whose only content is an identifier. */
 function codeBrackets(rel, text) {
-  typescript ??= createRequire(import.meta.url)('typescript');
-  const ts = typescript;
+  const ts = sourceTs();
   const source = ts.createSourceFile(rel, text, ts.ScriptTarget.Latest, false, ts.ScriptKind.JS);
   const out = new Set();
   const bracketBefore = (node) => text.lastIndexOf('[', node.getStart(source));
@@ -211,8 +209,8 @@ function emittedCodes(base = root) {
   };
   const NOT_CODES = readNotCodes(base);
   const { texts, envNames } = sourceTexts(base);
-  typescript ??= createRequire(import.meta.url)('typescript');
-  const index = failureSourceIndex(typescript, texts.filter(([rel]) => rel.endsWith('.mjs')));
+  const typescript = sourceTs(), scriptTexts = new Map(texts.filter(([rel]) => rel.endsWith('.mjs')));
+  const index = failureSourceIndex(typescript, scriptTexts, file => parseSource(scriptTexts.get(file), file));
   const recognition = protocolEnumOffsets(typescript, index, cliEnums(base));
   for (const classified of [environmentOffsets(typescript, index), catchRecognitionOffsets(typescript, index)]) {
     for (const [file, offsets] of classified) {

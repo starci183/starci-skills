@@ -2,22 +2,21 @@
 // Inputs are parsed source files only; provider modules are never imported or executed.
 import path from 'node:path';
 import {isConstVariable, nameText} from './ts-ast.mjs';
-import {parseSource} from '../hfs/runtime-rules/source-ast.mjs';
 
 const unwrap = (t, node) => t.isParenthesizedExpression(node) ? unwrap(t, node.expression) : node;
 const topLevel = (t, node) => t.isVariableStatement(node.parent?.parent) && t.isSourceFile(node.parent.parent.parent);
 
 /** Index unique const bindings and named relative imports without resolving or executing application modules. */
-export function failureSourceIndex(t, texts) {
+export function failureSourceIndex(t, texts, sourceFor) {
   const sources = new Map(texts);
   return {
     closedCollections: new Set(),
-    get: file => sources.has(file) ? sourceInfo(t, file, sources.get(file)) : null,
-    *values() { for (const [file, text] of sources) yield sourceInfo(t, file, text); },
+    get: file => sources.has(file) ? sourceInfo(t, file, sourceFor(file)) : null,
+    *values() { for (const file of sources.keys()) yield sourceInfo(t, file, sourceFor(file)); },
     *importers(file, name) {
       for (const [candidate, text] of sources) {
         if (!text.includes(path.posix.basename(file))) continue;
-        const info = sourceInfo(t, candidate, text);
+        const info = sourceInfo(t, candidate, sourceFor(candidate));
         for (const [local, imported] of info.imports) if (imported.file === file && imported.name === name) yield {info, local};
         if (info.namespaceImports.has(file) || info.reexports.has(file) || info.unresolvedImports.length) yield {info, unresolved: true};
       }
@@ -25,8 +24,7 @@ export function failureSourceIndex(t, texts) {
   };
 }
 
-function sourceInfo(t, file, text) {
-  const source = parseSource(text, file);
+function sourceInfo(t, file, source) {
   const info = {file, source, bindings: new Map(), imports: new Map(), namespaceImports: new Set(), reexports: new Set(),
     identifiers: [], declarations: new Map(), dynamicImports: [], unresolvedImports: []};
   const visit = node => {

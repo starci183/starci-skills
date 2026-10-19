@@ -184,7 +184,7 @@ function projectedQuotes(t, info, uses, offsets) {
 export function environmentOffsets(t, index) {
   const found = new Map();
   for (const info of index.values()) {
-    const offsets = new Set(), {aliases} = envFacts(info.source.text, info.file);
+    const offsets = new Set(), {aliases} = envFacts(t, info.source);
     const visit = node => {
       if (t.isObjectLiteralExpression(node) && envObject(t, node, aliases)) {
         for (const property of node.properties) if (t.isPropertyAssignment(property) && t.isStringLiteralLike(property.name)) offsets.add(property.name.getStart(info.source));
