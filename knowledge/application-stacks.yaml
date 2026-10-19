@@ -42,14 +42,16 @@ guidance:
       separately; never reuse app storage credentials as independent backup by inference.
   - id: STACK-DEV
     requirement: |
-      Dev defaults to Docker Compose and cold-starts the whole selected app on a clean supported
+      Full development defaults to Docker Compose and cold-starts the whole selected app on a clean supported
       machine with Docker Linux containers and declared bootstrap tools, without host app runtimes, forgotten files,
-      manual realms or unnamed volumes. Provide one prepare/up path, health-gated idempotent
+      manual realms or unnamed volumes. Lite development runs local Supabase in Docker Linux containers
+      managed by the Supabase CLI; start the Docker engine before the local Supabase stack.
+      Application processes follow their declared development profile. Provide one prepare/up path, health-gated idempotent
       init/migration jobs, application readiness and a dependency-backed smoke journey.
       Generate declared local service secrets once, encrypt and reuse them. Provider-issued
       credentials are researched owner inputs only for enabled features requiring them.
       A separately declared native-app profile may run application packages through exact package
-      scripts while the same Compose-owned dependencies remain managed. Bind each package to a
+      scripts while the same declared container-managed dependencies remain managed. Bind each package to a
       repository role, immutable revision, package root, private generated env file, host ports and
       readiness. Bind container applications to the same source revision plus exact context,
       Dockerfile and package inputs, and require loopback published-port readiness or an enabled

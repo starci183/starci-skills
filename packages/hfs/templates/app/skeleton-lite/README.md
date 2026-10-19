@@ -24,6 +24,8 @@ Declare `ci.github.repository` and `ci.github.defaultBranch` in `.starcistacks/a
 
 ## Development
 
+Start the Docker engine, then run `npm run db:start` to start local Supabase in Docker containers through the Supabase CLI. Configure the local environment and start the API and web app separately using the package scripts for the declared development profile.
+
 ```sh
 npm install
 npm run contract:emit

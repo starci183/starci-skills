@@ -1,5 +1,8 @@
 # Changelog
 
+## 4.7.9 - 2026-10-19
+- Changed: the lite scaffold README explicitly starts the Docker engine before the Supabase CLI-managed local stack and keeps application startup in its declared development profile.
+
 ## 4.7.8 - 2026-10-19
 - Fixed: catalog usage follows ordered object and JSX spreads, readonly class translator fields and their declared forwarding methods while unknown or overwritten producers remain barriers.
 - Fixed: strict-null narrowing retains initializer provenance only for an unmodified const reference; destructuring writes and ancestor replacements invalidate the proof across the containing evaluation frame.

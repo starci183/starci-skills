@@ -32,6 +32,8 @@ TypeScript everywhere, NestJS in `be/`, Next.js with next-intl in `fe/`, Supabas
 
 ## Development
 
+Start the Docker engine, then run `npm run db:start` to start local Supabase in Docker containers through the Supabase CLI. After configuring their local environment, start the API and web app separately with `npm run dev:be` and `npm run dev:fe`, following the declared development profile.
+
 ```sh
 npm install
 npm run contract:emit
