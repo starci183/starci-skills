@@ -230,10 +230,10 @@ const dependencyDetail = (d, dependants) => `${dependants.length} job(s) wait on
  */
 export function stuckOf({ db, workflowId, now = Date.now(), sla = telemetrySettings().stuckSla, ownerGates = [], peerWaits = [], queued = [], heldSettle = [], settleReady = [], awaitingOwner = [], jobs = null }) {
   const out = [];
-  jobs ??= db.prepare("SELECT job_id, op_id, status, result_json, created_at, updated_at FROM jobs WHERE workflow_id=? AND kind<>'kernel'").all(workflowId);
-  const jobRow = new Map(jobs.map((j) => [j.job_id, j]));
+  const workflowJobs = jobs ?? db.prepare("SELECT job_id, op_id, status, result_json, created_at, updated_at FROM jobs WHERE workflow_id=? AND kind<>'kernel'").all(workflowId);
+  const jobRow = new Map(workflowJobs.map((j) => [j.job_id, j]));
   const ctx = { db, workflowId, now, sla, out };
-  const capped = retryCapsOf(jobs);
+  const capped = retryCapsOf(workflowJobs);
   const pendingAsks = awaitingOwner.filter((a) => (a.answer ?? 'pending') === 'pending');
   for (const gate of ownerGates) pushOwnerGate(ctx, gate, capped.get(gate.incidentId), pendingAsks);
   for (const ask of pendingAsks) pushPendingAsk(ctx, ask, jobRow);

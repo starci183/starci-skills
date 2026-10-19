@@ -33,7 +33,7 @@ Exit 0 is clean, 1 reports findings, and 2 is bad usage or unreadable input.`;
 class CliOnlyEntryInputError extends Error {}
 
 const posix = (file) => String(file).replaceAll('\\', '/');
-const slashPattern = (value) => posix(value).split('/').map(escapeRegExp).join(String.raw`[\\/]`);
+const slashPattern = (value) => posix(value).split('/').map((part) => escapeRegExp(part)).join(String.raw`[\\/]`);
 const lineAt = (text, at) => text.slice(0, at).split('\n').length;
 
 const fullyExempt = (file) => file.startsWith('packages/cli/src/')

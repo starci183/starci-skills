@@ -507,7 +507,7 @@ export async function buildFixtureHarness({ component, exportName, props, css, t
   if (!fixture || typeof fixture !== 'object' || Array.isArray(fixture)) throw new UsageError(`${props} must hold the props object`);
   const dirs = [...(productDir ? [productDir] : []), path.dirname(component), cwd];
   const grammarRoot = grammar?.pick?.root ?? null;
-  const aliases = grammarRoot && grammar.pick.source !== 'product' ? { [GRAMMAR_PACKAGE]: grammarRoot } : {};
+  const aliases = grammarRoot && grammar?.pick?.source !== 'product' ? { [GRAMMAR_PACKAGE]: grammarRoot } : {};
   const found = esbuildInstall(dirs);
   if (!found) throw new UsageError(`${RENDER_TOOL_UNAVAILABLE}: no esbuild resolvable from ${dirs.join(', ')} or the runtime`);
   const esbuild = requirePackage(found);

@@ -128,7 +128,7 @@ export async function attemptProducts(repo, report, { checkpoint = null } = {}) 
   const checkpointHead = checkedHead(checkpoint?.sha);
   const head = checkpointHead ?? reportHead;
   const headSource = (checkpointHead && 'runtime-checkpoint') || (reportHead && 'report-tested') || null;
-  const empty = { head, headSource, headAt: checkpointHead ? checkpoint.at ?? null : null, reportHead,
+  const empty = { head, headSource, headAt: checkpointHead ? checkpoint?.at ?? null : null, reportHead,
     parent: null, repo: repo ?? null, files: [], otherChanged: [], claims: [], error: null, errorCode: null,
     scope: { listed: 0, returned: 0, truncated: false } };
   const claims = Array.isArray(report?.claims) ? publicJson(report.claims) : [];

@@ -188,6 +188,14 @@ async function candidateGate({ repo, run, cwd, head, remote, branch, tag, deps, 
   return { lifted, candidate };
 }
 
+/** Create the annotated tag from its validated changelog section, or return the visible refusal without pushing. */
+function createReleaseTag({ run, cwd, tag, changelog, refuse }) {
+  const section = changelogSection(changelog, tag.slice(1));
+  if (!section.found) return refuse('release-notes', `the changelog section for ${tag} is missing`);
+  const made = run(['tag', '-a', tag, '--cleanup=verbatim', '-F', '-'], { cwd, input: section.body });
+  return made.ok ? null : refuse('tag-failed', `could not create the annotated tag ${tag}: ${made.stderr.slice(0, 200)}`);
+}
+
 /**
  * Cut the release `tag` (v<version>) of `repo`: see the header. Async (the L4 Sonar gate is): a Promise of {ok, verdict, why, tag, head, suite, skips, declaredSkips, pushed, tagCreated}.
  * The tag is required, must be `v*`, and is created here, ANNOTATED, with the CHANGELOG section as its message (an existing annotated tag on HEAD is reused).
@@ -225,8 +233,8 @@ export async function cutRelease({ repo, remote = 'origin', branch = 'main', tag
   const { lifted, candidate } = judged;
 
   if (!local) {
-    const made = run(['tag', '-a', tag, '--cleanup=verbatim', '-F', '-'], { cwd, input: changelogSection(changelog, tag.slice(1)).body });
-    if (!made.ok) return refuse('tag-failed', `could not create the annotated tag ${tag}: ${made.stderr.slice(0, 200)}`);
+    const tagRefusal = createReleaseTag({ run, cwd, tag, changelog, refuse });
+    if (tagRefusal) return tagRefusal;
     out.tagCreated = true;
   }
   const refs = [branch, `refs/tags/${tag}`];

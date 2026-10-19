@@ -62,6 +62,11 @@ const BOOLEAN_FLAGS = new Set(['json', 'start', 'dry-run', 'no-notify', 'request
 const csv = (v) => splitList(v);
 const clip = (s, n = 400) => clipLine(s, n);
 
+/**
+ * Parse bridge arguments as positional strings, named values, switches and repeatable repository values.
+ * @param {string[]} argv
+ * @returns {Record<string, string|boolean|string[]|undefined> & {_: string[], repos?: string[]}}
+ */
 export function parseArgs(argv) {
   const out = { _: [] };
   for (let i = 0; i < argv.length; i++) {

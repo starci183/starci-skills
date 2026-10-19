@@ -52,7 +52,7 @@ export async function runSupabaseAuth(ctx) {
     plan: {
       provider: target.provider, origin: target.origin, context: target.context,
       action: 'user-ensure', email: target.resource.user.email, emailConfirmed: target.resource.user.emailConfirmed,
-      existingUserPolicy: 'preserve-password-and-confirmation', newUserPassword: 'declared-custody',
+      existingUserPolicy: 'preserve-password-and-confirmation',
       research: { readAt: '2026-10-19', sources: [
         'https://supabase.com/docs/reference/javascript/auth-admin-createuser',
         'https://supabase.com/docs/guides/getting-started/api-keys',

@@ -15,6 +15,7 @@ import { realpathOr } from '../../lib/fs-kind.mjs';
 export function isLinkLike(p, { parentReal = null, stat = null } = {}) {
   let st = stat;
   if (!st) { try { st = fs.lstatSync(p); } catch { return false; } }
+  if (!st) return false;
   if (st.isSymbolicLink()) return true;
   if (!st.isDirectory()) return false;
   try { fs.readlinkSync(p); return true; } catch { /* not a link readlink can read */ }

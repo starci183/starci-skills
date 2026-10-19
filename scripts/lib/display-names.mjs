@@ -104,7 +104,7 @@ function productName(raw) {
 }
 /** The first clause of the owner's goal text: up to the first sentence end, line break, colon or dash aside. */
 function firstClause(text) {
-  const s = String(text ?? '').split(/\r?\n/).map(squash).find(Boolean) ?? '';
+  const s = String(text ?? '').split(/\r?\n/).map((line) => squash(line)).find(Boolean) ?? '';
   const clause = s.split(/(?<=[.!?;:])\s|\s[—–-]\s|\s\(/)[0] ?? '';
   return trimTrailingChars(clause, CLAUSE_TRAILING_CHAR).trim();
 }

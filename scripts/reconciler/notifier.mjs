@@ -168,8 +168,8 @@ async function digestInputs({ env = process.env, now = Date.now(), repos = null 
   const [{ productRepos, supervisorSettings }, { openLedgerReader, ledgerFileFor }, { workflowView }, { listDecisions }] = await Promise.all([
     import('../machine/home.mjs'), import('../../engine/db/ledger.mjs'), import('../kernel/progress-rca.mjs'), import('../machine/decisions.mjs')]);
   const progress = [], ownerWaits = [];
-  if (repos == null) { try { repos = productRepos(supervisorSettings()); } catch { repos = []; } }
-  for (const repo of repos) {
+  const targets = repos ?? (() => { try { return productRepos(supervisorSettings()); } catch { return []; } })();
+  for (const repo of targets) {
     const ledger = ledgerDigest(repo, { env, now, workflowView, listDecisions, ledgerFileFor, openLedgerReader });
     if (!ledger) continue;
     progress.push(...ledger.progress);

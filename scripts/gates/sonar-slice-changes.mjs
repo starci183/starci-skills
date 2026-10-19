@@ -30,6 +30,7 @@ const hunkRange = (line) => {
  * The new-side line ranges of a `git diff -U0` patch: [{path, added, ranges: [[from, to], ...]}]. A deleted
  * file is dropped; a rename or mode change without a hunk keeps its path with no range. Header lines are
  * only read before a file's first hunk, so a removed line that starts with "-- " is never a header.
+ * @returns {{path: string, added: boolean, ranges: [number, number][]}[]} Only entries with a parsed, nonempty new-side path survive.
  */
 export function parseDiffNewLines(patch) {
   const files = [];

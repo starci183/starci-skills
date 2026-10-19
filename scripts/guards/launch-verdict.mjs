@@ -64,9 +64,10 @@ export const launchVerdict = (program, args, guard = null) => {
       remedy: 'inspect with `starci machine worktrees counts`; remove clean merged lane worktrees with `starci machine worktrees-clean`; worktrees are created and removed only by the runtime worktree API (scripts/machine/worktree-orca.mjs createOrcaWorktree / removeOrcaWorktree, scripts/kernel/workflow-worktree.mjs releaseWorkflowWorktree); report a need you cannot meet as blocked environment' };
     return null;
   }
-  const testWorld = String(guard?.op ?? '').startsWith('uat.') ? testWorldOf(program, args) : null;
+  const op = String(guard?.op ?? '');
+  const testWorld = op.startsWith('uat.') ? testWorldOf(program, args) : null;
   if (testWorld) return { code: 'UAT_TEST_WORLD', command: [program, ...args].join(' ').slice(0, 200),
-    reason: `${guard.op} walks the app's real dev stack: a test world (${testWorld}) fakes what the walk must prove`,
+    reason: `${op} walks the app's real dev stack: a test world (${testWorld}) fakes what the walk must prove`,
     remedy: 'bring up the dev stack the app-root .starcistacks/<env> declares with its own start commands, check it with env-health, and walk it; a stack that will not come up is reported blocked environment' };
   const how = headlessHow(program, args);
   return how ? { code: 'AGENT_HEADLESS_LAUNCH', ...launchRefusal(program, args, how) } : null;

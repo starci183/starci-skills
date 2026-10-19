@@ -115,6 +115,6 @@ export function verbCli(argv = process.argv.slice(2)) {
   const value = (n) => { const i = argv.indexOf(`--${n}`); return i >= 0 ? argv[i + 1] ?? null : null; };
   const csv = (v) => String(v ?? '').split(',').map((s) => s.trim()).filter(Boolean);
   const asJson = argv.includes('--json');
-  const print = (r, human) => console.log(asJson ? JSON.stringify(r) : [human].flat().map(textLine).join('\n'));
+  const print = (r, human) => console.log(asJson ? JSON.stringify(r) : [human].flat().map((line) => textLine(line)).join('\n'));
   return { argv, verb: argv[0], value, csv, asJson, print };
 }

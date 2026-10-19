@@ -181,7 +181,7 @@ import { collectJobFiles, evidenceHostPathGate, filedReportOf, indexJobArtifacts
 import { checkWorkFilesAbs, inSecretScope, rangeFiles } from '../work/validate/work-hygiene.mjs';
 import { legOrderExemption } from './leg-order.mjs';
 import { proofAcceptanceOf, coverageOf, verifyProofs } from './proof-integrity.mjs';
-import { classifyFailure, isMeasurementLeg, measurementCheckClass, resolveRootOwner } from './verify-failure.mjs';
+import { ROOT_VERIFY_OP, classifyFailure, failureShapeOf, isMeasurementLeg, measurementCheckClass, resolveRootOwner } from './verify-failure.mjs';
 import { readEnv } from '../lib/env.mjs';
 import { bestEffortCall } from '../agent/best-effort-call.mjs';
 import { normalizeProvider } from '../lib/provider.mjs';
@@ -673,6 +673,7 @@ const heartbeatAtOf = (job) => {
 // state with its gate and an outage error row the provider CLI rendered (evidence for the provider
 // circuit; an active turn is getting completions, so an old error row above it proves nothing).
 const workerScreenRead = (db, job, terminalHandle, { frame }) => {
+  /** @type {{shellPrompt: string|null, inputDraft: string|null, screen: string|null, screenState: string|null, screenGate: unknown, providerOutage: ReturnType<typeof workerOutageEvidence>}} */
   const out = { shellPrompt: null, inputDraft: null, screen: null, screenState: null, screenGate: null, providerOutage: null };
   try {
     const read = terminalRead({ terminal: terminalHandle, screen: true });
@@ -684,6 +685,7 @@ const workerScreenRead = (db, job, terminalHandle, { frame }) => {
     if (read?.ok) out.inputDraft = read.draft ?? null;
     if (read?.ok && frame) out.screen = read.screen ?? null;
     if (read?.ok) {
+      /** @type {{state: string, gate?: unknown}} */
       const classified = out.shellPrompt ? { state: 'agent-exited' } : classifyAgentScreen(read.screen, { ...(db ? stagedInputEvidenceOf(db, job) : {}), draft: out.inputDraft });
       out.screenState = classified.state;
       out.screenGate = classified.state === 'interactive-gate' ? classified.gate ?? null : null;
@@ -1716,6 +1718,7 @@ const rejectDispatch = (ledger, job, jobId, op, model, {
   let providerHealth = null;
   // Resolved outside the transaction: an Orca-managed identity is a host call.
   const credential = authFailure && !providerHealthEvidence && model?.provider ? currentCredentialOf(model.provider) : null;
+  const screenTail = screenTailOf(details?.screen);
   ledger.transaction(() => {
     const now = Date.now();
     const leasesReleased = effectState === 'none' ? releaseLeases(ledger.db, { jobId }) : 0;
@@ -1748,7 +1751,7 @@ const rejectDispatch = (ledger, job, jobId, op, model, {
         effectState, attemptConsumed: false, retryable: reusable, leasesReleased, providerHealth,
         terminalClosed, ...(closed ? { closed } : {}), ...(attemptId != null ? { attemptId } : {}),
         ...(trust ? { trust } : {}), ...(admission ? { admission } : {}),
-        ...(screenTailOf(details?.screen) ? { screenTail: screenTailOf(details.screen) } : {}) },
+        ...(screenTail ? { screenTail } : {}) },
     });
     recordRejectionCause(ledger, { job, op, jobId, attemptId, now, providerHealth, incident, authFailure, outageFailure, model, signal, error });
   });
@@ -1776,9 +1779,11 @@ const DISPATCH_LEASE_TTL_MS = allocationMs('dispatchLeaseTtlMs');
 // In a bound project each request is spelled repository-qualified (scripts/kernel/lease-canon.mjs), and
 // held rows are compared in that form through their holder job, so a bare and a repository-prefixed
 // spelling of one file overlap (inc-52a4a5ee5b12). Without a canonicalizer: the paths as written.
-const opLeaseRequests = (payload, canon = null, op = null) => (canon
-  ? canon.requests(payload, op ?? payload?.opId ?? null)
-  : ownedPathLeaseRequests((payload.owned_paths ?? []).filter(Boolean)));
+const opLeaseRequests = (payload, canon = null, op = null) => {
+  if (canon) return canon.requests(payload, op ?? payload?.opId ?? null);
+  if (payload == null) throw new TypeError('noncanonical lease requests require a job payload');
+  return ownedPathLeaseRequests((payload.owned_paths ?? []).filter(Boolean));
+};
 
 // A write set another job's LIVE lease still owns is a wait, never a launch failure. A job
 // was dispatched twice and rejected at `reserve` both times behind its own workflow's running
@@ -2518,19 +2523,10 @@ const enqueueFollowOn = (ledger, template, { op = jobOpOf(template), retryOf = n
  * from the recorded result_json.nextStep since the owner last opened that route's gate. Past it, or on a
  * needUser route, an owner-gate incident holds the failed job alone; other legs keep running.
  */
-const ROOT_VERIFY_OP = 'review.verify';
 let kindsCatalogCache = null;
 const kindsCatalog = () => (kindsCatalogCache ??= parseYaml(fs.readFileSync(path.join(skillRoot, 'modules', 'models', 'kinds.yaml'), 'utf8')));
 const kindOfOp = (catalog, op) => (catalog.kinds?.[op] ? op : Object.keys(catalog.kinds ?? {}).find((kind) => catalog.kinds[kind]?.operator === op) ?? op);
 const opOfKind = (catalog, kind) => catalog.kinds?.[kind]?.operator ?? kind;
-/** The route-table key of a failed settle: no report, a done claim the Kernel's checks overruled, or the report outcome. */
-const failureShapeOf = ({ reportFiled, reportOutcome, claimOverruled, failureClass = null, op = null }) => {
-  if (!reportFiled) return { verdict: 'no-report' };
-  if (claimOverruled) return { outcome: reportOutcome, verdict: 'rejected' };
-  return { outcome: reportOutcome ?? 'failed', ...(failureClass ? { class: failureClass } : {}),
-    // A review's measured findings are the `findings` verdict the review route repairs from.
-    ...(failureClass === 'findings' && op === ROOT_VERIFY_OP ? { verdict: 'findings' } : {}) };
-};
 /** The build-family ops of modules/models/kinds.yaml (a measurement leg becomes a gate once one of them settled). */
 const buildOpsOf = () => [...new Set(Object.entries(kindsCatalog().kinds ?? {}).filter(([, k]) => k?.family === 'build').map(([kind]) => opOfKind(kindsCatalog(), kind)))];
 /** The previous attempt of a job's retry lineage as {report, checks}, or null. */
@@ -3018,14 +3014,15 @@ function settleFailedNoReport(ledger, job, { workerProof = null, evidence = [], 
       payload: { opId: op, attempt: tryOf(job), dispatchId, liveness, terminal: handle, effectState, evidence,
         ...(environment ? { environment, attemptConsumed: false, hostWipe: workerProof.hostWipe } : {}) } });
     settledPayload = next;
-    nextStep = enqueueNextStep(ledger, { ...job, payload_json: JSON.stringify(next) }, { shape: failureShapeOf({ reportFiled: false }), environment: Boolean(environment), liveness, repo });
-    const retried = nextStep.kind === 'retry' && nextStep.jobs?.[0]
-      ? db.prepare('SELECT job_id,try_no,unit_id FROM jobs WHERE job_id=?').get(nextStep.jobs[0]) : null;
+    const routedStep = enqueueNextStep(ledger, { ...job, payload_json: JSON.stringify(next) }, { shape: failureShapeOf({ reportFiled: false }), environment: Boolean(environment), liveness, repo });
+    nextStep = routedStep;
+    const retried = routedStep.kind === 'retry' && routedStep.jobs?.[0]
+      ? db.prepare('SELECT job_id,try_no,unit_id FROM jobs WHERE job_id=?').get(routedStep.jobs[0]) : null;
     const retryReceiptOf = (row, step) => {
       if (row) { return { enqueued: true, jobId: row.job_id, tryNo: row.try_no, unitId: row.unit_id }; }
       return { enqueued: false, reason: step.kind === 'owner-gate' ? 'route-limit' : step.reason, ...(step.incidentId ? { incidentId: step.incidentId } : {}) };
     };
-    retry = retryReceiptOf(retried, nextStep);
+    retry = retryReceiptOf(retried, routedStep);
   });
   let machineRefsReleased = 0;
   if (machineRefs.length) {

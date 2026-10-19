@@ -349,7 +349,9 @@ async function checkEnvironments({ repo, ids = [], paths = [], restart = false, 
 /* ------------------------------------------------------------------------ CLI */
 
 function parseArgs(argv) {
-  const out = { _: [] };
+  /** @type {string[]} Positional command words; named options remain separate properties. */
+  const positional = [];
+  const out = { _: positional };
   for (let i = 0; i < argv.length; i += 1) {
     const a = argv[i];
     if (a === '--') { out.command = argv.slice(i + 1); break; }

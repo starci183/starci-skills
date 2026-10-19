@@ -2,6 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { sha256 } from '../../engine/digest.mjs';
+import { byCodeUnit } from '../../engine/by-code-unit.mjs';
 import { sopsIdentityEnv } from '../../engine/secrets.mjs';
 import { readMap, setSecretValues } from '../hfs/secret-store.mjs';
 import { defaultSops } from '../hfs/secret-sops.mjs';
@@ -39,7 +40,7 @@ function admittedAgeEnvironment(env) {
 /** A fixed native consumer calls this only after admission and its own public capability checks. */
 export function provisionNativeChildEnvironment(env, nativeContext, { age = false } = {}) {
   if (nativeContext?.schema !== 'starci/native-provision-context@1'
-    || Object.keys(nativeContext).sort().join(',') !== 'guardsRoot,schema,stateRoot,terminal'
+    || Object.keys(nativeContext).sort(byCodeUnit).join(',') !== 'guardsRoot,schema,stateRoot,terminal'
     || nativeContext.terminal !== (env?.ORCA_TERMINAL_HANDLE ?? null)
     || typeof nativeContext.stateRoot !== 'string' || typeof nativeContext.guardsRoot !== 'string'
     || !path.isAbsolute(nativeContext.stateRoot) || !path.isAbsolute(nativeContext.guardsRoot)

@@ -1,5 +1,19 @@
 // telegram-bridge-text.mjs — what the Telegram bridge says to the owner, in the owner's language (see telegram-bridge.mjs).
 import { translator } from '../lib/i18n.mjs';
+import { askMessage, linkFor } from '../connectors/telegram.mjs';
+
+/**
+ * Project a bridge ask into the existing localized message and link presentation.
+ * @param {{workflowId: string, title?: string|null, question: {text?: unknown, options?: unknown[]}}} state
+ * @param {{language?: string, serving?: {url: string, credential?: boolean, expiresAt?: string|number|null}|null,
+ *   base?: string|null, note?: string|null, exposeCredentialAsks?: boolean}} [options]
+ */
+export function bridgeAskText(state, { language, serving = null, base = null, note = null, exposeCredentialAsks = false } = {}) {
+  const workflow = { id: state.workflowId, title: state.title };
+  if (!serving) return askMessage({ workflow, question: state.question, language, note });
+  const link = linkFor({ url: serving.url, credential: serving.credential }, { base, exposeCredentialAsks });
+  return askMessage({ workflow, question: state.question, link, expiresAt: serving.expiresAt, language, note });
+}
 
 // The bridge's English sources translate through the i18n catalog (modules/i18n/messages, scripts/lib/i18n.mjs).
 export const bridgeText = (language) => {

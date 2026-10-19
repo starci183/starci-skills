@@ -16,11 +16,8 @@ export async function sweepGitLocks({ apply = false, now = Date.now(), env = pro
   const out = { ok: true, freedBytes: 0, deleted: [], skipped: [], errors: [], report: [] };
   const staleMs = Number(allocation?.housekeeping?.gitIndexLockStaleMs ?? allocation?.gitIndexLockStaleMs);
   if (Number.isNaN(staleMs) || staleMs <= 0) { out.ok = false; out.errors.push('modules/models/runtimes.yaml allocation.housekeeping.gitIndexLockStaleMs must declare a positive number of milliseconds'); return out; }
-  let targets = repos;
-  if (!targets) {
-    const { productRepos, supervisorSettings } = await import('../machine/home.mjs');
-    targets = productRepos(supervisorSettings());
-  }
+  const targets = repos || await import('../machine/home.mjs')
+    .then(({ productRepos, supervisorSettings }) => productRepos(supervisorSettings()));
   const record = apply ? await supervisorLockRecorder({ env, by: 'housekeeping' }) : null;
   for (const repo of targets) {
     const r = indexLock({ repo, staleMs, now, apply, list, record });

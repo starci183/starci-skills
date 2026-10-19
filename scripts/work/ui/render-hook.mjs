@@ -23,7 +23,7 @@ const endsInExtension=value=>{
  * diff names the record; all three point at the same directory, which is what the checks read.
  */
 export function uiDirOf({op={},files=[]}={}){
-  const paths=[...(Array.isArray(op.references)?op.references:[]),...(Array.isArray(op.allowlist)?op.allowlist:[]),...(Array.isArray(files)?files:[])].map(slash).filter(Boolean);
+  const paths=[...(Array.isArray(op.references)?op.references:[]),...(Array.isArray(op.allowlist)?op.allowlist:[]),...(Array.isArray(files)?files:[])].map(file=>slash(file)).filter(Boolean);
   for(const entry of paths){
     const trimmed=entry.replace(TRAILING_STAR_SEGMENT,'').replace(TRAILING_SLASHES,'');
     // Only a canonical Work UI node is a design input. Grammar references can contain their own `ui/`

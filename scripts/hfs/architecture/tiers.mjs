@@ -72,8 +72,7 @@ function stronglyConnected(adjacency) {
   for (const start of adjacency.keys()) {
     if (state.index.has(start)) continue;
     startTraversal(state, adjacency, start);
-    while (state.work.length) {
-      const frame = state.work.at(-1);
+    for (let frame = state.work.at(-1); frame; frame = state.work.at(-1)) {
       const next = frame.iterator.next();
       if (next.done) {
         finishFrame(state, frame);

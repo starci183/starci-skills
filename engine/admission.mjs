@@ -303,7 +303,7 @@ const retryClassOf=(last,disposition)=>{
  *   unit-try-budget-exhausted  try_no would pass work_units.try_budget; only the owner or the Supervisor raises it (H3)
  */
 const refuseDoneUnit=(unit,last,reopen)=>{
-  if(reopen?.reason&&reopen?.by)return;
+  if(reopen?.reason&&reopen?.by)return {reason:reopen.reason,by:reopen.by};
   throw refuse(`unit ${unit.unit_id} already passed (${last.job_id}); running it again needs an explicit reopen with a reason (--reopen <reason>)`,'unit-already-passed',{passed:last.job_id});
 };
 export function admitUnitTry({unit=null,tries=[],retryOf=null,reopen=null}={}){
@@ -320,11 +320,11 @@ export function admitUnitTry({unit=null,tries=[],retryOf=null,reopen=null}={}){
   }
   if(retryOf&&retryOf!==last.job_id)throw refuse(`--retry-of ${retryOf} is not the latest try of unit ${unit.unit_id} (${last.job_id} is): a retry follows the unit's latest failed try`,'retry-lineage-invalid',{latest:last.job_id});
   const done=unit.state==='done'||last.status==='succeeded';
-  if(done)refuseDoneUnit(unit,last,reopen);
+  const reopening=done?refuseDoneUnit(unit,last,reopen):null;
   if(retryOf&&!done&&!RETRYABLE_JOB_STATUSES.includes(last.status))throw refuse(`--retry-of ${retryOf} is ${last.status}: a retry follows a FAILED or awaiting_owner try of the same unit`,'retry-lineage-invalid');
   const tryNo=Number(last.try_no)+1;
   if(tryNo-(ordered.length-spentTries(ordered))>Number(unit.try_budget))throw refuse(`unit ${unit.unit_id} spent ${spentTries(ordered)} of its ${unit.try_budget} tries: the owner or the Supervisor decides (starci kernel unit --raise-budget), never another try`,'unit-try-budget-exhausted',{tries:Number(last.try_no),budget:Number(unit.try_budget)});
-  if(done)return {tryNo,retryOf:null,resumeOf:null,retryClass:'follow-up',reopen:{reason:String(reopen.reason),by:String(reopen.by)}};
+  if(reopening)return {tryNo,retryOf:null,resumeOf:null,retryClass:'follow-up',reopen:{reason:String(reopening.reason),by:String(reopening.by)}};
   const disposition=RETRYABLE_JOB_STATUSES.includes(last.status)?retryDisposition(last):null;
   const resume=last.status==='cancelled';
   return {tryNo,retryOf:resume?null:last.job_id,resumeOf:resume?last.job_id:null,retryClass:retryClassOf(last,disposition),reopen:null};

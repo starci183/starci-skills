@@ -68,8 +68,9 @@ import { readSupervisor, supervisorEvent, withSupervisor } from '../machine/home
 import { clipLine } from '../lib/clip.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
 import { minutes } from '../lib/time.mjs'; import { isMain } from '../lib/is-main.mjs';
-import { DECISION_TEXT, CONTRACT_CONFLICT_TEXT, NOTE_KIND, OWNER_ONLY, SUPERVISOR_ADDRESSED, WORKER_DIED_TEXT } from './owed-text.mjs';
+import { citedIncidents, DECISION_TEXT, CONTRACT_CONFLICT_TEXT, NOTE_KIND, OWNER_ONLY, SUPERVISOR_ADDRESSED, WORKER_DIED_TEXT } from './owed-text.mjs';
 import { retryChainFindings, workerDiedFindings, repeatRejectFindings, guardFailedFindings, rerouteLoopFindings, staleInputFindings } from './owed-patterns.mjs';
+export { citedIncidents } from './owed-text.mjs';
 export { isLeaseOverlapRefusal } from './owed-patterns.mjs';
 export const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const CLASSES = Object.freeze({ owner: 'owner', peer: 'peer', kernel: 'kernel', progress: 'in-progress', supervisor: 'supervisor' });
@@ -170,9 +171,6 @@ const documentFrequency = (commits) => {
     return memo.get(token);
   };
 };
-
-/** Incident ids an incident's text cites (escalations, recurrences, addenda). */
-export const citedIncidents = (text, own = null) => [...new Set(String(text ?? '').match(/\binc-[0-9a-f]{12}\b/g) ?? [])].filter((id) => id !== own);
 
 /**
  * The .claude commit that likely fixed one incident: {sha, at, subject, how, tokens?} or null.

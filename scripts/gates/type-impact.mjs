@@ -110,8 +110,8 @@ const broadScan = (root, selected, inventory, projects, errors) => {
  */
 export function typeImpact(root, files, { deleted = [] } = {}) {
   root = path.resolve(root);
-  const projects = new Map(), errors = [], removed = new Set(deleted.map(posixPath));
-  const selected = [...new Set(files.map(posixPath))];
+  const projects = new Map(), errors = [], removed = new Set(deleted.map((file) => posixPath(file)));
+  const selected = [...new Set(files.map((file) => posixPath(file)))];
   let broad = selected.some(sharedImpact);
   const workspaces = workspaceDirs(root, manifestAt(root)).filter((dir) => exposesDist(manifestAt(path.join(root, dir))));
   const state = { removed, workspaces, projects, errors };

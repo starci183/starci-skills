@@ -350,7 +350,7 @@ if (isMain(import.meta.url)) {
   const argv = process.argv.slice(2);
   const repos = argv.flatMap((a, i) => (a === '--repo' && argv[i + 1] ? [argv[i + 1]] : []));
   const results = pushMains({ repos: repos.length ? repos : null, dryRun: argv.includes('--dry-run'), hooksOnly: argv.includes('--hooks-only') });
-  supervisorLog('push', results.map(describePush).join(' ; '));
-  console.log(argv.includes('--json') ? JSON.stringify(results) : results.map(describePush).join('\n'));
+  supervisorLog('push', results.map((result) => describePush(result)).join(' ; '));
+  console.log(argv.includes('--json') ? JSON.stringify(results) : results.map((result) => describePush(result)).join('\n'));
   if (results.some((r) => r.refused || r.error)) process.exitCode = 1;
 }

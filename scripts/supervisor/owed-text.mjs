@@ -4,6 +4,13 @@
 import { altOf } from '../lib/source-phrases.mjs';
 
 /**
+ * Incident ids an incident's text cites (escalations, recurrences, addenda).
+ * @param {unknown} text
+ * @param {string|null} [own]
+ */
+export const citedIncidents = (text, own = null) => [...new Set(String(text ?? '').match(/\binc-[0-9a-f]{12}\b/g) ?? [])].filter((id) => id !== own);
+
+/**
  * Kernel note kinds: records of a plan, a cut, a ruling or a decision already taken. They hold
  * nothing (only owner-gate and peer-wait kinds hold jobs), so they are their Kernel's to resolve
  * when done - unless the note addresses the supervisor (SUPERVISOR_ADDRESSED), which makes it OWED.

@@ -364,6 +364,11 @@ export function readLogs(logs, { workflowId, jobIds = null, after = 0, kinds = n
 }
 
 // ------------------------------------------------------------------------------------------------ cli
+/**
+ * Parse sync arguments as positional strings, named values and switches.
+ * @param {string[]} argv
+ * @returns {Record<string, string|boolean|string[]|undefined> & {_: string[]}}
+ */
 const argsOf = (argv) => { const a = { _: [] }; for (let i = 0; i < argv.length; i++) { const k = argv[i]; if (!k.startsWith('--')) { a._.push(k); continue; } const name = k.slice(2); if (['apply', 'json', 'dry-run', 'rederive'].includes(name)) a[name] = true; else a[name] = argv[++i]; } return a; };
 
 async function main() {

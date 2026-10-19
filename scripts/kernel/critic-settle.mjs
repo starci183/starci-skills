@@ -55,7 +55,7 @@ function trustProblem(verdict, entry, codes) {
 export function judgeCriticVerdict({ op, roots, owned = [], runtime = null, contract = criticContract(), rubrics = criticRubrics() }) {
   const entry = criticOwedBy(op, { contract, rubrics });
   if (!entry) return null;
-  if (runtime?.op !== op || runtime?.kind !== op) return refused({ status: 'missing', code: 'op-critic-verdict-missing' }, `the runtime's Critic has not judged the records of ${op} yet (event runtime-critic-run): the runtime owes that run, nothing is asked of the op or the Kernel`);
+  if (!runtime || runtime.op !== op || runtime.kind !== op) return refused({ status: 'missing', code: 'op-critic-verdict-missing' }, `the runtime's Critic has not judged the records of ${op} yet (event runtime-critic-run): the runtime owes that run, nothing is asked of the op or the Kernel`);
   const verdict = runtime;
   const trust = trustProblem(verdict, entry, contract.codes);
   if (trust) return trust;

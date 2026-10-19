@@ -104,7 +104,11 @@ export const SELECTED_AGE_VERSIONS = new Set(['1.2.1', '1.3.1']);
 const IDENTITY_TIMEOUT_MS = 20_000;
 const CONTROLLED_ENV = new Set(['SOPS_AGE_KEY', 'SOPS_AGE_KEY_FILE', 'SOPS_AGE_KEY_CMD', 'SOPS_AGE_SSH_PRIVATE_KEY_FILE', 'SOPS_AGE_SSH_PRIVATE_KEY_CMD', 'SOPS_AGE_RECIPIENT', 'SOPS_KEYSERVICE', 'SOPS_ENABLE_LOCAL_KEYSERVICE', 'SOPS_DECRYPTION_ORDER', 'SOPS_KMS_ARN', 'SOPS_GCP_KMS_IDS', 'SOPS_HUAWEICLOUD_KMS_IDS', 'SOPS_AZURE_KEYVAULT_URLS', 'SOPS_VAULT_URIS', 'SOPS_PGP_FP', 'SOPS_AGE_RECIPIENTS', 'HOME', 'USERPROFILE', 'APPDATA', 'XDG_CONFIG_HOME']);
 
-/** Construct only the child map; empty desktop roots make Go return directory errors, not fallback paths. */
+/**
+ * Construct only the child map; empty desktop roots make Go return directory errors, not fallback paths.
+ * @param {object} env The admitted caller environment.
+ * @param {string|null} inlineName Selected inline identity name, or null to omit every identity.
+ */
 function isolatedSopsEnv(env, inlineName = 'SOPS_AGE_KEY') {
   const out = Object.fromEntries(Object.entries(env).filter(([name]) => !CONTROLLED_ENV.has(name.toUpperCase())));
   out.HOME = ''; out.USERPROFILE = ''; out.APPDATA = ''; out.XDG_CONFIG_HOME = '';

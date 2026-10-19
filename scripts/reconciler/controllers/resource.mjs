@@ -130,7 +130,7 @@ function poolSignals(pools, now) {
   const hitSignal = (p, at) => {
     const named = [p.model, p.pool, p.target, p.jobPool].find((v) => v && byTarget.has(v));
     if (named) return hit(named, at);
-    const prov = [p.provider, p.pool].map(normalizeProvider).find((v) => v && byProvider.has(v));
+    const prov = [p.provider, p.pool].map((value) => normalizeProvider(value)).find((v) => v && byProvider.has(v));
     for (const target of byProvider.get(prov) ?? []) hit(target, at);
   };
   return { byProvider, hits, hit, hitSignal };
@@ -155,8 +155,12 @@ function createResourceController(overrides = {}) {
   const readMachineOr = (fn, fallback) => readSupervisor(fn, fallback, { env: env() });
   const settings = { ...resourceControllerSettings(), ...overrides.config };
   // Shadow keeps its own hysteresis (it never writes throttle_state); active reads it back from the row it writes.
-  const memory = { shadowPrev: null, lastWould: null, lastFootprintAt: null, starving: {}, clocks: {}, lastProbe: {},
-    pools: null, poolCursor: {}, providerSeen: {}, poolWould: null, circuits: {} };
+  const memory = { shadowPrev: null,
+    /** @type {string | null} Serialized shadow-host state from the preceding pass. */
+    lastWould: null, lastFootprintAt: null, starving: {}, clocks: {}, lastProbe: {},
+    pools: null, poolCursor: {}, providerSeen: {},
+    /** @type {string | null} Serialized shadow-pool caps from the preceding pass. */
+    poolWould: null, circuits: {} };
 
   const clock = (ctx, entity, state, on, slaMs, meta) => {
     const k = `${entity}|${state}`;

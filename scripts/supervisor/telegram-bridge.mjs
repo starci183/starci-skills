@@ -74,7 +74,7 @@ import {
   reassertManager, recordAlive, spawnDetached, withLedgerRead, writeConnectorState,
 } from '../connectors/lib.mjs';
 import {
-  ASK_CALLBACK, askButton, askEntryByKey, askKeyOf, askMessage, botCall, DEFAULT_API_BASE, drawReviewEntryByMessage, linkFor, recordAskMessage,
+  ASK_CALLBACK, askButton, askEntryByKey, askKeyOf, botCall, DEFAULT_API_BASE, drawReviewEntryByMessage, linkFor, recordAskMessage,
   removeAskMessage, sweepAskMessages, telegramSettings, TEXT_MAX, textFor,
 } from '../connectors/telegram.mjs';
 import { redact } from '../connectors/telegram-polite.mjs';
@@ -86,7 +86,7 @@ import { clipLine } from '../lib/clip.mjs';
 import { translator } from '../lib/i18n.mjs';
 import { sleep } from '../lib/sleep.mjs';
 import { eachInOrder, findInOrder, repeatInOrder } from '../lib/in-order.mjs';
-import { bridgeText } from './telegram-bridge-text.mjs';
+import { bridgeAskText, bridgeText } from './telegram-bridge-text.mjs';
 import { starciSourceRoot } from '../../engine/runtime-root.mjs';
 import { isSpecRun } from '../lib/env.mjs';
 const SERVE_ASK_FILE = fileURLToPath(new URL('../kernel/ask-server-main.mjs', import.meta.url));
@@ -264,6 +264,9 @@ function createBridge({
   const sups = () => listSupervisors({ env, now: now(), onlineMs });
   const labelOf = (sup) => sup.label || sup.id;
 
+  /** Offer supervisors, retaining the held-message notice when requested.
+   * @param {{note?: string|null}} [options]
+   */
   const chooser = async ({ note = null } = {}) => {
     const all = sups();
     if (!all.length) return send(note === 'held' ? t().heldNone : t().none);
@@ -337,13 +340,9 @@ function createBridge({
     const expose = current.telegram?.exposeCredentialAsks === true;
     return { expose, needsTunnel: !serving.credential || expose };
   };
-  const askText = (state, { serving = null, base = null, note = null } = {}) => {
-    const workflow = { id: state.workflowId, title: state.title };
-    if (!serving) return askMessage({ workflow, question: state.question, language: current.language, note });
-    const { expose } = askLink(serving);
-    const link = linkFor({ url: serving.url, credential: serving.credential }, { base, exposeCredentialAsks: expose });
-    return askMessage({ workflow, question: state.question, link, expiresAt: serving.expiresAt, language: current.language, note });
-  };
+  const askText = (state, { serving = null, base = null, note = null } = {}) => bridgeAskText(state, {
+    serving, base, note, language: current.language,
+    exposeCredentialAsks: current.telegram?.exposeCredentialAsks === true });
   // Where one ask lives: the store entry its button key names, else a scan of the repos' open asks.
   const targetOf = (key) => {
     const entry = askEntryByKey(key, env);

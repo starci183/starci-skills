@@ -75,6 +75,8 @@ export function roleOf(file) {
 /**
  * Put bytes (a Buffer, a string, or a file path) in the blob store, redacted first when they are text. Runs OUTSIDE
  * the ledger transaction. Returns {sha, bytes, mediaType, redaction, fileUri} for registerBlob / putArtifact.
+ * @param {string|Uint8Array|ArrayBuffer|ArrayLike<number>} source
+ * @param {{mediaType?: string|null, file?: boolean|null, repoRoots?: string[]}} [options]
  */
 export function stageBlob(source, { mediaType = null, file = null, repoRoots = [] } = {}) {
   let raw;
@@ -144,6 +146,8 @@ export function attemptOf(db, { workflowId = null, dispatchId = null, jobId = nu
 /**
  * The status of one check run. `unavailable` (the checker could not run: missing tool, host down, spawn error)
  * is infra, never red (H7); a runner-observed non-zero exit is never 'pass' (H8).
+ * @param {{exitCode?: number|null, declaredExitCode?: number|null, unavailable?: boolean, error?: boolean,
+ *   skipped?: boolean, status?: string|null}} [options]
  */
 function checkStatusOf({ exitCode = null, declaredExitCode = null, unavailable = false, error = false, skipped = false, status = null } = {}) {
   if (status && !CHECK_STATUSES.includes(status)) throw refuse(`check status must be ${CHECK_STATUSES.join('|')}, got '${status}'`, 'check-status-unknown');

@@ -73,6 +73,9 @@ export class WorkQueue {
    * Queue (controller, key), due at `dueAt` (default now). An existing row keeps the earlier due time, except a row
    * in backoff (attempts > 0), which keeps its backoff, and a parked row (its budget spent), which a new event re-arms with a fresh budget
    * (a resync does not: nothing changed). A key in flight is marked dirty instead.
+   * @param {string} controller
+   * @param {string} key
+   * @param {{reason?: string | null, dueAt?: number | null}} [options] Named event reason and an optional due time.
    */
   add(controller, key, { reason = null, dueAt = null } = {}) {
     if (typeof key !== 'string' || !key) return false;

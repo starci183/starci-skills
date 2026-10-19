@@ -47,6 +47,7 @@ const launchModelOf = (provider, model, card) => model ?? (card?.start?.defaultM
 // (worker-show) + 1 deeper than config.yaml orca.maxWorkerDepth (`maxDepth` overrides it) is refused at step 'depth'
 // with worker-depth-exceeded before anything is trusted or started (effectState none). An unreadable parent depth
 // proves nothing: the launch goes on and Orca stays the authority. The receipt carries the attested `depth`.
+/** @param {{effort?: string|null, admission?: ReturnType<typeof admitAgent>|null, [option: string]: unknown}} [options] */
 export function spawnAgent({ provider, model = null, effort = null, worktree, repo = null, baseBranch = null, name = null, setup = null, title, spec, taskTitle = null,
   run, from = null, request, onCreated = null, parentDispatch = null, maxDepth = null, preflight = null, io = null,
   role = 'worker', scopeId = null, allowGroup = null, admission = null, bias = null, ownerGrant = null, biasTrusted = false, tier = null, liveSeat = null, history = null, author = null, qualityFloor = null, kind = null, difficulty = null, config = undefined, env = process.env } = {}) {
@@ -332,6 +333,7 @@ function settleLaunch(session, launch, issued, { effort, onCreated, depth, limit
 // worker-start --spec files it. `request` is the launch's ledger identity (the caller's attempt, token or placement):
 // run-create and worker-start derive their --retry-request ids from it (calls.yaml replay: request).
 // Returns spawnAgent's receipt (runId/taskId on it), or {ok:false, step:'run-create', effectState:'none'}.
+/** @param {{effort?: string|null, admission?: ReturnType<typeof admitAgent>|null, [option: string]: unknown}} [options] */
 export function startAgent({ provider, model = null, effort = null, worktree, repo = null, baseBranch = null, name = null, setup = null, title, prompt, specFile = null,
   heading = null, objective, entry = null, priorRunId = null, request, onCreated = null, parentDispatch = null, maxDepth = null, io = null,
   role = 'worker', scopeId = null, allowGroup = null, admission = null, bias = null, ownerGrant = null, biasTrusted = false, tier = null, liveSeat = null, history = null, author = null, qualityFloor = null, kind = null, difficulty = null, config = undefined, env = process.env } = {}) {

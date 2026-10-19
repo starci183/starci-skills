@@ -203,13 +203,13 @@ const RUNTIME_WAKE_OPENER = /Watchdog liveness wake for\b|Durable transition wak
 export function draftOwnership(draft, { texts = [], stagedPattern = DEFAULT_STAGED_PATTERN } = {}) {
   const d = squash(draft);
   if (!d) return { kind: 'none', draft: null };
-  const own = texts.filter((text) => typeof text === 'string').map(squash).filter(Boolean);
+  const own = texts.filter((text) => typeof text === 'string').map((text) => squash(text)).filter(Boolean);
   if (own.includes(d) || stagedPattern.test(d)) return { kind: 'own', draft: d };
   let rest = d;
   for (const text of own) rest = rest.split(text).join('\n');
   const starts = [...rest.matchAll(RUNTIME_WAKE_OPENER)].map((m) => m.index);
   const cuts = [0, ...starts.filter((i) => i > 0), rest.length];
-  const pieces = cuts.slice(0, -1).flatMap((from, i) => rest.slice(from, cuts[i + 1]).split('\n')).map(squash).filter(Boolean);
+  const pieces = cuts.slice(0, -1).flatMap((from, i) => rest.slice(from, cuts[i + 1]).split('\n')).map((text) => squash(text)).filter(Boolean);
   const runtimePiece = (piece) => new RegExp(`^(?:${RUNTIME_WAKE_OPENER.source})`).test(piece)
     || (piece.length >= MIN_ECHO_CHARS && own.some((text) => text.includes(piece)));
   return { kind: pieces.every(runtimePiece) ? 'runtime' : 'foreign', draft: d };

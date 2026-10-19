@@ -56,7 +56,7 @@ const compile = (policy) => {
   const value = {
     bound: toSet(policy.roles?.bound), nodeTest: toSet(policy.roles?.['node-test']), suiteOps: toSet(policy.roles?.['suite-ops']),
     backupRoles: toSet(policy.roles?.['backup-roles']), backupRef,
-    runtime: toSet(policy.runtime), nodeScripts: Array.isArray(policy['node-scripts']) ? policy['node-scripts'].map(slash) : [],
+    runtime: toSet(policy.runtime), nodeScripts: Array.isArray(policy['node-scripts']) ? policy['node-scripts'].map((file) => slash(file)) : [],
     read: toSet(policy.read), scopedWrite: toSet(policy['scoped-write']), npmPrograms: toSet(policy.npm?.programs), npmRead: toSet(policy.npm?.read),
     gitRead: toSet(policy.git?.read), gitListForms: toSet(policy.git?.['list-forms']), orcaRead: toSet(policy.orca?.read), orcaGroups: toSet(policy.orca?.['groups-read']),
   };

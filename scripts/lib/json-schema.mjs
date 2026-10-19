@@ -66,7 +66,7 @@ export function validateAgainstSchema(value, schema) {
       else if (matched === 0) {
         errors.push(`${at}: ${keyword} matches no alternative`);
         // The nearest branch explains a refusal without mixing findings from mutually exclusive shapes.
-        const nearest = outcomes.reduce((best, findings) => findings.length < best.length ? findings : best);
+        const nearest = outcomes.reduce((best, findings) => findings.length < best.length ? findings : best, outcomes[0]);
         errors.push(...nearest);
       }
     }

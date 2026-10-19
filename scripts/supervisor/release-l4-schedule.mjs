@@ -42,7 +42,8 @@ export function runGraph(rows, limits) {
   checkGraph(rows, limits);
   return new Promise((resolve, reject) => {
     const results = new Map(), state = new Map(rows.map((row) => [row.id, 'waiting'])), running = {};
-    const fault = { error: null, raised: false };
+    /** @type {{error: Error | null}} The first rejection, normalized at its boundary without replacing an Error instance. */
+    const fault = { error: null };
     let live = 0;
     const size = (pool) => (typeof limits[pool] === 'function' ? limits[pool]() : limits[pool]);
     const ready = (row) => state.get(row.id) === 'waiting' && row.after.every((id) => state.get(id) === 'done') && (running[row.pool] ?? 0) < size(row.pool);
@@ -58,16 +59,16 @@ export function runGraph(rows, limits) {
       live += 1;
       Promise.resolve().then(row.run).then(
         (value) => { results.set(row.id, value); settle(row); },
-        (error) => { fault.raised = true; fault.error ??= error; settle(row); },
+        (error) => { fault.error ??= error instanceof Error ? error : new Error(`release schedule: ${row.id} rejected with a non-Error`, { cause: error }); settle(row); },
       );
     };
     const finish = () => {
-      if (fault.raised) { reject(fault.error); return; }
+      if (fault.error) { reject(fault.error); return; }
       const stuck = rows.filter((row) => state.get(row.id) === 'waiting').map((row) => row.id);
       if (stuck.length) reject(new Error(`release schedule: ${stuck.join(', ')} could not start`)); else resolve(results);
     };
     function pump() {
-      if (fault.raised) { if (live === 0) finish(); return; }
+      if (fault.error) { if (live === 0) finish(); return; }
       for (const row of rows) if (ready(row)) start(row);
       if (live === 0) finish();
     }

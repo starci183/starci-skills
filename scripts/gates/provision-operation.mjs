@@ -294,6 +294,16 @@ function closeOperation(state) {
   return failed;
 }
 
+// Cleanup failure has explicit precedence over either a returned or rejected operation completion.
+async function completeProvision(body, cleanup) {
+  let result, cause, rejected = false;
+  try { result = await body(); }
+  catch (error) { cause = error; rejected = true; }
+  if (cleanup()) return provisionRefusal('provision-cleanup-recovery-required');
+  if (rejected) throw cause;
+  return result;
+}
+
 /**
  * Prepare or execute one fixed adapter action. Only an accepted exact plan can open custody.
  * Local request replay does not deduplicate remote calls: running, partial and unknown operations
@@ -301,57 +311,59 @@ function closeOperation(state) {
  */
 export async function runProvisionOperation(ctx, input) {
   const state = { lockOwned: false, accepted: false, effectStarted: false, heldOutcome: null };
-  try {
-    state.spec = operationSpec(ctx, input);
-    const { spec } = state;
-    state.ledger = openLedger({ file: ledgerFileFor(spec.target.ledgerRoot, { env: ctx.env }), repoRoot: spec.target.ledgerRoot });
-    state.prepared = currentPlan(state.ledger, spec, ctx.operationPolicy);
-    state.row = state.prepared.row;
-    if (!spec.execute) return { code: 0, data: { schema: 'starci/provision-operation@1', ok: true,
-      operation: descriptor(state.row), plan: state.prepared.plan, next: state.row.accepted_at === null ? 'owner-plan-acceptance' : 'execute' } };
-    const admission = admitOperation(state, ctx);
-    if (admission) return admission;
-    claimOperation(state, ctx);
-    return persistOutcome(state, await executeAdapter(state, ctx));
-  } catch (error) { return recoverOperation(state, error); }
-  finally { if (closeOperation(state)) return provisionRefusal('provision-cleanup-recovery-required'); }
+  return completeProvision(async () => {
+    try {
+      state.spec = operationSpec(ctx, input);
+      const { spec } = state;
+      state.ledger = openLedger({ file: ledgerFileFor(spec.target.ledgerRoot, { env: ctx.env }), repoRoot: spec.target.ledgerRoot });
+      state.prepared = currentPlan(state.ledger, spec, ctx.operationPolicy);
+      state.row = state.prepared.row;
+      if (!spec.execute) return { code: 0, data: { schema: 'starci/provision-operation@1', ok: true,
+        operation: descriptor(state.row), plan: state.prepared.plan, next: state.row.accepted_at === null ? 'owner-plan-acceptance' : 'execute' } };
+      const admission = admitOperation(state, ctx);
+      if (admission) return admission;
+      claimOperation(state, ctx);
+      return persistOutcome(state, await executeAdapter(state, ctx));
+    } catch (error) { return recoverOperation(state, error); }
+  }, () => closeOperation(state));
 }
 
 /** Inspect a prepared plan or record its real native terminal checkpoint without provider effects. */
 export async function runProvisionControl(ctx) {
   let ledger;
-  try {
-    const ledgerRoot = repositoryHome(ctx.cwd), file = ledgerFileFor(ledgerRoot, { env: ctx.env });
-    ledger = inspectLedger({ file });
-    let row = provisionOperation(ledger.db, ctx.args.operation);
-    if (!row) return provisionRefusal('provision-operation-unknown');
-    const plan = readJson(row.plan_sha);
-    const selected = resolveProvisionTarget({ cwd: ctx.cwd, targetId: row.target_id });
-    if (selected.declaration.sha256 !== plan.target.declaration.sha256) return provisionRefusal('provision-plan-input-drift');
-    const command = ctx.positionals[0];
-    if (command !== 'accept') return { code: 0, data: { schema: 'starci/provision-operation@1', ok: true,
-      operation: descriptor(row), ...(command === 'plan' ? { plan } : {}) } };
-    if (ctx.role !== 'owner' || typeof ctx.confirmProvisionPlan !== 'function') return provisionRefusal('provision-owner-checkpoint-required');
-    const authorityInput = { ledger, target: selected, operationId: row.operation_id, planSha: row.plan_sha };
-    const authority = resolveProvisionAuthority(ctx, authorityInput);
-    if (!authority.ok || authority.bound) return provisionRefusal('provision-owner-checkpoint-required');
-    if (ctx.args.digest !== row.plan_sha) return provisionRefusal('provision-plan-digest-mismatch');
-    if (!['planned', 'accepted', 'unknown', 'partial'].includes(row.state)) return provisionRefusal('provision-reconcile-required');
-    if (row.accepted_by === 'owner-terminal') return { code: 0, data: { schema: 'starci/provision-operation@1', ok: true, operation: descriptor(row) } };
-    const confirmed = await ctx.confirmProvisionPlan({ plan, digest: row.plan_sha }, { db: ledger.db, file, root: ledgerRoot });
-    if (confirmed.accepted !== true) return provisionRefusal(confirmed.code);
-    const currentAuthority = resolveProvisionAuthority(ctx, authorityInput);
-    if (!currentAuthority.ok || currentAuthority.bound) return provisionRefusal('provision-owner-checkpoint-required');
-    if (resolveProvisionTarget({ cwd: ctx.cwd, targetId: row.target_id }).declaration.sha256 !== plan.target.declaration.sha256)
-      return provisionRefusal('provision-plan-input-drift');
-    const operationId = row.operation_id, planSha = row.plan_sha;
-    ledger.close(); ledger = null;
-    ledger = openLedger({ file, repoRoot: ledgerRoot });
-    row = ledger.write.acceptProvisionOperation({ operationId, planSha });
-    return { code: 0, data: { schema: 'starci/provision-operation@1', ok: true, operation: descriptor(row) } };
-  } catch { return provisionRefusal('provision-control-unavailable'); }
-  finally {
-    try { ledger?.close(); }
-    catch { return provisionRefusal('provision-cleanup-recovery-required'); }
-  }
+  return completeProvision(async () => {
+    try {
+      const ledgerRoot = repositoryHome(ctx.cwd), file = ledgerFileFor(ledgerRoot, { env: ctx.env });
+      ledger = inspectLedger({ file });
+      let row = provisionOperation(ledger.db, ctx.args.operation);
+      if (!row) return provisionRefusal('provision-operation-unknown');
+      const plan = readJson(row.plan_sha);
+      const selected = resolveProvisionTarget({ cwd: ctx.cwd, targetId: row.target_id });
+      if (selected.declaration.sha256 !== plan.target.declaration.sha256) return provisionRefusal('provision-plan-input-drift');
+      const command = ctx.positionals[0];
+      if (command !== 'accept') return { code: 0, data: { schema: 'starci/provision-operation@1', ok: true,
+        operation: descriptor(row), ...(command === 'plan' ? { plan } : {}) } };
+      if (ctx.role !== 'owner' || typeof ctx.confirmProvisionPlan !== 'function') return provisionRefusal('provision-owner-checkpoint-required');
+      const authorityInput = { ledger, target: selected, operationId: row.operation_id, planSha: row.plan_sha };
+      const authority = resolveProvisionAuthority(ctx, authorityInput);
+      if (!authority.ok || authority.bound) return provisionRefusal('provision-owner-checkpoint-required');
+      if (ctx.args.digest !== row.plan_sha) return provisionRefusal('provision-plan-digest-mismatch');
+      if (!['planned', 'accepted', 'unknown', 'partial'].includes(row.state)) return provisionRefusal('provision-reconcile-required');
+      if (row.accepted_by === 'owner-terminal') return { code: 0, data: { schema: 'starci/provision-operation@1', ok: true, operation: descriptor(row) } };
+      const confirmed = await ctx.confirmProvisionPlan({ plan, digest: row.plan_sha }, { db: ledger.db, file, root: ledgerRoot });
+      if (confirmed.accepted !== true) return provisionRefusal(confirmed.code);
+      const currentAuthority = resolveProvisionAuthority(ctx, authorityInput);
+      if (!currentAuthority.ok || currentAuthority.bound) return provisionRefusal('provision-owner-checkpoint-required');
+      if (resolveProvisionTarget({ cwd: ctx.cwd, targetId: row.target_id }).declaration.sha256 !== plan.target.declaration.sha256)
+        return provisionRefusal('provision-plan-input-drift');
+      const operationId = row.operation_id, planSha = row.plan_sha;
+      ledger.close(); ledger = null;
+      ledger = openLedger({ file, repoRoot: ledgerRoot });
+      row = ledger.write.acceptProvisionOperation({ operationId, planSha });
+      return { code: 0, data: { schema: 'starci/provision-operation@1', ok: true, operation: descriptor(row) } };
+    } catch { return provisionRefusal('provision-control-unavailable'); }
+  }, () => {
+    try { ledger?.close(); return false; }
+    catch { return true; }
+  });
 }

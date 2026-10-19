@@ -112,8 +112,13 @@ const putBusyFrame = (m, terminal, state) => {
  * compares against; `since` keeps the first sighting of a repeating signature.
  */
 function frozenBusyFrame({ signature, prev = null, now = Date.now(), outputAgeMs = null, frozenMs = DEFAULTS.frozenMinutes * 60_000 }) {
-  const same = prev?.signature === signature;
-  const state = { signature, since: same ? prev.since ?? now : now, reads: same ? (prev.reads ?? 1) + 1 : 1 };
+  const state = { signature, since: now, reads: 1 };
+  let same = false;
+  if (prev != null && prev.signature === signature) {
+    same = true;
+    state.since = prev.since ?? now;
+    state.reads = (prev.reads ?? 1) + 1;
+  }
   const frozen = same || (Number.isFinite(outputAgeMs) && outputAgeMs >= frozenMs);
   return { frozen, state };
 }
@@ -179,7 +184,7 @@ function planWake({ now = Date.now(), wakes = [], unread = [], reported = [], fi
   if (revision?.state === 'owed') tags.push('revision');
   const text = wakeText({ tags, unread, fresh, remind, openDis, diFresh, diRemind, land, report, workerDeaths, revision });
   if (text && wakes.some((w) => w.payload.text === text)) return { tags: [], inbox: [], land: [], report: [], decisions: [], text: null, duplicate: true };
-  return { tags, inbox, land, report, decisions: decide, text, revision: tags.includes('revision') ? revision.to : null, revisionNotice: tags.includes('revision') ? revision : null };
+  return { tags, inbox, land, report, decisions: decide, text, revision: tags.includes('revision') ? revision?.to : null, revisionNotice: tags.includes('revision') ? revision : null };
 }
 
 /* ------------------------------------------------------------ the pass */

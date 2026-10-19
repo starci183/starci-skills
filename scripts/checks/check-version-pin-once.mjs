@@ -82,7 +82,7 @@ const restatedPin = (lines, i, ver, nameRe, pins) => {
 function versionPinFindings(files, pins) {
   const findings = [];
   const names = [...pins.keys()];
-  const nameRe = new RegExp(`(?<![w@/-])(?:${names.map(escapeRegExp).join('|')})(?![w-])`, 'g');
+  const nameRe = new RegExp(`(?<![w@/-])(?:${names.map((name) => escapeRegExp(name)).join('|')})(?![w-])`, 'g');
   for (const [rel, text] of Object.entries(files)) {
     if (!inScope(rel)) continue;
     const lines = text.split('\n');

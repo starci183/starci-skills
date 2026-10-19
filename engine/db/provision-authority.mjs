@@ -1,6 +1,7 @@
 // Read-only joins of a native dispatch and its accepted goal grant; no prompt text grants authority.
 import { canonicalJSON } from '../canonical-json.mjs';
 import { sha256 } from '../digest.mjs';
+import { byCodeUnit } from '../by-code-unit.mjs';
 import { pathKey } from '../../scripts/lib/path-key.mjs';
 
 const denied = reason => ({ ok: false, reason });
@@ -59,7 +60,7 @@ export function provisionGoalGrant(db, { caller, operationId, planSha, ledgerId,
     || lease.generation !== job.generation || lease.token !== job.lease_token || lease.expires_at <= Date.now()))
     return denied('provision-filed-contract-unverified');
   const grants = goalJson.provisionGrants, approval = goalJson.provisionGrantsApproval;
-  if (!Array.isArray(grants) || new Set(grants.map(grant => grant?.operation)).size !== grants.length || grants.some(grant => !grant || Object.keys(grant).sort().join(',') !== 'digest,op,operation'
+  if (!Array.isArray(grants) || new Set(grants.map(grant => grant?.operation)).size !== grants.length || grants.some(grant => !grant || Object.keys(grant).sort(byCodeUnit).join(',') !== 'digest,op,operation'
     || typeof grant.op !== 'string' || typeof grant.operation !== 'string' || !/^[a-f0-9]{64}$/u.test(grant.digest ?? '')))
     return denied('provision-goal-grant-unsupported');
   if (approval?.source !== 'owner-goal-entry' || approval.digest !== sha256(canonicalJSON(grants))

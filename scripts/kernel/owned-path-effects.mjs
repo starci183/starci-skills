@@ -77,7 +77,7 @@ const dirtyOf = (root, specs, timeoutMs, label) => {
     // -z: NUL-separated records with literal paths — no C-quoting, so a name carrying bytes like the
     // U+F03A a Windows checkout writes for ':' round-trips (inc-e7e54ba0b970). A rename/copy record
     // is `XY <dest>\0<origin>`; the origin is the next record and is not itself evidence.
-    const r = git(gitStatus, root, ['--porcelain', '-z', '--untracked-files=all', '--', ...batch.map(ownedPathspec)], timeoutMs);
+    const r = git(gitStatus, root, ['--porcelain', '-z', '--untracked-files=all', '--', ...batch.map((spec) => ownedPathspec(spec))], timeoutMs);
     if (!r.ok) return { error: r.error };
     const records = r.stdout.split('\0');
     for (let i = 0; i < records.length; i++) {
@@ -124,7 +124,7 @@ const repoEffects = ({ root, specs, role, repos, since, sinceMs, timeoutMs }) =>
   if (d.error) return { error: 'git-status', repo: root, detail: d.error };
   const shas = new Set();
   for (const batch of specBatches(specs)) {
-    const log = git(gitLog, root, ['--all', `--since=${since}`, '--format=%H', '--', ...batch.map(ownedPathspec)], timeoutMs);
+    const log = git(gitLog, root, ['--all', `--since=${since}`, '--format=%H', '--', ...batch.map((spec) => ownedPathspec(spec))], timeoutMs);
     if (!log.ok) return { error: 'git-log', repo: root, detail: log.error };
     for (const sha of log.stdout.split('\n').map((line) => line.trim()).filter(Boolean)) shas.add(sha);
   }

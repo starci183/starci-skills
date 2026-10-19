@@ -291,7 +291,7 @@ function pickRefusal({ root, deps, result }, { scratch, step, base, pick }) {
 /** The landed result: main moved to `head`; the grammar rebuild when the change touched it. */
 function landedResult({ root, env, deps, result }, { checked, base, head }) {
   const landed = { ...result, ok: true, landed: head, base, head, checks: checked.checks, changed: checked.changed };
-  const grammarPaths = [...(checked.changed ?? []), ...(checked.rows ?? []).flatMap((row) => row.slice(1))].map(normPath);
+  const grammarPaths = [...(checked.changed ?? []), ...(checked.rows ?? []).flatMap((row) => row.slice(1))].map((file) => normPath(file));
   if (grammarPaths.some((file) => file.startsWith('packages/grammar/src/') || file === 'packages/grammar/package.json')) {
     try { landed.grammarRebuild = (deps.rebuildGrammar ?? buildGrammar)({ root, changed: grammarPaths, env }); }
     catch (error) { landed.grammarRebuild = { ok: false, step: 'exception', detail: String(error?.message ?? error), owed: ['grammar-dist-rebuild'] }; }

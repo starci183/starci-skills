@@ -50,7 +50,11 @@ function supLogRows(rows, { env = process.env } = {}) {
 }
 export const supLog = (row, options) => supLogRows([row], options);
 
-/** The row of one owed-action act (actions.mjs recordAction, notify.mjs --item). Pure. */
+/**
+ * The row of one owed-action act (actions.mjs recordAction, notify.mjs --item). Pure.
+ * @param {{item: string, action: string, reason?: unknown, klass?: string|null, workflowId?: string|null,
+ *   repo?: string|null, refs?: string[], delivered?: boolean|null, at?: number}} options
+ */
 export const actionRow = ({ item, action, reason, klass = null, workflowId = null, repo = null, refs = [], delivered = null, at }) => ({
   kind: 'supervisor.action', at, level: delivered === false ? 'warn' : 'info',
   msg: `${action} ${item}: ${String(reason ?? '').replace(/\s+/g, ' ').slice(0, 200)}`,

@@ -25,7 +25,7 @@ const same = (left, right) => canonicalJSON(left) === canonicalJSON(right);
 const fail = () => { throw new Error('NATIVE_CONSUMER_DECLARATION_REFUSED'); };
 
 function ordinaryPublicFile(root, name) {
-  if (!name || name.split(/[\\/]/).some(part => ['..', '.', 'secrets'].includes(part)) || /(?:^|\/)\.env(?:\.|$)|\.enc$/i.test(name)) fail();
+  if (!name || name.split(/[\\/]/).some(part => ['..', '.', 'secrets'].includes(part)) || /(?:(?:^|\/)\.env(?:\.|$)|\.enc$)/i.test(name)) fail();
   let current = root;
   for (const part of name.split(/[\\/]/)) {
     current = path.join(current, part);

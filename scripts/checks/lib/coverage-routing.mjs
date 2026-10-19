@@ -28,7 +28,7 @@ function contributionBindings(index) {
     if (node.type !== 'CallExpression' || node.callee.type !== 'MemberExpression') continue;
     if (node.callee.object.name === 'CONTRIBUTIONS' && nodeName(node.callee.property) === 'push') roots.push(...node.arguments);
   }
-  return roots.flatMap(astNodes).filter((node) => node.type === 'Property' && nodeName(node.key) === 'rules').map((node) => node.value);
+  return roots.flatMap((root) => astNodes(root)).filter((node) => node.type === 'Property' && nodeName(node.key) === 'rules').map((node) => node.value);
 }
 
 function generatedGraphRules(context, index, routes, profile) {

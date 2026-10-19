@@ -32,6 +32,7 @@ function appendShellCommand(commands, state, next) {
 }
 
 function shellLineCommands(line, commands) {
+  /** @type {{quote: string | null, command: string, separator: string | null}} */
   const state = { quote: null, command: '', separator: null };
   for (let i = 0; i < line.length; i++) {
     const char = line[i];

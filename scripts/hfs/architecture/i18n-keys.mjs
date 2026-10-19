@@ -65,7 +65,7 @@ function templatePatternOf(node) {
   return [node.head.text, ...node.templateSpans.map(span => span.literal.text)].join('\u0000').split('.').map(segment => {
     if (!segment.includes('\u0000')) return segment;
     const parts = segment.split('\u0000');
-    return parts.every(part => part === '') ? '*' : new RegExp(`^${parts.map(escapeRegExp).join('.*')}$`, 'su');
+    return parts.every(part => part === '') ? '*' : new RegExp(`^${parts.map((part) => escapeRegExp(part)).join('.*')}$`, 'su');
   });
 }
 

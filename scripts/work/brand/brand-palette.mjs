@@ -243,8 +243,8 @@ function measurePalette(image, palette, { exclude = null } = {}) {
   const { width, height, data } = image;
   const step = Math.max(1, Math.ceil(Math.sqrt((width * height) / SAMPLE_BUDGET)));
   const cache = new Map();
-  const rects = (Array.isArray(exclude) ? exclude : [exclude]).filter(Boolean);
-  const excluded = (x, y) => rects.some((r) => x >= r.x && y >= r.y && x < r.x + r.width && y < r.y + r.height);
+  const rects = Array.isArray(exclude) ? exclude : [exclude];
+  const excluded = (x, y) => rects.some((r) => r && x >= r.x && y >= r.y && x < r.x + r.width && y < r.y + r.height);
   const classify = (r, g, b) => {
     const key = ((r >> 2) << 12) | ((g >> 2) << 6) | (b >> 2);
     if (cache.has(key)) return cache.get(key);

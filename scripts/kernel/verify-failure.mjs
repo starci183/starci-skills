@@ -20,6 +20,8 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import { FAILURE_CLASSES } from './report-envelope.mjs';
 import { isLiteWorkRoot } from '../lib/work-edition.mjs';
 import { WORK_DIR_NAME } from '../lib/roots.mjs';
+
+export const ROOT_VERIFY_OP = 'review.verify';
 /** The verify ops whose red is, by default, a defect in what they walked or measured - never in the walk. */
 const VERIFY_OPS = new Set(['uat.verify', 'uat.assisted.verify', 'e2e.verify', 'integration.verify', 'interface.audit', 'review.verify', 'security.verify', 'perf.verify', 'unit.verify']);
 /** The ops that walk a served stack: `starci kernel dispatch` runs the environment pre-step (scripts/uat/env-health.mjs) for them. */
@@ -182,6 +184,18 @@ export function classifyFailure({ op, report, checks = null, measurement = false
   }
   return { class: 'transient', reason: report ? 'no evidence of a deterministic cause' : 'no report' };
 }
+
+/**
+ * The route-table key of a failed settle: no report, a done claim the Kernel's checks overruled, or the report outcome.
+ * @param {{reportFiled: boolean, reportOutcome?: string|null, claimOverruled?: boolean, failureClass?: string|null, op?: string|null}} options
+ */
+export const failureShapeOf = ({ reportFiled, reportOutcome, claimOverruled, failureClass = null, op = null }) => {
+  if (!reportFiled) return { verdict: 'no-report' };
+  if (claimOverruled) return { outcome: reportOutcome, verdict: 'rejected' };
+  return { outcome: reportOutcome ?? 'failed', ...(failureClass ? { class: failureClass } : {}),
+    // A review's measured findings are the `findings` verdict the review route repairs from.
+    ...(failureClass === 'findings' && op === ROOT_VERIFY_OP ? { verdict: 'findings' } : {}) };
+};
 
 // ------------------------------------------------------------------ root cause → owning op and files
 

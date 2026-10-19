@@ -222,7 +222,7 @@ async function runSandbox({ tarball, keep = false }) {
   const results = [];
   const record = (name, ok, detail = '') => results.push({ name, status: ok ? 'pass' : 'fail', detail: ok ? detail : detail || 'assertion false' });
   const step = async (name, body) => {
-    try { await body(); } catch (error) {
+    try { return await body(); } catch (error) {
       if (!(error instanceof CouldNotRun)) throw error;
       results.push({ name, status: 'error', detail: error.message });
     }
@@ -276,7 +276,8 @@ async function runSandbox({ tarball, keep = false }) {
   record('age-keygen is on PATH (prerequisite of the init identity setup)', ageKeygen !== null, `${ageKeygen ?? 'none'}, version ${ageVersion}${ageKeygen ? '' : ': the install below is expected to hold'}`);
 
   const claude = path.join(app, '.claude');
-  let installStatus = null;
+  /** @type {number | null} The completed install status, or null when the install could not run. */
+  let installStatus;
   // The installer child runs with its output captured (and echoed), so a failed install reports what it printed instead of a bare exit code.
   let lastRun = { stdout: '', stderr: '', report: '' };
   const install = async ({ cwd = app, homeDir = home, environment = env } = {}) => {
@@ -296,11 +297,15 @@ async function runSandbox({ tarball, keep = false }) {
   const failed = (label, status) => childDetail({ label, status, ...lastRun });
   const skipped = (names, why) => { for (const name of names) results.push({ name, status: 'skipped', detail: why }); };
   if (fetched) {
-    await step('install into the app', async () => {
-      installStatus = await install();
-      record('runtime install into the app exits 0', installStatus === 0, installStatus === 0 ? '' : failed('runtime install', installStatus));
-    });
-  } else skipped(['runtime install into the app exits 0'], 'skipped: the tarball fetch above did not succeed');
+    installStatus = await step('install into the app', async () => {
+      const status = await install();
+      record('runtime install into the app exits 0', status === 0, status === 0 ? '' : failed('runtime install', status));
+      return status;
+    }) ?? null;
+  } else {
+    installStatus = null;
+    skipped(['runtime install into the app exits 0'], 'skipped: the tarball fetch above did not succeed');
+  }
 
   if (installStatus === 0) {
     await step('configuration assertions', async () => {

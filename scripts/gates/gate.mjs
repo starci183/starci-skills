@@ -228,7 +228,7 @@ async function lintBaseCounts({ root, base, head, delta, hfs, readBase, cache })
   // on a file's base path, or on no file, is the base's. A content finding on a changed file does not reproduce there.
   const headPathOf = new Map(head.filter((f) => f.engine === 'hfs' && f.path && basePathOf(delta, f.path)).map((f) => [basePathOf(delta, f.path), f.path]));
   if (headPathOf.size || head.some((f) => f.engine === 'hfs' && !f.path)) {
-    const listing = lines(gitText(lsTree, root, ['-r', '--name-only', '--full-tree', base])).map(posixPath);
+    const listing = lines(gitText(lsTree, root, ['-r', '--name-only', '--full-tree', base])).map((file) => posixPath(file));
     const prefix = (gitText(revParseQuery, root, ['--show-prefix']) ?? '').trim();
     const files = listing.filter((f) => f.startsWith(prefix)).map((f) => f.slice(prefix.length));
     const { checkRepo } = await import(pathToFileURL(path.join(hfs.dir, 'runtime', 'scripts', 'hfs', 'check.mjs')).href);
@@ -492,8 +492,8 @@ export function droppedMainChanges(root, { merge, mainParent, laneParent }) {
   if (!mergeBase) throw Object.assign(new Error(`merge ${merge}: its parents ${laneParent} and ${mainParent} have no merge-base`), { code: 'GATE_MERGE_UNREADABLE' });
   const remerge = git(mergeTree, root, ['--write-tree', '--name-only', '--no-messages', laneParent, mainParent]);
   if (remerge.error || ![0, 1].includes(remerge.status)) throw Object.assign(new Error(`merge ${merge}: git merge-tree could not recompute it: ${String(remerge.stderr ?? remerge.error?.message ?? '').trim().split('\n')[0]}`), { code: 'GATE_MERGE_UNREADABLE' });
-  const conflicted = lines(remerge.stdout).slice(1).map(posixPath);
-  const touched = lines(gitText(gitDiff, root, ['--no-renames', '--name-only', mergeBase, mainParent])).map(posixPath);
+  const conflicted = lines(remerge.stdout).slice(1).map((file) => posixPath(file));
+  const touched = lines(gitText(gitDiff, root, ['--no-renames', '--name-only', mergeBase, mainParent])).map((file) => posixPath(file));
   const main = blobsAt(root, mainParent, touched), lane = blobsAt(root, laneParent, touched), recorded = blobsAt(root, merge, touched);
   const conflicts = new Set(conflicted);
   const dropped = touched.filter((file) => (main.get(file) ?? null) !== (lane.get(file) ?? null) && (recorded.get(file) ?? null) === (lane.get(file) ?? null))
