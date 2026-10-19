@@ -1,3 +1,5 @@
+import { emailAddress } from './email-address.mjs';
+
 /** Fixed public codes from Supabase adapters; private provider error strings never become receipts. */
 export const supabaseResultCodes = new Set([
   'provider-operation-failed', 'supabase-action-invalid', 'supabase-action-policy-unavailable',
@@ -34,14 +36,8 @@ export const supabaseRefusal = (code) => ({
     code: supabaseResultCodes.has(code) ? code : 'provider-operation-failed' },
 });
 
-/** Validate the declared email's basic shape with one linear scan and no ambiguous regex backtracking. */
-export function supabaseEmailAddress(value) {
-  if (typeof value !== 'string' || /\s/u.test(value)) return false;
-  const parts = value.split('@');
-  if (parts.length !== 2 || !parts[0] || !parts[1]) return false;
-  const dot = parts[1].indexOf('.', 1);
-  return dot > 0 && dot < parts[1].length - 1;
-}
+/** Apply the shared basic email validator to declared Supabase identities. */
+export const supabaseEmailAddress = value => emailAddress(value);
 
 /** Classify usable key material in memory; masked values and unsupported shapes cannot become stored credentials. */
 export function supabaseApiKeyKind(value) {

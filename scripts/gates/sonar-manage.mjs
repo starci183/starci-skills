@@ -9,6 +9,7 @@ import {sonarHostCredential} from './sonar-host-connection.mjs';
 import {log as gitLog} from '../api/git/log.mjs';
 import {statusQuery} from '../api/git/status-query.mjs';
 import {findInOrder} from '../lib/in-order.mjs';
+import {emailAddress} from '../lib/email-address.mjs';
 import {resultCodes, fail, verified, uncertain} from './sonar-managed-results.mjs';
 import {sonarTokenAction} from './sonar-token-actions.mjs';
 
@@ -46,13 +47,6 @@ const selectedRows = (rows, field, selected) => {
 const closed = (value, names) => Object.keys(value).every(key => names.includes(key));
 const publicScalar = value => typeof value === 'number' ? Number.isFinite(value) : ['string', 'boolean'].includes(typeof value);
 const validPublicValue = value => publicScalar(value) || Array.isArray(value) && value.every(publicScalar);
-const validEmail = value => {
-  if (typeof value !== 'string' || /\s/.test(value)) return false;
-  const parts = value.split('@');
-  if (parts.length !== 2 || !parts[0]) return false;
-  const dot = parts[1].indexOf('.');
-  return dot > 0 && dot < parts[1].length - 1;
-};
 
 const projectRequest = (resource, args) => {
   const name = resource.name ?? resource.projectKey, visibility = resource.visibility;
@@ -79,7 +73,7 @@ const userRequest = (resource, args, target) => {
   const users = selectedRows(resource.localUsers, 'login', args.login);
   if (users.some(user => !closed(user, ['login', 'name', 'email', 'passwordRole']) || !namePattern.test(user.login) || user.login.length < 2
       || typeof user.name !== 'string' || !user.name || user.name.length > 200 || /[\r\n]/.test(user.name)
-      || (user.email !== undefined && !validEmail(user.email))
+      || (user.email !== undefined && !emailAddress(user.email))
       || (user.passwordRole !== undefined && (typeof user.passwordRole !== 'string' || !user.passwordRole || reservedCredentialRoles.has(user.passwordRole)))))
     throw new Error('Invalid declared local user');
   return {users};

@@ -79,7 +79,7 @@ const relativeModule = (t, node, file) => {
 };
 
 /** Resolve a local const or a directly exported relative named import; ambiguity remains unresolved. */
-export function failureBinding(t, index, info, identifier, seen = new Set()) {
+function failureBinding(t, index, info, identifier, seen = new Set()) {
   if (!t.isIdentifier(identifier) || seen.has(`${info.file}:${identifier.text}`)) return null;
   seen.add(`${info.file}:${identifier.text}`);
   if ((info.declarations.get(identifier.text) ?? 0) !== 1) return null;
