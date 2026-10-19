@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.7.10 - 2026-10-19
+- Changed: pins @starci/hfs 4.7.10 for the canon cohort carrying the regenerated Stylelint vocabulary.
+
 ## 1.7.9 - 2026-10-19
 - Changed: pins @starci/hfs 4.7.9 for the lite development Docker/Supabase guidance in the scaffold README.
 

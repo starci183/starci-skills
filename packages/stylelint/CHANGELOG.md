@@ -1,5 +1,8 @@
 # Changelog
 
+## 2.0.10 - 2026-10-19
+- Fixed: regenerate the Grammar 0.10.0 CSS vocabulary to include the DragItem vendor property --starci-drag-item-leading; Stylelint rule implementations are unchanged.
+
 ## 2.0.9 - 2026-10-12
 
 - Changed: refresh the combined Grammar CSS vocabulary for the declared button properties --button-bg, --button-bg-hover, --button-bg-pressed and --button-fg; Stylelint rule implementations, vendor vocabulary, breakpoints, status tones and theme values are unchanged.
