@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.7.8 - 2026-10-19
+- Changed: pins @starci/hfs 4.7.8 for precise catalog provenance, mutation-aware strict-null narrowing and bounded finite template keys.
+
 ## 1.7.7 - 2026-10-19
 - Changed: pins @starci/hfs 4.7.7 for the current canon pins carrying the front-end module classification correction.
 

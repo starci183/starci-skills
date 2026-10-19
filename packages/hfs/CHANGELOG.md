@@ -1,5 +1,10 @@
 # Changelog
 
+## 4.7.8 - 2026-10-19
+- Fixed: catalog usage follows ordered object and JSX spreads, readonly class translator fields and their declared forwarding methods while unknown or overwritten producers remain barriers.
+- Fixed: strict-null narrowing retains initializer provenance only for an unmodified const reference; destructuring writes and ancestor replacements invalidate the proof across the containing evaluation frame.
+- Fixed: finite template catalog keys resolve from bounded tuple and callback values, with unknown spans and excessive products rejected; a proven catalog leaf consumes only its same-bundle locale siblings.
+
 ## 4.7.7 - 2026-10-19
 - Changed: bundled canon pins follow the front-end canon's module classification correction in 8.4.13; HFS command behavior is unchanged.
 

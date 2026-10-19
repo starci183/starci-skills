@@ -1,5 +1,8 @@
 # Changelog
 
+## 8.4.14 - 2026-10-19
+- Changed: bundled runtime and canon pins follow @starci/hfs 4.7.8, @starci/cli 1.7.8 and the matching lint canon cohort for the catalog provenance repairs; front-end canon rules are unchanged.
+
 ## 8.4.13 - 2026-10-19
 - Fixed: shared import classification selects an existing module file before virtual slot inference, so public auth barrels retain their resolved owner while impure redirect helpers remain refused.
 

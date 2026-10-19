@@ -6,7 +6,7 @@ until every S* row in `docs/goal.md` holds with fresh evidence, then `1.0.0` fre
 
 ## [Unreleased]
 
-## [1.0.0-alpha.22] — 2026-10-18
+## [1.0.0-alpha.22] — 2026-10-19
 
 Hotfix of the red alpha.21 CI (run 39070215259) and the candidate CI flow: this release is the first cut through it.
 
@@ -26,7 +26,7 @@ Hotfix of the red alpha.21 CI (run 39070215259) and the candidate CI flow: this 
 
 ### Fixed
 - Front-end import classification selects an existing module file before virtual slot inference, so public auth barrels retain their resolved owner while impure redirect helpers remain refused.
-- Translation usage analysis follows shorthand translator arguments, bounded dynamic keys and memoized forwarding properties, retaining live catalog entries while reporting unused keys.
+- Translation usage analysis follows ordered object and JSX spreads, readonly class translator fields, declared forwarding methods and bounded finite template keys. Strict-null narrowing preserves only unmodified const-reference provenance; unknown producers, destructuring writes and ancestor replacements remain barriers, and locale peers are consumed only within their proven catalog bundle.
 - The Supabase API owner launches the app-installed JavaScript CLI through Node on Windows, preserving shell-free arguments and refusing command shims that require a shell.
 - Codecov uses the same slot-derived coverage complement as Jest and Sonar in managed apps and the runtime's example flags and components. NIVO v0.2.5's merged shard report proved all 882 measured logic files at 100%, but incidental config, module and persistence imports broadened Codecov's denominator to 2011 files (98.24%); those files now follow the existing coverage scope while project, patch and component targets remain 100% with zero tolerance.
 - Sonar's JavaScript analyzer receives the existing 6144 MiB CI Node budget through `sonar.javascript.node.maxspace` in the managed app configuration and the runtime configuration producer, leaving memory for Java and the OS on the 8 GB runner. The unsupported `sonar.nodejs.maxspace` left the NIVO v0.2.4 tag scan at a 2240 MB limit, where analysis ran out of memory.
@@ -42,7 +42,7 @@ Hotfix of the red alpha.21 CI (run 39070215259) and the candidate CI flow: this 
 - Sharded coverage equals the unsharded run on lines and functions for every file (NIVO: 883 of 883), but a file may hold 1-2 more branch entries than the unsharded run (NIVO: 27 files): jest merges raw V8 across test files before it converts them, while shards convert apart. Extra entries can only add uncovered branches, never hide one. Exact branch equality (merging raw V8 across shards) is an alpha.23 follow-up.
 
 ### Evidence
-- The current candidate pins @starci/hfs 4.7.7, @starci/cli 1.7.7, @starci/jest-preset 2.3.2, @starci/eslint-canon-be 3.4.13, @starci/eslint-canon-fe 8.4.13 and @starci/grammar 0.10.0; runtime 1.0.0-alpha.22. Earlier published cohorts remain immutable.
+- The current candidate pins @starci/hfs 4.7.8, @starci/cli 1.7.8, @starci/jest-preset 2.3.2, @starci/eslint-canon-be 3.4.14, @starci/eslint-canon-fe 8.4.14 and @starci/grammar 0.10.0; runtime 1.0.0-alpha.22. Earlier published cohorts remain immutable.
 - The package phase was stopped after lint canons 3.4.8/8.4.8 reached npm and before HFS/CLI upload to repair the coverage prerequisites. Their published payloads stay immutable; lint canons 3.4.9/8.4.9 carried the replacement pins through the completed native package phase.
 - The NIVO v0.2.4 tag scan then exposed the unsupported Sonar heap key. HFS 4.7.4 and CLI 1.7.4 carry the correction, and lint canons 3.4.10/8.4.10 carry their matching bundled pins; the published HFS 4.7.3, CLI 1.7.3 and lint canons 3.4.9/8.4.9 stay immutable.
 

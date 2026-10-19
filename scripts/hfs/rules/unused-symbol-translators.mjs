@@ -2,17 +2,20 @@
 import { nameText } from '../../lib/ts-ast.mjs';
 import { unwrapCatalogExpression as unwrap } from '../../lib/ts-analysis.mjs';
 import { callable, staticStrings } from './unused-symbol-values.mjs';
-import { returnedExpressions, symbolAt, valuesOf } from './unused-symbol-flow.mjs';
+import { receiverBinding, returnedExpressions, symbolAt, valuesOf, writesBinding } from './unused-symbol-flow.mjs';
 
 const TRANSLATOR_NAME = /^(?:t|translate)$/u;
 
-function translationFactories(ts, source) {
-  const factories = new Set(['useTranslations', 'getTranslations']);
+function translationFactories(state, source) {
+  const { ts, checker } = state;
+  const factories = new Map(['useTranslations', 'getTranslations'].map(name => [name, {}]));
   for (const statement of source.statements) {
-    if (!ts.isImportDeclaration(statement) || !/^(?:next-intl|next-intl\/server)$/u.test(statement.moduleSpecifier.text)) continue;
+    if (!ts.isImportDeclaration(statement) || !/^(?:next-intl(?:\/server)?|use-intl\/core)$/u.test(statement.moduleSpecifier.text)) continue;
     const named = statement.importClause?.namedBindings;
     if (named && ts.isNamedImports(named)) for (const element of named.elements) {
-      if (factories.has((element.propertyName ?? element.name).text)) factories.add(element.name.text);
+      const name = (element.propertyName ?? element.name).text;
+      if (/^(?:useTranslations|getTranslations|createTranslator)$/u.test(name))
+        factories.set(element.name.text, { options: name === 'createTranslator', symbol: checker.getSymbolAtLocation(element.name) });
     }
   }
   return factories;
@@ -23,8 +26,14 @@ function translatorNamespace(state, initializer, factories) {
   let init = unwrap(ts, initializer);
   if (init && ts.isAwaitExpression(init)) init = unwrap(ts, init.expression);
   if (!init || !ts.isCallExpression(init) || !ts.isIdentifier(init.expression) || !factories.has(init.expression.text)) return null;
+  const factory = factories.get(init.expression.text);
+  if (factory.symbol && state.checker.getSymbolAtLocation(init.expression) !== factory.symbol) return null;
   let first = init.arguments[0];
-  if (first && ts.isObjectLiteralExpression(first)) first = first.properties.find(property => nameText(ts, property.name, { numbers: true }) === 'namespace')?.initializer;
+  if (factory.options && (!first || !ts.isObjectLiteralExpression(first))) return [];
+  if (first && ts.isObjectLiteralExpression(first)) {
+    if (first.properties.some(property => ts.isSpreadAssignment(property) || nameText(ts, property.name, { numbers: true }) === null)) return [];
+    first = first.properties.findLast(property => nameText(ts, property.name, { numbers: true }) === 'namespace')?.initializer;
+  }
   return first ? staticStrings(state, first) : [''];
 }
 
@@ -36,7 +45,23 @@ function translatorList(ts, initializer) {
   return list && ts.isArrayLiteralExpression(list) ? list.elements : [];
 }
 
-const isFunction = (ts, node) => Boolean(node) && (ts.isArrowFunction(node) || ts.isFunctionExpression(node) || ts.isFunctionDeclaration(node));
+const isFunction = (ts, node) => ts.isFunctionLike(node)
+  && (ts.isExpression(node) || ts.isFunctionDeclaration(node) || ts.isMethodDeclaration(node));
+
+/** A branch may forward the same key or return it unchanged; an unrelated result proves no translator. */
+function forwardedExpression(state, expression, parameter) {
+  const { ts, checker } = state;
+  const node = unwrap(ts, expression);
+  if (node && ts.isIdentifier(node) && checker.getSymbolAtLocation(node) === parameter) return [];
+  if (node && ts.isConditionalExpression(node)) {
+    const choices = [node.whenTrue, node.whenFalse].map(branch => forwardedExpression(state, branch, parameter));
+    return choices.every(choice => choice !== null) ? choices.flat() : null;
+  }
+  const first = node && ts.isCallExpression(node) ? unwrap(ts, node.arguments[0]) : null;
+  if (!first || !ts.isIdentifier(first) || checker.getSymbolAtLocation(first) !== parameter) return null;
+  const namespaces = receiverNamespaces(state, node.expression);
+  return namespaces.length ? namespaces : null;
+}
 
 /** A function whose result is a call on a bound translator with its own first parameter is that translator. */
 function forwardedNamespaces(state, fn) {
@@ -44,12 +69,9 @@ function forwardedNamespaces(state, fn) {
   const parameter = fn.parameters[0];
   if (!parameter || !ts.isIdentifier(parameter.name)) return [];
   const own = checker.getSymbolAtLocation(parameter.name);
-  return returnedExpressions(ts, fn).flatMap(expression => {
-    const call = unwrap(ts, expression);
-    const first = call && ts.isCallExpression(call) ? unwrap(ts, call.arguments[0]) : null;
-    if (!first || !ts.isIdentifier(first) || checker.getSymbolAtLocation(first) !== own) return [];
-    return receiverNamespaces(state, call.expression);
-  });
+  if (writesBinding(state, fn.body, own)) return [];
+  const choices = returnedExpressions(ts, fn).map(expression => forwardedExpression(state, expression, own));
+  return choices.every(choice => choice !== null) ? choices.flat() : [];
 }
 
 /** useCallback(fn, deps) and useMemo(() => fn, deps) are the function fn. */
@@ -96,7 +118,7 @@ function bindTranslator(state, name, initializer, factories) {
 
 /** Wrappers depend on translators bound in other modules, so bind until nothing new appears. */
 export function translationBindings(state, sources) {
-  const factories = new Map([...sources.values()].map(source => [source, translationFactories(state.ts, source)]));
+  const factories = new Map([...sources.values()].map(source => [source, translationFactories(state, source)]));
   for (let pass = 0, size = -1; pass < 4 && size !== state.translators.size; pass++) {
     size = state.translators.size;
     for (const source of sources.values()) {
@@ -112,6 +134,7 @@ export function translationBindings(state, sources) {
 /** Namespaces of the translators a receiver can be: declared here, or handed in through arguments and props. */
 function receiverNamespaces(state, receiver) {
   const { ts, checker } = state;
+  if (explicitCatalogGet(ts, receiver)) return [''];
   const resolving = state.resolvingReceivers ??= new Set();
   if (resolving.has(receiver)) return [];
   resolving.add(receiver);
@@ -120,24 +143,23 @@ function receiverNamespaces(state, receiver) {
     if (direct !== undefined) return direct;
     return valuesOf(state, receiver).flatMap(leaf => {
       // A translator factory called in place as an argument: f(useTranslations("admin")).
-      if (ts.isCallExpression(leaf)) return translatorNamespace(state, leaf, translationFactories(ts, leaf.getSourceFile())) ?? [];
+      if (ts.isCallExpression(leaf)) return translatorNamespace(state, leaf, translationFactories(state, leaf.getSourceFile())) ?? [];
       if (isFunction(ts, leaf)) return forwardedNamespaces(state, leaf);
       return ts.isIdentifier(leaf) ? state.translators.get(symbolAt(state, leaf)) ?? [] : [];
     });
   } finally { resolving.delete(receiver); }
 }
 
-function handedIn(state, receiver) {
-  const { ts } = state;
-  let root = receiver;
-  while (ts.isPropertyAccessExpression(root)) root = root.expression;
-  const declaration = ts.isIdentifier(root) ? symbolAt(state, root)?.valueDeclaration : null;
-  return Boolean(declaration) && (ts.isParameter(declaration) || ts.isBindingElement(declaration));
-}
-
 function leafName(ts, node) {
   if (ts.isPropertyAccessExpression(node)) return node.name.text;
   return ts.isIdentifier(node) ? node.text : '';
+}
+
+function explicitCatalogGet(ts, callee) {
+  if (!ts.isPropertyAccessExpression(callee) || callee.name.text !== 'get') return false;
+  const owner = callee.expression;
+  const name = nameText(ts, ts.isPropertyAccessExpression(owner) ? owner.name : owner, { numbers: true }) ?? '';
+  return /message|catalog/iu.test(name);
 }
 
 /** A callback typed (string, ...) => string: the shape of a translator whatever its name. */
@@ -160,12 +182,10 @@ export function catalogNamespace(state, callee) {
   if (ts.isPropertyAccessExpression(callee) && /^(?:rich|raw|markup)$/u.test(callee.name.text)) receiver = callee.expression;
   const resolved = receiverNamespaces(state, receiver);
   if (resolved.length) return resolved;
-  if (handedIn(state, receiver) && (TRANSLATOR_NAME.test(leafName(ts, receiver)) || translatorShaped(state, receiver))) return [null];
-  if (ts.isPropertyAccessExpression(callee) && callee.name.text === 'get') {
-    const owner = callee.expression;
-    const name = nameText(ts, ts.isPropertyAccessExpression(owner) ? owner.name : owner, { numbers: true }) ?? '';
-    if (/message|catalog/iu.test(name)) return [''];
-  }
-  if (ts.isIdentifier(callee) && TRANSLATOR_NAME.test(callee.text)) return [''];
+  const binding = receiverBinding(state, receiver);
+  // Observed unresolved producers cannot use the generic namespace fallback.
+  if (binding.handedIn && (TRANSLATOR_NAME.test(leafName(ts, receiver)) || translatorShaped(state, receiver)))
+    return binding.observed ? [] : [null];
+  if (ts.isIdentifier(callee) && TRANSLATOR_NAME.test(callee.text)) return binding.observed ? [] : [''];
   return [];
 }
