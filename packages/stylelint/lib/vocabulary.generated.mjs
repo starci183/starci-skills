@@ -106,6 +106,7 @@ export const VENDOR = [
   "--radius-sm",
   "--radius-xl",
   "--radius-xs",
+  "--starci-drag-item-leading",
   "--trigger-width",
 ]
 
