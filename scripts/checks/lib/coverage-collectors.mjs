@@ -91,7 +91,10 @@ function walk(context, index, node, state, stack) {
   if (node.type === 'BlockStatement') return walkBlock(context, index, node, state, stack);
   if (node.type === 'VariableDeclaration') declareBindings(context, index, node);
   if (node.type === 'IfStatement') return walkBranch(context, index, node, state, stack);
-  if (node.type === 'ForOfStatement') return walkLoop(context, index, node, state, stack);
+  if (node.type === 'ForOfStatement') {
+    walkLoop(context, index, node, state, stack);
+    return false;
+  }
   if (['AssignmentExpression', 'UpdateExpression'].includes(node.type)) assignment(context, index, node, state);
   if (['CallExpression', 'NewExpression'].includes(node.type)) visitCall(context, index, node, state, stack);
   for (const child of astChildren(node)) walk(context, index, child, state, stack);
@@ -106,12 +109,11 @@ function walkBlock(context, index, node, state, stack) {
 
 function walkLoop(context, index, node, state, stack) {
   const values = evaluate(context, index, node.right);
-  if (Array.isArray(values) && values.length === 0) return false;
+  if (Array.isArray(values) && values.length === 0) return;
   const scope = localScope(index);
   bindPattern(context, scope, node.left.declarations?.[0]?.id ?? node.left,
     { index, node: node.right });
   walk(context, scope, node.body, state, stack);
-  return false;
 }
 
 function walkBranch(context, index, node, state, stack) {

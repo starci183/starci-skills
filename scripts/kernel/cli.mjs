@@ -1796,6 +1796,7 @@ const opLeaseRequests = (payload, canon = null, op = null) => {
 // no wait here and reserve still refuses it as before. `conflicts` takes reserveTwoPhase's
 // pathConflicts (the race after this check) or, absent, the ledger is read now.
 const livePathLeaseWait = (db, job, payload, { conflicts = null, now = Date.now(), repo = null } = {}) => {
+  /** @type {ReturnType<typeof findOwnedPathLeaseConflicts>|null} */
   let found = conflicts;
   if (!Array.isArray(found)) {
     const canon = repo ? leaseCanonOf(db, repo) : null;
@@ -2977,7 +2978,8 @@ const retryNoteOf = (retry) => {
 function settleFailedNoReport(ledger, job, { workerProof = null, evidence = [], dispatchId = null, pathProof = null, repo, args }) {
   const db = ledger.db, jobId = job.job_id, op = jobOpOf(job);
   const handle = workerProof?.terminal ?? null, liveness = workerProof?.liveness ?? null;
-  const environment = workerProof?.hostWipe?.cause ?? null;
+  const hostWipe = workerProof?.hostWipe ?? null;
+  const environment = hostWipe?.cause ?? null;
   let machineRefs = [], leasesReleased = 0, retry = null, nextStep = null, settledPayload = null, effectState = 'unknown';
   ledger.transaction(() => {
     const fresh = db.prepare('SELECT status FROM jobs WHERE job_id=?').get(jobId);
@@ -3012,7 +3014,7 @@ function settleFailedNoReport(ledger, job, { workerProof = null, evidence = [], 
         leasesReleased, machineRefs, reportsConsumed: false, ...(environment ? { environment } : {}) } });
     ledger.appendEvent({ workflowId: job.workflow_id, entityType: 'job', entityId: jobId, kind: 'worker-failed-no-report',
       payload: { opId: op, attempt: tryOf(job), dispatchId, liveness, terminal: handle, effectState, evidence,
-        ...(environment ? { environment, attemptConsumed: false, hostWipe: workerProof.hostWipe } : {}) } });
+        ...(environment ? { environment, attemptConsumed: false, hostWipe } : {}) } });
     settledPayload = next;
     const routedStep = enqueueNextStep(ledger, { ...job, payload_json: JSON.stringify(next) }, { shape: failureShapeOf({ reportFiled: false }), environment: Boolean(environment), liveness, repo });
     nextStep = routedStep;
@@ -3045,7 +3047,7 @@ function settleFailedNoReport(ledger, job, { workerProof = null, evidence = [], 
   const pattern = bestEffort(() => raiseDeadWorkerPattern(ledger, job));
   const typedReleased = bestEffort(() => releaseTypedWaits(ledger, { repo, wake: true, self: job.workflow_id }).resolved) ?? [];
   const out = { ok: true, jobId, recovery: 'settled-failed', status: 'failed', verdict: 'fail', reason: FAILED_NO_REPORT, reportFiled: false, attempt: tryOf(job),
-    effectState, evidence, dispatchId, liveness, leasesReleased, machineRefsReleased, retry, nextStep, attemptConsumed: !environment, ...(environment ? { environment, hostWipe: workerProof.hostWipe } : {}),
+    effectState, evidence, dispatchId, liveness, leasesReleased, machineRefsReleased, retry, nextStep, attemptConsumed: !environment, ...(environment ? { environment, hostWipe } : {}),
     ...(managedWorker ? { managedWorker } : {}),
     artifacts, ...(pattern ? { pattern } : {}), ...(Array.isArray(typedReleased) && typedReleased.length ? { autoResolved: typedReleased.map(({ incidentId, workflowId }) => ({ incidentId, workflowId })) } : {}) };
   emit(out, `settled ${jobId} failed-no-report (worker ${handle ?? '?'} ${liveness ?? 'dead'}${environment ? ' in a ' + environment + ': no business attempt spent' : ''}; effect ${effectState}${evidence.length ? ': ' + evidence.slice(0, 6).join(', ') : ''}; leases released: ${leasesReleased})`
