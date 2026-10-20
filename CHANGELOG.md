@@ -6,6 +6,18 @@ until every S* row in `docs/goal.md` holds with fresh evidence, then `1.0.0` fre
 
 ## [Unreleased]
 
+## [1.0.0-alpha.24] — 2026-10-20
+
+Code-quality release: the runtime's SonarCloud project goes from 175 open code smells (3 critical) at alpha.23 to none.
+
+### Changed
+- The local `sonar-rules` gate enforces every Sonar rule id SonarCloud raised on alpha.23 that has a type-free local port, calibrated against those findings, so the smells cannot return unseen before the next scan.
+- Candidate package pins select HFS 4.7.13, CLI 1.7.13, back-end canon 3.4.19 and front-end canon 8.4.19; CLI depends exactly on its matching HFS package.
+
+### Fixed
+- Every open SonarCloud code smell of alpha.23 is refactored away without behavior change: complex regular expressions are composed from named parts, character classes are concise, literal prefix and suffix tests use `startsWith`/`endsWith`, multi-line blocks have braces, optional chaining and `export … from` replace their long forms, default parameters come last, `await` is gone from synchronous calls and dead stores are removed.
+- `starci work draw-source` awaits its entry at the top level: its typecheck half moved to `scripts/work/draw/draw-typecheck.mjs`, so `draw-grammar.mjs` no longer imports the entry module.
+
 ## [1.0.0-alpha.23] — 2026-10-19
 
 ### Added

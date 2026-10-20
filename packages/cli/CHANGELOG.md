@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.7.13 - 2026-10-20
+- Fixed: the generated runtime installer selects 1.0.0-alpha.24; pins @starci/hfs 4.7.13 for the smell-free bundled source.
+
 ## 1.7.12 - 2026-10-19
 - Fixed: the generated runtime installer selects 1.0.0-alpha.23 and the Supabase lifecycle catalog admits Lite applications; pins @starci/hfs 4.7.12 for the repaired bundled source checks.
 

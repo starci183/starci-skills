@@ -1,5 +1,8 @@
 # Changelog
 
+## 4.7.13 - 2026-10-20
+- Fixed: bundled runtime source clears the SonarCloud code smells of alpha.23 (regex complexity, concise classes, string prefix and suffix checks, block braces, optional chaining, export-from, default parameters, synchronous awaits, dead stores) without behavior change; canon pins follow the matching package cohort.
+
 ## 4.7.12 - 2026-10-19
 - Fixed: bundled source analysis uses explicit nullable contracts, unary callback arguments and grouped regular-expression alternatives while preserving refusal paths; canon pins follow the matching package cohort.
 
