@@ -17,6 +17,7 @@ Code-quality release: the runtime's SonarCloud project goes from 175 open code s
 ### Fixed
 - Every open SonarCloud code smell of alpha.23 is refactored away without behavior change: complex regular expressions are composed from named parts, character classes are concise, literal prefix and suffix tests use `startsWith`/`endsWith`, multi-line blocks have braces, optional chaining and `export … from` replace their long forms, default parameters come last, `await` is gone from synchronous calls and dead stores are removed.
 - `starci work draw-source` awaits its entry at the top level: its typecheck half moved to `scripts/work/draw/draw-typecheck.mjs`, so `draw-grammar.mjs` no longer imports the entry module.
+- The native app release gate's sonar row produces the external issues report the app declares before it runs the scanner: it runs `starci app lint --side <side> --sonar reports/lint.<side>.sonar.json` for every side the app has and writes the merged `reports/lint.sonar.json` exactly like the managed CI merge step; a failing lint fails the row and the scanner does not run.
 
 ## [1.0.0-alpha.23] — 2026-10-19
 

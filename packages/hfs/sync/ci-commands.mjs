@@ -189,7 +189,7 @@ function frontendBuild(source, app) {
   return { env: singleEnv, steps };
 }
 
-/** The per-side lint reports (one artifact per lint matrix side) join into the one reports/lint.sonar.json the Sonar import reads, even when one side wrote none. */
+/** The per-side lint reports (one artifact per lint matrix side) join into the one reports/lint.sonar.json the Sonar import reads, even when one side wrote none. The local release gate writes the same file with mergeSonarReports (release/lint-report.mjs): keep both identical. */
 function sonarMergeSteps(condition) {
   return [
     '      - name: merge Sonar lint reports',

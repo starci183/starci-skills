@@ -10,6 +10,7 @@ import { isPlainObject as plain } from '../runtime/engine/plain-object.mjs';
 import { qualityServices } from '../runtime/scripts/hfs/ci-declaration.mjs';
 import { firstLine, lines, tool } from '../stack/context.mjs';
 import { failure, refusal } from '../stack/errors.mjs';
+import { produceLintReports } from './lint-report.mjs';
 
 export const RELEASE_CODE = 'RELEASE_CONFIG_INVALID';
 const SONAR_UNREACHABLE = 'SONAR_UNREACHABLE';
@@ -230,8 +231,17 @@ async function sonarAvailability(ctx, gate) {
 /** Unreachable optional providers remain explicit skipped rows, with a real log and no scan invocation. */
 async function runAvailableGate(ctx, gate, options) {
   const availability = await sonarAvailability(ctx, gate);
-  if (!availability) return runGate(ctx, gate, options);
   const log = path.join(options.dir, `${gate.name}.log`);
+  if (!availability) {
+    if (!gate.provider) return runGate(ctx, gate, options);
+    // The scanner imports the app's declared external issues report: produce it first with the app's own lint, as the managed CI does.
+    const started = ctx.now();
+    const lint = produceLintReports(ctx, { launch, platform: options.platform, env: withoutCredentials(ctx.env, options.credentialNames) });
+    if (lint.pass) return runGate(ctx, gate, { ...options, preface: lint.text });
+    fs.writeFileSync(log, lint.text);
+    return { name: gate.name, command: gate.command.join(' '), pass: false, detail: 'lint report failed (see log)', seconds: Math.round((ctx.now() - started) / 1000),
+      summary: null, log: path.resolve(log), logSha256: sha256(log), env: Object.keys(gate.env) };
+  }
   fs.writeFileSync(log, availability.detail + '\n');
   return { name: gate.name, command: gate.command.join(' '), ...availability, seconds: 0,
     summary: null, log: path.resolve(log), logSha256: sha256(log), env: Object.keys(gate.env) };
@@ -242,7 +252,7 @@ const withoutCredentials = (values, credentialNames) => {
   return Object.fromEntries(Object.entries(values ?? {}).filter(([key]) => !selected.has(key.toUpperCase())));
 };
 
-function runGate(ctx, gate, { dir, platform, credentialNames }) {
+function runGate(ctx, gate, { dir, platform, credentialNames, preface = '' }) {
   const log = path.join(dir, `${gate.name}.log`);
   const started = ctx.now();
   const [command, args] = launch(gate.command, platform);
@@ -251,7 +261,7 @@ function runGate(ctx, gate, { dir, platform, credentialNames }) {
   const run = tool(ctx, command, args, { cwd: ctx.cwd, env });
   const output = `${run.stdout ?? ''}${run.stderr ?? ''}`;
   const text = gate.name === 'sonar' && gate.env.SONAR_TOKEN ? output.replaceAll(gate.env.SONAR_TOKEN, '[REDACTED]') : output;
-  fs.writeFileSync(log, text);
+  fs.writeFileSync(log, preface + text);
   const verdict = judgeVerdict(run, gate, text);
   if (gate.name === 'sonar' && gate.env.SONAR_TOKEN) verdict.detail = verdict.detail.replaceAll(gate.env.SONAR_TOKEN, '[REDACTED]');
   const seconds = Math.round((ctx.now() - started) / 1000);
