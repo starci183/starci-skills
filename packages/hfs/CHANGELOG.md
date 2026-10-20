@@ -1,6 +1,7 @@
 # Changelog
 
 ## 4.7.13 - 2026-10-20
+- Fixed: the lite CI template sets NODE_OPTIONS on the database migration check step; ci-standard heap.steps lists `npm run db:lint`.
 - Fixed: bundled runtime source clears the SonarCloud code smells of alpha.23 (regex complexity, concise classes, string prefix and suffix checks, block braces, optional chaining, export-from, default parameters, synchronous awaits, dead stores) without behavior change; canon pins follow the matching package cohort.
 - Fixed: `starci app release gate --sonar` produces `reports/lint.sonar.json` before the scanner (per-side `starci app lint --sonar` runs merged like the managed CI), so the scanner no longer fails on the missing external issues report; a failing lint fails the sonar row.
 

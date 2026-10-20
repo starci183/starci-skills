@@ -15,6 +15,7 @@ Code-quality release: the runtime's SonarCloud project goes from 175 open code s
 - Candidate package pins select HFS 4.7.13, CLI 1.7.13, back-end canon 3.4.19 and front-end canon 8.4.19; CLI depends exactly on its matching HFS package.
 
 ### Fixed
+- The rendered lite app CI gives its database migration check (`npm run db:lint`, a full `starci app check`) the same raised Node heap as the other heavy steps; NIVO v0.2.6 candidate CI ran out of memory there.
 - Every open SonarCloud code smell of alpha.23 is refactored away without behavior change: complex regular expressions are composed from named parts, character classes are concise, literal prefix and suffix tests use `startsWith`/`endsWith`, multi-line blocks have braces, optional chaining and `export … from` replace their long forms, default parameters come last, `await` is gone from synchronous calls and dead stores are removed.
 - `starci work draw-source` awaits its entry at the top level: its typecheck half moved to `scripts/work/draw/draw-typecheck.mjs`, so `draw-grammar.mjs` no longer imports the entry module.
 - The native app release gate's sonar row produces the external issues report the app declares before it runs the scanner: it runs `starci app lint --side <side> --sonar reports/lint.<side>.sonar.json` for every side the app has and writes the merged `reports/lint.sonar.json` exactly like the managed CI merge step; a failing lint fails the row and the scanner does not run.

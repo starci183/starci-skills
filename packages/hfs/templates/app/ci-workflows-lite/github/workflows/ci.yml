@@ -107,6 +107,8 @@ jobs:
 {{> app/ci-workflows/build-cache-save.yml}}
       - name: database migration checks
         run: {{ciDatabaseLint}}
+        env:
+          NODE_OPTIONS: {{nodeOptions}}
 
 {{sonarJob}}
   db-types:

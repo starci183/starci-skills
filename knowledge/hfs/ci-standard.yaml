@@ -27,7 +27,7 @@ defaults:
 # The steps that need a raised Node heap on the GitHub runner, matched on their `run` text, and the least heap they must declare in NODE_OPTIONS.
 heap:
   minMiB: 6144
-  steps: ['npm run typecheck', 'npm run lint', 'app lint', 'app check --coverage-from']
+  steps: ['npm run typecheck', 'npm run lint', 'app lint', 'app check --coverage-from', 'npm run db:lint']
 
 items:
   - id: candidate-trigger
