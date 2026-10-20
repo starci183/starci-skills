@@ -1,7 +1,7 @@
 group: app
 verb: hygiene
 owner: "@starci/hfs"
-summary: judge staged worktree metadata, stack files and plaintext secrets
+summary: judge staged worktree metadata, stack files, plaintext secrets and new logic files without a spec
 impl: null
 flags: []
 exit: {"0": clean, "1": findings, "2": refusal or bad usage}

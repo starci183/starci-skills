@@ -156,6 +156,7 @@ rules:
       automated:
         - HFS_CI_MISSING_CANON
         - HFS_HOOKS_PATH_REDIRECTED
+        - HFS_HOOKS_NOT_INSTALLED
         - HFS_ARCH_CONFIG_UNREAD
       manual: []
     relatedExamples: []
@@ -216,6 +217,7 @@ rules:
         - HFS_E2E_IN_AUTOMATIC_GATE
         - BE_TEST_TOPOLOGY
         - BE_CONTRACT_UNGUARDED
+        - BE_UNIT_SPEC_NOT_STAGED
         - FE_NO_TESTS
       manual: []
     relatedExamples: []

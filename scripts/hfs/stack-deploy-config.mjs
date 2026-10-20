@@ -314,3 +314,17 @@ export function normalizeDeploy(block, { project, probe }) {
   if (block.stack === undefined && !NAME.test(String(project))) c.problem('deploy.stack', `the stack name ${project} must match ${NAME}`);
   return { config: c.problems.length === 0 ? config : null, problems: c.problems };
 }
+
+/**
+ * The component-to-app ties a stack declaration states: every `environments.<env>.deploy.images.<service>` entry with a string
+ * `app`, as `[{ environment, service, app }]`. Read without validating the rest of the block (R294 judges that), so a defect
+ * elsewhere in a deploy block never hides the tie R165 reads.
+ */
+export function deployImageApps(doc) {
+  const ties = [];
+  for (const [environment, spec] of Object.entries(plain(doc?.environments) ? doc.environments : {})) {
+    const block = plain(spec) && plain(spec.deploy) && plain(spec.deploy.images) ? spec.deploy.images : {};
+    for (const [service, entry] of Object.entries(block)) if (plain(entry) && typeof entry.app === 'string') ties.push({ environment, service, app: entry.app });
+  }
+  return ties;
+}

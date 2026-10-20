@@ -197,5 +197,6 @@ rules:
       automated:
         - BE_TEST_TOPOLOGY
         - BE_CONTRACT_UNGUARDED
+        - BE_UNIT_SPEC_NOT_STAGED
       manual: []
     relatedExamples: []

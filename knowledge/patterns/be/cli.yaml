@@ -133,6 +133,7 @@ rules:
         - BE_CLI_COMMAND_SHAPE
         - BE_TEST_TOPOLOGY
         - BE_CONTRACT_UNGUARDED
+        - BE_UNIT_SPEC_NOT_STAGED
         - BE_SPEC_PLACEMENT
         - BE_FEATURE_THIN
       manual:

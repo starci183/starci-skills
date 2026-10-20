@@ -12,6 +12,7 @@ import { refusal as verbRefusal, resultOk as success, resultOutput as output } f
 import { underHostLock, hostLockRetryBudget } from './verb-lock.mjs';
 import { installStateOf, writeInstallMarker, clearInstallMarker, lockfileInstallPresent } from './npm-install-state.mjs';
 import { installFailureOf, treeHolders } from './npm-install-failure.mjs';
+import { ensureGitHooks, hooksLine } from './npm-hooks.mjs';
 
 const comparablePath = (value) => {
   const resolved = path.resolve(value);
@@ -77,7 +78,8 @@ export async function npmCi(ctx, deps = {}) {
     markInstalled: deps.markInstalled ?? writeInstallMarker,
     clearMarker: deps.clearMarker ?? clearInstallMarker,
     lockInstalled: deps.lockInstalled ?? lockfileInstallPresent,
-    holders: deps.holders ?? treeHolders
+    holders: deps.holders ?? treeHolders,
+    hooks: deps.hooks ?? ensureGitHooks
   };
   const role = ctx?.role ?? 'owner';
 
@@ -124,8 +126,16 @@ export async function npmCi(ctx, deps = {}) {
         data: { schema: 'starci/npm-ci@1', ok: true, cwd, ms }
       };
     }, deps);
-    return lockedValue(locked);
+    return withHooks(lockedValue(locked), cwd, api.hooks, ctx?.env, refusal);
   } catch (error) {
     return refusal(cwd, `host lock failed: ${String(error?.message ?? error)}`, 1);
   }
+}
+
+/** A finished install (installed, skipped or adopted) also has the checkout's git hooks (npm-hooks.mjs); hooks still missing fail it. */
+export function withHooks(result, cwd, ensure, env, refusal) {
+  if (result?.code !== 0) return result;
+  const hooks = ensure(cwd, { env: env ?? process.env });
+  if (hooks.state === 'failed') return refusal(cwd, `${result.text}; ${hooksLine(hooks)}`, 1, { ...result.data, ok: false, hooks });
+  return { ...result, text: `${result.text}\n${hooksLine(hooks)}`, data: { ...result.data, hooks } };
 }

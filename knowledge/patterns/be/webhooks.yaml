@@ -82,6 +82,7 @@ rules:
         - HFS_README_BADGE_NOT_LIVE
         - BE_TEST_TOPOLOGY
         - BE_CONTRACT_UNGUARDED
+        - BE_UNIT_SPEC_NOT_STAGED
       manual:
         - Confirm the provider endpoint is one door and that a second endpoint of the same provider is a second door only when it has a different proof.
     relatedExamples: [webhooks]

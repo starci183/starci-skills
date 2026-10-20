@@ -83,5 +83,6 @@ rules:
         - HFS_CANON_PIN_DRIFT
         - HFS_CI_MISSING_CANON
         - HFS_HOOKS_PATH_REDIRECTED
+        - HFS_HOOKS_NOT_INSTALLED
       manual: []
     relatedExamples: []

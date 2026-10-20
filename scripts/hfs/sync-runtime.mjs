@@ -36,12 +36,13 @@ const SLOT_FILES = [
   'scripts/hfs/allows.mjs',
   'knowledge/hfs/slots.yaml',
 ];
-/** The entry modules of `starci app check`, `starci app secret`, `starci app db` and the coverage scope `starci app sync` renders; their static import closures are bundled. */
+/** The entry modules of `starci app check`, `starci app secret`, `starci app db`, the coverage scope `starci app sync` renders and the staged-spec judgement of `starci app hygiene`; their static import closures are bundled. */
 const CHECK_ENTRIES = [
   'scripts/hfs/check.mjs', 'scripts/hfs/architecture.mjs', 'scripts/hfs/secret.mjs', 'scripts/hfs/coverage-scope.mjs',
   'scripts/hfs/db-baseline-verb.mjs', 'scripts/hfs/db-restamp-verb.mjs', 'scripts/hfs/db-plan-verb.mjs',
   'scripts/api/supabase/database-push.mjs',
   'scripts/hfs/app-wiring.mjs', 'scripts/hfs/coverage-from.mjs', 'scripts/hfs/example-secrets.mjs', 'scripts/hfs/stack-deploy-config.mjs',
+  'scripts/hfs/rules/staged-specs.mjs',
 ];
 /** Static imports and `new URL(<relative>.yaml, import.meta.url)` reads (the framework-pinned knowledge file) are followed. */
 const IMPORT_SPEC = /(?:\bfrom\s+|\bimport\s*\(\s*|\bimport\s+)['"](\.[^'"]+)['"]/g;

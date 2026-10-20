@@ -183,6 +183,7 @@ rules:
       automated:
         - BE_TEST_TOPOLOGY
         - BE_CONTRACT_UNGUARDED
+        - BE_UNIT_SPEC_NOT_STAGED
         - BE_SPEC_QUALITY
         - HFS_EDITION_INVALID
         - HFS_EDITION_FORBIDDEN_PRESENT

@@ -28,7 +28,7 @@
 //                                            printSchema(lexicographicSortSchema) of the resolvers the app root composes; no env, no database, no network.
 //   starci app sync (--check | --write) [--cwd <dir>]  the managed files of the root (scripts, husky, CI, .gitignore block, sonar, prettier) and
 //                                            of each side (tsconfig, eslint, jest, stylelint); sync/cli.mjs
-//   starci app hygiene                             the pre-commit guard: staged .starciwork and .starcistacks paths, and the secrets guard over every staged file (read from the index); sync/cli.mjs
+//   starci app hygiene                             the pre-commit guard: staged .starciwork and .starcistacks paths, the secrets guard over every staged file (read from the index) and a new back-end logic file staged without its unit spec; sync/cli.mjs
 //   starci app coverage merge --out <lcov> <lcov-or-dir>...  the lcov reports of the sharded unit run merged into one (coverage/cli.mjs; the managed CI coverage job)
 //   starci app new service <dir> <name> [--inject <Decorator>=<module>:<Type> | <Class>=<module>]... [--cwd <dir>]
 //                                            a back-end `<name>.service.ts` and its `<name>.service.spec.ts` skeleton (scaffold/service.mjs; <dir> is
@@ -390,7 +390,7 @@ async function scaffoldMain(opts, { cwd, edition = 'full', presets, lock, stdout
   const [name, ...extra] = opts.positional;
   if (!name || extra.length) throw new Error('starci app scaffold takes `<name> [--into <dir>] [--edition full|lite] [--registry-visibility public|private]`');
   const { root: created, files } = scaffoldApp({ name, into: path.resolve(cwd, opts.into ?? '.'), edition, presets: presets ?? await scaffoldPresets(), ...(opts['registry-visibility'] === undefined ? {} : { registryVisibility: opts['registry-visibility'] }), ...(lock ? { lock } : {}) });
-  out(`starci app scaffold: created ${created} (${files.length} files); next: npm ci, then starci app lint\n`);
+  out(`starci app scaffold: created ${created} (${files.length} files); next: starci npm ci (the lockfile, then the git hooks through npm run prepare; after a raw npm ci --ignore-scripts run npm run prepare), then starci app lint\n`);
   return 0;
 }
 

@@ -89,6 +89,7 @@ rules:
         - HFS_E2E_IN_AUTOMATIC_GATE
         - BE_TEST_TOPOLOGY
         - BE_CONTRACT_UNGUARDED
+        - BE_UNIT_SPEC_NOT_STAGED
         - BE_SPEC_QUALITY
         - BE_CLI_COMMAND_SHAPE
         - BE_INTEGRATION_SPEC_MISSING
@@ -269,6 +270,7 @@ rules:
         - BE_SPEC_QUALITY
         - BE_TEST_TOPOLOGY
         - BE_CONTRACT_UNGUARDED
+        - BE_UNIT_SPEC_NOT_STAGED
         - BE_AMBIENT_CLOCK
       manual:
         - Confirm each constructor dependency of the service has its mandatory cases in the spec, not only a call count.
@@ -294,6 +296,7 @@ rules:
         - BE_SPEC_QUALITY
         - BE_TEST_TOPOLOGY
         - BE_CONTRACT_UNGUARDED
+        - BE_UNIT_SPEC_NOT_STAGED
       manual: []
     relatedExamples: [service-spec]
   - id: BE-TEST-7
@@ -355,6 +358,7 @@ rules:
         - BE_SPEC_QUALITY
         - BE_TEST_TOPOLOGY
         - BE_CONTRACT_UNGUARDED
+        - BE_UNIT_SPEC_NOT_STAGED
         - BE_CLI_COMMAND_SHAPE
       manual: []
     relatedExamples: []
@@ -388,6 +392,7 @@ rules:
         - BE_SPEC_QUALITY
         - BE_TEST_TOPOLOGY
         - BE_CONTRACT_UNGUARDED
+        - BE_UNIT_SPEC_NOT_STAGED
         - BE_SPEC_FORM_ALL_ROLES
       manual:
         - Review that titles and assertions describe the required behavior.
@@ -483,6 +488,7 @@ rules:
         - BE_APP_BUSINESS_ROLE
         - BE_TEST_TOPOLOGY
         - BE_CONTRACT_UNGUARDED
+        - BE_UNIT_SPEC_NOT_STAGED
         - BE_SPEC_QUALITY
         - BE_APP_BOOT_PROOF_MISSING
       manual:
@@ -526,6 +532,7 @@ rules:
         - HFS_SONAR_CONFIG
         - BE_TEST_TOPOLOGY
         - BE_CONTRACT_UNGUARDED
+        - BE_UNIT_SPEC_NOT_STAGED
         - HFS_COVERAGE_SCOPE_DRIFT
         - HFS_COVERAGE_BELOW
       manual:

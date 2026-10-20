@@ -74,7 +74,7 @@ R164 `HFS_IMAGE_UNPINNED` applies to every component of a product with multiple 
 
 <a id="r165"></a>
 
-R165 `HFS_SERVICE_STACK_DECLARATION` requires every API and worker app of that product to have a component with the same name and `role: service`, in lite and full.
+R165 `HFS_SERVICE_STACK_DECLARATION` requires every API and worker app of that product to have a `role: service` component, in lite and full: the component named like the app, or the component whose `environments.<env>.deploy.images.<component>.app` (in any environment) names the app. A deployed service named after its stack (`shop-api: {app: api}`) keeps its name; renaming it to the app would rename the live service and put the short alias on a shared network (R294).
 
 `.starcistacks/application-stacks.yaml` declares every service as a component with `role: service` (`HFS_SERVICE_STACK_DECLARATION`,
 R165). Every `image` of a product with more than one service is pinned (`HFS_IMAGE_UNPINNED`, R164): a digest

@@ -13369,6 +13369,17 @@ BE_TEST_TOPOLOGY:
   owner: op-retry
   kind: check-finding
 
+BE_UNIT_SPEC_NOT_STAGED:
+  title: "A new back-end logic file is committed without its unit spec"
+  title_vi: "Tệp logic back-end mới được commit mà không có unit spec"
+  meaning_vi: "Commit thêm `<file>`, một tệp `<name>.<role>.ts` có vai trò logic mà unit coverage đo ở mức 100 mỗi tệp, nhưng index không có `<name>.<role>.spec.ts` bên cạnh nó: mã được viết trước, spec để sau."
+  causes_vi:
+    - "Agent viết mã trước rồi định sửa lint và spec sau, thay vì chạy vòng op `starci gate read` → mã + spec → `starci gate run`"
+    - "Spec đã viết nhưng chưa được stage cùng tệp"
+  nextStep_vi: "Viết `<name>.<role>.spec.ts` bên cạnh tệp trong cùng thay đổi, chạy `starci gate run --root <app> --changed <files> --tests <pattern>`, rồi stage cả hai tệp và commit lại qua hook. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không thêm ngoại lệ."
+  owner: op-retry
+  kind: check-finding
+
 BE_CONTRACT_UNGUARDED:
   title: "A fake serves payload fixtures that no sandbox contract spec compares with the real provider"
   title_vi: "Fixture của fake chưa có contract spec bảo vệ"
@@ -13577,6 +13588,17 @@ FE_SOURCE_FORM:
     - "Thiếu JSDoc hoặc có emoji"
     - "Có chữ tiếng Việt trong mã nguồn ngoài danh mục i18n hoặc slot fixture i18n"
   nextStep_vi: "Chuyển tệp về đúng thư mục tầng, đổi tên export theo thư mục và thêm JSDoc tiếng Anh. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không thêm ngoại lệ."
+  owner: op-retry
+  kind: check-finding
+
+HFS_HOOKS_NOT_INSTALLED:
+  title: "The hooks folder core.hooksPath names is missing or empty in this checkout"
+  title_vi: "Hook Git chưa được cài trong bản checkout này"
+  meaning_vi: "`core.hooksPath` trỏ tới `.husky/_` (hoặc `.husky`) nhưng thư mục đó không tồn tại hoặc không có hook đã cài (không có tệp điều phối `h` của husky) trong bản checkout này, nên Git không chạy pre-commit và pre-push: mọi commit bỏ qua lint và spec. Một worktree dùng chung cấu hình Git của clone chính nhưng `.husky/_` chỉ được husky tạo ở nơi đã cài phụ thuộc có chạy lifecycle script."
+  causes_vi:
+    - "Cài phụ thuộc với `--ignore-scripts` nên script `prepare` (husky) không chạy"
+    - "Worktree mới tạo chưa từng chạy husky; runtime chỉ ghi hook riêng của nó vào `.husky/_`"
+  nextStep_vi: "Chạy `starci npm ci` ở gốc app (lệnh này chạy trình cài hook husky `prepare` của app kể cả khi lifecycle script bị bỏ qua), rồi commit lại qua hook; không dùng `--no-verify`. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
   owner: op-retry
   kind: check-finding
 
@@ -14902,10 +14924,10 @@ HFS_IMAGE_UNPINNED:
 HFS_SERVICE_STACK_DECLARATION:
   title: "Each service app is a service component of the stack"
   title_vi: "Ứng dụng dịch vụ chưa được khai báo trong stack"
-  meaning_vi: "Một ứng dụng api hoặc worker dưới `be/apps/<service>/` của sản phẩm nhiều dịch vụ không có thành phần `role: service` cùng tên trong `.starcistacks/application-stacks.yaml`."
+  meaning_vi: "Một ứng dụng api hoặc worker dưới `be/apps/<service>/` của sản phẩm nhiều dịch vụ không có thành phần `role: service` trong `.starcistacks/application-stacks.yaml`: không có thành phần cùng tên, và không có thành phần nào được `environments.<env>.deploy.images.<component>.app` gắn với ứng dụng đó."
   causes_vi:
     - "Vi phạm luật R165: mọi dịch vụ của sản phẩm nhiều dịch vụ là một thành phần `role: service` của stack (image riêng `<repo>/<service>:<x.y.z>`, build từ Dockerfile của app)."
-  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: thêm thành phần cùng tên app (role service, image đã ghim, file compose và cổng của môi trường)."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: thêm thành phần cùng tên app (role service, image đã ghim, file compose và cổng của môi trường), hoặc gắn thành phần dịch vụ đang chạy với app qua `environments.<env>.deploy.images.<component>.app` thay vì đổi tên dịch vụ."
   owner: op-retry
   kind: check-finding
 

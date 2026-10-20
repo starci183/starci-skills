@@ -230,6 +230,8 @@ In lite and full, `BE_TEST_TOPOLOGY` enforces back-end test topology: colocated 
 
 `BE_CONTRACT_UNGUARDED` rejects a network fake's payload fixtures when no contract spec for that provider references those fixtures and compares the real provider's shape with the fixture's shape through the imported world `shapeOf` helper. A matching sandbox contract guards the fixtures; a fake without payload fixtures needs no such guard.
 
+`BE_UNIT_SPEC_NOT_STAGED` is the commit-time half of the same topology: `starci app hygiene`, run by the managed pre-commit hook, refuses a back-end logic file the index adds when the coverage scope measures it (a role of `ruleParams.be.logicRoles` below a measured root) and its `<name>.<role>.spec.ts` is not staged beside it, naming the file. Write the spec in the same change and stage both; a file that already exists is judged by the coverage gate.
+
 <a id="r142"></a>
 ### Ambient identifier ownership
 

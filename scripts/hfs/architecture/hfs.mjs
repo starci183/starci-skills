@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { lsFiles } from '../../api/git/ls-files.mjs'; import { revParseQuery } from '../../api/git/rev-parse-query.mjs'; import { configGet } from '../../api/git/config-get.mjs'; import { gitOutputOf } from '../../lib/git.mjs';
 import { braceVariants } from '../../lib/glob.mjs';
+import { hooksDirState } from '../../lib/git-hooks-dir.mjs';
 import { createSlotResolver, loadSlotManifest, openHfs } from '../slots.mjs';
 import { isFeTestPath } from '../rules/fe-no-tests.mjs';
 import { byCodeUnit } from '../../lib/list.mjs';
@@ -21,6 +22,7 @@ export const HFS_RULE_IDS = [
   'HFS_APPS_REQUIRED',
   'HFS_APP_LAYOUT_INVALID',
   'HFS_E2E_IN_AUTOMATIC_GATE',
+  'HFS_HOOKS_NOT_INSTALLED',
   'HFS_HOOKS_PATH_REDIRECTED',
   'HFS_MODULE_TIER_INVALID',
   'HFS_PACKAGE_MANAGER_MIXED',
@@ -114,15 +116,28 @@ function ownsGitTopLevel(root) {
   }
 }
 
-/** A directory that is not the top level of its own work tree has no hooks of its own: the check is not applicable there. */
+/**
+ * The hooks of the checked root: core.hooksPath stays husky's (HFS_HOOKS_PATH_REDIRECTED), and the folder it names holds
+ * installed hooks in this checkout (HFS_HOOKS_NOT_INSTALLED, scripts/lib/git-hooks-dir.mjs). An unset key judges nothing: a CI
+ * checkout installs without hooks. A directory that is not the top level of its own work tree has no hooks of its own: the
+ * check is not applicable there.
+ */
 function hooksPathNotRedirected({ root, finding }) {
   if (!ownsGitTopLevel(root)) return { status: 'not-applicable', reason: 'the checked root is not the top level of its own Git work tree, so it has no hooks of its own' };
   const set = configGet(root, 'core.hooksPath', { local: true });
   if (!set.ok) return { status: 'checked' }; // key not set: nothing is redirected
-  const value = set.stdout;
-  if (value && !HUSKY_HOOKS_PATH.test(value.replaceAll('\\', '/')))
+  const value = String(set.stdout ?? '').trim();
+  if (!value) return { status: 'checked' };
+  if (!HUSKY_HOOKS_PATH.test(value.replaceAll('\\', '/'))) {
     finding('HFS_HOOKS_PATH_REDIRECTED', '.git/config', `core.hooksPath is set to ${value} in this clone. Unset it (git config --local --unset core.hooksPath) and let husky own the hooks; a redirected path skips the pre-commit and pre-push gates.`);
-  return { status: 'checked' };
+    return { status: 'checked' };
+  }
+  const hooks = hooksDirState(root, value);
+  if (hooks.state !== 'installed') {
+    const what = { missing: 'does not exist', empty: 'holds no installed hook (husky never ran here)', unreadable: `cannot be read (${hooks.error})` }[hooks.state];
+    finding('HFS_HOOKS_NOT_INSTALLED', value, `core.hooksPath is ${value}, but that folder ${what} in this checkout, so git runs no pre-commit or pre-push gate and a commit skips lint and specs. Install the hooks before committing: run \`starci npm ci\` at the app root (it runs the app's hook installer \`npm run prepare\` even when lifecycle scripts are ignored), or \`npm run prepare\`; an install with --ignore-scripts alone never installs them.`);
+  }
+  return { status: 'checked', hooks: hooks.state };
 }
 
 /** The tracked paths under the given root, relative to it: the pathspec keeps a nested directory from listing the paths of its enclosing clone. */

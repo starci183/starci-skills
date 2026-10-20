@@ -418,7 +418,7 @@ starci app explain be/src/modules/domain/order/index.ts
 
 ### starci app hygiene
 
-judge staged worktree metadata, stack files and plaintext secrets
+judge staged worktree metadata, stack files, plaintext secrets and new logic files without a spec
 
 exit: 0 clean; 1 findings; 2 refusal or bad usage
 
@@ -3114,8 +3114,11 @@ Conventions:
 - npm ci installs the lockfile into this worktree's real node_modules and never uses a junction or symbolic link
 - package.json and package-lock.json must be clean before the run
 - dependency installs run one at a time under the host lock and never use npm install
+- after an install, a core.hooksPath naming a missing or empty folder runs the root husky prepare (npm run prepare), lifecycle scripts ignored or not
+- the receipt's hooks field reports the git hooks as installed, repaired, not-set or not-declared
+- a hooks path still naming a missing or empty folder after the installer ran fails the verb
 
-exit: 0 the clean lockfile was installed; 1 npm or the host lock failed; 2 the worktree or install state was refused
+exit: 0 the clean lockfile was installed; 1 npm, the host lock or the git hooks install failed; 2 the worktree or install state was refused
 
 json: starci/npm-ci@1
 
@@ -3151,8 +3154,11 @@ Conventions:
 - each target StarCi pin is reported as moved (with its workspace), skipped when no package.json declares it, or refused with a reason
 - a failed canon phase exits nonzero even when the first CLI install succeeded
 - installs always use --save-exact and report the package.json and package-lock.json diff stat
+- after an install, a core.hooksPath naming a missing or empty folder runs the root husky prepare (npm run prepare), lifecycle scripts ignored or not
+- the receipt's hooks field reports the git hooks as installed, repaired, not-set or not-declared
+- a hooks path still naming a missing or empty folder after the installer ran fails the verb
 
-exit: 0 exact dependencies and any requested canon pins were installed; 1 npm, Git, target canon loading or the host lock failed; 2 the package, target pin or worktree was refused
+exit: 0 exact dependencies and any requested canon pins were installed; 1 npm, Git, target canon loading, the host lock or the git hooks install failed; 2 the package, target pin or worktree was refused
 
 json: starci/npm-install@1
 

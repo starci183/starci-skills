@@ -3,8 +3,10 @@
 // .starcistacks must not be a plaintext secret (only *.enc is sealed). It is also the secrets guard of the commit: every staged file, in
 // any tree, is read from the index and judged with the one secret judgement of `starci app check` (scripts/hfs/rules/secrets.mjs: a secret by
 // being, an .enc that is no sops envelope, a line that matches a secret pattern), so no plaintext secret reaches the history whatever
-// .gitignore says (`git add -f`, a path tracked before a rule tightened). There is no override. The pre-commit hook judges the staged
-// files; scripts/gates/hfs-sync.mjs judges every tracked file.
+// .gitignore says (`git add -f`, a path tracked before a rule tightened). There is no override. At an HFS app root (hfs.json) it also
+// refuses a back-end logic file the index adds without its unit spec beside it (BE_UNIT_SPEC_NOT_STAGED,
+// scripts/hfs/rules/staged-specs.mjs over the coverage scope), naming the file. The pre-commit hook judges the staged files;
+// scripts/gates/hfs-sync.mjs judges every tracked file.
 //
 // Run inside a full runtime checkout — the repository under judgment is the checkout — it also reports the
 // state-root ledger finding of that checkout's scripts/housekeeping/hk-orphan-ledgers.mjs: LEDGER_ORPHAN_STATE_ROOT. Any other repository — a product repo,
@@ -14,6 +16,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { secretFileFindings } from '../runtime/scripts/hfs/rules/secrets.mjs';
+import { stagedSpecFindings } from '../runtime/scripts/hfs/rules/staged-specs.mjs';
+import { loadSlotManifest } from '../runtime/scripts/hfs/slots.mjs';
 import { runGit } from '../runtime/scripts/api/git/lib.mjs';
 
 // One git call through the runtime's git owner (scripts/api/git/lib.mjs): stdout, or the failure thrown the way execFileSync threw it (error.status carries the exit code). The caller's own env is passed on unchanged: a hook runs with GIT_INDEX_FILE set, which the staged reads must keep seeing.
@@ -64,6 +68,15 @@ export const stagedFiles = cwd => gitList(cwd, ['diff', '--cached', '--name-only
 
 /** Every tracked file. */
 export const trackedFiles = cwd => gitList(cwd, ['ls-files', '-z']);
+
+/** Files the index adds for the next commit. */
+const addedFiles = cwd => gitList(cwd, ['diff', '--cached', '--name-only', '--diff-filter=A', '-z']);
+
+/** The new back-end logic files staged without their unit spec, at an HFS app root only (a repository without hfs.json has no slots). */
+function missingSpecFindings(cwd, { added = addedFiles(cwd), indexed, manifest } = {}) {
+  if (!fs.existsSync(path.join(cwd, 'hfs.json')) || !added.some(file => file.startsWith('be/'))) return [];
+  return stagedSpecFindings(manifest ?? loadSlotManifest(), added, indexed ?? new Set(trackedFiles(cwd)));
+}
 
 const MAX_STAGED_BYTES = 1024 * 1024;
 
@@ -125,9 +138,11 @@ async function ledgerHygieneFindings(cwd = process.cwd()) {
   }
 }
 
-/** `starci app hygiene`: checks staged files plus state-root ledger findings when reachable; returns the exit code. */
+/** `starci app hygiene`: checks staged files (for the staged run also the new logic files without a spec) plus state-root ledger findings when reachable; returns the exit code. */
 export async function runWorkHygiene({ cwd = process.cwd(), out = line => process.stdout.write(`${line}\n`), files } = {}) {
-  const { checked, findings } = judge(cwd, files ?? stagedFiles(cwd));
+  const judged = judge(cwd, files ?? stagedFiles(cwd));
+  const { checked } = judged;
+  const findings = [...judged.findings, ...(files ? [] : missingSpecFindings(cwd))];
   const ledgerFindings = await ledgerHygieneFindings(cwd);
   const all = [...findings, ...ledgerFindings];
   for (const finding of all) out(`${finding.code} ${finding.file} ${finding.message}`);

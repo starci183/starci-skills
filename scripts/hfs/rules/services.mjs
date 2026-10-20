@@ -5,7 +5,8 @@
 //                                   exists only at be/apps/<service>/ (fe/apps/<app>/Dockerfile is a front end's);
 //   R164 HFS_IMAGE_UNPINNED         in a multi-service product every component image of application-stacks.yaml is a digest or an exact
 //                                   version (x.y.z), never a missing tag, `latest`, a branch word or a major/minor-only tag;
-//   R165 HFS_SERVICE_STACK_DECLARATION  each api or worker app of a multi-service product is a `role: service` component of the stack;
+//   R165 HFS_SERVICE_STACK_DECLARATION  each api or worker app of a multi-service product is a `role: service` component of the stack,
+//                                   named after the app or mapped to it by `environments.<env>.deploy.images.<component>.app`;
 //   R166 HFS_EVENT_CONTRACT         the async contract is vendored: `be/contracts/<service>/events.json` equals the provider's
 //                                   `apps/<service>/src/events.ts` table (an event may declare `compensates: "<event>"`), every event a
 //                                   consumer's `apps/<app>/src/consumes.ts` names exists in that snapshot at the same version;
@@ -16,6 +17,7 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { findStackDeclaration } from '../../lib/stack-declaration.mjs';
+import { deployImageApps } from '../stack-deploy-config.mjs';
 import { loadTypescript } from '../../lib/package-at.mjs';
 import { propertyText } from '../../lib/ts-ast.mjs';
 import { folded, readEventClasses, snapshotText } from '../../lib/event-contract.mjs';
@@ -105,7 +107,17 @@ function imagePinFindings({ repoRoot, repo }) {
 
 // ------------------------------------------------------------------------------------------------ R165 stack declaration
 
-/** Findings of R165: each service app of a multi-service product is a `role: service` component. */
+/**
+ * The component names that stand for `app`: the app's own name, then every `environments.<env>.deploy.images` key whose `app` is
+ * the app (the one tie between component and app the declaration states, read by scripts/hfs/stack-deploy-config.mjs). A product
+ * whose deployed service is named after its stack (`shop-api: {app: api}`) keeps that name; renaming it would rename the live
+ * service and put the short app alias on a shared network (R294).
+ */
+function componentNamesOf(doc, app) {
+  return [...new Set([app, ...deployImageApps(doc).filter((tie) => tie.app === app).map((tie) => tie.service)])];
+}
+
+/** Findings of R165: each service app of a multi-service product is a `role: service` component, named after it or mapped to it by deploy.images. */
 function serviceStackFindings({ repoRoot, repo }) {
   const services = servicesOf(repo);
   if (services.length < 2) return [];
@@ -115,9 +127,11 @@ function serviceStackFindings({ repoRoot, repo }) {
   const file = '.starcistacks/application-stacks.yaml';
   const findings = [];
   for (const app of services) {
-    const component = components[app.name];
-    if (component === null || typeof component !== 'object') findings.push(found(SERVICE_STACK_DECLARATION, file, `${file} declares no component \`${app.name}\` for the ${app.kind} app be/apps/${app.name}; every service of a multi-service product is a \`role: service\` component (own image \`<repo>/${app.name}:<exact version>\`, built from be/apps/${app.name}/Dockerfile).`, { app: app.name }));
-    else if (component.role !== 'service') findings.push(found(SERVICE_STACK_DECLARATION, file, `${file} components.${app.name} is the stack's face of be/apps/${app.name} and must be \`role: service\`, not \`${String(component.role)}\`.`, { app: app.name }));
+    const names = componentNamesOf(declaration.doc, app.name);
+    const declared = names.filter((name) => components[name] !== null && typeof components[name] === 'object');
+    if (declared.some((name) => components[name].role === 'service')) continue;
+    if (!declared.length) findings.push(found(SERVICE_STACK_DECLARATION, file, `${file} declares no component for the ${app.kind} app be/apps/${app.name}: none named \`${app.name}\` and none mapped to it by \`environments.<env>.deploy.images.<component>.app: ${app.name}\`; every service of a multi-service product is a \`role: service\` component (own image at an exact version, built from be/apps/${app.name}/Dockerfile).`, { app: app.name }));
+    else findings.push(found(SERVICE_STACK_DECLARATION, file, `${file} ${declared.map((name) => 'components.' + name).join(', ')} is the stack's face of be/apps/${app.name} and must be \`role: service\`, not \`${String(components[declared[0]].role)}\`.`, { app: app.name, components: declared }));
   }
   return findings;
 }

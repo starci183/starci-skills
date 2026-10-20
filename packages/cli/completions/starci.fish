@@ -65,7 +65,7 @@ complete -c starci -n '__starci_needs_verb app' -a 'coverage' -d 'merge the cove
 complete -c starci -n '__starci_needs_verb app' -a 'db' -d 'preview or apply database migrations, encrypted backups and guarded linked resets'
 complete -c starci -n '__starci_needs_verb app' -a 'emit' -d 'emit backend GraphQL, operation and event contract snapshots'
 complete -c starci -n '__starci_needs_verb app' -a 'explain' -d 'explain which HFS slot owns one app-relative path'
-complete -c starci -n '__starci_needs_verb app' -a 'hygiene' -d 'judge staged worktree metadata, stack files and plaintext secrets'
+complete -c starci -n '__starci_needs_verb app' -a 'hygiene' -d 'judge staged worktree metadata, stack files, plaintext secrets and new logic files without a spec'
 complete -c starci -n '__starci_needs_verb app' -a 'lint' -d 'lint both app sides and report repository, ESLint and stylelint findings together'
 complete -c starci -n '__starci_needs_verb app' -a 'new' -d 'create a canonical service, unit spec or app image definition'
 complete -c starci -n '__starci_needs_verb app' -a 'release' -d 'run the release gates and write the L4 record and tag, or push branch and tag atomically'

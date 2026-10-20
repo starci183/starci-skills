@@ -16,6 +16,9 @@ conventions:
   - each target StarCi pin is reported as moved (with its workspace), skipped when no package.json declares it, or refused with a reason
   - a failed canon phase exits nonzero even when the first CLI install succeeded
   - installs always use --save-exact and report the package.json and package-lock.json diff stat
+  - after an install, a core.hooksPath naming a missing or empty folder runs the root husky prepare (npm run prepare), lifecycle scripts ignored or not
+  - the receipt's hooks field reports the git hooks as installed, repaired, not-set or not-declared
+  - a hooks path still naming a missing or empty folder after the installer ran fails the verb
 flags:
   - {name: dev, type: boolean, summary: save the CLI and explicit packages as development dependencies}
   - {name: canon, type: boolean, summary: install the target CLI and move its declared exact StarCi canon pins}
@@ -23,7 +26,7 @@ positional:
   - {name: package, required: false, variadic: true}
 exit:
   "0": "exact dependencies and any requested canon pins were installed"
-  "1": "npm, Git, target canon loading or the host lock failed"
+  "1": "npm, Git, target canon loading, the host lock or the git hooks install failed"
   "2": "the package, target pin or worktree was refused"
 json: starci/npm-install@1
 examples:

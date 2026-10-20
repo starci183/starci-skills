@@ -9,12 +9,15 @@ conventions:
   - npm ci installs the lockfile into this worktree's real node_modules and never uses a junction or symbolic link
   - package.json and package-lock.json must be clean before the run
   - dependency installs run one at a time under the host lock and never use npm install
+  - after an install, a core.hooksPath naming a missing or empty folder runs the root husky prepare (npm run prepare), lifecycle scripts ignored or not
+  - the receipt's hooks field reports the git hooks as installed, repaired, not-set or not-declared
+  - a hooks path still naming a missing or empty folder after the installer ran fails the verb
 flags:
   - {name: workspace, type: list, summary: npm workspaces to install}
 positional: []
 exit:
   "0": "the clean lockfile was installed"
-  "1": "npm or the host lock failed"
+  "1": "npm, the host lock or the git hooks install failed"
   "2": "the worktree or install state was refused"
 json: starci/npm-ci@1
 examples:

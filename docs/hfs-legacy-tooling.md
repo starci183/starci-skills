@@ -4,7 +4,7 @@ Owner: knowledge/hfs/rules.yaml
 
 ## CI and hooks
 
-In both lite and full apps, `HFS_CI_MISSING_CANON` means that the CI workflow does not run `starci app lint`, directly or through a package script that actually invokes it, or explicitly selects a CLI version different from the canon pin. Run the pinned lint entry in CI. `HFS_HOOKS_PATH_REDIRECTED` means the clone redirects `core.hooksPath` away from husky; use `.husky/_` or remove that local override.
+In both lite and full apps, `HFS_CI_MISSING_CANON` means that the CI workflow does not run `starci app lint`, directly or through a package script that actually invokes it, or explicitly selects a CLI version different from the canon pin. Run the pinned lint entry in CI. `HFS_HOOKS_PATH_REDIRECTED` means the clone redirects `core.hooksPath` away from husky; use `.husky/_` or remove that local override. `HFS_HOOKS_NOT_INSTALLED` means `core.hooksPath` names husky's folder but this checkout has none, or one without husky's dispatcher `h` (a linked worktree, an install with `--ignore-scripts`), so git runs no pre-commit or pre-push gate; run `starci npm ci` at the app root, which runs the app's declared hook installer (its husky `prepare` script) after every install. An unset `core.hooksPath`, as in a CI checkout, is not judged.
 
 ## Dependency consistency
 

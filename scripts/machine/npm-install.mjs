@@ -9,7 +9,8 @@ import { revParseQuery } from '../api/git/rev-parse-query.mjs';
 import { runNpm } from '../api/npm/run-npm.mjs';
 import { withoutSeatEnv } from '../lib/seat-env.mjs';
 import { refusal as verbRefusal, resultOk as success, resultOutput as output } from '../lib/verb-call.mjs';
-import { ownedTreeRefusal, linkedNodeModules, lockedValue } from './npm-ci.mjs';
+import { ownedTreeRefusal, linkedNodeModules, lockedValue, withHooks } from './npm-ci.mjs';
+import { ensureGitHooks } from './npm-hooks.mjs';
 import { underHostLock, hostLockRetryBudget } from './verb-lock.mjs';
 import { canonInstallPlan } from './npm-install-locations.mjs';
 
@@ -168,7 +169,8 @@ export async function npmInstall(ctx, deps = {}) {
     lstat: deps.lstat ?? fs.lstatSync,
     lock: deps.underHostLock ?? underHostLock,
     now: deps.now ?? Date.now,
-    revParse: deps.revParse ?? revParseQuery
+    revParse: deps.revParse ?? revParseQuery,
+    hooks: deps.hooks ?? ensureGitHooks
   };
   const role = ctx?.role ?? 'owner';
   const unowned = ownedTreeRefusal(cwd, role, api.revParse, refusal);
@@ -211,7 +213,7 @@ export async function npmInstall(ctx, deps = {}) {
 
       return installCanonFamily({ api, cwd, target, requested, pinResults, packages, finish, run });
     }, deps);
-    return lockedValue(locked);
+    return withHooks(lockedValue(locked), cwd, api.hooks, ctx?.env, refusal);
   } catch (error) {
     return refusal(cwd, `host lock failed: ${String(error?.message ?? error)}`, 1, { packages: resolved.packages });
   }
