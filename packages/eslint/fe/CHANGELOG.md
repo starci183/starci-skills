@@ -1,5 +1,8 @@
 # Changelog
 
+## 8.4.20 - 2026-10-20
+- Changed: bundled runtime copies carry the HFS hooks-installed check (`HFS_HOOKS_NOT_INSTALLED`); lint behavior is unchanged; canon pins follow the matching package cohort.
+
 ## 8.4.19 - 2026-10-20
 - Fixed: bundled runtime source clears the SonarCloud code smells of alpha.23 (regex complexity, concise classes, string prefix and suffix checks, block braces, optional chaining, export-from, default parameters, synchronous awaits, dead stores) without behavior change; canon pins follow the matching package cohort.
 

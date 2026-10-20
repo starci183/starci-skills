@@ -1,5 +1,11 @@
 # Changelog
 
+## 4.7.14 - 2026-10-20
+- Added: `starci app hygiene` (the managed pre-commit hook) refuses a back-end logic file the index adds without its `<name>.<role>.spec.ts` beside it, naming the file (`BE_UNIT_SPEC_NOT_STAGED`, R47); the measured roles and roots come from the coverage scope.
+- Added: `starci app check` reports `HFS_HOOKS_NOT_INSTALLED` (R13, error) when a set `core.hooksPath` names a hooks folder that is missing or holds no husky dispatcher in the checkout, with the install remedy.
+- Fixed: R165 `HFS_SERVICE_STACK_DECLARATION` accepts, for an api or worker app, a `role: service` component named after it or mapped to it by `environments.<env>.deploy.images.<component>.app` in any environment, so a deployed service named after its stack (`shop-api: {app: api}`) needs no rename onto a shared network alias.
+- Changed: the scaffold's next step names `starci npm ci`, which installs the lockfile and then the app's git hooks; canon pins follow the matching package cohort.
+
 ## 4.7.13 - 2026-10-20
 - Fixed: the lite CI template sets NODE_OPTIONS on the database migration check step; ci-standard heap.steps lists `npm run db:lint`.
 - Fixed: bundled runtime source clears the SonarCloud code smells of alpha.23 (regex complexity, concise classes, string prefix and suffix checks, block braces, optional chaining, export-from, default parameters, synchronous awaits, dead stores) without behavior change; canon pins follow the matching package cohort.

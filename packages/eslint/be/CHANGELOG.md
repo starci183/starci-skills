@@ -1,5 +1,8 @@
 # Changelog
 
+## 3.4.21 - 2026-10-20
+- Changed: bundled runtime copies carry the HFS hooks-installed check (`HFS_HOOKS_NOT_INSTALLED`) the R47 staged-spec law and the R165 component-to-app law; lint behavior is unchanged; canon pins follow the matching package cohort.
+
 ## 3.4.20 - 2026-10-20
 - Changed: republished for the complete alpha.24 cohort; 3.4.19 was published alone by an interrupted publication and bundles a canon-pins copy taken before the cohort was complete, so it is not used.
 

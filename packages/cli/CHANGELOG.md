@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.7.14 - 2026-10-20
+- Changed: the `starci npm ci` and `starci npm install` catalog entries state that a finished install also installs the checkout's git hooks (the declared husky `prepare`, run when the hooks folder is missing or empty, lifecycle scripts ignored or not) and reports them; `starci app hygiene` names the staged spec check; pins @starci/hfs 4.7.14.
+
 ## 1.7.13 - 2026-10-20
 - Fixed: the generated runtime installer selects 1.0.0-alpha.24; pins @starci/hfs 4.7.13 for the smell-free bundled source.
 

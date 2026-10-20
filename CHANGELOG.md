@@ -8,13 +8,20 @@ until every S* row in `docs/goal.md` holds with fresh evidence, then `1.0.0` fre
 
 ## [1.0.0-alpha.24] — 2026-10-20
 
-Code-quality release: the runtime's SonarCloud project goes from 175 open code smells (3 critical) at alpha.23 to none.
+Code-quality release: the runtime's SonarCloud project goes from 175 open code smells (3 critical) at alpha.23 to none, and a coding agent can no longer commit code first and fix lint or specs afterwards.
+
+### Added
+- `starci npm ci` and `starci npm install` install the checkout's git hooks after every finished install, skipped and workspace installs included: when `core.hooksPath` names a missing or empty folder and the root `prepare` script runs husky, `npm run prepare` runs even when lifecycle scripts were ignored; the receipt reports the hooks, and hooks still missing fail the verb. NIVO worktrees installed with `npm ci --ignore-scripts` committed 8 branches without any pre-commit check.
+- `starci app check` reports `HFS_HOOKS_NOT_INSTALLED` (R13) when a set `core.hooksPath` names a hooks folder that is missing or holds no husky dispatcher in the checkout.
+- `starci app hygiene`, run by the managed pre-commit hook, refuses a new back-end logic file (a role of the coverage scope below a measured root) staged without its unit spec beside it, naming the file (`BE_UNIT_SPEC_NOT_STAGED`, R47).
+- Every code-writing delegation, a Kernel op or a plain-chat subagent alike, runs the op loop of `knowledge/op-gate.yaml` (`starci gate read`, code with specs, `starci gate run`, fix, report both JSON documents); `skills/starci/references/code-delegation.md` holds the reusable brief.
 
 ### Changed
 - The local `sonar-rules` gate enforces every Sonar rule id SonarCloud raised on alpha.23 that has a type-free local port, calibrated against those findings, so the smells cannot return unseen before the next scan.
-- Candidate package pins select HFS 4.7.13, CLI 1.7.13, back-end canon 3.4.20 and front-end canon 8.4.19; CLI depends exactly on its matching HFS package.
+- Candidate package pins select HFS 4.7.14, CLI 1.7.14, back-end canon 3.4.21 and front-end canon 8.4.20; CLI depends exactly on its matching HFS package.
 
 ### Fixed
+- R165 `HFS_SERVICE_STACK_DECLARATION` accepts a `role: service` component tied to the app by `environments.<env>.deploy.images.<component>.app` (any environment) as well as one named like the app; NIVO v0.3.0 declares `nivo-api: {app: api}`, and renaming that component to `api` would rename the live service and put the short alias on the shared edge network (R294).
 - The rendered lite app CI gives its database migration check (`npm run db:lint`, a full `starci app check`) the same raised Node heap as the other heavy steps; NIVO v0.2.6 candidate CI ran out of memory there.
 - Every open SonarCloud code smell of alpha.23 is refactored away without behavior change: complex regular expressions are composed from named parts, character classes are concise, literal prefix and suffix tests use `startsWith`/`endsWith`, multi-line blocks have braces, optional chaining and `export … from` replace their long forms, default parameters come last, `await` is gone from synchronous calls and dead stores are removed.
 - `starci work draw-source` awaits its entry at the top level: its typecheck half moved to `scripts/work/draw/draw-typecheck.mjs`, so `draw-grammar.mjs` no longer imports the entry module.
