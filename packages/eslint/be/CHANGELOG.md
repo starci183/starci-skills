@@ -1,5 +1,8 @@
 # Changelog
 
+## 3.4.22 - 2026-10-20
+- Changed: republished for the complete 1.7.14 cohort; 3.4.21 was published while @starci/hfs 4.7.14 and @starci/cli 1.7.14 stopped at their clean proof, so it is a superseded orphan and is not used. Content equals 3.4.21 apart from the canon pins.
+
 ## 3.4.21 - 2026-10-20
 - Changed: bundled runtime copies carry the HFS hooks-installed check (`HFS_HOOKS_NOT_INSTALLED`) the R47 staged-spec law and the R165 component-to-app law; lint behavior is unchanged; canon pins follow the matching package cohort.
 

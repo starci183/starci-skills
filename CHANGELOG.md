@@ -18,7 +18,7 @@ Code-quality release: the runtime's SonarCloud project goes from 175 open code s
 
 ### Changed
 - The local `sonar-rules` gate enforces every Sonar rule id SonarCloud raised on alpha.23 that has a type-free local port, calibrated against those findings, so the smells cannot return unseen before the next scan.
-- Candidate package pins select HFS 4.7.14, CLI 1.7.14, back-end canon 3.4.21 and front-end canon 8.4.20; CLI depends exactly on its matching HFS package.
+- Candidate package pins select HFS 4.7.14, CLI 1.7.14, back-end canon 3.4.22 and front-end canon 8.4.21 (3.4.21 and 8.4.20 were published alone by an interrupted publication and are superseded); CLI depends exactly on its matching HFS package.
 
 ### Fixed
 - R165 `HFS_SERVICE_STACK_DECLARATION` accepts a `role: service` component tied to the app by `environments.<env>.deploy.images.<component>.app` (any environment) as well as one named like the app; NIVO v0.3.0 declares `nivo-api: {app: api}`, and renaming that component to `api` would rename the live service and put the short alias on the shared edge network (R294).
