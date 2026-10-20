@@ -12,6 +12,7 @@ import { ownRules } from './sonar-own-rules.mjs';
 
 const COGNITIVE_COMPLEXITY_LIMIT = 15;
 const MAX_PARAMETERS = 7;
+const REGEX_COMPLEXITY_LIMIT = 20;
 
 /** {sonar, rule, options?, type, note?}: `rule` is `<plugin>/<name>` (the core rules have no plugin). */
 export const RULES = Object.freeze([
@@ -42,6 +43,26 @@ export const RULES = Object.freeze([
   { sonar: 'S6582', rule: 'starci-sonar/prefer-optional-chain', type: 'smell', note: 'own rule: typescript-eslint\'s needs type information' },
   { sonar: 'S9383', rule: 'starci-sonar/floating-promise', type: 'bug', note: 'own rule, syntactic: Promise.*, open .then chains and same-file async functions; typescript-eslint\'s needs type information' },
   { sonar: 'S1516', rule: 'starci-sonar/no-line-separator-escape', type: 'smell' },
+  { sonar: 'S5843', rule: 'sonarjs/regex-complexity', options: [{ threshold: REGEX_COMPLEXITY_LIMIT }], type: 'smell' },
+  { sonar: 'S6353', rule: 'sonarjs/concise-regex', type: 'smell' },
+  { sonar: 'S2681', rule: 'sonarjs/no-unenclosed-multiline-block', type: 'smell' },
+  { sonar: 'S1788', rule: 'starci-sonar/default-param-last', type: 'smell', note: 'own rule: ESLint core also reports a destructured options parameter with a default, which Sonar accepts' },
+  { sonar: 'S1940', rule: 'sonarjs/no-inverted-boolean-check', type: 'smell' },
+  { sonar: 'S1481', rule: 'sonarjs/no-unused-vars', type: 'smell' },
+  { sonar: 'S1854', rule: 'sonarjs/no-dead-store', type: 'smell' },
+  { sonar: 'S4165', rule: 'sonarjs/no-redundant-assignments', type: 'smell' },
+  { sonar: 'S6326', rule: 'sonarjs/no-regex-spaces', type: 'smell' },
+  { sonar: 'S6035', rule: 'sonarjs/single-character-alternation', type: 'smell' },
+  { sonar: 'S6397', rule: 'sonarjs/single-char-in-character-classes', type: 'smell' },
+  { sonar: 'S6535', rule: 'no-useless-escape', type: 'smell', note: 'ESLint core' },
+  { sonar: 'S7763', rule: 'starci-sonar/prefer-export-from', type: 'smell', note: 'own rule: the unicorn rule also reports an import the file uses itself, which Sonar accepts' },
+  { sonar: 'S6557', rule: 'starci-sonar/prefer-starts-ends-with', type: 'smell', note: 'own rule: the unicorn rule reads inline regexes only (3 of the 21 Sonar reports), the typescript-eslint one needs type information' },
+  { sonar: 'S7750', rule: 'unicorn/prefer-array-find', type: 'smell' },
+  { sonar: 'S7784', rule: 'unicorn/prefer-structured-clone', type: 'smell' },
+  { sonar: 'S7765', rule: 'unicorn/prefer-includes', type: 'smell' },
+  { sonar: 'S7754', rule: 'unicorn/prefer-array-some', type: 'smell' },
+  { sonar: 'S7721', rule: 'unicorn/consistent-function-scoping', options: [{ checkArrowFunctions: false }], type: 'smell' },
+  { sonar: 'S7785', rule: 'unicorn/prefer-top-level-await', type: 'smell' },
 ]);
 
 /**

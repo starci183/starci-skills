@@ -62,11 +62,13 @@ function catalogsPerApp(config, graph) {
 
 /** Each interpolation can fill part or all of a segment; the template's static fragments keep their literal spelling. */
 function templatePatternOf(node) {
-  return [node.head.text, ...node.templateSpans.map(span => span.literal.text)].join('\u0000').split('.').map(segment => {
-    if (!segment.includes('\u0000')) return segment;
+  const pattern = [];
+  for (const segment of [node.head.text, ...node.templateSpans.map(span => span.literal.text)].join('\u0000').split('.')) {
+    if (!segment.includes('\u0000')) { pattern.push(segment); continue; }
     const parts = segment.split('\u0000');
-    return parts.every(part => part === '') ? '*' : new RegExp(`^${parts.map((part) => escapeRegExp(part)).join('.*')}$`, 'su');
-  });
+    pattern.push(parts.every(part => part === '') ? '*' : new RegExp(`^${parts.map((part) => escapeRegExp(part)).join('.*')}$`, 'su'));
+  }
+  return pattern;
 }
 
 function patternsOf(ts, files) {

@@ -50,6 +50,13 @@ function supLogRows(rows, { env = process.env } = {}) {
 }
 export const supLog = (row, options) => supLogRows([row], options);
 
+/** The text of a reason: '' for none, the message line of an Error, JSON for other objects. */
+const reasonText = (value) => {
+  if (value == null) return '';
+  if (typeof value === 'object') return value instanceof Error ? String(value) : JSON.stringify(value);
+  return String(value);
+};
+
 /**
  * The row of one owed-action act (actions.mjs recordAction, notify.mjs --item). Pure.
  * @param {{item: string, action: string, reason?: unknown, klass?: string|null, workflowId?: string|null,
@@ -57,7 +64,7 @@ export const supLog = (row, options) => supLogRows([row], options);
  */
 export const actionRow = ({ item, action, reason, klass = null, workflowId = null, repo = null, refs = [], delivered = null, at }) => ({
   kind: 'supervisor.action', at, level: delivered === false ? 'warn' : 'info',
-  msg: `${action} ${item}: ${String(reason ?? '').replace(/\s+/g, ' ').slice(0, 200)}`,
-  data: { action, item, ...(reason ? { reason: String(reason) } : {}), ...(klass ? { class: klass } : {}), ...(workflowId ? { workflowId } : {}), ...(repo ? { repo } : {}), ...(delivered != null ? { delivered } : {}) },
+  msg: `${action} ${item}: ${reasonText(reason).replace(/\s+/g, ' ').slice(0, 200)}`,
+  data: { action, item, ...(reason ? { reason: reasonText(reason) } : {}), ...(klass ? { class: klass } : {}), ...(workflowId ? { workflowId } : {}), ...(repo ? { repo } : {}), ...(delivered != null ? { delivered } : {}) },
   refs: refsOf({ workflowId, repo, item, extra: refs }),
 });

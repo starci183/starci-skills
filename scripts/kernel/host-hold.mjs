@@ -44,7 +44,7 @@ function capabilityHold(op, repo) {
  */
 export function hostHoldOf({ env = process.env, repo, workflowId, db, ledgerFile = null } = {}, { resources = hostResourcesFor, throttle = hostThrottle } = {}) {
   const held = new Map();
-  const capability = (op) => { if (!held.has(op)) held.set(op, capabilityHold(op, repo)); return held.get(op); };
+  const capability = (op) => { if (!held.has(op)) { held.set(op, capabilityHold(op, repo)); } return held.get(op); };
   let host = null;
   try { host = resources({ env, repo }); } catch { return capability; }
   const byOp = new Map();

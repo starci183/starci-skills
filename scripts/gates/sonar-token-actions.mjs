@@ -42,7 +42,7 @@ async function sealGeneratedToken(client, target, token, value, callbacks, env) 
   const accepted = await client.validateToken(value);
   if (!accepted.ok || accepted.data?.valid !== true) return fail('sonar-token-generated-auth-unverified', {outcome: 'partial', writeAck: true, resourceId: token.name});
   let sealed;
-  try {sealed = await sealProvisionValues(target.destination, value, {repoRoot: target.repoRoot, env});}
+  try {sealed = sealProvisionValues(target.destination, value, {repoRoot: target.repoRoot, env});}
   catch {return fail('sonar-token-seal-unreconciled', {outcome: 'partial', writeAck: true, resourceId: token.name});}
   callbacks.checkpoint({phase: 'token-sealed', generationName: token.name, destinationRef: sealed.destinationRef});
   return null;

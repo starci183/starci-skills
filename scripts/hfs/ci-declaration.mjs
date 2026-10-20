@@ -60,7 +60,10 @@ export function qualityServices(doc, { example = false } = {}) {
 /** Enumerate a missing directory as empty; all filesystem access uses the caller's injected synchronous seam. */
 function entries(dir, fs) {
   try { return fs.readdirSync(dir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name)); }
-  catch (error) { if (error.code === 'ENOENT') return []; throw error; }
+  catch (error) {
+    if (error.code === 'ENOENT') return [];
+    throw error;
+  }
 }
 
 /** Read only encrypted envelope key names, never decrypting or returning any sealed value. */
@@ -70,7 +73,7 @@ export function sealedKeyNames(root, { fs }) {
     for (const member of entries(path.join(base, env.name, 'secrets'), fs).filter((entry) => entry.isFile() && entry.name.endsWith('.enc'))) {
       const file = `.starcistacks/${env.name}/secrets/${member.name}`;
       const source = fs.readFileSync(path.join(root, file), 'utf8');
-      const dotenv = [...source.matchAll(/^([A-Za-z_][A-Za-z0-9_]*)=ENC\[/gm)].map((match) => match[1]).filter((key) => !key.startsWith('sops_'));
+      const dotenv = [...source.matchAll(/^([A-Za-z_]\w*)=ENC\[/gm)].map((match) => match[1]).filter((key) => !key.startsWith('sops_'));
       let keys = dotenv;
       if (!dotenv.length) {
         const doc = parseYaml(source);

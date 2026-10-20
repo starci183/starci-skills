@@ -26,10 +26,13 @@ export function writeVerifyReceipt(root, record) {
   return writeProofFile(verifyReceiptFile(root, record.sha), record);
 }
 
+const atLeastZero = (n) => n >= 0;
+const positive = (n) => n > 0;
+
 function testsProblem(tests) {
   const { packages, e2e } = tests ?? {};
-  if (!(packages?.total >= 0) || packages.green !== packages.total) return `the verify receipt records the package clean-test at ${packages?.green}/${packages?.total}`;
-  if (!(e2e?.total > 0) || e2e.pass !== e2e.total) return `the verify receipt records the scaffold e2e at ${e2e?.pass}/${e2e?.total}`;
+  if (!atLeastZero(packages?.total) || packages.green !== packages.total) return `the verify receipt records the package clean-test at ${packages?.green}/${packages?.total}`;
+  if (!positive(e2e?.total) || e2e.pass !== e2e.total) return `the verify receipt records the scaffold e2e at ${e2e?.pass}/${e2e?.total}`;
   return null;
 }
 
@@ -41,7 +44,7 @@ function verifyProblem(record, { sha, tree, base, root }) {
   if (record.base !== base) return `the verify receipt proved the tests against ${short(record.base)}, not ${short(base)}`;
   if (!judgedIn(record.root, root)) return `the verify receipt's proofs ran in ${record.root ?? 'no named tree'}, not in ${root}`;
   const { check } = record;
-  if (!(check?.total > 0) || check.pass !== check.total) return `the verify receipt records the check at ${check?.pass}/${check?.total}`;
+  if (!positive(check?.total) || check.pass !== check.total) return `the verify receipt records the check at ${check?.pass}/${check?.total}`;
   return testsProblem(record.tests);
 }
 

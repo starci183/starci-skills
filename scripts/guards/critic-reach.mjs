@@ -19,7 +19,7 @@ const inside = (file, dir) => sameOrUnder(pathKey(path.resolve(file)), pathKey(p
 const same = (a, b) => pathKey(path.resolve(a)) === pathKey(path.resolve(b));
 /** Readable by the Critic: its directory, and the one Task file the runtime wrote for it outside that directory (reach.taskFile). */
 const readable = (file, guard) => inside(file, guard.reach.dir) || (typeof guard.reach.taskFile === 'string' && same(file, guard.reach.taskFile));
-const expands = (value, program) => /[$`]/.test(value) || (!TEXT_PROGRAMS.has(program) && (/%/.test(value) || /^~/.test(value)));
+const expands = (value, program) => /[$`]/.test(value) || (!TEXT_PROGRAMS.has(program) && (/%/.test(value) || String(value).startsWith('~')));
 
 /** The verdict file of the guard, absolute. */
 const verdictPathOf = (guard) => path.resolve(guard.reach.dir, guard.reach.verdictFile);

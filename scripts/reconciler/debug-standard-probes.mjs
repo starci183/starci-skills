@@ -204,7 +204,7 @@ const insideTree = (cwd, tree) => normal(cwd) === normal(tree) || normal(cwd).st
 function settleEvidence(c) {
   return c.workflow.attempts.filter((a) => a.verdict === 'pass').map((a) => {
     const item = { attemptId: a.attemptId, op: a.op };
-    const event = eventsOf(c.workflow, 'op-settled').filter((e) => e.attemptId === a.attemptId).pop();
+    const event = eventsOf(c.workflow, 'op-settled').findLast((e) => e.attemptId === a.attemptId);
     if (!event?.checkedIn?.length) return { ...item, ...na(event ? 'the settle event names no directory the checks ran in' : 'no settle event') };
     const stray = event.checkedIn.filter((r) => !insideTree(r.cwd, a.worktreePath));
     if (stray.length) return { ...item, ...overdue(`checks ran in ${stray[0].cwd}, the attempt's tree is ${a.worktreePath}`, 'checks-ran-outside-tree') };

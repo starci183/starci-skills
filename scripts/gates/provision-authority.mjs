@@ -18,7 +18,7 @@ export function resolveProvisionAuthority(ctx, { ledger, target, operationId, pl
       return { ok: false, bound: true, reason: 'provision-native-caller-unverified' };
     machine = openMachineReader({ env: ctx.env });
     const placement = machine?.worktreeRow(target.repoRoot);
-    if (!placement || placement.removed_at !== null || placement.kind !== 'workflow'
+    if (placement?.removed_at !== null || placement.kind !== 'workflow'
       || placement.workflow_id !== guard.workflowId || placement.ledger_id !== ledger.ledgerId
       || pathKey(canonicalPath(placement.repo_root)) !== pathKey(canonicalPath(target.ledgerRoot)))
       return { ok: false, bound: true, reason: 'provision-native-placement-unverified' };

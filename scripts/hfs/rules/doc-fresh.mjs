@@ -52,10 +52,15 @@ function resolvedPath(raw, file, tracked, link, generated, roots) {
   return candidates.some((candidate) => !candidate.startsWith('../') && (trackedPath(candidate, tracked) || generated.has(candidate)));
 }
 
+const ENV_NAME = /[A-Z][A-Z0-9_]*/.source;
+const INLINE_LINK = /\]\(\s*(?:<([^>]+)>|([^\s)]+))(?:\s+['"][^)]*)?\)/.source;
+const REFERENCE_LINK = /^\s*\[[^\]]+\]:\s*(?:<([^>]+)>|(\S+))/.source;
+const MARKDOWN_LINK = new RegExp(`${INLINE_LINK}|${REFERENCE_LINK}`, 'g');
+
 function pathReferences(line) {
   const refs = [];
   // Markdown inline and reference links, including image links. URLs and anchors are excluded later.
-  for (const match of line.matchAll(/\]\(\s*(?:<([^>]+)>|([^\s)]+))(?:\s+['"][^)]*)?\)|^\s*\[[^\]]+\]:\s*(?:<([^>]+)>|(\S+))/g)) {
+  for (const match of line.matchAll(MARKDOWN_LINK)) {
     refs.push({ target: match[1] ?? match[2] ?? match[3] ?? match[4], link: true });
   }
   const masked = line.replace(/\]\([^)]*\)/g, ']');
@@ -171,9 +176,14 @@ function importedFiles(file, text, tracked) {
   });
 }
 
+const READER_CALL = /\b(\w+)\s*\.\s*\w+\s*\(\s*['"]([A-Z][A-Z0-9_]*)['"]/.source;
+const PROCESS_ENV_DOT = /\bprocess\.env\.([A-Z][A-Z0-9_]*)/.source;
+const PROCESS_ENV_INDEX = /\bprocess\.env\[['"]([A-Z][A-Z0-9_]*)['"]\]/.source;
+const ENV_READ = new RegExp(`${READER_CALL}|${PROCESS_ENV_DOT}|${PROCESS_ENV_INDEX}`, 'g');
+
 function addReaderKeys(text, keys) {
   const readers = new Set(['env', 'source', ...[...text.matchAll(/\b(\w+)\s*:\s*EnvSource\b/g)].map((match) => match[1])]);
-  for (const match of text.matchAll(/\b(\w+)\s*\.\s*\w+\s*\(\s*['"]([A-Z][A-Z0-9_]*)['"]|\bprocess\.env\.([A-Z][A-Z0-9_]*)|\bprocess\.env\[['"]([A-Z][A-Z0-9_]*)['"]\]/g)) {
+  for (const match of text.matchAll(ENV_READ)) {
     if (match[3] || match[4]) keys.add(match[3] ?? match[4]);
     else if (readers.has(match[1])) keys.add(match[2]);
   }
@@ -242,6 +252,11 @@ function unknownEnvironmentName(name, line, keys, codes, tokens, explicit) {
   return !keys.has(name) && !(name.endsWith('_FILE') && keys.has(name.slice(0, -5)));
 }
 
+const QUOTED_ENV_NAME = `\`(${ENV_NAME})\``;
+const REFERENCED_ENV_NAME = String.raw`\b(?:process\.env\.|\$\{?)(${ENV_NAME})`;
+const ASSIGNED_ENV_NAME = String.raw`\b(${ENV_NAME})\s*=`;
+const ENV_NAME_CITATION = new RegExp(`${QUOTED_ENV_NAME}|${REFERENCED_ENV_NAME}|${ASSIGNED_ENV_NAME}`, 'g');
+
 function nameFindings(file, lines, keys, rules, tokens) {
   const findings = [];
   const codes = new Set(rules.rules.flatMap((rule) => rule.failureCodes));
@@ -249,7 +264,7 @@ function nameFindings(file, lines, keys, rules, tokens) {
     for (const match of line.matchAll(/\bR\d+\b/g)) {
       if (!rules.rule(match[0])) findings.push(found(RULE_UNKNOWN, file, `${file} cites unknown rule ${match[0]}; use an id from the HFS rule catalog`, { line: index + 1, reference: match[0] }));
     }
-    for (const match of line.matchAll(/`([A-Z][A-Z0-9_]*)`|\b(?:process\.env\.|\$\{?)([A-Z][A-Z0-9_]*)|\b([A-Z][A-Z0-9_]*)\s*=/g)) {
+    for (const match of line.matchAll(ENV_NAME_CITATION)) {
       const name = match[1] ?? match[2] ?? match[3];
       if (!unknownEnvironmentName(name, line, keys, codes, tokens, !match[1])) continue;
       findings.push(found(ENV_UNKNOWN, file, `${file} cites unknown environment key ${name}; declare it in a typed environment reader or KEYS.md, or update the documentation`, { line: index + 1, reference: name }));

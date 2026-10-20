@@ -61,7 +61,7 @@ export function privateDirectory(repoRoot, directory) {
   const missing = [];
   for (let at = directory; !fs.existsSync(at); at = path.dirname(at))
     missing.push(at);
-  for (const at of missing.reverse()) fs.mkdirSync(at, { mode: 0o700 });
+  for (const at of missing.toReversed()) fs.mkdirSync(at, { mode: 0o700 });
   for (let at = directory; ; at = path.dirname(at)) {
     const stat = fs.lstatSync(at);
     if (!stat.isDirectory() || stat.isSymbolicLink())

@@ -21,7 +21,7 @@ import { fileURLToPath } from 'node:url';
 import { revParseQuery } from '../api/git/rev-parse-query.mjs';
 import { findPackage } from '../lib/package-at.mjs';
 import { readJsonFile } from '../lib/json.mjs';
-import { GRAMMAR_PACKAGE, typecheckDraw } from './draw/draw-source.mjs';
+import { GRAMMAR_PACKAGE, typecheckDraw } from './draw/draw-typecheck.mjs';
 import { grammarDistStatus } from '../gates/grammar-dist.mjs';
 import { isFile } from './work-io.mjs';
 import { isMain } from '../lib/is-main.mjs';

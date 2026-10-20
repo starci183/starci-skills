@@ -10,7 +10,7 @@ import { withProvisionCredentials } from './provision-custody.mjs';
 export async function runSupabaseCloud(ctx) {
   const action = ctx?.positionals?.[0];
   let target;
-  try { target = await resolveProvisionTarget({ cwd: ctx.cwd, targetId: ctx.args?.target, provider: 'supabase-cloud' }); }
+  try { target = resolveProvisionTarget({ cwd: ctx.cwd, targetId: ctx.args?.target, provider: 'supabase-cloud' }); }
   catch { return supabaseRefusal('supabase-target-unavailable'); }
   const spec = supabaseCloudSpec(action, target);
   if (!spec.ok) return supabaseRefusal(spec.code);

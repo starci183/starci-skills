@@ -366,11 +366,11 @@ function withVersion(text,version){
 function withCatalogRendererCount(text,count){
   const lines=text.split('\n');
   const topics=topLevelRange(lines,'topics');
-  const start=lines.findIndex((line,i)=>i>topics.start&&i<topics.end&&/^  - id: common\s*$/.test(line));
+  const start=lines.findIndex((line,i)=>i>topics.start&&i<topics.end&&/^ {2}- id: common\s*$/.test(line));
   if(start<0)throw new Error('no topics.common entry');
-  const next=lines.findIndex((line,i)=>i>start&&i<topics.end&&/^  - /.test(line));
+  const next=lines.findIndex((line,i)=>i>start&&i<topics.end&&line.startsWith('  - '));
   const end=next<0?topics.end:next;
-  const summary=lines.findIndex((line,i)=>i>start&&i<end&&/^    summary: \|[-+]?\s*$/.test(line));
+  const summary=lines.findIndex((line,i)=>i>start&&i<end&&/^ {4}summary: \|[-+]?\s*$/.test(line));
   if(summary<0)throw new Error('topics.common.summary is not a literal block');
   const after=lines.findIndex((line,i)=>i>summary&&i<end&&line.trim()&&!/^ {6}/.test(line));
   const summaryEnd=after<0?end:after;

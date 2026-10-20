@@ -12,7 +12,6 @@ import { found } from './read.mjs';
 export const HFS_COVERAGE_BELOW = 'HFS_COVERAGE_BELOW';
 const METRICS = ['lines', 'functions', 'branches'];
 const SUMMARY = { LF: ['lines', 'found'], LH: ['lines', 'hit'], FNF: ['functions', 'found'], FNH: ['functions', 'hit'], BRF: ['branches', 'found'], BRH: ['branches', 'hit'] };
-const SOURCE = /\.ts$/;
 const SPEC = /(?:\.(?:spec|test)|-spec)\.ts$/;
 const countOf = (value) => /^\d+$/.test(value) && Number.isSafeInteger(Number(value)) ? Number(value) : null;
 const slash = (value) => path.posix.normalize(String(value).replaceAll('\\', '/'));
@@ -66,7 +65,10 @@ function parseLcov(text) {
   const records = [];
   const problems = [];
   let current = null;
-  const flush = () => { if (current) records.push(current); current = null; };
+  const flush = () => {
+    if (current) records.push(current);
+    current = null;
+  };
   for (const [index, raw] of String(text).replace(/^\uFEFF/, '').split(/\r?\n/).entries()) {
     const line = raw.trim();
     if (!line) continue;
@@ -102,7 +104,7 @@ function inventory({ files, all, repo, manifest }) {
   const scope = coverageScope(effective, repo.providers ?? repo.sides?.be?.providers ?? []);
   const roots = scope.roots.map((dir) => globExpression(`${dir}**`));
   const excludes = scope.excludes.map((dir) => globExpression(`${dir}**`));
-  const candidates = [...new Set((all ?? files ?? []).map(slash))].filter((file) => file.startsWith(prefix) && SOURCE.test(file) && !SPEC.test(file)).sort(byCodeUnit);
+  const candidates = [...new Set((all ?? files ?? []).map(slash))].filter((file) => file.startsWith(prefix) && file.endsWith('.ts') && !SPEC.test(file)).sort(byCodeUnit);
   const measured = [];
   const unmeasured = [];
   for (const file of candidates) {

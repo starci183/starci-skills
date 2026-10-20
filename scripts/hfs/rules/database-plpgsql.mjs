@@ -290,7 +290,7 @@ async function functionFindings(file, fn, facts, exposed) {
 
 function alteredDefinerFindings(file, alter, facts, exposed) {
   if (!alter.securityDefiner) return [];
-  const created = facts.functions.filter((fn) => fn.index < alter.index && matchesAlter(fn, alter)).at(-1);
+  const created = facts.functions.findLast((fn) => fn.index < alter.index && matchesAlter(fn, alter));
   const node = created?.node ?? { func: alter.node.func };
   const fn = { ...alter, node, altered: true, originIndex: created?.index ?? -1 };
   return definerDeclarationFindings(file, fn, facts, exposed, true);

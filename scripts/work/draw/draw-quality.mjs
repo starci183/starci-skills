@@ -43,8 +43,8 @@ import { DRAW_TOOL, SHAPE_DUPLICATE, assetStateOf } from '../ui/ui-shapes.mjs';
 import { anatomyFindings, dnaFindings, loadDna, proposalFilesFor, proposalNamesIn } from './draw-dna.mjs';
 import { accentBudgetOf, drawLoopSettings, htmlTasteFindings } from './draw-taste.mjs';
 import { assetRequestIdsFor } from '../asset-slot.mjs';
-import { DRAW_LOOP_MISSING, loopCoverageFindings, loopFileOfRef } from './draw-loop-coverage.mjs';
-import { DRAW_RATIONALE_MISSING, loadRationale, measuresOf, rationaleFileOf, rationaleFindings, ruleResolver } from './draw-rationale.mjs';
+import { loopCoverageFindings, loopFileOfRef } from './draw-loop-coverage.mjs';
+import { loadRationale, measuresOf, rationaleFileOf, rationaleFindings, ruleResolver } from './draw-rationale.mjs';
 import { altOf } from '../../lib/source-phrases.mjs';
 
 export { SHAPE_DUPLICATE };
@@ -54,7 +54,8 @@ export const DRAW_COPY_INTERNAL = 'DRAW_COPY_INTERNAL';
 export const DRAW_BADGE_UNTONED = 'DRAW_BADGE_UNTONED';
 export const DRAW_SCORE_BELOW = 'DRAW_SCORE_BELOW';
 export const DRAW_NOT_OWNER_ACCEPTED = 'DRAW_NOT_OWNER_ACCEPTED';
-export { DRAW_LOOP_MISSING, DRAW_RATIONALE_MISSING };
+export { DRAW_LOOP_MISSING } from './draw-loop-coverage.mjs';
+export { DRAW_RATIONALE_MISSING } from './draw-rationale.mjs';
 const SCORE_SCHEMA = 'starci/ui-proof-score@1';
 /** The largest share of an image's rows two renders of one XBase may differ in and still be one shape plus a status band. */
 const STATUS_BAND_MAX = 0.3;

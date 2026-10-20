@@ -19,7 +19,7 @@ export function defaultSops(
   env = process.env,
   repoRoot = invocationDir(),
   platform = process.platform,
-  tools,
+  tools = undefined,
 ) {
   const { sops: binary } = publicStorage(() => secretTools(env, tools));
   const selectedEnv = ageIdentityEnv(repoRoot, env, tools);

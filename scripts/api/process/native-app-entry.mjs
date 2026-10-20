@@ -55,7 +55,10 @@ function supabasePlatform(require, installation) {
   for (const suffix of candidates) {
     const name = `@supabase/cli-${suffix}`;
     try { require.resolve(`${name}/package.json`); }
-    catch (error) { if (error.code === 'MODULE_NOT_FOUND') continue; throw error; }
+    catch (error) {
+      if (error.code === 'MODULE_NOT_FOUND') continue;
+      throw error;
+    }
     // Once Node selects a package, a confinement or identity failure cannot select another candidate.
     return packageIdentity(manifestFor(require, name, installation), name, installation, 256 * 1024 * 1024);
   }

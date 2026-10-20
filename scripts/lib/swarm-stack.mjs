@@ -4,8 +4,10 @@ import { composeEntries } from './compose-values.mjs';
 import { repositoryOf } from './stack-services.mjs';
 
 const PINNED_IMAGE = /@sha256:[a-f0-9]{64}$/i;
-const VERSIONED_SECRET = /-v[1-9][0-9]*$/;
-const BACKING_IMAGE = /^(?:postgres(?:ql)?|postgresql-repmgr|redis(?:-stack(?:-server)?)?|(?:cp-)?kafka(?:-native)?|keycloak|minio|rabbitmq|mysql(?:-server)?|mongo(?:db)?|mongodb-community-server)$/i;
+const VERSIONED_SECRET = /-v[1-9]\d*$/;
+const BACKING_IMAGE_SQL_AND_CACHE = 'postgres(?:ql)?|postgresql-repmgr|redis(?:-stack(?:-server)?)?|mysql(?:-server)?|mongo(?:db)?|mongodb-community-server';
+const BACKING_IMAGE_BROKERS_AND_OTHERS = '(?:cp-)?kafka(?:-native)?|keycloak|minio|rabbitmq';
+const BACKING_IMAGE = new RegExp(`^(?:${BACKING_IMAGE_SQL_AND_CACHE}|${BACKING_IMAGE_BROKERS_AND_OTHERS})$`, 'i');
 const mapping = value => plain(value) ? value : {};
 const present = value => typeof value === 'string' && Boolean(value.trim());
 const configured = value => Object.keys(mapping(value)).length > 0;

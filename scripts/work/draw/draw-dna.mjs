@@ -139,8 +139,11 @@ const appendParsedText = (node, text) => { if (text.trim()) node.children.push({
 
 function closeHtmlTag(current, tag) {
   let at = current;
-  while (at) { if (at.tag === tag) break; at = at.parent; }
-  return at?.parent ? at.parent : current;
+  while (at) {
+    if (at.tag === tag) break;
+    at = at.parent;
+  }
+  return at?.parent ?? current;
 }
 
 function appendHtmlTag(s, match, current, index) {

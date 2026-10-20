@@ -15,6 +15,7 @@ export const isSpecRun = (env = process.env) => Boolean(env.NODE_TEST_CONTEXT);
  * would pass red specs from inside a test process. The runner marks the spec files it starts itself, so isSpecRun stays true inside them.
  */
 export function withoutTestRunner(env = process.env) {
-  const { NODE_TEST_CONTEXT: _enclosing, ...rest } = env;
+  const rest = { ...env };
+  delete rest.NODE_TEST_CONTEXT;
   return rest;
 }

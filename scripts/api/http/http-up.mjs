@@ -20,7 +20,7 @@ export async function httpUp(url, { timeoutMs, tries = 1, health = false, fetchI
   const attempts = Math.max(1, tries);
   const succeeded = await repeatInOrder(async (done) => {
     const i = done + 1;
-    if (!(i <= attempts)) return false;
+    if (Number.isNaN(attempts) || i > attempts) return false;
     const started = Date.now();
     try {
       const res = await fetchImpl(url, { redirect: 'manual', signal: AbortSignal.timeout(timeoutMs) });

@@ -60,7 +60,11 @@ const valuesAt = (doc, dotted) => {
   const walk = (node, keys) => {
     if (node == null) return;
     if (Array.isArray(node)) { node.forEach((item) => walk(item, keys)); return; }
-    if (!keys.length) { if (typeof node === 'string') out.push(node); else if (node && typeof node === 'object') Object.values(node).forEach((v) => walk(v, [])); return; }
+    if (!keys.length) {
+      if (typeof node === 'string') out.push(node);
+      else if (node && typeof node === 'object') Object.values(node).forEach((v) => walk(v, []));
+      return;
+    }
     if (typeof node === 'object') walk(node[keys[0]], keys.slice(1));
   };
   walk(doc, String(dotted).split('.'));

@@ -19,8 +19,6 @@ import { found, readText } from './read.mjs';
 export const ENV_VALUE_SHAPE = 'ENV_VALUE_SHAPE';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const FILE_SUFFIX = /_FILE$/u;
-const ENV_EXAMPLE = /\.env\.example$/u;
 const SKIP_DIRECTORY = new Set(['node_modules', 'dist', 'coverage', '.git']);
 
 const SHAPES = Object.freeze({
@@ -61,7 +59,7 @@ function listEnvSourceFiles(repoRoot) {
 function shapeViolations(reads, map) {
   const violations = [];
   for (const [key, value] of Object.entries(map)) {
-    if (FILE_SUFFIX.test(key)) continue;
+    if (key.endsWith('_FILE')) continue;
     const shape = reads.get(key)?.shape;
     if (shape && !shapeOk(shape, value)) violations.push({ key, expected: shapeText(shape) });
   }
@@ -71,7 +69,7 @@ function shapeViolations(reads, map) {
 /** The findings of R249 over the `*.env.example` files of an app judged at its root scope (both editions). */
 export function envValueShapeFindings({ repoRoot, all = [], isRoot }) {
   if (!isRoot) return [];
-  const examples = all.filter((file) => ENV_EXAMPLE.test(file));
+  const examples = all.filter((file) => file.endsWith('.env.example'));
   if (!examples.length) return [];
   const reads = collectEnvReads(repoRoot, all);
   if (reads === null) return [];

@@ -4,7 +4,6 @@
 
 export const RT_SECRET_TRACKED = 'RT_SECRET_TRACKED';
 
-const SEALED = /\.enc$/u;
 const ENV_FILES = new Set(['secret.env', '.env']);
 
 /** RT_SECRET_TRACKED findings: one per tracked sealed secret or secret env file that ruleParams.runtime.heldSecrets does not name. */
@@ -13,7 +12,7 @@ export function secretTrackedFindings(ctx) {
   const found = [];
   for (const file of ctx.files) {
     const base = file.slice(file.lastIndexOf('/') + 1);
-    if ((SEALED.test(base) || ENV_FILES.has(base)) && !held.has(file)) {
+    if ((base.endsWith('.enc') || ENV_FILES.has(base)) && !held.has(file)) {
       found.push({ code: RT_SECRET_TRACKED, level: 'error', path: file, message: `${file} is a secret tracked in the public runtime repository: the host's secrets live in the untracked .claude/secret.env (secret.env.example lists the names), so remove it from the index (git rm); a ciphertext in git history is only removed by rotating the secret` });
     }
   }

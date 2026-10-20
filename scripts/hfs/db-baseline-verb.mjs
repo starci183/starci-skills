@@ -87,7 +87,7 @@ function baselinePlan(root, opts, now) {
   if (!active.length) throw new DbVerbError('baseline requires an existing active migration chain');
   const archived = dbSqlFiles(root, MIGRATIONS_ARCHIVE_DIR);
   const oldStamps = [...active, ...archived].map((entry) => entry.stamp);
-  const last = oldStamps.sort((left, right) => left.localeCompare(right)).at(-1);
+  const last = oldStamps.toSorted((left, right) => left.localeCompare(right)).at(-1);
   const stamp = opts.stamp ?? now().toISOString().replace(/\D/g, '').slice(0, 14);
   if (!/^\d{14}$/.test(stamp) || migrationStamp(stamp) === null || stamp <= last) throw new DbVerbError('--stamp must be a valid UTC version after the archive boundary');
   const file = `${MIGRATIONS_DIR}/${stamp}_baseline.sql`;
@@ -225,7 +225,10 @@ function extensionDeclaration(stmt, sql, extensions) {
 
 function baselineStatement(state, stmt, sql) {
   if (roleDeclaration(stmt, sql, state.roles) || extensionDeclaration(stmt, sql, state.extensions)) return;
-  if (stmt.DropRoleStmt) { for (const role of stmt.DropRoleStmt.roles ?? []) state.roles.delete(role.RoleSpec?.rolename); return; }
+  if (stmt.DropRoleStmt) {
+    for (const role of stmt.DropRoleStmt.roles ?? []) state.roles.delete(role.RoleSpec?.rolename);
+    return;
+  }
   if (stmt.GrantRoleStmt || stmt.AlterExtensionStmt || stmt.AlterExtensionContentsStmt || /^OBJECT_ROLE$/.test(stmt.RenameStmt?.renameType ?? '')) throw new DbVerbError('baseline cannot reconstruct role membership, role renames or extension alterations');
   if (dataMutation(stmt) || sourceExecution(stmt)) throw new DbVerbError('baseline cannot reconstruct migration-owned data changes or custom execution from a schema-only dump');
   const node = Object.values(stmt)[0];

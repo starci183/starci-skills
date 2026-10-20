@@ -17,10 +17,10 @@
 // directory or from the Work directory name outside this module.
 import fs from 'node:fs';
 import path from 'node:path';
-import { skillRoot, starciLocalRoot, starciSourceRoot } from '../../engine/runtime-root.mjs';
-import { tempRoot } from '../../engine/temp-root.mjs';
+import { skillRoot } from '../../engine/runtime-root.mjs';
 
-export { tempRoot, starciLocalRoot, starciSourceRoot };
+export { tempRoot } from '../../engine/temp-root.mjs';
+export { starciLocalRoot, starciSourceRoot } from '../../engine/runtime-root.mjs';
 
 /** The runtime tree this code runs from. */
 const runtimeTree = skillRoot;

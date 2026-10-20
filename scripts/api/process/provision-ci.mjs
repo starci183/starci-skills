@@ -2,7 +2,7 @@ import path from 'node:path';
 import { runProgram } from './run-program.mjs';
 import { ciNativeArguments, ciChildEnvironment } from '../../lib/provision-ci-contract.mjs';
 
-const held = (code, writeAck = false, publicReadback = false, name) => ({
+const held = (code, writeAck = false, publicReadback = false, name = undefined) => ({
   outcome: writeAck ? 'partial' : 'unknown', code, writeAck, publicReadback, consumerVerified: false,
   ...(name === undefined ? {} : { proof: { name, valueToNameBindingVerified: false } }),
 });

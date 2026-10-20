@@ -25,7 +25,6 @@ import { wordingOnly } from '../machine/revision-change.mjs';
 
 export const CODE = 'RT_REVISION_SCOPE';
 const finding = (message) => ({ code: CODE, path: SCOPE_FILE, line: 0, message: `${SCOPE_FILE} ${message}` });
-const SCRIPT = /\.mjs$/;
 const PROMPT_TOKEN = /['"`]([\w.-]+\.(?:md|yaml))['"`]/g;
 
 const trackedFiles = (root) => String(lsFiles(['--cached'], { dir: root, maxBuffer: 64 * 1024 * 1024 }).stdout ?? '').split(/\r?\n/).filter(Boolean);
@@ -49,7 +48,7 @@ function coverageFindings(doc, files) {
 
 function engineFindings(root, doc, files) {
   const out = [];
-  const scripts = files.filter((file) => SCRIPT.test(file));
+  const scripts = files.filter((file) => file.endsWith('.mjs'));
   for (const row of doc.rows.filter((r) => r.roles?.engine === 'restart')) {
     const hit = scripts.find((file) => rowsOf(doc, file).includes(row));
     if (hit) out.push(finding(`row ${row.id} hand-lists an engine restart for the script ${hit}; the engine-loaded scripts are derived from engineEntries`));

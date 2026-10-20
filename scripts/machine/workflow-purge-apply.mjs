@@ -167,7 +167,7 @@ export function applyPurgePlan({ plan, env = process.env, deps = {} }) {
   results.decisions = resolveDecisions(plan.decisions, env);
   const errors = [...results.workers, ...results.terminals, ...results.trees, ...results.refs, ...results.guards, ...results.prompts].filter((item) => item.ok === false).map((item) => `${item.dispatchId ?? item.handle ?? item.path ?? item.name ?? item.file}: ${item.error ?? 'failed'}`);
   if (!errors.length && plan.ledger.mode === 'purge') results.ledger = deps.purgeLedger({ plan });
-  if (results.ledger && results.ledger.ok === false) errors.push(`ledger: ${results.ledger.error}`);
+  if (results.ledger?.ok === false) errors.push(`ledger: ${results.ledger.error}`);
   const event = errors.length ? null : journalPurge({ plan, stored, resumed, results, env });
   return { ok: errors.length === 0, resumed, results, errors, event };
 }

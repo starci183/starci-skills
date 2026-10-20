@@ -29,7 +29,8 @@ const inner = (t) => t.replace(/^<|>$/g, '');
 
 // ---- extraction -----------------------------------------------------------------------------------------------
 
-const COMMAND_AT = /(?<![\w@./:-])(?:npx\s+starci|npm\s+run\s+starci(?:\s+--silent)?(?:\s+--)?|starci)(?![\w@./-])(?=\s|$)/g;
+const COMMAND_FORM = /npx\s+starci|npm\s+run\s+starci(?:\s+--silent)?(?:\s+--)?|starci/;
+const COMMAND_AT = new RegExp(String.raw`(?<![\w@./:-])(?:${COMMAND_FORM.source})(?![\w@./-])(?=\s|$)`, 'g');
 const FENCE = /^\s*(?:[-*>|]\s*)?```/;
 const SCRIPT_COMMENT = /^\s*(?:\/\/|\*|\/\*)/;
 const CONTINUED = /\\\s*$/;

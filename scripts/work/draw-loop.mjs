@@ -73,10 +73,10 @@ import { archetypeOf } from './ui-archetype.mjs';
 import { readProposals, proposalFilesUnder } from './grammar-proposal.mjs';
 import { LOOP_SCHEMA } from './draw/draw-loop-coverage.mjs';
 import { rationaleFileOf } from './draw/draw-rationale.mjs'; import { isMain } from '../lib/is-main.mjs';
-import { browserProbes, DRAW_BEAUTY_BELOW, DRAW_CRITIC_MISSING, DRAW_METRICS_FAILED, DRAW_METRICS_UNVERIFIED, machineMetrics, stemOf } from './draw-loop-metrics.mjs';
+import { browserProbes, DRAW_METRICS_FAILED, DRAW_METRICS_UNVERIFIED, machineMetrics, stemOf } from './draw-loop-metrics.mjs';
 import { tempRoot } from '../../engine/temp-root.mjs'; import { makeTempDir } from '../api/fs/make-temp-dir.mjs';
 
-export { DRAW_BEAUTY_BELOW, DRAW_CRITIC_MISSING, DRAW_METRICS_FAILED, DRAW_METRICS_UNVERIFIED, machineMetrics }; export { DRAW_RENDER_RED, GEOMETRY_OFF_GRAMMAR } from './draw-loop-metrics.mjs';
+export { DRAW_METRICS_FAILED, DRAW_METRICS_UNVERIFIED, machineMetrics }; export { DRAW_BEAUTY_BELOW, DRAW_CRITIC_MISSING, DRAW_RENDER_RED, GEOMETRY_OFF_GRAMMAR } from './draw-loop-metrics.mjs';
 
 export { DRAW_LOOP_MISSING, LOOP_SCHEMA, livePartsOf, loopCoverageFindings } from './draw/draw-loop-coverage.mjs';
 

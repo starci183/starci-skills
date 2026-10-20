@@ -14,8 +14,8 @@ import { stacksDeploymentFindings } from './stacks-runtime.mjs';
 
 const mapping = value => plain(value) ? value : {};
 const present = value => typeof value === 'string' && Boolean(value.trim());
-const VERSION = /^[1-9][0-9]*$/;
-const VERSIONED_SECRET = /-v[1-9][0-9]*$/;
+const VERSION = /^[1-9]\d*$/;
+const VERSIONED_SECRET = /-v[1-9]\d*$/;
 const SENSITIVE_KEY = /password|passwd|secret|token|credential|private[_-]?key|api[_-]?key|service[_-]?role|(?:(?:^|_)key$)/i;
 const SOURCE = /^be\/(?:apps|src)\/.*\.[cm]?[jt]sx?$/;
 const TEST_SOURCE = /(?:\.(?:spec|test)|-spec)\.[cm]?[jt]sx?$|\/tests\//;
@@ -124,7 +124,7 @@ function traefikHosts(rule) {
 function positiveHostCall(prefix) {
   const scopes = [false];
   let pending = false;
-  for (const token of prefix.match(/"[^"]*"|'[^']*'|`[^`]*`|[()!]|[A-Za-z_][A-Za-z_0-9]*|\S/g) ?? []) {
+  for (const token of prefix.match(/"[^"]*"|'[^']*'|`[^`]*`|[()!]|[A-Za-z_]\w*|\S/g) ?? []) {
     if (token === '!') { pending = !pending; continue; }
     if (token === '(') scopes.push(scopes.at(-1) !== pending);
     if (token === ')' && scopes.length > 1) scopes.pop();
@@ -139,7 +139,7 @@ function labelHosts(service, family) {
   if (family === 'traefik' && labels.some(([key, value]) => key === 'traefik.enable' && String(value) === 'false')) return hosts;
   for (const [key, value] of labels) {
     if (family === 'traefik' && key.startsWith('traefik.http.routers.') && key.endsWith('.rule')) hosts.push(...traefikHosts(value));
-    if (family === 'caddy-docker-proxy' && /^caddy(?:_[0-9]+)?$/.test(key)) hosts.push(...String(value).split(/[\s,]+/).map(hostOf).filter(Boolean));
+    if (family === 'caddy-docker-proxy' && /^caddy(?:_\d+)?$/.test(key)) hosts.push(...String(value).split(/[\s,]+/).map(hostOf).filter(Boolean));
   }
   return hosts;
 }
@@ -282,7 +282,7 @@ function positiveMonitor(value) {
   const units = value.match(/[a-z]+/g) ?? [], quantities = value.split(/[a-z]+/);
   if (quantities.pop() !== '' || !units.length) return false;
   return units.every(unit => ['ns', 'us', 'ms', 's', 'm', 'h'].includes(unit))
-    && quantities.every(quantity => /^[0-9]+(?:\.[0-9]+)?$/.test(quantity)) && /[1-9]/.test(value);
+    && quantities.every(quantity => /^\d+(?:\.\d+)?$/.test(quantity)) && /[1-9]/.test(value);
 }
 
 function updatePolicyIssues(id, service, add) {

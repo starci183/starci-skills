@@ -68,8 +68,11 @@ export function runGraph(rows, limits) {
       if (stuck.length) reject(new Error(`release schedule: ${stuck.join(', ')} could not start`)); else resolve(results);
     };
     function pump() {
-      if (fault.error) { if (live === 0) finish(); return; }
-      for (const row of rows) if (ready(row)) start(row);
+      if (fault.error) {
+        if (live === 0) finish();
+        return;
+      }
+      for (const row of rows) { if (ready(row)) start(row); }
       if (live === 0) finish();
     }
     pump();

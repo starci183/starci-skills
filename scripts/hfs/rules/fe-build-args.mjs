@@ -91,7 +91,7 @@ function requiredNames(root, files, app, ts) {
   const names = new Set();
   for (const file of files.filter(file => file.startsWith(prefix))) {
     const local = file.slice(prefix.length);
-    const source = SOURCE.test(local) && (local.startsWith('src/') || /^next\.config\./u.test(local) || SCHEMA.test(local));
+    const source = SOURCE.test(local) && (local.startsWith('src/') || local.startsWith('next.config.') || SCHEMA.test(local));
     const schema = SCHEMA.test(local) && /\.(?:json|ya?ml)$/u.test(local);
     if (!source && !schema) continue;
     const text = readText(root, file);

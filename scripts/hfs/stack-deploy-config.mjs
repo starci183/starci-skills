@@ -176,7 +176,10 @@ function configs(c, block, probe) {
     out.push({ name: entry.name, file: entry.file, env: entry.env });
   });
   const seen = new Set();
-  for (const entry of out) { if (seen.has(entry.name)) c.problem('deploy.configs', `config name ${entry.name} is declared twice`); seen.add(entry.name); }
+  for (const entry of out) {
+    if (seen.has(entry.name)) c.problem('deploy.configs', `config name ${entry.name} is declared twice`);
+    seen.add(entry.name);
+  }
   return out;
 }
 
@@ -242,7 +245,7 @@ function tasks(c, block, services) {
   return out;
 }
 
-const REGISTRY_HOST = /^[a-z0-9][a-z0-9.-]*(?::[0-9]{1,5})?$/u;
+const REGISTRY_HOST = /^[a-z0-9][a-z0-9.-]*(?::\d{1,5})?$/u;
 const VISIBILITY = ['public', 'private'];
 
 /** The image registry: host (default ghcr.io) and the visibility the app's packages are meant to have (default public, the canon scaffold writes it and the app owns it afterwards). */

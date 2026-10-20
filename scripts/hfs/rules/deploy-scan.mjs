@@ -8,17 +8,61 @@ const DEPLOY = /(?:^|\/)deploy\//;
 const SCRIPT = /(?:^|\/)scripts\//;
 const COMPOSE = /(?:^|\/)(?:docker-)?compose(?:[.-][^/]*)?\.ya?ml$/;
 const DOCKERFILE = /(?:^|\/)Dockerfile(?:\.[^/]*)?$/;
-const CREDENTIAL_FILE = /(?:(?:^|\/)(?:secrets?\.env(?:\.[^/]*)?|\.env(?:\.[^/]*)?|secrets\/))|(?:\.enc$)/i;
-const HOST_CRON = /\b(?:crontab|anacron|crond|supercronic)\b|\/etc\/cron(?:\b|[./])|\bcron\.d\b|\/var\/spool\/cron\b|@(?:reboot|yearly|annually|monthly|weekly|daily|midnight|hourly)\b|\b[\w.@-]+\.timer\b|\bOn(?:Calendar|BootSec|UnitActiveSec|ActiveSec)\s*=|(?:^|[\s;|&"'])at\s+(?:(?:-[a-z]+\s+)*)((?:-[ft]\b)|now\b|tomorrow\b|\d{1,2}:\d{2}\b|midnight\b|noon\b)/im;
+const CREDENTIAL_FILE_PARTS = [/(?:^|\/)secrets?\.env(?:\.[^/]*)?/, /(?:^|\/)\.env(?:\.[^/]*)?/, /(?:^|\/)secrets\//, /\.enc$/];
+const CREDENTIAL_FILE = new RegExp(CREDENTIAL_FILE_PARTS.map((part) => part.source).join('|'), 'i');
+const AT_JOB_ARGUMENT = /-[ft]\b|now\b|tomorrow\b|\d{1,2}:\d{2}\b|midnight\b|noon\b/.source;
+const HOST_CRON_PARTS = [
+  /\b(?:crontab|anacron|crond|supercronic)\b/,
+  /\/etc\/cron(?:\b|[./])/,
+  /\bcron\.d\b/,
+  /\/var\/spool\/cron\b/,
+  /@(?:reboot|yearly|annually|monthly|weekly|daily|midnight|hourly)\b/,
+  /\b[\w.@-]+\.timer\b/,
+  /\bOn(?:Calendar|BootSec|UnitActiveSec|ActiveSec)\s*=/,
+  new RegExp(String.raw`(?:^|[\s;|&"'])at\s+(?:-[a-z]+\s+)*(?:${AT_JOB_ARGUMENT})`),
+];
+const HOST_CRON = new RegExp(HOST_CRON_PARTS.map((part) => part.source).join('|'), 'im');
 const HOST_CRON_PATH = /(?:^|\/)(?:crontab(?:$|\/)|cron\.d(?:\/|$)|[^/]+\.(?:timer|crontab)$)/;
 const CRON_NUMERIC_FIELD = /^[\d*,/-]+$/;
 const CRON_NAMED_FIELD = /^[\w*,/-]+$/;
-const CRON_CONTAINER = /\bimage\s*:\s*["']?(?:[^\s"']*\/)?(?:cron|crond|supercronic|ofelia)(?=[:@\s"']|$)|\b(?:command|entrypoint)\s*:[^\n]*\b(?:cron|crond|supercronic)\b/i;
-const SLEEP_LOOP = /\b(?:while\s+(?:true|:|\[\s*1\s*\])|for\s*\(\(\s*;\s*;\s*\)\))\s*[;\n][\s\S]{0,4000}?\bsleep\s+/i;
+const CRON_CONTAINER_PARTS = [
+  /\bimage\s*:\s*["']?(?:[^\s"']*\/)?(?:cron|crond|supercronic|ofelia)(?=[:@\s"']|$)/,
+  /\b(?:command|entrypoint)\s*:[^\n]*\b(?:cron|crond|supercronic)\b/,
+];
+const CRON_CONTAINER = new RegExp(CRON_CONTAINER_PARTS.map((part) => part.source).join('|'), 'i');
+const SLEEP_LOOP_HEAD_PARTS = [/while\s+(?:true|:|\[\s*1\s*\])/, /for\s*\(\(\s*;\s*;\s*\)\)/];
+const SLEEP_LOOP_HEAD = new RegExp(String.raw`\b(?:${SLEEP_LOOP_HEAD_PARTS.map((part) => part.source).join('|')})`, 'gi');
+const SLEEP_LOOP_BREAK = /[^\S\n]*[;\n]/y;
+const SLEEP_LOOP_SLEEP = /\bsleep\s+/gi;
+const SLEEP_LOOP_REACH = 4000;
+/** An endless-loop head, a statement break, then a `sleep` within SLEEP_LOOP_REACH characters: searched in steps so no regex backtracks across the pair. */
+const SLEEP_LOOP = {
+  test(text) {
+    for (const head of text.matchAll(SLEEP_LOOP_HEAD)) {
+      SLEEP_LOOP_BREAK.lastIndex = head.index + head[0].length;
+      if (!SLEEP_LOOP_BREAK.test(text)) continue;
+      SLEEP_LOOP_SLEEP.lastIndex = SLEEP_LOOP_BREAK.lastIndex;
+      const sleep = SLEEP_LOOP_SLEEP.exec(text);
+      if (sleep && sleep.index - SLEEP_LOOP_BREAK.lastIndex <= SLEEP_LOOP_REACH) return true;
+    }
+    return false;
+  },
+};
 const INLINE_NODE = /\bnode\b[^\n;&|]*?\s(?:-(?:e|p|pe)\b|--(?:eval|print)(?:\s|=))/;
-const INLINE_SQL_ACTION = /\b(?:insert\s+into|update\s+[\w."']+\s+set|delete\s+from|create\s+(?:table|function|view)|alter\s+table|truncate\s+(?:table\s+)?[\w."'])\b/i;
+const INLINE_SQL_ACTION_PARTS = [
+  /insert\s+into/,
+  /update\s+[\w."']+\s+set/,
+  /delete\s+from/,
+  /create\s+(?:table|function|view)/,
+  /alter\s+table/,
+  /truncate\s+(?:table\s+)?[\w."']/,
+];
+const INLINE_SQL_ACTION = new RegExp(String.raw`\b(?:${INLINE_SQL_ACTION_PARTS.map((part) => part.source).join('|')})\b`, 'i');
 const REMOTE_SHELL = /\b(?:curl|wget)\b[^|\n]*\|\s*(?:sudo\s+)?(?:ba|da|z)?sh\b/i;
-const COMPOSE_COMMAND = /\bdocker(?:\s+(?:--(?:context|host)(?:\s+|=)\S+|-H\s+\S+))*\s+compose\b[^\n;&|]*|\bdocker-compose\b[^\n;&|]*/g;
+const DOCKER_GLOBAL_OPTION = /(?:--(?:context|host)(?:\s+|=)|-H\s+)\S+/.source;
+const DOCKER_COMPOSE_COMMAND = new RegExp(String.raw`\bdocker(?:\s+${DOCKER_GLOBAL_OPTION})*\s+compose\b[^\n;&|]*`).source;
+const DOCKER_COMPOSE_V1_COMMAND = /\bdocker-compose\b[^\n;&|]*/.source;
+const COMPOSE_COMMAND = new RegExp(`${DOCKER_COMPOSE_COMMAND}|${DOCKER_COMPOSE_V1_COMMAND}`, 'g');
 const COMPOSE_OPTIONS = new Set(['-f', '--file', '-p', '--project-name', '--project-directory', '--env-file', '--profile', '--parallel', '--ansi', '--progress']);
 const DEV = /(?:^|[\s/._="'-])(?:dev|development|local)(?=$|[\s/._"'-])/i;
 const NON_DEV = /(?:^|[\s/._="'-])(?:prod|production|staging|stage|vps|preview)(?=$|[\s/._"'-])/i;

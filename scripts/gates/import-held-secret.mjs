@@ -32,7 +32,7 @@ function readMemberFromHistory({cwd,member,rev=null}){
     at=`${hash}^`;
   }
   const shown=show([`${at}:${member}`],{cwd});
-  if(shown.status!==0||!String(shown.stdout??'').trim())return {error:`${member} is not in ${at}: ${String(shown.stderr??'').trim().split(/\r?\n/).slice(-1)[0]??'empty'}`};
+  if(shown.status!==0||!String(shown.stdout??'').trim())return {error:`${member} is not in ${at}: ${String(shown.stderr??'').trim().split(/\r?\n/).at(-1)??'empty'}`};
   return {ciphertext:String(shown.stdout),rev:at};
 }
 

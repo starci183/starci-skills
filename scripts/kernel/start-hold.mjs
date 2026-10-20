@@ -23,7 +23,7 @@ const BUDGET_KEYS = ['startRetryMs', 'startRetryMaxMs', 'startSameCauseMax', 'st
 export function startHoldBudget(read = readModuleJson) {
   const seat = read('modules', 'reconciler', 'host.yaml')?.seats?.kernel ?? {};
   for (const key of BUDGET_KEYS) {
-    if (!(Number(seat[key]) > 0)) throw new Error(`modules/reconciler/host.yaml seats.kernel.${key} must be a positive number`);
+    if (Number.isNaN(Number(seat[key])) || Number(seat[key]) <= 0) throw new Error(`modules/reconciler/host.yaml seats.kernel.${key} must be a positive number`);
   }
   return { intervalMs: Number(seat.startRetryMs), maxIntervalMs: Number(seat.startRetryMaxMs), maxAttempts: Number(seat.startSameCauseMax), heldRetryMs: Number(seat.startHeldRetryMs) };
 }

@@ -48,9 +48,10 @@ function tagRefusal(cwd, { remoteRef, localSha }) {
 function pushRefusals({ text, cwd = process.cwd() }) {
   return parseLines(text).flatMap((ref) => {
     let line = null;
-    if (CANDIDATE_REF.test(ref.remoteRef)) line = null;
-    else if (ref.remoteRef === 'refs/heads/main') line = mainRefusal(cwd, ref);
-    else if (RELEASE_TAG_REF.test(ref.remoteRef)) line = tagRefusal(cwd, ref);
+    if (!CANDIDATE_REF.test(ref.remoteRef)) {
+      if (ref.remoteRef === 'refs/heads/main') line = mainRefusal(cwd, ref);
+      else if (RELEASE_TAG_REF.test(ref.remoteRef)) line = tagRefusal(cwd, ref);
+    }
     return line ? [line] : [];
   });
 }

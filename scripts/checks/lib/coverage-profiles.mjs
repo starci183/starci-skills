@@ -3,11 +3,12 @@ import { nodeName, resolvedExpression } from './coverage-ast.mjs';
 
 const UNKNOWN = Symbol('unknown profile value');
 
+// binary and kindGuard answer a boolean, or null when undecidable; profileValue maps null to UNKNOWN.
 function binary(operator, left, right) {
-  if (left === UNKNOWN || right === UNKNOWN) return UNKNOWN;
+  if (left === UNKNOWN || right === UNKNOWN) return null;
   if (operator === '===') return left === right;
   if (operator === '!==') return left !== right;
-  return UNKNOWN;
+  return null;
 }
 
 function logical(context, index, node, profile, seen) {
@@ -41,11 +42,11 @@ function profileValue(context, index, node, profile, seen = new Set()) {
   switch (node.type) {
     case 'Literal': return node.value;
     case 'MemberExpression': return profileMember(node) ? profile : UNKNOWN;
-    case 'CallExpression': return kindGuard(node, profile);
+    case 'CallExpression': return kindGuard(node, profile) ?? UNKNOWN;
     case 'LogicalExpression': return logical(context, index, node, profile, next);
     case 'ConditionalExpression': return conditional(context, index, node, profile, next);
     case 'BinaryExpression': return binary(node.operator,
-      profileValue(context, index, node.left, profile, next), profileValue(context, index, node.right, profile, next));
+      profileValue(context, index, node.left, profile, next), profileValue(context, index, node.right, profile, next)) ?? UNKNOWN;
     case 'UnaryExpression': return negated(context, index, node, profile, next);
     default: return UNKNOWN;
   }
@@ -55,13 +56,13 @@ const profileMember = node => (!node.computed || node.property.type === 'Literal
 
 // Architecture config derives kinds from the HFS profile, just as the graph derives profile.
 function kindGuard(node, profile) {
-  if (node.callee.computed && node.callee.property.type !== 'Literal') return UNKNOWN;
-  if (nodeName(node.callee.property) !== 'includes') return UNKNOWN;
+  if (node.callee.computed && node.callee.property.type !== 'Literal') return null;
+  if (nodeName(node.callee.property) !== 'includes') return null;
   const member = node.callee.object;
-  if (member?.type !== 'MemberExpression' || nodeName(member.property) !== 'kinds') return UNKNOWN;
-  if (member.computed && member.property.type !== 'Literal') return UNKNOWN;
+  if (member?.type !== 'MemberExpression' || nodeName(member.property) !== 'kinds') return null;
+  if (member.computed && member.property.type !== 'Literal') return null;
   const kind = node.arguments[0]?.value;
-  if (!['backend', 'frontend'].includes(kind)) return UNKNOWN;
+  if (!['backend', 'frontend'].includes(kind)) return null;
   return kind === (profile === 'be' ? 'backend' : 'frontend');
 }
 

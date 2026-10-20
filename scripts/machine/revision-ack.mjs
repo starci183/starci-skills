@@ -4,7 +4,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { sha256 } from '../../engine/digest.mjs';
-import { NOTICE_SCHEMA, manifestHolds, noticeOf, readManifestOf, recordPayload } from './revision-notice.mjs';
+import { manifestHolds, noticeOf, readManifestOf, recordPayload } from './revision-notice.mjs';
 
 /** The notice of a seat now. */
 export const noticeFor = (seat) => noticeOf({ role: seat.role, root: seat.root, current: seat.current, records: seat.records() });
@@ -62,4 +62,4 @@ export function attest(seat, submitted) {
   return { notice, manifest };
 }
 
-export { NOTICE_SCHEMA };
+export { NOTICE_SCHEMA } from './revision-notice.mjs';

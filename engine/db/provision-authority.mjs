@@ -29,7 +29,7 @@ export function provisionGoalGrant(db, { caller, operationId, planSha, ledgerId,
   if (!Number.isSafeInteger(attemptId) || attemptId < 1
     || (caller.attemptId !== undefined && Number(caller.attemptId) !== attemptId)
     || (caller.dispatchId !== undefined && caller.dispatchId !== attempt.dispatch_id)) return denied('provision-native-attempt-unverified');
-  if (!job || job.kind !== 'op' || job.status !== 'running' || job.workflow_id !== guard.workflowId || job.op_id !== guard.op
+  if (job?.kind !== 'op' || job.status !== 'running' || job.workflow_id !== guard.workflowId || job.op_id !== guard.op
     || !attempt || attempt.job_id !== guard.jobId || attempt.workflow_id !== guard.workflowId
     || attempt.op_id !== guard.op || !attempt.dispatch_id || attempt.terminal_handle !== caller.terminal
     || attempt.managed !== 1 || attempt.started_at === null || attempt.attested_at === null
@@ -40,7 +40,7 @@ export function provisionGoalGrant(db, { caller, operationId, planSha, ledgerId,
   const goal = db.prepare('SELECT * FROM goals WHERE workflow_id=? ORDER BY revision DESC LIMIT 1').get(guard.workflowId);
   const unit = db.prepare('SELECT * FROM work_units WHERE workflow_id=? AND unit_id=?').get(guard.workflowId, job.unit_id);
   const goalJson = parse(goal?.json), payload = parse(job.payload_json);
-  if (workflow?.phase !== 'running' || workflow.archived_at !== null || !goal || goal.approved_by !== 'owner'
+  if (workflow?.phase !== 'running' || workflow.archived_at !== null || goal?.approved_by !== 'owner'
     || !goal.markdown?.trim() || !goal.goal_identity || workflow.goal_identity !== goal.goal_identity || !goalJson || goalJson.provisional === true
     || !unit || unit.goal_revision !== goal.revision || unit.current_job_id !== job.job_id
     || payload?.goal_binding?.revision !== goal.revision || payload?.goal_binding?.identity !== goal.goal_identity)

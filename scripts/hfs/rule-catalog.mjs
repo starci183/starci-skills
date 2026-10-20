@@ -21,7 +21,10 @@ const RULE_KEYS = new Set(['id', 'code', 'law', 'scope', 'kinds', 'gates', 'fail
 const CASE_KEYS = new Set(['id', 'date', 'source', 'ruling', 'quote', 'supersedes', 'status', 'staleWhen', 'amendedBy']);
 const CASE_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const ENFORCER_KEYS = new Set(['kind', 'id', 'status', 'at', 'editions', 'editionWhy']);
-const CASE_REFERENCE = /^(?:case-[1-9][0-9]*|(?:ruling:)?R[0-9]{2,3}(?:\/case-[1-9][0-9]*)?|owner:[a-z][a-z0-9]*(?:-[a-z0-9]+)*)$/;
+const CASE_ID = /case-[1-9]\d*/;
+const RULING_REFERENCE = new RegExp(String.raw`(?:ruling:)?R\d{2,3}(?:/${CASE_ID.source})?`);
+const OWNER_REFERENCE = /owner:[a-z][a-z0-9]*(?:-[a-z0-9]+)*/;
+const CASE_REFERENCE = new RegExp(`^(?:${CASE_ID.source}|${RULING_REFERENCE.source}|${OWNER_REFERENCE.source})$`);
 const EVIDENCE_KEYS = new Set(['path', 'edition', 'editions']);
 const PROOF_KEYS = new Set([...EVIDENCE_KEYS, 'codes', 'fixtures']);
 const WITNESS_KEYS = new Set(['edition', 'base', 'mutate', 'expect']);
@@ -191,7 +194,7 @@ function checkRuleCases(rule, label, bad) {
     const at = `${label}.cases[${index}]`;
     if (!isPlainObject(item)) { bad.push(`${at} is not a map`); return; }
     for (const key of Object.keys(item)) if (!CASE_KEYS.has(key)) bad.push(`${at} has unknown key ${key}`);
-    if (typeof item.id !== 'string' || !/^case-[1-9][0-9]*$/.test(item.id) || ids.has(item.id)) bad.push(`${at}.id must be a unique case-N`);
+    if (typeof item.id !== 'string' || !/^case-[1-9]\d*$/.test(item.id) || ids.has(item.id)) bad.push(`${at}.id must be a unique case-N`);
     ids.add(item.id);
     if (typeof item.date !== 'string' || !CASE_DATE.test(item.date)) bad.push(`${at}.date must be YYYY-MM-DD`);
     if (item.source !== 'owner') bad.push(`${at}.source must be owner`);

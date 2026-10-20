@@ -7,16 +7,32 @@ const PLAINTEXT_LOAD = 'HFS_SCRIPT_PLAINTEXT_LOAD';
 const XTRACE = 'HFS_SCRIPT_XTRACE';
 const SERVICE_ROLE = 'HFS_SERVICE_ROLE_SCOPE';
 const SUPABASE_OWNER = 'be.integrations.supabase';
-const SECRET_FILE = /(?:(?:^|\/)(?:secrets?\.env(?:\.[^/]*)?|\.env(?:\.[^/]*)?|\.nivo-lite(?:\/|$)))|(?:\.enc$)/iu;
+const SECRET_ENV_FILE = /(?:^|\/)(?:secrets?\.env|\.env)(?:\.[^/]*)?/iu;
+const SECRET_NIVO_FILE = /(?:^|\/)\.nivo-lite(?:\/|$)/iu;
+const SECRET_ENC_FILE = /\.enc$/iu;
+const isSecretFile = (file) => SECRET_ENV_FILE.test(file) || SECRET_NIVO_FILE.test(file) || SECRET_ENC_FILE.test(file);
 const EXCLUDED_TREE = /(?:^|\/)(?:node_modules|\.git|\.claude|\.secrets|secrets|tests?|__tests__|docs|coverage|dist|build)(?:\/|$)/u;
 const TEST_FILE = /(?:\.(?:spec|test)|-spec)\.[cm]?[jt]sx?$/u;
 const SOURCE = /\.(?:[cm]?[jt]sx?|sh|bash|zsh|ksh|ps1|psm1|bat|cmd|py|rb|pl)$/iu;
 const WORKFLOW = /(?:^|\/)\.?(?:github\/)?workflows\/[^/]+\.ya?ml$/u;
 const DELIVERY = /(?:^|\/)(?:deploy|scripts|bin)\//u;
 const DOCKER = /(?:^|\/)(?:Dockerfile(?:\.[^/]*)?|(?:docker-)?compose(?:[.-][^/]*)?\.ya?ml)$/iu;
-const SECRET_REFERENCE = /(?:^|[\s/\\'"`(=])(?:secrets?\.env(?:\.[\w.-]+)?|\.env(?:\.[\w.-]+)?|\.nivo-lite(?:[/\\][\w./\\-]*)?)(?=$|[\s/\\'"`),;])/iu;
+const SECRET_REFERENCE_NAME = /(?:secrets?\.env|\.env)(?:\.[\w.-]+)?/;
+const SECRET_REFERENCE_NIVO = /\.nivo-lite(?:[/\\][\w./\\-]*)?/;
+const SECRET_REFERENCE_BEFORE = /(?:^|[\s/\\'"`(=])/;
+const SECRET_REFERENCE_AFTER = /(?=$|[\s/\\'"`),;])/;
+const SECRET_REFERENCE_SOURCE = `${SECRET_REFERENCE_BEFORE.source}(?:${SECRET_REFERENCE_NAME.source}|${SECRET_REFERENCE_NIVO.source})${SECRET_REFERENCE_AFTER.source}`;
+const SECRET_REFERENCE = new RegExp(SECRET_REFERENCE_SOURCE, 'iu');
 const EXAMPLE_REFERENCE = /(?:secrets?\.env|\.env)\.(?:example|sample|template)(?=$|[^\w.-])/giu;
-const LOAD = /(?:^|[\s;&|('"`])(?:source|cat|tac|less|more|head|tail|grep|egrep|fgrep|awk|gawk|sed|base64|Get-Content|gc|Import-DotEnv|env-cmd|load_dotenv|loadEnvFile|readFile(?:Sync)?|readTextFile(?:Sync)?|ReadAllText|ReadAllLines|dotenv\s*\.\s*(?:config|parse))\b|\b(?:File|IO)\s*\.\s*(?:read|readlines)\b|\.\s*read_(?:text|bytes)\s*\(|(?:^|[\s;&|])\.[\t ]+|(?<!<)<(?!<)/iu;
+const LOAD_SHELL_COMMAND = /(?:^|[\s;&|('"`])(?:source|cat|tac|less|more|head|tail|grep|egrep|fgrep|awk|gawk|sed|base64)\b/iu;
+const LOAD_WINDOWS_COMMAND = /(?:^|[\s;&|('"`])(?:Get-Content|gc|Import-DotEnv|env-cmd|load_dotenv|loadEnvFile)\b/iu;
+const LOAD_READ_CALL = /(?:^|[\s;&|('"`])(?:readFile(?:Sync)?|readTextFile(?:Sync)?|ReadAllText|ReadAllLines|dotenv\s*\.\s*(?:config|parse))\b/iu;
+const LOAD_FILE_READ = /\b(?:File|IO)\s*\.\s*(?:read|readlines)\b/iu;
+const LOAD_PYTHON_READ = /\.\s*read_(?:text|bytes)\s*\(/iu;
+const LOAD_DOT_SOURCE = /(?:^|[\s;&|])\.[\t ]+/iu;
+const LOAD_REDIRECT = /(?<!<)<(?!<)/iu;
+const LOAD_PATTERNS = [LOAD_SHELL_COMMAND, LOAD_WINDOWS_COMMAND, LOAD_READ_CALL, LOAD_FILE_READ, LOAD_PYTHON_READ, LOAD_DOT_SOURCE, LOAD_REDIRECT];
+const isLoad = (line) => LOAD_PATTERNS.some((pattern) => pattern.test(line));
 const READ_CALL = /\b(?:readFile(?:Sync)?|readTextFile(?:Sync)?|ReadAllText|ReadAllLines|load_dotenv|loadEnvFile|dotenv\s*\.\s*(?:config|parse))\s*\(/giu;
 const TRACE_COMMAND = /(?:^|[\s;&|('"`]|#!)(?:set|\/?(?:[\w.-]+\/)*(?:bash|sh|dash|zsh|ksh))\s+/giu;
 const SHELL_OPTIONS = /\bSHELLOPTS\s*=\s*['"]?([^\s;'"]*)/giu;
@@ -26,7 +42,7 @@ const SERVICE_ROLE_NAME = /(?:^|[^a-z0-9])(?:[a-z0-9]+[_-])*service[_-]?role(?:[
 function executableText(text) {
   return text.replace(/\/\*[\s\S]*?\*\//gu, '').split(/\r?\n/u)
     .filter((line) => !/^\s*(?:#(?!!)|\/\/)/u.test(line)).join('\n')
-    .replace(/(?:\\|`)\r?\n/gu, ' ');
+    .replace(/[\\`]\r?\n/gu, ' ');
 }
 
 const hasSecretReference = (text) => SECRET_REFERENCE.test(text.replace(EXAMPLE_REFERENCE, 'example-file'));
@@ -37,7 +53,7 @@ function callArguments(text, from) {
   for (let at = from; at < Math.min(text.length, from + 1024); at += 1) {
     const character = text[at];
     if (character === '\\') { at += 1; continue; }
-    if (quote) { if (character === quote) quote = ''; continue; }
+    if (quote) { if (character === quote) { quote = ''; } continue; }
     if (['\'', '"', '`'].includes(character)) { quote = character; continue; }
     if (character === '(') depth += 1;
     if (character === ')' && --depth === 0) return text.slice(from, at);
@@ -81,7 +97,7 @@ function plaintextLoad(text) {
   const lines = text.split(/\r?\n/u);
   const aliases = secretAliases(lines);
   const secretReference = (value) => hasSecretReference(value) || aliases.some((alias) => alias.test(value));
-  return lines.some((line) => LOAD.test(line) && secretReference(line)) || multilineLoad(text, secretReference) || pythonLoad(text);
+  return lines.some((line) => isLoad(line) && secretReference(line)) || multilineLoad(text, secretReference) || pythonLoad(text);
 }
 
 function tracingOptions(source) {
@@ -120,7 +136,7 @@ function integrationOwns(file, resolver) {
 }
 
 function isSource(file) {
-  if (SECRET_FILE.test(file) || EXCLUDED_TREE.test(file) || TEST_FILE.test(file)) return false;
+  if (isSecretFile(file) || EXCLUDED_TREE.test(file) || TEST_FILE.test(file)) return false;
   return SOURCE.test(file) || WORKFLOW.test(file) || DOCKER.test(file)
     || file.endsWith('/package.json') || file === 'package.json'
     || (DELIVERY.test(file) && !/\.[a-z0-9]+$/iu.test(file));

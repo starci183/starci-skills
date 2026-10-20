@@ -4,9 +4,9 @@
 // The mode is read from the checkout the cut or the hook runs in. A release record names the mode it was cut under, but a record never decides it: the gate accepts a record that says `ci` only
 // while this checkout's config says `ci` too. An owner file that is absent, unreadable or invalid reads as `local` (fail closed: the stricter mode).
 import { inspectOwnerConfig } from '../../engine/config.mjs';
-import { releaseSuiteMode, SUITE_MODES } from '../../engine/release-config.mjs';
+import { releaseSuiteMode } from '../../engine/release-config.mjs';
 
-export { SUITE_MODES };
+export { SUITE_MODES } from '../../engine/release-config.mjs';
 
 /** The suite mode of the owner config under `root`: 'local' or 'ci'. */
 export function suiteModeOf(root) {

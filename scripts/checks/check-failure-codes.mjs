@@ -45,7 +45,9 @@ const SCAN_EXT = /\.(mjs|yaml)$/;
 const SKIP_FILES = new Set([CATALOG_FILE, 'scripts/checks/check-failure-codes.mjs']);
 
 /** UPPER_SNAKE literals that are not codes: environment variables, Node/SQLite error names, settings and key names. */
-const NOT_CODE_PREFIX = /^(?:(ORCA|NODE|CODEX|CLAUDE|OPENAI|CLOUDFLARE|TELEGRAM|ANTHROPIC|GITHUB|GIT|DEVIN|LOCALAPPDATA|APPDATA|USERPROFILE|HTTP|SQLITE|ERR)_|SONAR_(?!(?:TUNNEL_NOT_RUNNING|DB_PASSWORD_MISMATCH|UNREACHABLE)$))/;
+const NOT_CODE_VENDOR_PREFIX = /^(?:ORCA|NODE|CODEX|CLAUDE|OPENAI|CLOUDFLARE|TELEGRAM|ANTHROPIC|GITHUB|GIT|DEVIN|LOCALAPPDATA|APPDATA|USERPROFILE|HTTP|SQLITE|ERR)_/;
+const NOT_CODE_SONAR_PREFIX = /^SONAR_(?!(?:TUNNEL_NOT_RUNNING|DB_PASSWORD_MISMATCH|UNREACHABLE)$)/;
+const NOT_CODE_PREFIX = { test: (code) => NOT_CODE_VENDOR_PREFIX.test(code) || NOT_CODE_SONAR_PREFIX.test(code) };
 const readNotCodes = (base) => new Set(readAllowlist('not-codes', base).map((entry) => entry.literal));
 
 const skipDir = (name) => name === 'node_modules' || name === '.git' || name === 'dist';

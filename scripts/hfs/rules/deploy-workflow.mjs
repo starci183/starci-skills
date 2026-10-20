@@ -59,7 +59,17 @@ const validPermissions = (value) => record(value) || value === 'read-all' || val
 const validConcurrency = (value) => nonempty(value) || (record(value) && nonempty(value.group));
 const deployName = (value) => !/authorize[\s_.-]+deploy[\s_.-]+key/i.test(value) && /(?:^|[\s/_.-])deploy(?:[\s/_.-]|$)/i.test(value);
 const materializeCommand = (script) => commands(script).some(({ text }) => /^starci\s+app\s+secret\s+materialize\b/.test(commandBody(text)));
-const deploymentCommand = (script) => commands(script).some(({ text }) => /^(?:starci\s+(?:app\s+)?(?:deploy|secret\s+materialize)\b|docker\s+stack\s+deploy\b|(?:ba?sh\s+)?(?:\.\/)?deploy\/|(?:ba?sh\s+)?(?:\.\/)?(?:scripts\/)?[\w.-]*deploy[\w.-]*\.sh\b|npm\s+run\s+deploy(?=[:\s]|$))/.test(commandBody(text)));
+const DEPLOYMENT_COMMANDS = [
+  /^starci\s+(?:app\s+)?(?:deploy|secret\s+materialize)\b/,
+  /^docker\s+stack\s+deploy\b/,
+  /^(?:ba?sh\s+)?(?:\.\/)?deploy\//,
+  /^(?:ba?sh\s+)?(?:\.\/)?(?:scripts\/)?[\w.-]*deploy[\w.-]*\.sh\b/,
+  /^npm\s+run\s+deploy(?=[:\s]|$)/,
+];
+const deploymentCommand = (script) => commands(script).some(({ text }) => {
+  const body = commandBody(text);
+  return DEPLOYMENT_COMMANDS.some((pattern) => pattern.test(body));
+});
 
 function hasAgeIdentity(job, doc) {
   const steps = activeSteps(job);

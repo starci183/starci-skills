@@ -127,5 +127,6 @@ export function classifyAll(ctx) {
     else if (verdict.happy) converted.push({ happy: verdict.happy, role: verdict.role, workflowId: p.workflowId });
   }
   const all = [...bugs, ...standardDepartures(ctx, bugs)].map((p) => ({ ...p, remedy: remedyOf(p.registry, ctx.registry) }));
-  return { bugs: all.sort((a, b) => b.blocks - a.blocks || byCodeUnit(a.key, b.key)), happy: happyFindings(ctx, converted) };
+  all.sort((a, b) => b.blocks - a.blocks || byCodeUnit(a.key, b.key));
+  return { bugs: all, happy: happyFindings(ctx, converted) };
 }

@@ -25,7 +25,7 @@ const KINDS = Object.freeze([
   { kind: 'work-dir', re: /['"`]\.starciwork['"`]/g, say: 'spells the Work directory name; WORK_DIR_NAME, workDirsInOrder, workDirHolding and workRecordPath in scripts/lib/roots.mjs resolve it', applies: (rel) => !SCANNER.test(rel) },
 ]);
 const withoutComments = (text) => String(text ?? '').replace(/^[ \t]*(?:\/\/|\/?\*).*$/gm, '');
-const countOf = (kind, rel, text) => (kind.applies(rel) ? (withoutComments(text).match(kind.re) ?? []).length : 0);
+const countOf = (kind, rel, text) => (kind.applies(rel) ? [...withoutComments(text).matchAll(kind.re)].length : 0);
 
 /**
  * The findings over `files` ({relativePath: text}) against `released` ({relativePath: text of the landing parent, or null}): a file that spells an input

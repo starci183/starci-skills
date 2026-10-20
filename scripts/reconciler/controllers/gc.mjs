@@ -436,10 +436,10 @@ function createGcController(overrides = {}) {
       ctx.log('reconciler.gc.worktrees', `worktree gc FAILED: ${String(error?.message ?? error).slice(0, 200)}`, { controller: NAME });
       return { ok: false, error: String(error?.message ?? error).slice(0, 200) };
     }
-    const stop = items.find((i) => i.action === 'stopped');
-    if (stop) await stoppedDecision(ctx, { reason: stop.reason, path: items.find((i) => i.fatal)?.path ?? null, damage: items.find((i) => i.fatal)?.damage ?? [stop.error] }); await untiedTreesDecision(ctx, items, { complete: !stop });
-    const removed = items.filter((i) => i.ok === true && i.action === 'remove').length;
-    const failed = items.filter((i) => i.ok === false);
+    const stop = items.find((i) => i.action === 'stopped'), fatal = items.find((i) => i.fatal);
+    if (stop) await stoppedDecision(ctx, { reason: stop.reason, path: fatal?.path ?? null, damage: fatal?.damage ?? [stop.error] });
+    await untiedTreesDecision(ctx, items, { complete: !stop });
+    const removed = items.filter((i) => i.ok === true && i.action === 'remove').length, failed = items.filter((i) => i.ok === false);
     if (items.length) {
       ctx.log('reconciler.gc.worktrees', `worktree gc: ${removed} removed, ${items.filter((i) => i.action === 'unregister').length} unregistered, ${items.filter((i) => i.action === 'adopt' && i.ok).length} adopted, ${failed.length} failed`,
         { controller: NAME, items: items.slice(0, 50) });

@@ -11,7 +11,6 @@ import { resolveRelative } from '../lib/relative-imports.mjs';
 import { walkFiles } from '../lib/walk.mjs';
 
 const SKIPPED_DIRS = new Set(['node_modules', '.git', '.runtime', 'examples', 'docs']);
-const GENERATED_MODULE = /\.generated\.mjs$/;
 const GENERATED_COPY = /^packages\/[^/]+(\/[^/]+)?\/runtime\//;
 const posix = (file) => String(file).replaceAll(path.sep, '/');
 
@@ -35,7 +34,7 @@ function linksOf({ file, index, resolve }) {
   };
   for (const [local, binding] of index.imports) add(binding.source, { kind: 'import', imported: binding.imported, local });
   for (const entry of index.reexports) add(entry.source, { kind: 'reexport', imported: entry.imported, exported: entry.exported });
-  if (GENERATED_MODULE.test(file)) return links;
+  if (file.endsWith('.generated.mjs')) return links;
   const owned = [...[...index.decls.values()].map((decl) => [decl.name, decl]), [null, index.module]];
   for (const [owner, uses] of owned) {
     for (const dynamic of uses.dynamics) add(dynamic.source, { kind: 'dynamic', owner });

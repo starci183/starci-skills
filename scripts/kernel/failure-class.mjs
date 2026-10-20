@@ -7,7 +7,9 @@ import { failureCodeCatalog } from '../lib/failure-code-catalog.mjs';
 import { boundValue } from './op-incident-policy.mjs';
 
 const CLASS_OF_KIND = Object.freeze({ 'check-finding': 'work', 'runtime-fault': 'runtime' });
-const CODE = /\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b|\b[a-z][a-z0-9]*(?:-[a-z0-9]+)+\b/g;
+const UPPER_CODE = /\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b/;
+const KEBAB_CODE = /\b[a-z][a-z0-9]*(?:-[a-z0-9]+)+\b/;
+const CODE = new RegExp(`${UPPER_CODE.source}|${KEBAB_CODE.source}`, 'g');
 const RETRY_BOUND = { ref: 'modules/models/kinds.yaml#routes[id=rejected-report-retries].limit' };
 
 /** 'work' | 'runtime' for a catalogued code whose kind decides the class, else null. */

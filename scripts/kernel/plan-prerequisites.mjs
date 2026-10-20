@@ -25,7 +25,7 @@ export function unsettledPlanPrerequisites(db, { workflowId, op }) {
   return authorPrerequisiteLegs(goalJsonOf(latestGoal(db, workflowId)))
     .filter((leg) => !rows.some((row) => row.op_id === leg && row.status === 'succeeded'))
     .map((leg) => {
-      const newest = rows.filter((row) => row.op_id === leg).at(-1) ?? null;
+      const newest = rows.findLast((row) => row.op_id === leg) ?? null;
       return { kind: 'plan-prerequisite-unsettled', code: WORK_AUTHOR_PREREQUISITE_UNSETTLED, op: leg, state: newest?.status ?? 'no-job', jobId: newest?.job_id ?? null };
     });
 }

@@ -23,7 +23,7 @@ function row(role, subject, bugs, happy, extra = {}) {
 }
 
 /** The latest attempt of a job in a workflow's attempts, or null. */
-const attemptOfJob = (attempts, jobId) => attempts.filter((a) => a.jobId === jobId).pop() ?? null;
+const attemptOfJob = (attempts, jobId) => attempts.findLast((a) => a.jobId === jobId) ?? null;
 
 function opRows(view, bugs, happy) {
   const mine = bugs.filter((b) => b.role === 'op' && b.workflowId === view.id);

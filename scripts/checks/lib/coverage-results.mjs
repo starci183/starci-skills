@@ -7,7 +7,10 @@ export function returnedExpressions(context, target) {
   if (target.node.body.type !== 'BlockStatement') return [{ index: target.index, node: target.node.body }];
   const out = [];
   scopedWalk(context, target.index, target.node.body, (index, node) => {
-    if (node.type === 'ReturnStatement') { if (node.argument) out.push({ index, node: node.argument }); return false; }
+    if (node.type === 'ReturnStatement') {
+      if (node.argument) out.push({ index, node: node.argument });
+      return false;
+    }
     return node.type !== 'CallExpression';
   });
   return out;

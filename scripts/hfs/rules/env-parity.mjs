@@ -35,12 +35,10 @@ const APP_MAIN = /(?:^|\/)apps\/[^/]+\/src\/main\.ts$/u;
 const SEALED_MEMBER = /^\.starcistacks\/[^/]+\/secrets\/[^/]+\.enc$/u;
 const KEYS_ROSTER = /^\.starcistacks\/[^/]+\/runtime\/env\/KEYS\.md$/u;
 const STACK_YAML = /^\.starcistacks\/.+\.ya?ml$/u;
-const ENV_EXAMPLE = /\.env\.example$/u;
-const PUBLIC_PREFIX = /^NEXT_PUBLIC_/u;
 const KEY_NAME = /^[A-Za-z_]\w*$/u;
 const FILE_SUFFIX = /_FILE$/u;
 const EXAMPLE_LINE = /^[ \t]*(?:export[ \t]+)?([A-Za-z_]\w*)[ \t]*=(.*)$/u;
-const ROSTER_KEY = /`([A-Za-z_][A-Za-z0-9_]*)`/gu;
+const ROSTER_KEY = /`([A-Za-z_]\w*)`/gu;
 
 const REQUIRED_ALWAYS = new Set(['string', 'url', 'secret', 'enum']);
 const FALLBACK_OPTIONAL = new Set(['int', 'bool', 'duration']);
@@ -274,14 +272,17 @@ function declaredYamlEntry(key, value, add) {
 /** The env names one yaml node declares: `environment:`/`env:` keys or `K=V` entries, `runtimeSecrets`, `secrets` and `vars[].name`. */
 function declaredFromYaml(node, add) {
   if (!node || typeof node !== 'object') return;
-  if (Array.isArray(node)) { for (const item of node) declaredFromYaml(item, add); return; }
+  if (Array.isArray(node)) {
+    for (const item of node) declaredFromYaml(item, add);
+    return;
+  }
   for (const [key, value] of Object.entries(node)) declaredYamlEntry(key, value, add);
 }
 
 function addDeclaredKey(declared, name) {
   if (!KEY_NAME.test(name)) return;
   declared.add(name);
-  if (FILE_SUFFIX.test(name)) declared.add(name.replace(FILE_SUFFIX, ''));
+  if (name.endsWith('_FILE')) declared.add(name.replace(FILE_SUFFIX, ''));
 }
 
 function declareKeysFromText(file, text, add) {
@@ -314,7 +315,7 @@ function addRequiredFindings(reads, sealed, declared, findings) {
 
 function sealedMemberFinding(key, member, reads, declared) {
   // The specific public-custody code wins over the generic unread one for a NEXT_PUBLIC_* key.
-  if (PUBLIC_PREFIX.test(key)) {
+  if (key.startsWith('NEXT_PUBLIC_')) {
     return found(ENV_PUBLIC_SEALED, member, `${member} seals the public key ${key}; NEXT_PUBLIC_* values are public configuration and never enter custody`);
   }
   if (!reads.has(key) && !declared.has(key)) {
@@ -347,7 +348,7 @@ function addDuplicateFindings(key, members, findings) {
 }
 
 function addExampleFindings(repoRoot, all, reads, findings) {
-  for (const file of all.filter((rel) => ENV_EXAMPLE.test(rel))) {
+  for (const file of all.filter((rel) => rel.endsWith('.env.example'))) {
     const text = readText(repoRoot, file);
     if (text === null) continue;
     for (const { key } of envExampleEntries(text)) {

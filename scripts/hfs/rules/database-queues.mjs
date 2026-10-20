@@ -104,7 +104,7 @@ function inspectDo(state, node, file) {
   const option = (key) => (node.args ?? []).find((item) => item.DefElem?.defname === key)?.DefElem?.arg?.String?.sval;
   const tree = plpgsqlTree(option('as') ?? '');
   walk(tree, (item) => {
-    if (item.PLpgSQL_expr && item.PLpgSQL_expr.parseMode === 0) inspectCalls(state, sqlTree(item.PLpgSQL_expr.query), file, true);
+    if (item.PLpgSQL_expr?.parseMode === 0) inspectCalls(state, sqlTree(item.PLpgSQL_expr.query), file, true);
     if (item.PLpgSQL_stmt_dynexecute) {
       const expression = sqlTree(`select ${item.PLpgSQL_stmt_dynexecute.query?.PLpgSQL_expr?.query ?? ''}`);
       dynamicOwnership(state, expression, file, true);
@@ -128,7 +128,7 @@ function grantCheck(state, node, file) {
 function recordGrant(state, node, file, executed) {
   state.grants.push({ node, file, created: new Map(state.created), executed });
   const grant = node.GrantStmt;
-  if (!executed || !grant || grant.objtype !== 'OBJECT_TABLE' || grant.targtype !== 'ACL_TARGET_OBJECT') return;
+  if (!executed || grant?.objtype !== 'OBJECT_TABLE' || grant.targtype !== 'ACL_TARGET_OBJECT') return;
   if (!(grant.grantees ?? []).some((item) => item.RoleSpec?.rolename === state.appRole)) return;
   const privileges = grant.privileges?.map((item) => item.AccessPriv?.priv_name).filter(Boolean) ?? TABLE_PRIVILEGES;
   for (const object of grant.objects ?? []) {

@@ -13,7 +13,10 @@ const SCRIPTS_DIR = /(?:^|\/)scripts\//;
 const PACKAGE_JSON = /(?:^|\/)package\.json$/;
 const SOURCE_FILE = /(?:^|\/)[^/.]+$|\.(?:sh|bash|zsh|mjs|cjs|js|ts|mts|py|ya?ml)$/;
 const TEST_FILE = /\.(?:spec|test)\.[cm]?[jt]s$/;
-const CREDENTIAL_FILE = /(?:(?:^|\/)(?:secrets?\.env(?:\.[^/]*)?|\.env(?:\.[^/]*)?|secrets\/))|(?:\.enc$)/i;
+const CREDENTIAL_ENV_FILE = /(?:^|\/)(?:secrets?\.env|\.env)(?:\.[^/]*)?/i;
+const CREDENTIAL_SECRETS_DIR = /(?:^|\/)secrets\//i;
+const CREDENTIAL_ENC_FILE = /\.enc$/i;
+const isCredentialFile = (file) => CREDENTIAL_ENV_FILE.test(file) || CREDENTIAL_SECRETS_DIR.test(file) || CREDENTIAL_ENC_FILE.test(file);
 const VERB_FILE = /^(render|provision|converge|verify|prune|rollback|release|backup|prepare|doctor|jobs|public)\.(?:mjs|js|cjs|sh)$/;
 const COMMENT_LINE = /^[ \t]*(?:#|\/\/).*$/gm;
 const LINE_CONTINUATION = /\\\r?\n\s*/g;
@@ -57,7 +60,7 @@ function sourceText(file, raw) {
 }
 
 function deploySource(file) {
-  if (MANAGED_WORKFLOW.test(file) || CREDENTIAL_FILE.test(file) || TEST_FILE.test(file)) return false;
+  if (MANAGED_WORKFLOW.test(file) || isCredentialFile(file) || TEST_FILE.test(file)) return false;
   if (PACKAGE_JSON.test(file) || WORKFLOW.test(file)) return true;
   return (DEPLOY_DIR.test(file) || SCRIPTS_DIR.test(file)) && SOURCE_FILE.test(file);
 }

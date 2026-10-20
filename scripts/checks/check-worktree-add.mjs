@@ -48,7 +48,10 @@ const SHELL_SCRIPT = /\.(?:ps1|sh)$/;
 
 /** The two files that may name the Orca removal: the call file and the module that hands it a link-free tree. */
 const ORCA_RM_HOMES = new Set(['scripts/api/orca/worktree-rm.mjs', 'scripts/machine/worktree-orca.mjs']);
-const ORCA_RM_IMPORT = /\bfrom\s+['"][^'"]*worktree-rm\.mjs['"]|\bimport\s*\(\s*['"][^'"]*worktree-rm\.mjs['"]|\borcaCall\s*\(\s*['"`]worktree-rm['"`]/;
+const ORCA_RM_FROM = /\bfrom\s+['"][^'"]*worktree-rm\.mjs['"]/;
+const ORCA_RM_DYNAMIC = /\bimport\s*\(\s*['"][^'"]*worktree-rm\.mjs['"]/;
+const ORCA_RM_CALL = /\borcaCall\s*\(\s*['"`]worktree-rm['"`]/;
+const ORCA_RM_IMPORT = { test: (line) => ORCA_RM_FROM.test(line) || ORCA_RM_DYNAMIC.test(line) || ORCA_RM_CALL.test(line) };
 const ORCA_RM_ARGV = /['"`]worktree['"`]\s*,\s*['"`]rm['"`]/;
 const ORCA_RM_SHELL = new RegExp(String.raw`${SHELL_PREFIX.source.replace('git', 'orca')}(?:\s+--?[\w-]+)*\s+worktree\s+(?:rm|remove)\b`);
 /** Whether a line removes an Orca worktree outside its homes: an import of the call file, an orcaCall of it, the argument list `worktree, rm`, or `orca worktree rm` handed to a shell. */

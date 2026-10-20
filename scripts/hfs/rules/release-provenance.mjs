@@ -13,7 +13,10 @@ import { found, readJson, readText } from './read.mjs';
 
 export const HFS_RELEASE_TAG_MISMATCH = 'HFS_RELEASE_TAG_MISMATCH';
 export const HFS_DB_DEPLOY_UNGUARDED = 'HFS_DB_DEPLOY_UNGUARDED';
-const SEMVER = /^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-(?:0|[1-9]\d*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|[0-9]*[A-Za-z-][0-9A-Za-z-]*))*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
+const SEMVER_NUMBER = String.raw`(?:0|[1-9]\d*)`;
+const SEMVER_PRERELEASE_ID = String.raw`(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*)`;
+const SEMVER_BUILD_ID = '[0-9A-Za-z-]+';
+const SEMVER = new RegExp(String.raw`^${SEMVER_NUMBER}\.${SEMVER_NUMBER}\.${SEMVER_NUMBER}(?:-${SEMVER_PRERELEASE_ID}(?:\.${SEMVER_PRERELEASE_ID})*)?(?:\+${SEMVER_BUILD_ID}(?:\.${SEMVER_BUILD_ID})*)?$`);
 const WORKFLOW = /^\.github\/workflows\/(images|db-deploy)\.ya?ml$/;
 const TAG = 1;
 const VERSION_PREFIX = 2;
@@ -42,7 +45,7 @@ function splitBoolean(expression, operator) {
   let start = 0, depth = 0, quote = '';
   for (let i = 0; i < expression.length; i += 1) {
     const char = expression[i];
-    if (quote) { if (char === quote) quote = ''; continue; }
+    if (quote) { if (char === quote) { quote = ''; } continue; }
     if (char === "'" || char === '"') { quote = char; continue; }
     if (char === '(') depth += 1;
     if (char === ')') depth -= 1;
@@ -56,7 +59,7 @@ function enclosingParentheses(text) {
   let depth = 0, quote = '';
   for (let i = 0; i < text.length - 1; i += 1) {
     const char = text[i];
-    if (quote) { if (char === quote) quote = ''; continue; }
+    if (quote) { if (char === quote) { quote = ''; } continue; }
     if (char === "'" || char === '"') { quote = char; continue; }
     if (char === '(') depth += 1;
     if (char === ')' && --depth === 0) return false;
@@ -109,7 +112,7 @@ function shellTagGuard(step) {
 }
 
 function checkoutPreservesRef(job) {
-  return (job.steps ?? []).filter((step) => /^actions\/checkout@/.test(step.uses ?? '')).every((step) => {
+  return (job.steps ?? []).filter((step) => (step.uses ?? '').startsWith('actions/checkout@')).every((step) => {
     const ref = step.with?.ref;
     return ref === undefined || /^\$\{\{\s*github\.(?:ref|ref_name|sha)\s*\}\}$/.test(String(ref));
   });
@@ -174,7 +177,7 @@ function imageFindings(file, workflow, version) {
   let builds = 0;
   for (const [name, job] of Object.entries(workflow.jobs ?? {})) {
     for (const step of job?.steps ?? []) {
-      if (!/^docker\/build-push-action@/.test(step.uses ?? '')) continue;
+      if (!(step.uses ?? '').startsWith('docker/build-push-action@')) continue;
       builds += 1;
       const guarded = tagOnlyTrigger(workflow) || refProof(job.if) === RELEASE_REF || refProof(step.if) === RELEASE_REF;
       if (!guarded || !checkoutPreservesRef(job) || !imageTagIsRelease(step.with?.tags, version)) findings.push(found(HFS_RELEASE_TAG_MISMATCH, file, `${file} job ${name} must build the checked-out release ref and tag every image with v<package.json version> or github.ref_name under a release-tag guard`, { job: name }));

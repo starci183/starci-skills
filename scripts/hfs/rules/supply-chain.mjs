@@ -141,12 +141,12 @@ const provenanceEnabled = (value) => asserted(value) || typeof value === 'string
 
 function imageActionEvidence(step) {
   const action = step.uses ?? '';
-  if (/^docker\/build-push-action@/.test(action)) {
+  if (action.startsWith('docker/build-push-action@')) {
     return { sbom: asserted(step.with?.sbom), provenance: provenanceEnabled(step.with?.provenance) };
   }
   return {
-    sbom: /^actions\/attest-sbom@/.test(action) && Boolean(step.with?.['sbom-path']),
-    provenance: /^actions\/attest-build-provenance@/.test(action) && Boolean(step.with?.['subject-path'] || step.with?.['subject-digest']),
+    sbom: action.startsWith('actions/attest-sbom@') && Boolean(step.with?.['sbom-path']),
+    provenance: action.startsWith('actions/attest-build-provenance@') && Boolean(step.with?.['subject-path'] || step.with?.['subject-digest']),
   };
 }
 

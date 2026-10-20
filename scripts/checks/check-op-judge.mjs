@@ -153,7 +153,7 @@ function rubricFindings(op, entry, covered, facts) {
   const findings = [];
   if ((entry.runs === 'runtime') !== runtime) findings.push(out(`judge critic runs ${entry.runs}, but the coverage row of ${op} says the Critic is ${runtime ? 'run by the runtime at settle' : 'run inside the op'}`));
   if (runtime) {
-    const kind = (facts.rubrics.kinds ?? []).find((row) => row.id === op);
+    const kind = (facts.rubrics.kinds ?? []).some((row) => row.id === op);
     if (!kind) findings.push(out(`judge critic: ${RUBRICS_FILE} has no rubric for ${op}`));
     if (entry.rubric !== `${RUBRICS_FILE}#kinds[id=${op}]`) findings.push(out(`judge critic rubric must be ${RUBRICS_FILE}#kinds[id=${op}]`));
   } else if (!exists(facts.root, entry.rubric) || !flat(covered.rubric).includes(entry.rubric)) {

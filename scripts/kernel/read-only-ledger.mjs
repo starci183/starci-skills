@@ -28,7 +28,7 @@ export function readOnlyLedger(file, { open = openLedgerReader } = {}) {
     attempts.push(what);
     throw Object.assign(new Error(`${what}: a read verb does not write the ledger`), { code: 'read-verb-write' });
   };
-  const guarded = (name, fn) => (sql, ...rest) => { if (WRITE_SQL.test(String(sql))) refuse(`${name}(${String(sql).trim().slice(0, 40)})`); return fn.call(raw, sql, ...rest); };
+  const guarded = (name, fn) => (sql, ...rest) => { if (WRITE_SQL.test(String(sql))) { refuse(`${name}(${String(sql).trim().slice(0, 40)})`); } return fn.call(raw, sql, ...rest); };
   const db = new Proxy(raw, { get: (target, name) => {
     if (name === 'prepare' || name === 'exec') return guarded(name, target[name]);
     const value = target[name];

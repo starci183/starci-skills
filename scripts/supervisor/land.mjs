@@ -301,7 +301,7 @@ function landedResult({ root, env, deps, result }, { checked, base, head }) {
 
 /** One attempt's work inside its scratch: the pick, the checks, the fast-forward. The result, or null when main moved under it (the gate reruns). */
 function landInScratch(run, scratch, step) {
-  const { commits, root, env, deps, result, check, liveDeps } = run;
+  const { commits, root, deps, result, check, liveDeps } = run;
   const { base } = step;
   const baseline = {};
   if (!deps.runChecks) {

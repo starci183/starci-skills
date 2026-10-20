@@ -14,7 +14,7 @@ function mergeProperty(before, after) {
 /** Every possible spread owner must be known before its property provenance is admitted. */
 function spreadProperty(state, expression, name, seen, resolve) {
   const choices = resolve(state, expression, seen).map(owner => ownerProperty(state, owner, name, seen, resolve));
-  if (!choices.length || choices.some(choice => choice === null)) return null;
+  if (!choices.length || choices.includes(null)) return null;
   return { values: choices.flatMap(choice => choice.values), missing: choices.some(choice => choice.missing) };
 }
 

@@ -123,7 +123,7 @@ function databaseSnapshot(target, declaration) {
 function publicSnapshot(target, resource) {
   const declaration = parseYaml(fs.readFileSync(target.declaration.path, 'utf8'));
   const environment = declaration.environments?.[target.endpoint.environment];
-  if (!environment || environment.status !== 'supported') fail();
+  if (environment?.status !== 'supported') fail();
   const selected = target.provider === 'app-stack' ? stackSnapshot(target, resource, environment) : databaseSnapshot(target, declaration);
   const files = ['package.json', 'package-lock.json', 'hfs.json', ...selected.files];
   const tracked = lsFiles(['--cached', '-z'], { cwd: target.repoRoot });

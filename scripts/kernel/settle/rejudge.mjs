@@ -50,7 +50,7 @@ function productDigestAt(tree, ref, files) {
   const rows = String(out.stdout ?? '').split(/\r?\n/).filter(Boolean).map((line) => line.replace(/^\d+ blob /, ''));
   const have = new Set(rows.map((row) => row.split('\t')[1]));
   if (out.status !== 0 || files.some((file) => !have.has(file))) return null;
-  return crypto.createHash('sha256').update(rows.sort(byCodeUnit).join('\n')).digest('hex');
+  return crypto.createHash('sha256').update([...rows].sort(byCodeUnit).join('\n')).digest('hex');
 }
 
 /**

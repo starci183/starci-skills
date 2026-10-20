@@ -7,6 +7,12 @@
 //   S2871 no-alphabetical-sort       `.sort()` / `.toSorted()` without a comparator on anything not provably a string array
 //                                    (sonarjs's port needs type information and stays silent on plain JavaScript)
 //   S1516 no-line-separator-escape   a string that spells a line separator (U+2028, U+2029)
+//   S7763 prefer-export-from         `import { a } from x; export { a }` where the import has no other use in the file (unicorn's prefer-export-from
+//                                    also reports an import the file uses itself; Sonar leaves that one alone)
+//   S1788 default-param-last         a default parameter (`a = 1`) followed by a parameter without one; ESLint core also reports a
+//                                    destructured `{ x } = {}` options parameter, which Sonar accepts
+//   S6557 prefer-starts-ends-with    `.test` of a regex that is only a literal prefix (`/^src\//`) or suffix (`/\.svg$/`), written inline or held in a
+//                                    const; the unicorn rule reads inline regexes only, the typescript-eslint one needs type information
 // Each one is calibrated against what SonarCloud reported on this project: it flags the shapes Sonar flagged and stays
 // quiet on the shapes Sonar left alone (the hundreds of one-parameter function references passed to `.map`).
 const ARRAY_METHODS = new Set(['map', 'filter', 'every', 'some', 'find', 'findIndex', 'findLast', 'findLastIndex', 'flatMap', 'forEach']);
@@ -167,10 +173,66 @@ function lineSeparatorRule() {
   }));
 }
 
+function exportFromRule() {
+  return rule({ reexport: 'Use `export…from` to re-export `{{name}}`.' }, (context) => ({
+    ExportNamedDeclaration(node) {
+      if (node.source) return;
+      for (const specifier of node.specifiers) {
+        const variable = context.sourceCode.getScope(node).set.get(specifier.local.name);
+        const imported = variable?.defs.length === 1 && variable.defs[0].type === 'ImportBinding';
+        if (imported && variable.references.length === 1) context.report({ node: specifier, messageId: 'reexport', data: { name: specifier.local.name } });
+      }
+    },
+  }));
+}
+
+const PARAMETER_FUNCTIONS = ['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression'];
+
+function defaultParamLastRule() {
+  const check = (context) => (node) => {
+    let plainSeen = false;
+    for (const param of node.params.toReversed()) {
+      if (param.type !== 'AssignmentPattern' && param.type !== 'RestElement') plainSeen = true;
+      else if (param.type === 'AssignmentPattern' && plainSeen && param.left.type === 'Identifier') context.report({ node: param, messageId: 'last' });
+    }
+  };
+  return rule({ last: 'Default parameters should be last.' }, (context) => Object.fromEntries(PARAMETER_FUNCTIONS.map((type) => [type, check(context)])));
+}
+
+const LITERAL_PREFIX = /^\^(?:[\w@~ -]|\\[./\\-])+$/;
+const LITERAL_SUFFIX = /^(?:[\w@~ -]|\\[./\\-])+\$$/;
+
+/** The regex literal `node` is, or the one the const it names is initialised with. */
+function regexLiteralOf(node, scope) {
+  if (node.type === 'Literal') return node.regex ? node : undefined;
+  if (node.type !== 'Identifier') return undefined;
+  let current = scope;
+  while (current?.set.has(node.name) === false) current = current.upper;
+  const def = current?.set.get(node.name).defs[0];
+  const init = def?.type === 'Variable' && def.parent.kind === 'const' ? def.node.init : undefined;
+  return init?.regex ? init : undefined;
+}
+
+function startsEndsWithRule() {
+  return rule({ use: "Use the 'String#{{method}}' method instead." }, (context) => ({
+    CallExpression(node) {
+      if (nameOf(node.callee) !== 'test' || node.arguments.length !== 1) return;
+      const regex = regexLiteralOf(node.callee.object, context.sourceCode.getScope(node));
+      if (!regex || !/^u?$/.test(regex.regex.flags)) return;
+      const { pattern } = regex.regex;
+      if (LITERAL_PREFIX.test(pattern)) context.report({ node, messageId: 'use', data: { method: 'startsWith' } });
+      else if (LITERAL_SUFFIX.test(pattern)) context.report({ node, messageId: 'use', data: { method: 'endsWith' } });
+    },
+  }));
+}
+
 export const ownRules = Object.freeze({
   'prefer-optional-chain': optionalChainRule(),
   'callback-arity': callbackArityRule(),
   'floating-promise': floatingPromiseRule(),
   'no-alphabetical-sort': alphabeticalSortRule(),
   'no-line-separator-escape': lineSeparatorRule(),
+  'prefer-export-from': exportFromRule(),
+  'prefer-starts-ends-with': startsEndsWithRule(),
+  'default-param-last': defaultParamLastRule(),
 });

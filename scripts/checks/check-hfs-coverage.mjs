@@ -8,7 +8,7 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import { HfsSlotsError, loadRuleCatalog, loadSlotManifest } from '../hfs/slots.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { coverageSources, exampleInventory } from './lib/coverage-inventory.mjs';
-import { coverageRuleFindings, REPORT_ONLY_CODES } from './lib/coverage-rules.mjs';
+import { coverageRuleFindings } from './lib/coverage-rules.mjs';
 import { coverageLedgerFindings } from './lib/coverage-ledgers.mjs';
 import { coverageCiteFindings } from './lib/coverage-cites.mjs';
 import { runCoverageWitnesses } from './lib/coverage-witness.mjs';
@@ -16,7 +16,7 @@ import { applyCoverageRatchet } from './lib/coverage-ratchet.mjs';
 import { PLUGIN_ENTRY, pluginRuleIds } from './check-hfs-rules.mjs';
 
 export const CODE = 'RT_COVERAGE_MATRIX';
-export { REPORT_ONLY_CODES };
+export { REPORT_ONLY_CODES } from './lib/coverage-rules.mjs';
 
 /** One catalog-driven static pass; fixture catalogs use the same path as the real repository. */
 function hfsCoverageFindings(context) {

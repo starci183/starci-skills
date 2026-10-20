@@ -197,10 +197,10 @@ function blockCatalogRanges(text, fields) {
   let fieldIndent = null;
   for (const line of text.split('\n')) {
     if (endsCatalogField(line, fieldIndent)) {
-      ranges[ranges.length - 1][1] = offset;
+      ranges.at(-1)[1] = offset;
       fieldIndent = null;
     }
-    const fieldMatch = /^([ \t]*(?:-\s*)?)([\w]+)\s*:/.exec(line);
+    const fieldMatch = /^([ \t]*(?:-\s*)?)(\w+)\s*:/.exec(line);
     if (fieldIndent === null && fields.has(fieldMatch?.[2])) {
       // A mapping key following '- ' starts after that prefix, not at the list item's indent.
       fieldIndent = fieldMatch[1].length;
@@ -208,7 +208,7 @@ function blockCatalogRanges(text, fields) {
     }
     offset += line.length + 1;
   }
-  if (fieldIndent !== null) ranges[ranges.length - 1][1] = Math.min(offset, text.length);
+  if (fieldIndent !== null) ranges.at(-1)[1] = Math.min(offset, text.length);
   return ranges;
 }
 
@@ -288,19 +288,31 @@ function markdownBoundaries(text) {
 }
 
 /** Paragraph offsets keep citations on adjacent wrapped lines together and split at actual blank/comment-only lines. */
+const YAML_KEY_HEAD = /[ \t]*(?:-[ \t]+)?[A-Za-z_][\w.-]*[ \t]*:/y;
+const YAML_KEY_TAIL = /[ \t]|\r?\n|$/y;
+
+/** True when a YAML `key:` line (optionally a list item) begins at `position`. */
+function startsYamlKeyLine(text, position) {
+  YAML_KEY_HEAD.lastIndex = position;
+  if (!YAML_KEY_HEAD.test(text)) return false;
+  YAML_KEY_TAIL.lastIndex = YAML_KEY_HEAD.lastIndex;
+  return YAML_KEY_TAIL.test(text);
+}
+
 function paragraphsOf(text, rel) {
   const paragraphs = [];
   let start = 0;
   const boundaries = [...blankLineBoundaries(text), ...emptyHtmlCommentBoundaries(text)];
   // Separate YAML values never repair one another's citations when records have no blank separator.
   if (/\.ya?ml(?:\.tpl)?$/i.test(rel)) {
-    for (const match of text.matchAll(/\n(?=[ \t]*(?:-[ \t]+)?[A-Za-z_][\w.-]*[ \t]*:(?:[ \t]|\r?\n|$))/g)) {
-      boundaries.push({ offset: match.index, end: match.index + 1 });
+    for (const match of text.matchAll(/\n/g)) {
+      if (startsYamlKeyLine(text, match.index + 1)) boundaries.push({ offset: match.index, end: match.index + 1 });
     }
   }
   // Markdown list items, headings and table rows are separate blocks even without blank lines.
   if (/\.md(?:\.tpl)?$/i.test(rel)) boundaries.push(...markdownBoundaries(text));
-  for (const boundary of boundaries.sort((left, right) => left.offset - right.offset)) {
+  boundaries.sort((left, right) => left.offset - right.offset);
+  for (const boundary of boundaries) {
     if (boundary.offset < start) continue;
     paragraphs.push({ start, text: text.slice(start, boundary.offset) });
     start = boundary.end;
@@ -309,9 +321,12 @@ function paragraphsOf(text, rel) {
   return paragraphs;
 }
 
-const CASE_CITE = /\bruling:(R\d+(?:\/[A-Za-z\d-]+)?)(?![\w/-])|\b(R\d+)(?:\s+|\/)(case-\d+)\b/g;
+const RULING_ID_CITE = /\bruling:(R\d+(?:\/[A-Za-z\d-]+)?)(?![\w/-])/;
+const RULING_CASE_CITE = /\b(R\d+)(?:\s+|\/)(case-\d+)\b/;
+const CASE_CITE = new RegExp(`${RULING_ID_CITE.source}|${RULING_CASE_CITE.source}`, 'g');
 const OWNER_CITE = /\b(?:owner:|ruling:)(?!R\d+\b)([a-z][a-z\d-]*)\b/g;
-const DATE_CITE = /\b(?:owner\s+)?ruling\s+(\d{4}-\d{2}-\d{2})\b/gi;
+const DATE_CITE = /\b(?:owner\s+)?ruling\s+(\d[\d-]{9})\b/gi;
+const DATE_SHAPE = /^\d{4}-\d{2}-\d{2}$/;
 const displayKey = (key) => (key.startsWith('owner:') ? key : `ruling:${key}`);
 
 function stalePatterns(records) {
@@ -360,6 +375,7 @@ function paragraphCitations(paragraph) {
 function addDateCitations(context, paragraph, citations, cited) {
   const { records, rel, text, add } = context;
   for (const match of paragraph.text.matchAll(DATE_CITE)) {
+    if (!DATE_SHAPE.test(match[1])) continue;
     const matching = [...records.values()].filter((record) => record.date === match[1]);
     if (!matching.length) {
       add(

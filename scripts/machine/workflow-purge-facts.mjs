@@ -55,8 +55,8 @@ function treesOf({ rows, orcaPs, workflowId }) {
   for (const w of orcaPs.ok ? orcaPs.worktrees : []) {
     const stamp = parseRuntimeStamp(w.comment);
     if (!w.path || w.isMainWorktree || stamp?.workflowId !== workflowId) continue;
-    const mains = orcaPs.worktrees.filter((x) => x.isMainWorktree && x.repoId === w.repoId);
-    add({ path: w.path, repoRoot: mains[0]?.path ?? null, kind: stamp.kind, orcaId: w.id, branch: w.branch ?? null, registered: false, pending: false });
+    const main = orcaPs.worktrees.find((x) => x.isMainWorktree && x.repoId === w.repoId);
+    add({ path: w.path, repoRoot: main?.path ?? null, kind: stamp.kind, orcaId: w.id, branch: w.branch ?? null, registered: false, pending: false });
   }
   return [...trees.values()].filter((tree) => tree.repoRoot);
 }

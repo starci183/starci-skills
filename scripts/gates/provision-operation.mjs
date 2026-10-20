@@ -42,7 +42,7 @@ const safeCode = code => PUBLIC_FAILURES.has(code) ? code : 'provider-operation-
 const provisionRefusal = code => ({ code: 2, data: { schema: 'starci/provision-operation@1', ok: false, code: safeCode(code) } });
 
 function blob(ledger, value) {
-  const stored = putBlob(Buffer.from(canonicalJSON(JSON.parse(JSON.stringify(value)))), { mediaType: 'application/json' });
+  const stored = putBlob(Buffer.from(canonicalJSON(structuredClone(value))), { mediaType: 'application/json' });
   ledger.write.recordBlob({ sha256: stored.sha, bytes: stored.size, mediaType: stored.mediaType, fileUri: blobPath(stored.sha), redaction: 'public-provision-record' });
   return stored.sha;
 }

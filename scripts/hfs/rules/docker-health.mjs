@@ -222,7 +222,10 @@ function masksProbeFailure(body) {
   for (let index = 0; index < body.length; index += 1) {
     const char = body[index];
     if (char === '\\') { index += 1; continue; }
-    if (quote) { if (char === quote) quote = null; continue; }
+    if (quote) {
+      if (char === quote) quote = null;
+      continue;
+    }
     if (char === '"' || char === "'") { quote = char; continue; }
     if (char === ';' || char === '|') return true;
   }

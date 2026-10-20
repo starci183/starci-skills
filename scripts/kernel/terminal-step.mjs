@@ -83,7 +83,7 @@ const LIVE_DECISION = ['open', 'claimed', 'escalated'];
 export function terminalFactsOf(db, jobId) {
   const row = db.prepare(`SELECT ${JOB_ROW} FROM jobs WHERE job_id=? AND kind='op'`).get(jobId);
   const wf = row ? db.prepare('SELECT phase, archived_at FROM workflows WHERE workflow_id=?').get(row.workflow_id) : null;
-  if (!wf || wf.phase !== 'running' || wf.archived_at || !['failed', 'awaiting_owner'].includes(row.status)) return null;
+  if (wf?.phase !== 'running' || wf.archived_at || !['failed', 'awaiting_owner'].includes(row.status)) return null;
   let hold = null;
   if (row.status === 'awaiting_owner' && ownerWaitIsAskless(db, row)) hold = TERMINAL_HOLDS.ownerWaitNoAsk;
   if (row.status === 'failed' && unsteppedFailures(db, [row], db.prepare(`SELECT ${JOB_ROW} FROM jobs WHERE workflow_id=? AND kind='op'`).all(row.workflow_id)).length) hold = TERMINAL_HOLDS.failedNoStep;

@@ -46,7 +46,7 @@ function answerStep(step, ctx) {
 
 const standing = (steps) => {
   const open = steps.find((s) => s.state === 'waiting' || s.state === 'overdue');
-  return open ? open.id : steps.filter((s) => s.state === 'done').pop()?.id ?? null;
+  return open ? open.id : steps.findLast((s) => s.state === 'done')?.id ?? null;
 };
 
 /** The host steps (scope host) over the whole snapshot. */

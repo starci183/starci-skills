@@ -44,7 +44,7 @@ export const pathsOverlap = (a, b) => sameOrUnder(a, b) || sameOrUnder(b, a);
  * @param {{trim?: boolean, collapse?: boolean, dot?: boolean, glob?: string|null, fold?: boolean}} [options]
  */
 export const normPath = (p, { trim = false, collapse = false, dot = false, glob = null, fold = false } = {}) => {
-  let s = String(p ?? '');
+  let s = p == null ? '' : String(p);
   if (trim) s = s.trim();
   s = slash(s);
   if (collapse) s = s.replace(/\/{2,}/g, '/');

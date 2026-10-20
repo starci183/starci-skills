@@ -30,7 +30,7 @@ const publicFile = (file, bound) => {
 function nativeConfiguration(target, request) {
   const doc = parseYaml(publicFile(target.declaration.path, 2 * 1024 * 1024).toString('utf8'));
   const quality = qualityServices(doc).sonar;
-  if (!quality || quality.optional !== false || quality.provider !== 'sonarqube'
+  if (quality?.optional !== false || quality.provider !== 'sonarqube'
       || quality.host?.replace(/\/$/, '') !== target.origin || quality.projectKey !== request.projectKey
       || !/^SONAR_(?:[A-Z0-9_]*_)?TOKEN$/.test(quality.token)
       || (quality.organization && quality.organization !== request.organization)

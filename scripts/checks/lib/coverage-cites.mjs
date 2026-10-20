@@ -7,20 +7,24 @@ const list = (value) => {
   if (value === undefined || value === null) return [];
   return Array.isArray(value) ? value : [value];
 };
-const ruleId = /^R[0-9]{2,3}$/;
+const ruleId = /^R\d{2,3}$/;
 const sourceExtension = /\.(?:[cm]?[jt]sx?)$/i;
 const specPath = /(?:^|\/)[^/]*\.(?:spec|test)\.[cm]?[jt]sx?$/i;
-const textExtension = /\.(?:md|mdx|txt|rst|ya?ml|json|toml|[cm]?[jt]sx?|sh|ps1|html|css|scss|hbs|ejs|njk|tmpl)$/i;
+const documentExtension = /\.(?:md|mdx|txt|rst|ya?ml|json|toml|[cm]?[jt]sx?)$/i;
+const assetExtension = /\.(?:sh|ps1|html|css|scss|hbs|ejs|njk|tmpl)$/i;
+const textExtension = { test: (path) => documentExtension.test(path) || assetExtension.test(path) };
+const envFile = /(?:^|\/)[^/]*\.env(?:\.[^/]*)?$/i;
+const secretKeyFile = /(?:^|\/)[^/]*\.(?:enc|pem|key|p12|pfx)$/i;
 
 /** Scope predicate also usable before reading files: generated copies and secret material never enter this scan. */
 function coverageCitePath(candidate) {
   const path = String(candidate).replaceAll('\\', '/');
   if (/(?:^|\/)(?:node_modules|\.git|\.claude|\.codex|\.tmp-docs|\.runtimes|dist|build|coverage|_derived|secrets|\.secrets)(?:\/|$)/i.test(path)) return false;
   if (/^packages\/(?:hfs\/runtime|eslint\/(?:be|fe)\/runtime)\//.test(path)) return false;
-  if (/(?:^|\/)(?:[^/]*\.env(?:\.[^/]*)?|\.env(?:\.[^/]*)?|[^/]*\.(?:enc|pem|key|p12|pfx))$/i.test(path)) return false;
+  if (envFile.test(path) || secretKeyFile.test(path)) return false;
   if (/(?:^|\/)CHANGELOG(?:\.[^/]*)?$/i.test(path)) return false;
   if (specPath.test(path)) return true;
-  if (/^examples\//.test(path)) return /(?:^|\/)README(?:\.(?:md|mdx|txt|rst))?$/i.test(path);
+  if (path.startsWith('examples/')) return /(?:^|\/)README(?:\.(?:md|mdx|txt|rst))?$/i.test(path);
   if (/^packages\/[^/]+\/src\//.test(path)) return sourceExtension.test(path);
   if (/^(?:docs|knowledge|templates|scripts\/hfs|packages\/hfs\/templates)\//.test(path)) {
     return textExtension.test(path) || /(?:^|\/)(?:README|Dockerfile)(?:\.[^/]*)?$/i.test(path);
@@ -36,8 +40,8 @@ function referenceKey(value, currentRule) {
   }
   if (typeof value !== 'string') return null;
   const text = value.trim().replace(/^ruling:/, '');
-  if (/^R[0-9]{2,3}[ /]case-[1-9][0-9]*$/.test(text)) return text.replace(' ', '/');
-  if (/^case-[1-9][0-9]*$/.test(text) && currentRule) return `${currentRule}/${text}`;
+  if (/^R\d{2,3}[ /]case-[1-9]\d*$/.test(text)) return text.replace(' ', '/');
+  if (/^case-[1-9]\d*$/.test(text) && currentRule) return `${currentRule}/${text}`;
   if (ruleId.test(text)) return text;
   if (!text) return null;
   return text.startsWith('owner:') ? text : `owner:${text}`;
@@ -93,10 +97,19 @@ function rulingIndex(context) {
   return { nodes, successors: successorIndex(nodes), dates: dateIndex(nodes) };
 }
 
+const CITE_RULE = String.raw`R\d{2,3}`;
+const CITE_CASE = String.raw`case-([1-9]\d*)`;
+const CITE_SLUG = '[a-z][a-z0-9]*(?:[-._][a-z0-9]+)*';
+const CITE_END = String.raw`(?![\w/-])`;
+const CITE_GRAMMAR = new RegExp([
+  String.raw`\bruling:(${CITE_RULE}(?:\/case-[1-9]\d*)?|${CITE_SLUG})${CITE_END}`,
+  String.raw`\b(${CITE_RULE})\s+${CITE_CASE}${CITE_END}`,
+  String.raw`\bowner:(${CITE_SLUG})${CITE_END}`,
+].join('|'), 'g');
+
 function references(text, index, includeDates = false) {
   const found = [];
-  const grammar = /\bruling:(R[0-9]{2,3}(?:\/case-[1-9][0-9]*)?|[a-z][a-z0-9]*(?:[-._][a-z0-9]+)*)(?![\w/-])|\b(R[0-9]{2,3})\s+case-([1-9][0-9]*)(?![\w/-])|\bowner:([a-z][a-z0-9]*(?:[-._][a-z0-9]+)*)(?![\w/-])/g;
-  for (const match of text.matchAll(grammar)) {
+  for (const match of text.matchAll(CITE_GRAMMAR)) {
     const key = match[2] ? `${match[2]}/case-${match[3]}` : referenceKey(match[1] ?? `owner:${match[4]}`);
     if (index.nodes.has(key)) found.push({ key, offset: match.index });
   }
@@ -190,7 +203,7 @@ function commentLine(line) {
 }
 
 function commentBody(text) {
-  return text.replace(/^\/[/\*]/, '  ').replace(/\*\/$/, '  ').split('\n').map(commentLine).join('\n');
+  return text.replace(/^\/[/*]/, '  ').replace(/\*\/$/, '  ').split('\n').map(commentLine).join('\n');
 }
 
 function titleChunks(text, tokens) {

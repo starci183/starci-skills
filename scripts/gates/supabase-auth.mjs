@@ -34,7 +34,7 @@ export async function runSupabaseAuth(ctx) {
   if (ctx?.positionals?.[0] !== 'user-ensure') return supabaseRefusal('supabase-auth-action-invalid');
   let target;
   try {
-    target = await resolveProvisionTarget({ cwd: ctx.cwd, targetId: ctx.args?.target, provider: 'supabase-auth' });
+    target = resolveProvisionTarget({ cwd: ctx.cwd, targetId: ctx.args?.target, provider: 'supabase-auth' });
     if (!validOrigin(target) || !validUser(target.resource?.user)) return supabaseRefusal('supabase-auth-target-invalid');
   } catch { return supabaseRefusal('supabase-auth-target-unavailable'); }
   const credentialRefs = { 'service-role': target.credentials?.['service-role'] };

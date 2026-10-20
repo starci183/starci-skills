@@ -7,7 +7,7 @@ const SLOT_META_FIELDS = Object.freeze(['templateNa', 'exemplifiedBy', 'editionW
 // alpha.14 shipped slot manifest 3.1.0; later additions cannot enter the legacy backlog.
 const LEGACY_SLOT_VERSION = Object.freeze([3, 1, 0]);
 export const REPORT_ONLY_CODES = Object.freeze(['RT_COVERAGE_NO_WITNESS', 'RT_COVERAGE_NO_EXAMPLE']);
-const ruleNumber = (rule) => Number(/^R([0-9]+)$/.exec(rule.id)?.[1] ?? Infinity);
+const ruleNumber = (rule) => Number(/^R(\d+)$/.exec(rule.id)?.[1] ?? Infinity);
 
 function legacyCoverageRule(rule) {
   return ruleNumber(rule) < 247 && !META_FIELDS.some((field) => Object.hasOwn(rule, field));
@@ -45,7 +45,8 @@ function findingReferences(finding, index) {
 }
 
 function withLevel(finding, level, legacy = false) {
-  const { legacy: _previous, ...rest } = finding;
+  const rest = { ...finding };
+  delete rest.legacy;
   return { ...rest, level, ...(legacy ? { legacy: true } : {}) };
 }
 

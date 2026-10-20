@@ -9,7 +9,9 @@ import fs from 'node:fs';
 import { allocationSettings } from '../../engine/config.mjs';
 import { retryAfterFailure } from '../lib/retry-budget.mjs';
 
-const VOLATILE = /\b[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}\b|\b(?:push|term|ctx|run|req)[-_][0-9a-f]{6,}\b/gi;
+const VOLATILE_UUID = /\b[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}\b/;
+const VOLATILE_PREFIXED = /\b(?:push|term|ctx|run|req)[-_][0-9a-f]{6,}\b/;
+const VOLATILE = new RegExp(`${VOLATILE_UUID.source}|${VOLATILE_PREFIXED.source}`, 'gi');
 const RULING_EVENTS = ['kernel-decision', 'gate-answered', 'owner-answered', 'supervisor-ruling-applied'];
 
 /** The declared growth as a retry budget (scripts/lib/retry-budget.mjs doubles the interval per repeat): {baseMs, capMs}. */

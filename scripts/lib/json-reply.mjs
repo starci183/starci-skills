@@ -3,5 +3,5 @@
 
 /** The parsed stdout of `reply` when it exited 0, else null. Never throws. */
 export function jsonReply(reply) {
-  try { return reply && reply.status === 0 ? JSON.parse(reply.stdout) : null; } catch { return null; }
+  try { return reply?.status === 0 ? JSON.parse(reply.stdout) : null; } catch { return null; }
 }

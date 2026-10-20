@@ -12,7 +12,10 @@ import { returnedExpressions, valuesOf } from './unused-symbol-flow.mjs';
 
 export const HFS_UNUSED_SYMBOL = 'HFS_UNUSED_SYMBOL';
 const SOURCE = /\.[cm]?[jt]sx?$/u;
-const EXCLUDED = /(?:^|\/)(?:node_modules|__generated__|_generated|dist|tests?|__tests__|test-support)\/|(?:\.(?:spec|test)|-spec)\.[cm]?[jt]sx?$|\.d\.[cm]?ts$/u;
+const EXCLUDED_DIR = /(?:^|\/)(?:node_modules|__generated__|_generated|dist|tests?|__tests__|test-support)\//u;
+const EXCLUDED_TEST_FILE = /(?:\.(?:spec|test)|-spec)\.[cm]?[jt]sx?$/u;
+const EXCLUDED_DECLARATION_FILE = /\.d\.[cm]?ts$/u;
+const isExcluded = (file) => EXCLUDED_DIR.test(file) || EXCLUDED_TEST_FILE.test(file) || EXCLUDED_DECLARATION_FILE.test(file);
 const CATALOG = /(?:\.messages|\.catalog)\.[cm]?[jt]s$/u;
 const JSON_CATALOG = /(?:^|\/)(?:messages|locales)\/[^/]+\.json$|\.catalog\.json$/u;
 const QUEUE_NAME = /(?:^QUEUE(?:_NAME)?$|_QUEUE(?:_NAME)?$)/u;
@@ -29,7 +32,7 @@ function compilerAt(repoRoot, supplied) {
 function sourceFiles(ts, repoRoot, files) {
   const sources = new Map();
   for (const file of files) {
-    if (!SOURCE.test(file) || EXCLUDED.test(file) || !/(?:^|\/)src\//u.test(file)) continue;
+    if (!SOURCE.test(file) || isExcluded(file) || !/(?:^|\/)src\//u.test(file)) continue;
     const text = readText(repoRoot, file);
     if (text !== null) sources.set(slash(path.resolve(repoRoot, file)), ts.createSourceFile(path.resolve(repoRoot, file), text, ts.ScriptTarget.Latest, true));
   }
@@ -259,7 +262,7 @@ function sourceReads(state, sources) {
 }
 
 function jsonCandidates(state, files) {
-  for (const file of files.filter(file => JSON_CATALOG.test(file) && !EXCLUDED.test(file))) {
+  for (const file of files.filter(file => JSON_CATALOG.test(file) && !isExcluded(file))) {
     let json;
     try { json = JSON.parse(readText(state.repoRoot, file)); } catch { continue; }
     const leaves = (value, prefix = '') => {
@@ -316,7 +319,8 @@ export function unusedSymbolFindings({ repoRoot, files, repo = {}, isRoot = fals
   const findings = new Map();
   for (const candidate of state.candidates) {
     if (candidate.used || candidate.kind === 'catalog key' && catalogRead(state, candidate, liveCodes) || !inScope(candidate.path)) continue;
-    const { used: _used, ...extra } = candidate;
+    const extra = { ...candidate };
+    delete extra.used;
     findings.set(`${candidate.path}:${candidate.name}`, found(HFS_UNUSED_SYMBOL, candidate.path, `${candidate.path} declares unused ${candidate.kind} ${candidate.name}; remove it or read it in production source (declarations, metadata maps and tests do not count).`, extra));
   }
   return [...findings.values(), ...ledgerFindings.filter(finding => inScope(finding.path))].sort((a, b) => a.path.localeCompare(b.path) || a.line - b.line || a.name.localeCompare(b.name));

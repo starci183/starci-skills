@@ -25,7 +25,7 @@ function assertRegisteredWorktree(repoRoot, ledgerRoot) {
   const machine = openMachineReader();
   try {
     const registered = machine?.worktreeRow(repoRoot);
-    if (!registered || registered.removed_at !== null || pathKey(canonicalPath(registered.repo_root)) !== pathKey(canonicalPath(ledgerRoot)))
+    if (registered?.removed_at !== null || pathKey(canonicalPath(registered.repo_root)) !== pathKey(canonicalPath(ledgerRoot)))
       throw refuse('provision-worktree-unregistered');
   } finally { machine?.close(); }
 }

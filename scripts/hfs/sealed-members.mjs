@@ -75,7 +75,7 @@ export function declaredSealedMembers(repoRoot) {
 
 function placeholderValue(key) {
   const generated = randomUUID();
-  if (/DB_URL$/u.test(key)) return `postgresql://app_be:${generated}@db.invalid:5432/app`;
+  if (key.endsWith('_URL') && key.slice(0, -4).endsWith('DB')) return `postgresql://app_be:${generated}@db.invalid:5432/app`;
   if (key.endsWith('_URL')) return `https://example.invalid/${generated}`;
   return generated;
 }

@@ -161,7 +161,7 @@ function readmeBadgeText(text, manifestText) {
     let url;
     try { url = new URL(address); } catch { return image; }
     if (!hosts.has(url.host) || url.username || url.password) return image;
-    const badgePath = url.host === 'codecov.io' ? /\/graph\/badge\.svg$/.test(url.pathname) : url.pathname === '/api/project_badges/measure';
+    const badgePath = url.host === 'codecov.io' ? url.pathname.endsWith('/graph/badge.svg') : url.pathname === '/api/project_badges/measure';
     if (!badgePath) return image;
     const fragment = address.indexOf('#');
     const queryEnd = fragment < 0 ? address.length : fragment;

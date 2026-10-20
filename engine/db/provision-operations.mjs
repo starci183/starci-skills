@@ -125,7 +125,7 @@ function claimProvisionOperation(db, { operationId, planSha, reconcile = false, 
 /** Persist safe checkpoints and terminal receipts under the execution generation that owns them. */
 function updateProvisionOperation(db, { operationId, generation, state = 'running', receiptSha = null, metadataSha = null, writeAck = false, code, at = Date.now(), pid = process.pid }) {
   const row = provisionOperation(db, operationId);
-  need(row && row.state === 'running' && row.generation === generation && row.owner_pid === pid, 'provision-executor-stale');
+  need(row?.state === 'running' && row.generation === generation && row.owner_pid === pid, 'provision-executor-stale');
   need(['running', 'applied', 'verified', 'failed', 'unknown', 'partial'].includes(state), 'provision-state-invalid');
   db.prepare('UPDATE provision_operations SET state=?,receipt_sha=COALESCE(?,receipt_sha),metadata_sha=COALESCE(?,metadata_sha),write_ack=MAX(write_ack,?),code=?,updated_at=? WHERE operation_id=?')
     .run(state, receiptSha, metadataSha, writeAck ? 1 : 0, code, at, operationId);

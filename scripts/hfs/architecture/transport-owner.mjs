@@ -94,7 +94,7 @@ function moduleSpecifierOf(ts, node) {
 function isApolloClientConstruction(ts, kit, checker, node) {
   if (!ts.isNewExpression(node)) return false;
   const binding = kit.importBinding(checker, node.expression);
-  return Boolean(binding && binding.name === 'ApolloClient' && binding.module.startsWith('@apollo/client'));
+  return Boolean(binding?.name === 'ApolloClient' && binding.module.startsWith('@apollo/client'));
 }
 
 function inspectLibraryImport({ ts, file, node, transport, report }) {

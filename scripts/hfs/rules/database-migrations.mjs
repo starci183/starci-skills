@@ -13,7 +13,10 @@ import { fileURLToPath } from 'node:url';
 import { loadTypescript } from '../../lib/package-at.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const MIGRATION_NAME = /^(\d{14})_([a-z0-9]+(?:-[a-z0-9]+)*|contract_[a-z0-9]+(?:[-_][a-z0-9]+)*|[a-z0-9]+(?:-[a-z0-9]+)*_contract_[a-z0-9]+(?:[-_][a-z0-9]+)*)\.sql$/;
+const MIGRATION_PLAIN = /[a-z0-9]+(?:-[a-z0-9]+)*/;
+const MIGRATION_CONTRACT_TAIL = /contract_[a-z0-9]+(?:[-_][a-z0-9]+)*/;
+const MIGRATION_SLUG = [MIGRATION_PLAIN.source, MIGRATION_CONTRACT_TAIL.source, `${MIGRATION_PLAIN.source}_${MIGRATION_CONTRACT_TAIL.source}`].join('|');
+const MIGRATION_NAME = new RegExp(String.raw`^(\d{14})_(${MIGRATION_SLUG})\.sql$`);
 export const isMigrationName = (name) => MIGRATION_NAME.test(name);
 const RESTAMP_HEADER = /^-- starci:restamp (\d{14}) (\d{14})(?:\r?\n|$)/;
 const withoutRestampHeader = (text) => text?.replace(RESTAMP_HEADER, '') ?? null;
@@ -227,7 +230,11 @@ export function databaseSqlTokens(text) {
   let index = 0;
   let line = 1;
   while (index < text.length) {
-    if (/\s/.test(text[index])) { if (text[index] === '\n') line += 1; index += 1; continue; }
+    if (/\s/.test(text[index])) {
+      if (text[index] === '\n') line += 1;
+      index += 1;
+      continue;
+    }
     const end = commentEnd(text, index);
     if (end !== null) { line += text.slice(index, end).split('\n').length - 1; index = end; continue; }
     const token = sqlTokenAt(text, index);
@@ -243,7 +250,10 @@ export function databaseSqlStatements(tokens) {
   const statements = [];
   let current = [];
   for (const token of tokens) {
-    if (token.t === 'punct' && token.v === ';') { if (current.length) statements.push(current); current = []; }
+    if (token.t === 'punct' && token.v === ';') {
+      if (current.length) statements.push(current);
+      current = [];
+    }
     else current.push(token);
   }
   if (current.length) statements.push(current);

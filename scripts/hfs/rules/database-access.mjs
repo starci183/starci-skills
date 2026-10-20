@@ -74,7 +74,7 @@ async function principalHelpers(analyses) {
     try { bodies.push({ name: fn.name, ast: await parseSql(body) }); } catch { /* PL/pgSQL safety is checked separately. */ }
   });
   const helpers = new Set();
-  for (let pass = 0; pass < bodies.length; pass += 1) {
+  for (let remaining = bodies.length; remaining > 0; remaining -= 1) {
     for (const body of bodies) if (hasPrincipal(body.ast, helpers)) helpers.add(body.name);
   }
   return helpers;

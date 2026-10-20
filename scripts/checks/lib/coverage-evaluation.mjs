@@ -64,10 +64,11 @@ function objectValue(context, index, node, seen) {
   return out;
 }
 
+// The mapped or filtered array, or null when the call cannot be evaluated (builtinValue maps null to UNKNOWN).
 function mappedValue(context, index, call, values, seen) {
-  if (!Array.isArray(values)) return UNKNOWN;
+  if (!Array.isArray(values)) return null;
   const callback = resolvedExpression(context, index, call.arguments[0]);
-  if (!callable(callback.node)) return UNKNOWN;
+  if (!callable(callback.node)) return null;
   const results = values.map((value, position) => {
     const scope = localScope(callback.index);
     callback.node.params.forEach((parameter, parameterIndex) => bindPattern(context, scope, parameter,
@@ -75,7 +76,7 @@ function mappedValue(context, index, call, values, seen) {
     return functionValue(context, scope, callback.node, seen);
   });
   if (nodeName(call.callee.property) === 'map') return results;
-  if (results.includes(UNKNOWN)) return UNKNOWN;
+  if (results.includes(UNKNOWN)) return null;
   return values.filter((_value, position) => results[position]);
 }
 
@@ -89,7 +90,7 @@ function builtinValue(context, index, call, seen) {
     return argument.every((entry) => Array.isArray(entry) && entry.length >= 2) ? Object.fromEntries(argument) : UNKNOWN;
   }
   const receiver = evaluate(context, index, callee.object, seen);
-  if (['map', 'filter'].includes(name)) return mappedValue(context, index, call, receiver, seen);
+  if (['map', 'filter'].includes(name)) return mappedValue(context, index, call, receiver, seen) ?? UNKNOWN;
   if (name === 'includes' && Array.isArray(receiver) && argument !== UNKNOWN) return receiver.includes(argument);
   return UNKNOWN;
 }

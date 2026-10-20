@@ -106,7 +106,7 @@ function queueMethods(env, declaration, constructor, excluded) {
     && decoratorsHave(env, parameter, 'InjectQueueOutbox', '@modules/platform/queue'));
   if (!outbox || !env.ts.isIdentifier(outbox.name)) return;
   for (const method of declaration.members) {
-    if (!env.ts.isMethodDeclaration(method) || !method.body || method.body.statements.length !== 1) continue;
+    if (!env.ts.isMethodDeclaration(method) || method.body?.statements.length !== 1) continue;
     const call = statementCall(env.ts, method.body.statements[0]);
     if (call && env.ts.isCallExpression(call) && receiverMember(env.ts, call) === outbox.name.text && call.expression.name.text === 'write'
       && call.arguments.length === 3 && call.arguments.every(argument => mapping(env, argument))) excluded.add(method);

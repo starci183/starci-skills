@@ -163,7 +163,7 @@ function bootstrapEntries(values) {
   const entries = Object.entries(values);
   if (!entries.length) throw new Error('Bootstrap requires at least one value');
   for (const [name, value] of entries) {
-    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name) || name.startsWith('sops_') || name.endsWith('_unencrypted')) {
+    if (!/^[A-Za-z_]\w*$/.test(name) || name.startsWith('sops_') || name.endsWith('_unencrypted')) {
       throw new Error('Bootstrap contains an invalid or reserved dotenv key');
     }
     if (typeof value !== 'string' || !value.length) throw new Error('Bootstrap values must be nonempty strings');

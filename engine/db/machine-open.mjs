@@ -12,6 +12,14 @@ const writerPragmas = (env) => ({ synchronous: 'NORMAL', busy_timeout: busyTimeo
   journal_size_limit: 67108864, trusted_schema: 'OFF' });
 export const pragma = (db, name) => { const row = db.prepare(`PRAGMA ${name}`).get(); return row ? Object.values(row)[0] : null; };
 
+function recordFacts(db) {
+  const facts = { sqlite_version: db.prepare('select sqlite_version() v').get().v, node_version: process.version, journal_mode: String(pragma(db, 'journal_mode')).toLowerCase() };
+  const stale = Object.entries(facts).filter(([k, v]) => db.prepare('SELECT value FROM machine_meta WHERE key=?').get(k)?.value !== v);
+  if (!stale.length) return;
+  const put = db.prepare('INSERT INTO machine_meta(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value');
+  try { for (const [k, v] of stale) put.run(k, v); } catch (error) { if (!isBusyError(error)) throw error; /* another writer records them */ }
+}
+
 /** The connection opener bound to the schema methods and the corruption reporter of machine.mjs. */
 export function machineOpenMethods({ checkSchema, createSchema, openWithRetry, corruptIncident }) {
   function openConnection(file, { readOnly = false, env = process.env, now = Date.now, onCorrupt = corruptIncident } = {}) {
@@ -48,12 +56,5 @@ export function machineOpenMethods({ checkSchema, createSchema, openWithRetry, c
     }, { file, onCorrupt });
   }
 
-  function recordFacts(db) {
-    const facts = { sqlite_version: db.prepare('select sqlite_version() v').get().v, node_version: process.version, journal_mode: String(pragma(db, 'journal_mode')).toLowerCase() };
-    const stale = Object.entries(facts).filter(([k, v]) => db.prepare('SELECT value FROM machine_meta WHERE key=?').get(k)?.value !== v);
-    if (!stale.length) return;
-    const put = db.prepare('INSERT INTO machine_meta(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value');
-    try { for (const [k, v] of stale) put.run(k, v); } catch (error) { if (!isBusyError(error)) throw error; /* another writer records them */ }
-  }
   return { openConnection };
 }

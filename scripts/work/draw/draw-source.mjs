@@ -42,13 +42,16 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { findPackage, requirePackage } from '../../lib/package-at.mjs';
 import { list, byCodeUnit } from '../../lib/list.mjs';
 import { isFile } from '../../lib/fs-kind.mjs';
 import { DRAW_OFF_GRAMMAR_COMPONENT } from './draw-dna.mjs';
 import { isMain } from '../../lib/is-main.mjs';
+import { GRAMMAR_PACKAGE, loadTypescript } from './draw-typecheck.mjs';
 
 export { DRAW_OFF_GRAMMAR_COMPONENT };
+// The typecheck half lives in draw-typecheck.mjs so draw-grammar.mjs can use it without importing this entry module.
+export { GRAMMAR_PACKAGE, loadTypescript };
+export { typecheckDraw } from './draw-typecheck.mjs';
 export const DRAW_TYPECHECK_FAILED = 'DRAW_TYPECHECK_FAILED';
 export const DRAW_RAW_STYLED_HTML = 'DRAW_RAW_STYLED_HTML';
 export const DRAW_IMPORT_OFF_GRAMMAR = 'DRAW_IMPORT_OFF_GRAMMAR';
@@ -56,14 +59,11 @@ export const DRAW_LAYOUT_VALUE_UNJUSTIFIED = 'DRAW_LAYOUT_VALUE_UNJUSTIFIED';
 export const DRAW_BASE_SIGNATURE = 'DRAW_BASE_SIGNATURE';
 
 export const DRAW_SOURCE_SUFFIX = '.draw.tsx';
-export const GRAMMAR_PACKAGE = '@starci/grammar';
 const GRAMMAR_MODULE_RX = /^@starci\/grammar(?:\/[a-z][a-z-]*)?$/;
 const ICON_MODULE_RX = /^@(?:heroicons\/react|starci\/heroicons)\/(?:24\/outline|16\/solid)$/;
 const REACT_MODULES = Object.freeze(['react']);
 /** A relative raster import: the art-slot placeholder of a MediaFrame/Image (data-asset-slot; interface.asset owes the art). */
 const ASSET_MODULE_RX = /^\.{1,2}\/[^?#]+\.(?:png|jpe?g|webp|gif|avif)$/i;
-/** Ambient declarations every draw file type-checks with (a raster import is its URL, as draw-render's esbuild emits it). */
-const DRAW_AMBIENT = ['png', 'jpg', 'jpeg', 'webp', 'gif', 'avif'].map((ext) => `declare module "*.${ext}" { const src: string; export default src }\n`).join('');
 /** HTML a drawing may use, for layout only (grid, region order, list semantics). */
 const LAYOUT_ELEMENTS = Object.freeze(['div', 'section', 'article', 'header', 'footer', 'main', 'aside', 'nav', 'ul', 'ol', 'li']);
 /** The attribute draw-render stamps on every layout element of a draw file (rendered-DOM ownership). */
@@ -129,12 +129,6 @@ function justifiedBy(cls, rationale) {
     && rx.test(`${e.value ?? ''} ${e.decision ?? ''}`)) ?? null;
 }
 
-/** The typescript module: the product's own install, else the runtime's. */
-export function loadTypescript(dirs = []) {
-  const found = findPackage([...dirs, SKILL_ROOT], ['typescript']);
-  if (!found) return null;
-  return { ts: requirePackage(found), version: found.version, root: found.root };
-}
 
 /** The rationale.json beside a draw file: <stem>.rationale.json, <XBase>.rationale.json, else rationale.json. */
 export function rationaleFileFor(file) {
@@ -354,59 +348,6 @@ export function markLayoutElements(text, { ts = loadTypescript()?.ts, file = 'so
   return out;
 }
 
-/* ------------------------------------------------------------------ typecheck */
-
-const nodeModulesUp = (dir) => {
-  const out = [];
-  for (let d = path.resolve(dir); ; d = path.dirname(d)) {
-    const nm = path.join(d, 'node_modules');
-    if (fs.existsSync(nm)) out.push(nm);
-    if (path.dirname(d) === d) break;
-  }
-  return out;
-};
-
-/**
- * Type-check one draw file against the grammar at `grammarRoot` (a package root holding dist/<family>/index.d.ts),
- * with the product's typescript and compiler options. Every bare import resolves from the product's node_modules, so
- * the draw file may live anywhere (a temp or ui-record dir). Returns {ok, errors:[{file, line, code, message}], typescript}.
- */
-export function typecheckDraw({ file, productDir, grammarRoot, ts: tsIn = null }) {
-  const loaded = tsIn ? { ts: tsIn, version: tsIn.version } : loadTypescript([productDir]);
-  if (!loaded) return { ok: false, errors: [{ file, line: null, code: 'no-typescript', message: `no typescript resolvable from ${productDir}` }], typescript: null };
-  const { ts } = loaded;
-  let options = { strict: true, jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.ESNext, moduleResolution: ts.ModuleResolutionKind.Bundler, target: ts.ScriptTarget.ES2020,
-    lib: ['lib.dom.d.ts', 'lib.dom.iterable.d.ts', 'lib.esnext.d.ts'], skipLibCheck: true, esModuleInterop: true, isolatedModules: true, resolveJsonModule: true };
-  const tsconfig = path.join(productDir, 'tsconfig.json');
-  if (isFile(tsconfig)) {
-    const read = ts.readConfigFile(tsconfig, ts.sys.readFile);
-    if (!read.error) options = ts.parseJsonConfigFileContent(read.config, ts.sys, productDir, undefined, tsconfig).options;
-  }
-  const modules = nodeModulesUp(productDir);
-  const paths = { ...options.paths };
-  const base = options.pathsBasePath ?? options.baseUrl ?? productDir;
-  for (const [k, v] of Object.entries(paths)) paths[k] = v.map((p) => path.resolve(base, p));
-  const gRoot = path.resolve(grammarRoot);
-  paths[GRAMMAR_PACKAGE] = [path.join(gRoot, 'dist', 'core', 'index.d.ts')];
-  paths[`${GRAMMAR_PACKAGE}/*`] = [path.join(gRoot, 'dist', '*', 'index.d.ts')];
-  paths['*'] = [...modules.map((m) => path.join(m, '@types', '*')), ...modules.map((m) => path.join(m, '*'))];
-  const opts = { ...options, paths, baseUrl: undefined, pathsBasePath: productDir, noEmit: true, incremental: false, composite: false, tsBuildInfoFile: undefined, plugins: undefined,
-    skipLibCheck: true, types: [], typeRoots: modules.map((m) => path.join(m, '@types')) };
-  const ambient = path.join(path.dirname(path.resolve(file)), '__starci-draw-ambient.d.ts');
-  const host = ts.createCompilerHost(opts);
-  const same = (a, b) => path.resolve(a).toLowerCase() === path.resolve(b).toLowerCase();
-  const { getSourceFile, fileExists, readFile } = host;
-  host.fileExists = (f) => same(f, ambient) || fileExists.call(host, f);
-  host.readFile = (f) => (same(f, ambient) ? DRAW_AMBIENT : readFile.call(host, f));
-  host.getSourceFile = (f, lang, ...rest) => (same(f, ambient) ? ts.createSourceFile(f, DRAW_AMBIENT, lang) : getSourceFile.call(host, f, lang, ...rest));
-  const program = ts.createProgram({ rootNames: [path.resolve(file), ambient], options: opts, host });
-  const diagnostics = ts.getPreEmitDiagnostics(program).filter((d) => d.category === ts.DiagnosticCategory.Error);
-  const errors = diagnostics.map((d) => {
-    const pos = d.file && d.start != null ? d.file.getLineAndCharacterOfPosition(d.start) : null;
-    return { file: d.file ? d.file.fileName : null, line: pos ? pos.line + 1 : null, code: `TS${d.code}`, message: ts.flattenDiagnosticMessageText(d.messageText, ' ').slice(0, 600) };
-  });
-  return { ok: errors.length === 0, errors, typescript: loaded.version ?? ts.version };
-}
 
 export const typecheckFindings = (result, { label }) => {
   if (result.ok) return [];
@@ -461,6 +402,11 @@ async function main(argv) {
 }
 
 if (isMain(import.meta.url)) {
-  // No top-level await: checkDrawSource imports draw-grammar.mjs, which imports this module, so an entry still pending on main() is a dependency that never settles.
-  main(process.argv.slice(2)).then((code) => { process.exitCode = code; }, (e) => { process.stderr.write(`draw-source: ${e?.stack ?? e}\n`); process.exitCode = 2; });
+  // Top-level await is safe: draw-grammar.mjs imports draw-typecheck.mjs, not this entry, so no dependency waits on main().
+  try {
+    process.exitCode = await main(process.argv.slice(2));
+  } catch (e) {
+    process.stderr.write(`draw-source: ${e?.stack ?? e}\n`);
+    process.exitCode = 2;
+  }
 }
