@@ -1,5 +1,8 @@
 # Changelog
 
+## 8.4.22 - 2026-10-21
+- Changed: bundled runtime copies carry slot manifest 3.4.0 (`be.contract.mcp-tools`); lint behavior is unchanged; canon pins follow the matching package cohort.
+
 ## 8.4.21 - 2026-10-20
 - Changed: republished for the complete 1.7.14 cohort; 8.4.20 was published while @starci/hfs 4.7.14 and @starci/cli 1.7.14 stopped at their clean proof, so it is a superseded orphan and is not used. Content equals 8.4.20 apart from the canon pins.
 

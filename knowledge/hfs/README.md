@@ -221,6 +221,7 @@ records. Any other content fails with `HFS_STARCIWORK_LITE_FORBIDDEN`: "lite .st
 | `be/contracts/<app>/openapi.json` | opt-in, tracked | `be.contract.openapi` |
 | `be/contracts/<app>/events.json` | opt-in, tracked | `be.contract.events` |
 | `be/contracts/<app>/events.pin.json` | opt-in, tracked | `be.contract.events.pin` |
+| `be/contracts/<app>/<contract>.tools.json` | opt-in, tracked | `be.contract.mcp-tools` |
 | `be/apps/<app>/src/` | required, tracked, app kind api, at least 1 | `be.app.api` |
 | `be/apps/<app>/src/` | opt-in, tracked, app kind worker | `be.app.worker` |
 | `be/apps/<app>/src/` | opt-in, tracked, app kind cli | `be.app.cli` |
@@ -336,6 +337,7 @@ be/contracts/<app>/schema.graphql                                               
 be/contracts/<app>/openapi.json                                                                                                                    opt-in    be.contract.openapi
 be/contracts/<app>/events.json                                                                                                                     opt-in    be.contract.events
 be/contracts/<app>/events.pin.json                                                                                                                 opt-in    be.contract.events.pin
+be/contracts/<app>/<contract>.tools.json                                                                                                           opt-in    be.contract.mcp-tools
 be/apps/<app>/src/                                                                                                                                 required  be.app.api
 be/apps/<app>/src/                                                                                                                                 opt-in    be.app.worker
 be/apps/<app>/src/                                                                                                                                 opt-in    be.app.cli
@@ -1130,4 +1132,5 @@ Every rule is an error from 2.0. Finding code, then the rule. The pattern files 
 | R299 | `HFS_WORKFLOW_CONTEXT` | GitHub Actions expressions use only contexts available at their workflow key. Job env cannot read runner, job, steps or env; runner-local data paths belong to step env or shell RUNNER_TEMP. Every tracked workflow is checked in both app editions. | product |
 | R300 | `FE_PUBLIC_BUILD_ARG_MISSING` | Every front-end app with a Dockerfile supplies each required NEXT_PUBLIC_* source/config/schema name through a Dockerfile ARG default or through that image's buildArgs.values/buildArgs.sealed.keys in every environment deploying the image. Source reads with literal string ?? or \|\| fallbacks are optional. The finding names missing keys and environments at the Dockerfile; sealed values are never opened. CI release images use the same starci app stack build-args verb and environment as deployment. | product |
 | R301 | `CI_STANDARD` | The managed app CI, the example apps (the reference) and the runtime repository's own workflows follow the ONE CI standard of knowledge/hfs/ci-standard.yaml (owner ruling ci-standard, 2026-10-18): the job shape fast/test/build(/sonar) with the unit run and the Codecov upload in test alone, full history with STARCI_BASE_REF written before the lint, NODE_OPTIONS --max-old-space-size=6144 on every heavy step, the Sonar lint per side, optional providers probed before they skip, a timeout on every job and every action pinned to a commit sha; the other items (candidate trigger R221, per-fe-app build env, prettier-stable renders, R299 contexts) are owned by the rules the standard names. Apps get the standard only through starci app sync. | product |
+| R302 | `HFS_MCP_TOOLS_SNAPSHOT` | An app that commits the MCP tool catalog of its server keeps it at `be/contracts/<app>/<contract>.tools.json` (slot be.contract.mcp-tools, opt-in), `<contract>` being `<server>@<major>`, as the server's `tools/list` result: `{ contract, server: { name, version }, tools }` where the contract equals the file name and the server name, and every tool has a unique name, a description and an object `inputSchema`. | product |
 <!-- hfs:generated-end rules -->

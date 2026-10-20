@@ -108,6 +108,7 @@ ignore:
   - "be/**/*.type.ts"
   - "be/apps/*/Dockerfile"
   - "be/apps/*/src/**"
+  - "be/contracts/*/*.tools.json"
   - "be/contracts/*/events.json"
   - "be/contracts/*/events.pin.json"
   - "be/contracts/*/openapi.json"

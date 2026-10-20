@@ -14931,6 +14931,17 @@ HFS_SERVICE_STACK_DECLARATION:
   owner: op-retry
   kind: check-finding
 
+HFS_MCP_TOOLS_SNAPSHOT:
+  title: "A committed MCP tool catalog has the canonical tools/list shape"
+  title_vi: "Snapshot danh mục tool MCP sai hình dạng chuẩn"
+  meaning_vi: "Tệp `<file>` dưới `be/contracts/<app>/<contract>.tools.json` không phải danh mục tool MCP chuẩn: thiếu app khai báo, `contract` không phải `<server>@<major>` khớp tên tệp và `server.name`, hoặc có tool thiếu tên, mô tả hay `inputSchema` kiểu object, hoặc trùng tên."
+  causes_vi:
+    - "Vi phạm luật R302: snapshot là kết quả `tools/list` của server MCP ở một major hợp đồng, được commit như giao diện giữa các repo."
+    - "Snapshot được chép tay hoặc đặt dưới thư mục của một app không khai báo trong hfs.json"
+  nextStep_vi: "Lấy lại kết quả `tools/list` của server, ghi `{ contract, server: { name, version }, tools }` vào đúng tệp của app phục vụ server đó và khai báo slot `be.contract.mcp-tools` trong `sides.be.optionalSlots`. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
+  owner: op-retry
+  kind: check-finding
+
 HFS_EVENT_CONTRACT:
   title: "The async contract between services is vendored and consumers match it"
   title_vi: "Hợp đồng sự kiện giữa các dịch vụ không khớp"

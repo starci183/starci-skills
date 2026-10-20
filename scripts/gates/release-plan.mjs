@@ -97,7 +97,7 @@ function publishedVerdict(row, registry, out) {
   const local = registry.localIntegrity(row.dir);
   if (row.runtimePackage && !local) return { ...out, action: 'blocked', blocker: `${row.name}@${row.version}: local runtime pack could not be listed` };
   if (!local) return { ...out, note: 'local pack could not be listed' };
-  if (local === out.registry.integrity) return { ...out, note: 'integrity matches' };
+  if (local === out.registry.integrity) return { ...out, note: 'integrity matches', identical: true };
   const content = registry.contentClass(row.name, row.version, row.dir);
   if (content === 'same') return { ...out, note: 'every file is identical; only the pack metadata differs' };
   if (row.runtimePackage) return { ...out, action: 'blocked', note: content, blocker: `${row.name}@${row.version}: published runtime bytes differ or cannot be proved (${content}); its version is immutable` };
@@ -122,10 +122,12 @@ const runtimeRow = (root, rows) => {
     deps: rows.filter((row) => ['set', 'pin-mismatch'].includes(row.kind)).map((row) => row.name) };
 };
 
-// A publish (or a forced bump) changes the canon-pins copy the bundling packages carry: each must carry a new version too.
+// A publish (or a forced bump) changes the canon-pins copy the bundling packages carry: each must carry a new version too. A
+// published bundler whose registry integrity equals its local pack already carries the final copy (the bytes are identical, so
+// the publish cannot change it) and is not blocked; one whose bytes differ still is (lead ruling release-plan-identical-bundler, 2026-10-21, owner-delegated).
 const bundlingBlockers = (ordered) =>
   ordered.some((r) => !r.last && (r.action === 'publish' || r.action === 'drift'))
-    ? ordered.filter((r) => r.last && !r.runtimePackage && r.action === 'published')
+    ? ordered.filter((r) => r.last && !r.runtimePackage && r.action === 'published' && !r.identical)
       .map((row) => `${row.name}@${row.version} is already published, but a publish or version bump of another package changes the canon-pins copy it bundles: bump it, resync its runtime copy, rebind`)
     : [];
 

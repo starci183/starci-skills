@@ -81,7 +81,7 @@ rules:
   - id: BE-SERVICES-3
     title: The contract between services is vendored and checked against the provider
     kind: mandatory
-    hfsRules: [R166, R23, R113]
+    hfsRules: [R166, R23, R113, R302]
     requirement: |-
       A synchronous API keeps its snapshot (`be/contracts/<service>/schema.graphql`, `openapi.json`; R23, R113). The async contract
       is the literal `EVENTS` table of the publisher's `apps/<service>/src/events.ts` (event name, version, payload fields, and `compensates` when the event announces the failure of the step another event started)
@@ -101,6 +101,7 @@ rules:
         - HFS_EVENT_CONTRACT
         - HFS_CONTRACT_SNAPSHOT_DRIFT
         - FE_GRAPHQL_CONTRACT
+        - HFS_MCP_TOOLS_SNAPSHOT
       manual:
         - Review the payload fields of a new event version for compatibility with the old consumers.
     relatedExamples: []

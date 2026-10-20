@@ -3,11 +3,16 @@ verb: run
 owner: runtime
 summary: run the measured product or document gate
 impl: {script: scripts/cli/gate-run.mjs}
+conventions:
+  - the slice is every file that differs from the base (committed, staged, dirty and untracked) plus the --changed files
+  - --changed extends the slice and never narrows it, so a report cannot hide an edit; narrow it with --base
+  - the base is --base, else the workflow's previous checkpoint, else the merge-base of HEAD with its upstream or main
+  - a TypeScript file with no tsconfig.json of its own under a hfs.json sides.<side>.reads tree is checked by that side's programs
 flags:
   - {name: root, type: string, summary: application root}
   - {name: base, type: string, summary: explicit gate base commit}
   - {name: main, type: string, summary: main reference used by the merge guard}
-  - {name: changed, type: list, summary: explicit files in the operation slice}
+  - {name: changed, type: list, summary: files added to the slice beside the delta from the base}
   - {name: tests, type: string, summary: test pattern for the operation slice}
   - {name: out, type: string, summary: write the gate report to this file}
   - {name: scope, type: enum, enum: [code, docs], default: code, summary: gate scope}

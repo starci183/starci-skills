@@ -862,6 +862,7 @@ surfaces:
         - be.contract.openapi
         - be.contract.events
         - be.contract.events.pin
+        - be.contract.mcp-tools
         - be.tests.world
         - be.tests.world.kit
         - be.tests.fixtures
@@ -896,6 +897,7 @@ surfaces:
         - be.contract.openapi
         - be.contract.events
         - be.contract.events.pin
+        - be.contract.mcp-tools
         - be.tests.world
         - be.tests.world.kit
         - be.tests.fixtures

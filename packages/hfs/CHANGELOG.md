@@ -1,5 +1,8 @@
 # Changelog
 
+## 4.7.15 - 2026-10-21
+- Added: slot `be.contract.mcp-tools` (opt-in, slot manifest 3.4.0) for the committed MCP tool catalog `be/contracts/<app>/<contract>.tools.json`, and R302 `HFS_MCP_TOOLS_SNAPSHOT`: the catalog names a declared be app, its contract is `<server>@<major>` equal to the file name and the server name, and every tool has a unique name, a description and an object `inputSchema`; canon pins follow the matching package cohort.
+
 ## 4.7.14 - 2026-10-20
 - Added: `starci app hygiene` (the managed pre-commit hook) refuses a back-end logic file the index adds without its `<name>.<role>.spec.ts` beside it, naming the file (`BE_UNIT_SPEC_NOT_STAGED`, R47); the measured roles and roots come from the coverage scope.
 - Added: `starci app check` reports `HFS_HOOKS_NOT_INSTALLED` (R13, error) when a set `core.hooksPath` names a hooks folder that is missing or holds no husky dispatcher in the checkout, with the install remedy.

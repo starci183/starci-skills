@@ -1162,6 +1162,13 @@ run the measured product or document gate
 | `--scope` | enum code|docs (default code) |  |
 | `--tree` | string |  |
 
+Conventions:
+
+- the slice is every file that differs from the base (committed, staged, dirty and untracked) plus the --changed files
+- --changed extends the slice and never narrows it, so a report cannot hide an edit; narrow it with --base
+- the base is --base, else the workflow's previous checkpoint, else the merge-base of HEAD with its upstream or main
+- a TypeScript file with no tsconfig.json of its own under a hfs.json sides.<side>.reads tree is checked by that side's programs
+
 exit: 0 gate is clean; 1 findings remain; 2 a machine could not run or usage was invalid
 
 json: always

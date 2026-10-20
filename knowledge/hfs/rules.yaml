@@ -4985,3 +4985,18 @@ rules:
       - {path: packages/hfs/templates/app/ci-workflows/github/workflows/ci.yml, edition: full}
     specNa: "owner:no-runtime-specs (2026-10-17): the runtime has no specs of its own; the scaffold e2e (e2e/hfs-scaffold-app.spec.mjs: a fresh scaffold has no finding) and the example apps prove it"
     witness: {status: unreachable, reason: "owner:no-runtime-specs (2026-10-17): the runtime has no spec fixtures", date: "2026-10-18"}
+  - id: R302
+    code: "HFS_MCP_TOOLS_SNAPSHOT"
+    law: "An app that commits the MCP tool catalog of its server keeps it at `be/contracts/<app>/<contract>.tools.json` (slot be.contract.mcp-tools, opt-in), `<contract>` being `<server>@<major>`, as the server's `tools/list` result: `{ contract, server: { name, version }, tools }` where the contract equals the file name and the server name, and every tool has a unique name, a description and an object `inputSchema`."
+    kinds: [check]
+    gates: [land, ci]
+    failureCodes: ["HFS_MCP_TOOLS_SNAPSHOT"]
+    enforcers:
+      - {kind: hfs, id: mcp-tools-snapshot, at: scripts/hfs/rules/mcp-tools.mjs}
+    editions: [lite, full]
+    docs:
+      - {path: docs/hfs-contract-snapshots.md#r302, editions: [lite, full]}
+    templateNa: "The canon emits no MCP catalog: the app commits its server's tools/list result, so there is no scaffolded snapshot."
+    exampleNa: "owner:mcp-tools-snapshot-no-example (2026-10-21): no example app serves an MCP server; the package spec judges a passing and a violating catalog"
+    specNa: "owner:no-runtime-specs (2026-10-17): the enforcer is runtime code with no spec of its own; the @starci/hfs package spec packages/hfs/src/mcp-tools-snapshot.spec.mjs runs it from the bundled copy"
+    witness: {status: unreachable, reason: "owner:no-runtime-specs (2026-10-17): the runtime has no spec fixtures; the package spec proves the rule", date: "2026-10-21"}

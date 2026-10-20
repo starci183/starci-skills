@@ -6,8 +6,9 @@ the loop. Code first and lint or specs afterwards is refused.
 
 1. READ: `starci gate read --root <app> --touch <files...> --out read-digest.json`, then read every file it lists.
 2. CODE: the change together with its unit specs (`<name>.<role>.spec.ts` beside each new logic file).
-3. CHECK: `starci gate run --root <app> --changed <files...> --tests <pattern> --out gate.json` (`--base <commit>` when the
-   default base, the merge-base with the upstream or main, is not the cut point).
+3. CHECK: `starci gate run --root <app> --base <commit the change started from> --changed <files...> --tests <pattern> --out gate.json`.
+   The gate judges every file that differs from the base plus the `--changed` files; `--changed` never narrows that slice, so
+   `--base` is what scopes it (inside a Kernel workflow the default base is the previous checkpoint).
 4. FIX: repeat CODE and CHECK until the gate exits 0. A finding the base already has is preexisting and is not fixed here;
    exit 2 is a tool that could not run, never a pass.
 5. REPORT: attach both JSON documents, `read-digest.json` and `gate.json`, unedited.
@@ -27,7 +28,7 @@ Install: starci npm ci at the app root before editing (installs the git hooks); 
 Op loop, in order, no step skipped:
   1. starci gate read --root <app> --touch <files> --out read-digest.json, and read every file it lists.
   2. Write the code and its unit specs together (<name>.<role>.spec.ts beside each new logic file).
-  3. starci gate run --root <app> --changed <files> --tests <pattern> --out gate.json
+  3. starci gate run --root <app> --base <commit before your change> --changed <files> --tests <pattern> --out gate.json
   4. Fix and rerun step 3 until it exits 0; never --no-verify, never a lint suppression.
 Report: the files changed, the commits, and both JSON documents (read-digest.json, gate.json) attached unedited.
 ```

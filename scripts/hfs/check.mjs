@@ -20,6 +20,7 @@
 //   HFS_CI_MISSING_CANON          (R13, rules/pipeline.mjs) CI without the pinned `starci app check`, pre-push without typecheck or lint
 //   HFS_DEP_VERSION_SKEW          (R14, rules/deps.mjs) a dependency at two versions in the workspace, or a nested copy in the lockfile
 //   HFS_CONTRACT_SNAPSHOT_DRIFT   (R23, rules/contract.mjs) an uncommitted back-end snapshot, or a front-end copy that differs from it
+//   HFS_MCP_TOOLS_SNAPSHOT        (R302, rules/mcp-tools.mjs) a committed MCP tool catalog that is not the canonical `tools/list` snapshot
 //   BE_TEST_TOPOLOGY              (R47, rules/test-topology.mjs) a `.test` file, a testing/ folder, a second jest configuration
 //   FE_NO_TESTS                   (R97, rules/fe-no-tests.mjs) a front end holds a spec, e2e or test-tool file, a test script or a test dependency; no exception
 //   FE_STACK_FORBIDDEN            (rules/fe-stack.mjs) a front-end manifest (the fe side's, or the app root's minus the back end's own libraries)
@@ -72,6 +73,7 @@ import { gitOutputOf } from '../lib/git.mjs';
 import { posixPath } from '../lib/path-key.mjs';
 import { treeFindings } from './tree-findings.mjs';
 import { contractFindings } from './rules/contract.mjs';
+import { mcpToolsSnapshotFindings } from './rules/mcp-tools.mjs';
 import { appRootFindings } from './rules/app-root.mjs';
 import { frontendFindings } from './rules/frontend-tree.mjs';
 import { lintSuppressionFindings } from './rules/lint-suppression.mjs';
@@ -102,7 +104,7 @@ export const CHECK_CODES = Object.freeze([
   'HFS_SLOT_UNDECLARED', 'HFS_SLOT_NOT_ENABLED', 'HFS_SLOT_AMBIGUOUS', 'HFS_TRACKED_MUST_BE_IGNORED', 'HFS_FORBIDDEN_PRESENT',
   'HFS_SLOT_REQUIRED_MISSING', 'HFS_MIN_INSTANCES', 'HFS_CANON_PIN_DRIFT', 'HFS_SIZE_SOFT_BACKLOG', 'BE_SOURCE_FORM',
   'HFS_MANAGED_FILE_DRIFT', 'HFS_TOOL_CONFIG_LOCAL', 'HFS_RULE_OFF_WITHOUT_REPLACEMENT', 'HFS_TS_STRICT',
-  'HFS_PLAINTEXT_SECRET', 'HFS_STACKS_SHAPE', 'HFS_CI_MISSING_CANON', 'HFS_DEP_VERSION_SKEW', 'HFS_CONTRACT_SNAPSHOT_DRIFT',
+  'HFS_PLAINTEXT_SECRET', 'HFS_STACKS_SHAPE', 'HFS_CI_MISSING_CANON', 'HFS_DEP_VERSION_SKEW', 'HFS_CONTRACT_SNAPSHOT_DRIFT', 'HFS_MCP_TOOLS_SNAPSHOT',
   'BE_TEST_TOPOLOGY', 'BE_SPEC_PLACEMENT', 'HFS_REPO_LOCAL_CHECK', 'HFS_LINT_SUPPRESSION_FILE', 'HFS_PROOF_COMMAND_FILE_MISSING', 'HFS_PEER_INTEGRATION_MISSING', 'BE_INTEGRATION_SPEC_MISSING', 'FE_GRAPHQL_CONTRACT', 'FE_NO_TESTS', 'HFS_MONO_WORKSPACES', 'HFS_MONO_FE_WORKSPACE', 'HFS_MONO_NEST_PROJECTS', 'HFS_MONO_WORKSPACE_DEP', 'BE_CLI_REQUIRED', 'FE_WIRE_GENERATED', 'FE_I18N_PLACEMENT', 'FE_I18N_CATALOG', 'HFS_SERVICE_PLACEMENT', 'HFS_IMAGE_UNPINNED', 'HFS_SERVICE_STACK_DECLARATION', 'HFS_EVENT_CONTRACT', 'BE_ASYNC_SPEC_MISSING', 'BE_SAGA_STEP_COMPENSATION', 'BE_SAGA_STATE_VERSIONED', 'BE_SAGA_EVENT_CONTRACT', 'BE_SAGA_CONSUMER_DEDUPE', 'BE_EVENT_CLASS_CONTRACT', 'BE_PATTERN_SPEC_MISSING', 'BE_CONTRACT_BREAKING', 'BE_KIND_DECLARATION', 'BE_KIND_EMPTY', 'HFS_DOCKER_BUILD_CONTEXT', 'HFS_DOCKER_STAGES', 'HFS_DOCKER_ENTRY', 'HFS_DOCKER_BASE_PIN', 'HFS_DOCKER_SECRETS', 'BE_SAGA_E2E_MISSING',
   'FE_STACK_FORBIDDEN', 'HFS_EDITION_FORBIDDEN_PRESENT', 'HFS_LITE_SECRET_CUSTODY', 'HFS_STARCIWORK_LITE_FORBIDDEN',
   'DB_MIGRATION_SHAPE', 'DB_RLS_REQUIRED', 'DB_DYNAMIC_DDL', 'DB_POLICY_SHAPE', 'DB_DEFINER_SAFE', 'DB_STORAGE_POLICY', 'DB_CONFIG_POLICY', 'DB_TYPES_DRIFT',
@@ -220,7 +222,7 @@ function contentRuleFindings({ repoRoot, repo, resolver, files, all, scoped, pin
       ...checkAppRoot({ root: repoRoot, resolver, tree: trackedTreeView(all) }).violations.map((item) => ({ code: item.ruleId, level: 'error', path: item.path, line: item.line, column: item.column, source: 'machine', message: `${item.path}: ${item.message}` })),
     );
   } else if (repo.profile === 'be') {
-    findings.push(...contractFindings({ repoRoot, files, repo, resolver }), ...testTopologyFindings({ repoRoot, files }));
+    findings.push(...contractFindings({ repoRoot, files, repo, resolver }), ...mcpToolsSnapshotFindings({ repoRoot, files, repo }), ...testTopologyFindings({ repoRoot, files }));
   } else {
     findings.push(...frontendFindings({ repoRoot, files, repo }), ...feNoTestsFindings({ repoRoot, files: files.filter((file) => inScope(file)) }));
   }

@@ -604,7 +604,7 @@ complete -c starci -n '__starci_using_command gate repo-presentation' -l runtime
 complete -c starci -n '__starci_using_command gate run' -l root -r -d 'application root'
 complete -c starci -n '__starci_using_command gate run' -l base -r -d 'explicit gate base commit'
 complete -c starci -n '__starci_using_command gate run' -l main -r -d 'main reference used by the merge guard'
-complete -c starci -n '__starci_using_command gate run' -l changed -r -d 'explicit files in the operation slice'
+complete -c starci -n '__starci_using_command gate run' -l changed -r -d 'files added to the slice beside the delta from the base'
 complete -c starci -n '__starci_using_command gate run' -l tests -r -d 'test pattern for the operation slice'
 complete -c starci -n '__starci_using_command gate run' -l out -r -d 'write the gate report to this file'
 complete -c starci -n '__starci_using_command gate run' -l scope -r -a 'code docs' -d 'gate scope'

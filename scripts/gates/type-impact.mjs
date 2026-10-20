@@ -65,6 +65,20 @@ const nearestProject = (root, file) => {
     if (pathKey(dir) === pathKey(root) || path.dirname(dir) === dir) return null;
   }
 };
+/**
+ * The compiler programs of the sides that read `file` across sides (hfs.json `sides.<side>.reads`, such as the generated
+ * `supabase/types/` of a lite app): such a file has no tsconfig of its own and is typechecked by the programs that import it,
+ * so a change to it affects every tsconfig.json of each reading side. Empty when no side reads it or there is no hfs.json.
+ */
+const readerProjects = (root, file) => {
+  let declaration;
+  try { declaration = JSON.parse(fs.readFileSync(path.join(root, 'hfs.json'), 'utf8')); } catch { return []; }
+  const sides = Object.entries(declaration?.sides ?? {}).filter(([, side]) => (Array.isArray(side?.reads) ? side.reads : []).some((prefix) => typeof prefix === 'string' && file.startsWith(prefix)));
+  return sides.flatMap(([side]) => {
+    const dir = path.join(root, side);
+    return fs.existsSync(dir) ? sourceFiles(dir).filter((config) => path.basename(config) === 'tsconfig.json').map((config) => posixPath(path.relative(root, config))) : [];
+  });
+};
 const sharedImpact = (file) => /(?:^|\/)(?:tsconfig[^/]*\.json|package\.json|package-lock\.json|npm-shrinkwrap\.json|pnpm-lock\.yaml|yarn\.lock|turbo\.json|hfs\.json)$/.test(file) || file.startsWith('scripts/');
 
 const addTo = (projects, project, source = null) => {
@@ -79,7 +93,12 @@ const scanSelected = (root, file, { removed, workspaces, projects, errors }) => 
   if (!TS_SOURCE.test(file)) return false;
   const exists = fs.existsSync(at), project = nearestProject(root, file);
   if (!exists && !removed.has(file)) { errors.push(`GATE_TSC_SOURCE_MISSING selected TypeScript does not exist: ${file}`); return false; }
-  if (!project && exists) { errors.push(`GATE_TSC_CONFIG_MISSING no tsconfig.json owns selected TypeScript ${file}`); return false; }
+  if (!project && exists) {
+    const readers = readerProjects(root, file);
+    if (!readers.length) { errors.push(`GATE_TSC_CONFIG_MISSING no tsconfig.json owns selected TypeScript ${file}`); return false; }
+    for (const reader of readers) addTo(projects, reader);
+    return false;
+  }
   if (project) addTo(projects, project, exists ? file : null);
   return workspaces.some((dir) => file.startsWith(`${dir}/`));
 };

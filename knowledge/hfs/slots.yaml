@@ -7,7 +7,7 @@
 # catalog READ this file through scripts/hfs/slots.mjs; none of them hardcodes a path.
 # Shape: modules/schemas/hfs-slots.schema.yaml. The repository side is hfs.json: modules/schemas/hfs-repo.schema.yaml.
 schema: starci/hfs-slots@3
-version: 3.3.0
+version: 3.4.0
 
 versioning:
   # MAJOR.MINOR.PATCH of this manifest. A repository pins only the MAJOR in hfs.json ("hfs": 3).
@@ -38,6 +38,7 @@ versioning:
 # or environment reads (BE_APP_OPTIONS_COMPOSITION). Secrets use EnvSource.secret(): <NAME>_FILE first, plain <NAME> only
 # when the file key is absent; .starcistacks owns custody. Capability <capability>.config.ts roles stay unchanged.
 # 3.3.0 is a minor (alpha.16): it ADDS the optional app.ci-stack-deploy slot, the managed workflow of the starci app stack verbs.
+# 3.4.0 is a minor (alpha.24): it ADDS the opt-in be.contract.mcp-tools slot, the committed MCP tool-catalog snapshot of an app.
 
 # Field meaning, per slot.
 #   id          stable name, never changes meaning inside a major.
@@ -1152,6 +1153,19 @@ slots:
     coverage: none
     why: the previously published event contract of a service, the same format as its events.json (copied over when the contract is published, never edited); the current events.json may only extend it additively, a breaking change is a new `<event>.v2` key (R177 BE_CONTRACT_BREAKING)
     rules: [BE_CONTRACT_BREAKING]
+
+  - id: be.contract.mcp-tools
+    since: 3.4.0
+    profiles: [be]
+    path: "contracts/<app>/<contract>.tools.json"
+    presence: opt-in
+    tracked: tracked
+    tier: none
+    tests: none
+    coverage: none
+    why: the MCP tool catalog an app's MCP server publishes at one contract major (`<server>@<major>`), the `tools/list` result its clients rely on, committed as a cross-repo interface; the canon emits no MCP catalog, so its shape is judged (R302 HFS_MCP_TOOLS_SNAPSHOT)
+    exampleNa: "owner:mcp-tools-snapshot-no-example (2026-10-21): no example app serves an MCP server; the package spec judges the shape"
+    rules: [HFS_MCP_TOOLS_SNAPSHOT]
 
   # ----- BE: apps (one slot per app kind; a new kind = a new slot, minor bump) ---------------------------
   # The files of every app (owner ruling 2026-10-14, R245 and R246, since 3.1.0), each with a line budget that

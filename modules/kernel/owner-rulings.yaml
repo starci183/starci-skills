@@ -627,6 +627,20 @@ rulings:
     supersedes: []
     enforcedBy: [scripts/hfs/example-secrets.mjs, packages/hfs/lint/run.mjs, scripts/supervisor/release-examples-lint.mjs]
 
+  - id: mcp-tools-snapshot-no-example
+    date: '2026-10-21'
+    source: "the lead, under the owner's delegation of code decisions to the lead (2026-10-20), relayed to the smells3 lane; owner to ratify"
+    ruling: "The opt-in slot be.contract.mcp-tools and rule R302 HFS_MCP_TOOLS_SNAPSHOT carry no example app evidence: no example app serves an MCP server, and adding a catalog to one would commit an interface it does not have. The package spec packages/hfs/src/mcp-tools-snapshot.spec.mjs judges a passing and each violating catalog shape in both editions instead."
+    supersedes: []
+    enforcedBy: [scripts/hfs/rules/mcp-tools.mjs, packages/hfs/src/mcp-tools-snapshot.spec.mjs]
+
+  - id: release-plan-identical-bundler
+    date: '2026-10-21'
+    source: "the lead, under the owner's delegation of code decisions to the lead (2026-10-20), relayed to the smells3 lane; owner to ratify"
+    ruling: "starci release publish does not block an already-published bundling canon whose registry integrity equals the integrity of its local pack when another package of the set publishes: identical bytes already carry the final canon-pins copy, so the publish cannot change them. A published bundler whose bytes differ is blocked exactly as before, and an unpublished one is unchanged. This corrects a false positive; it loosens no check of differing content."
+    supersedes: []
+    enforcedBy: [scripts/gates/release-plan.mjs]
+
 supersedes:
   'ruling:R212/case-2': ['ruling:R212/case-1']
   'ruling:R212/case-4': ['ruling:R212/case-1', 'ruling:R212/case-2']
