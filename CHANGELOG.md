@@ -12,7 +12,7 @@ Code-quality release: the runtime's SonarCloud project goes from 175 open code s
 
 ### Changed
 - The local `sonar-rules` gate enforces every Sonar rule id SonarCloud raised on alpha.23 that has a type-free local port, calibrated against those findings, so the smells cannot return unseen before the next scan.
-- Candidate package pins select HFS 4.7.13, CLI 1.7.13, back-end canon 3.4.19 and front-end canon 8.4.19; CLI depends exactly on its matching HFS package.
+- Candidate package pins select HFS 4.7.13, CLI 1.7.13, back-end canon 3.4.20 and front-end canon 8.4.19; CLI depends exactly on its matching HFS package.
 
 ### Fixed
 - The rendered lite app CI gives its database migration check (`npm run db:lint`, a full `starci app check`) the same raised Node heap as the other heavy steps; NIVO v0.2.6 candidate CI ran out of memory there.

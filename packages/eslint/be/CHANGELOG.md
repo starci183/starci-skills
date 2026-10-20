@@ -1,5 +1,8 @@
 # Changelog
 
+## 3.4.20 - 2026-10-20
+- Changed: republished for the complete alpha.24 cohort; 3.4.19 was published alone by an interrupted publication and bundles a canon-pins copy taken before the cohort was complete, so it is not used.
+
 ## 3.4.19 - 2026-10-20
 - Fixed: bundled runtime source clears the SonarCloud code smells of alpha.23 (regex complexity, concise classes, string prefix and suffix checks, block braces, optional chaining, export-from, default parameters, synchronous awaits, dead stores) without behavior change; canon pins follow the matching package cohort.
 
