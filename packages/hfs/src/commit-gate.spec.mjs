@@ -10,20 +10,22 @@ import { spawnSync } from 'node:child_process';
 import { checkAppRoot } from '../runtime/scripts/hfs/architecture/hfs.mjs';
 import { openHfs } from '../runtime/scripts/hfs/slots.mjs';
 import { runWorkHygiene } from '../sync/hygiene.mjs';
+import { starterDeclaration } from '../scaffold/app.mjs';
 
-const exampleHfs = new URL('../../../examples/lite-app/hfs.json', import.meta.url);
+/** The lite app declaration the package's own scaffold writes: the package proof carries no examples/ tree. */
+const APP_DECLARATION = `${JSON.stringify(starterDeclaration('fixture', undefined, 'lite'), null, 2)}\n`;
 const gitEnv = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_')));
 const git = (cwd, ...args) => {
   const run = spawnSync('git', args, { cwd, encoding: 'utf8', env: gitEnv, windowsHide: true });
   assert.equal(run.status, 0, `git ${args.join(' ')}: ${run.stderr}`);
 };
 
-/** A fresh app repository: git initialised on main, the lite example's hfs.json at its root. */
+/** A fresh app repository: git initialised on main, the scaffold's lite app declaration at its root. */
 function appRepo(t, prefix) {
   const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), prefix)));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   git(root, 'init', '-q', '-b', 'main');
-  fs.copyFileSync(exampleHfs, path.join(root, 'hfs.json'));
+  fs.writeFileSync(path.join(root, 'hfs.json'), APP_DECLARATION);
   return root;
 }
 
