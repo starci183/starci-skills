@@ -210,7 +210,14 @@ unused imports, and imports used only for re-export. Use `Promise.all` for
 independent calls, code-point helpers, `String.raw`, named intermediate values,
 and direct `export ... from` declarations. `void` is reserved for discarded
 calls. Front-end components must read every member of their declared props type.
-The dedicated RuleTester specs exercise each published enforcer with passing
+A `<video>` or `<audio>` element carries a `<track kind="captions">` child or is
+muted. Beyond these, both canons switch on every rule of the Sonar way
+TypeScript profile that has an ESLint equivalent (`scripts/lib/sonar-way.mjs`:
+eslint-plugin-sonarjs' Sonar way set with the cognitive complexity limit 15, and
+the core, typescript-eslint and unicorn rules SonarSource builds on, such as
+seven parameters at most, no duplicate import, optional chaining and
+`Set#has`), so `starci app lint` in the op loop reports what the scan would. The
+dedicated RuleTester specs exercise each published enforcer with passing
 and violating source in both editions; unit and end-to-end source specs retain
 the scan exclusion declared by the rule.
 

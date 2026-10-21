@@ -43,5 +43,9 @@ for (const edition of ['lite', 'full']) {
       valid: ['type Props = { title: string }; const Title = (props: Props) => <h1>{props.title}</h1>'],
       invalid: [{ code: 'type Props = { title: string; note: string }; const Title = (props: Props) => <h1>{props.title}</h1>', errors: [{ messageId: 'unused' }] }],
     });
+    tester.run('media-has-caption', rules['media-has-caption'], {
+      valid: ['const Clip = () => <video src="a.mp4"><track kind="captions" src="a.vtt" /></video>'],
+      invalid: [{ code: 'const Clip = () => <video src="a.mp4" />', errors: [{ messageId: 'caption' }] }],
+    });
   });
 }

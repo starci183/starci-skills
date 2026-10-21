@@ -10,8 +10,8 @@ const registerClaimProof = () => {
     it("fenced-job/claim-bumps-token: a live lease blocks a second worker and expiration advances the same row's token", async () => {
         const { clock, claims, successorClaims, claim, delivery } = world.modules.build("claim")
         const results = await Promise.all([claim(claims, "worker-1"), claim(successorClaims, "worker-2")])
-        const first = results.find((job) => job !== null)
-        assert(first !== undefined && first !== null)
+        const first = results.find((job): job is ClaimedJob => job !== null)
+        assert(first !== undefined)
         expect(first.fencingToken).toBe(1)
         expect(results.filter((job) => job === null)).toHaveLength(1)
 

@@ -38,7 +38,7 @@ versioning:
 # or environment reads (BE_APP_OPTIONS_COMPOSITION). Secrets use EnvSource.secret(): <NAME>_FILE first, plain <NAME> only
 # when the file key is absent; .starcistacks owns custody. Capability <capability>.config.ts roles stay unchanged.
 # 3.3.0 is a minor (alpha.16): it ADDS the optional app.ci-stack-deploy slot, the managed workflow of the starci app stack verbs.
-# 3.4.0 is a minor (alpha.24): it ADDS the opt-in be.contract.mcp-tools slot, the committed MCP tool-catalog snapshot of an app.
+# 3.4.0 is a minor (alpha.25): it ADDS the opt-in be.contract.mcp-tools slot, the committed MCP tool-catalog snapshot of an app.
 
 # Field meaning, per slot.
 #   id          stable name, never changes meaning inside a major.

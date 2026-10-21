@@ -105,3 +105,18 @@ test("S6767: a member of the props type that the component never reads is remove
     ],
   })
 })
+
+test("S4084: a video or audio element carries a captions track or is muted", () => {
+  tester.run("media-has-caption", rule("media-has-caption"), {
+    valid: [
+      'const A = () => <video src="a.mp4"><track kind="captions" src="a.vtt" /></video>',
+      'const B = () => <video src="loop.mp4" muted autoPlay />',
+      'const C = () => <Video src="a.mp4" />',
+      { filename: "src/a.spec.tsx", code: 'const D = () => <audio src="a.mp3" />' },
+    ],
+    invalid: [
+      { code: 'const E = () => <video src="a.mp4" />', errors: [{ messageId: "caption" }] },
+      { code: 'const F = () => <audio src="a.mp3"><track kind="subtitles" src="a.vtt" /></audio>', errors: [{ messageId: "caption" }] },
+    ],
+  })
+})

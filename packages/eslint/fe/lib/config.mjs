@@ -13,6 +13,8 @@
  * the canon.
  */
 import tsParser from "@typescript-eslint/parser"
+import { OUTSIDE_THE_SCAN_FILES } from "../runtime/scripts/lib/sonar-syntax-rules.mjs"
+import { sonarWayRules } from "../runtime/scripts/lib/sonar-way.mjs"
 
 /** A disable directive is a weakening of lint, and one that suppresses nothing is dead weight. */
 export const linterOptions = Object.freeze({ noInlineConfig: true, reportUnusedDisableDirectives: "error" })
@@ -41,9 +43,10 @@ const levelOf = (setting) => (Array.isArray(setting) ? setting[0] : setting)
  * @param {Record<string, unknown>} input.source - The source-tree levels (canon rules plus the React Hooks rules).
  * @param {object} input.reactHooks - The React Hooks plugin.
  * @param {object} input.tsPlugin - The typescript-eslint plugin.
- * @returns {Array<object>} The flat config: one ignore block and one typed source block.
+ * @param {{ sonarjs: object, unicorn: object }} input.sonar - The plugins of the Sonar way rules (scripts/lib/sonar-way.mjs).
+ * @returns {Array<object>} The flat config: one ignore block, one typed source block and the Sonar way block.
  */
-export const buildFeConfig = ({ hfs, plugin, source, reactHooks, tsPlugin }) => {
+export const buildFeConfig = ({ hfs, plugin, source, reactHooks, tsPlugin, sonar }) => {
   if (!hfs || typeof hfs.slotOf !== "function" || typeof hfs.repoRoot !== "string") {
     throw new Error("starciFeConfig needs { hfs: loadHfs(import.meta.url) } - the rules read the repository's slots through it")
   }
@@ -67,5 +70,7 @@ export const buildFeConfig = ({ hfs, plugin, source, reactHooks, tsPlugin }) => 
       settings,
       rules: { ...source, ...BORROWED },
     },
+    // Sonar way: what the scan raises is refused while the code is written; a spec is outside the scan, so outside this block.
+    { files: [...SOURCE_FILES], ignores: [...OUTSIDE_THE_SCAN_FILES], plugins: { sonarjs: sonar.sonarjs, unicorn: sonar.unicorn }, rules: sonarWayRules(sonar.sonarjs).rules },
   ]
 }

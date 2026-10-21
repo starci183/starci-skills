@@ -11,6 +11,7 @@ import { qualityServices } from '../runtime/scripts/hfs/ci-declaration.mjs';
 import { firstLine, lines, tool } from '../stack/context.mjs';
 import { failure, refusal } from '../stack/errors.mjs';
 import { produceLintReports } from './lint-report.mjs';
+import { sonarQualityGate } from './sonar-quality-gate.mjs';
 
 export const RELEASE_CODE = 'RELEASE_CONFIG_INVALID';
 const SONAR_UNREACHABLE = 'SONAR_UNREACHABLE';
@@ -237,7 +238,7 @@ async function runAvailableGate(ctx, gate, options) {
     // The scanner imports the app's declared external issues report: produce it first with the app's own lint, as the managed CI does.
     const started = ctx.now();
     const lint = produceLintReports(ctx, { launch, platform: options.platform, env: withoutCredentials(ctx.env, options.credentialNames) });
-    if (lint.pass) return runGate(ctx, gate, { ...options, preface: lint.text });
+    if (lint.pass) return judgeQualityGate(ctx, gate, runGate(ctx, gate, { ...options, preface: lint.text }));
     fs.writeFileSync(log, lint.text);
     return { name: gate.name, command: gate.command.join(' '), pass: false, detail: 'lint report failed (see log)', seconds: Math.round((ctx.now() - started) / 1000),
       summary: null, log: path.resolve(log), logSha256: sha256(log), env: Object.keys(gate.env) };
@@ -245,6 +246,19 @@ async function runAvailableGate(ctx, gate, options) {
   fs.writeFileSync(log, availability.detail + '\n');
   return { name: gate.name, command: gate.command.join(' '), ...availability, seconds: 0,
     summary: null, log: path.resolve(log), logSha256: sha256(log), env: Object.keys(gate.env) };
+}
+
+/**
+ * A scanner that exited 0 only uploaded its report: the row passes when the server's quality gate of that analysis is OK
+ * (sonar-quality-gate.mjs). The verdict replaces the row's detail and is appended to its log; the row's time includes the wait.
+ */
+async function judgeQualityGate(ctx, gate, row) {
+  if (!row.pass) return row;
+  const started = ctx.now();
+  const verdict = await sonarQualityGate(ctx, { cwd: ctx.cwd, host: gate.provider.host, token: gate.env.SONAR_TOKEN });
+  const failed = (verdict.conditions ?? []).map((line) => `  failed: ${line}\n`).join('');
+  fs.appendFileSync(row.log, `\nquality gate: ${verdict.detail}\n${failed}`);
+  return { ...row, pass: verdict.pass, detail: verdict.detail, seconds: row.seconds + Math.round((ctx.now() - started) / 1000), logSha256: sha256(row.log) };
 }
 
 const withoutCredentials = (values, credentialNames) => {

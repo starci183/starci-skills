@@ -1,6 +1,6 @@
 {
   "name": "@starci/eslint-canon-be",
-  "version": "3.4.24",
+  "version": "3.4.25",
   "description": "The StarCi back-end lint canon: every rule its laws publish, gathered as one flat-config plugin.",
   "type": "module",
   "license": "MIT",
@@ -41,6 +41,8 @@
   ],
   "dependencies": {
     "@typescript-eslint/eslint-plugin": "^8.70.0",
-    "@typescript-eslint/parser": "^8.70.0"
+    "@typescript-eslint/parser": "^8.70.0",
+    "eslint-plugin-sonarjs": "4.2.1",
+    "eslint-plugin-unicorn": "65.0.0"
   }
 }

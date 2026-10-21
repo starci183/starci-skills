@@ -493,6 +493,9 @@ Conventions:
 - declared release.gates gets audit appended if missing
 - --sonar appends @sonar/scan@4.3.0 against services.sonar.host (host.public for a host mapping), plus organization for sonarcloud;
 - disabled or unavailable Sonar or an unset token refuses RELEASE_SONAR_UNAVAILABLE
+- a scanner exit 0 is not a pass: the row polls api/ce/task until the analysis ends, then reads api/qualitygates/project_status with the same token
+- OK passes; ERROR is red as RELEASE_SONAR_GATE_FAILED naming each failed condition, as is a FAILED or CANCELED task
+- a task still running after 600 s is RELEASE_SONAR_GATE_TIMEOUT; no report-task, an HTTP error or no gate is RELEASE_SONAR_GATE_UNREADABLE
 - OWNER RULING candidate-ci (2026-10-18): the gate no longer reads the default-branch CI; the verdict is the candidate run of the sha
 - push --execute sends HEAD to refs/heads/release/candidate-<version> first and waits for its ci.yml run (it triggers on release/candidate-*)
 - green moves the branch and the tag in one atomic push; red refuses RELEASE_CANDIDATE_CI_RED naming the failing jobs

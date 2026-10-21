@@ -31,8 +31,9 @@ const hfs = hfsFromDeclaration(FE, ROOT)
 const config = starciFeConfig({ hfs })
 const [ignores, ...single] = config
 
-test("the factory returns an ignore block and a typed source block, all from the HFS profile", () => {
-  assert.equal(config.length, 2)
+test("the factory returns an ignore block, a typed source block and the Sonar way block, all from the HFS profile", () => {
+  assert.equal(config.length, 3)
+  assert.deepEqual(config[2].files, single[0].files, "the Sonar way block lints the same source")
   assert.ok(ignores.ignores.includes("**/__generated__/**"))
   assert.deepEqual(single[0].files, ["apps/*/src/**/*.{ts,tsx}", "packages/*/src/**/*.{ts,tsx}"])
   assert.ok(!single[0].files.some((glob) => glob.startsWith("packages/ui/")), "no package is named literally")
@@ -54,8 +55,9 @@ test("every published rule is enabled at error - no rule is off, none is a warni
 
 test("no rule in either block is off, warn or a numeric level below error", () => {
   for (const block of single) {
-    for (const [name, level] of Object.entries(block.rules)) {
-      assert.equal(level, "error", `${name} is ${JSON.stringify(level)}`)
+    for (const [name, setting] of Object.entries(block.rules)) {
+      const level = Array.isArray(setting) ? setting[0] : setting
+      assert.equal(level, "error", `${name} is ${JSON.stringify(setting)}`)
     }
   }
 })
@@ -88,8 +90,8 @@ test("a hooks plugin too old to carry the effect and ref rules is refused, not a
   assert.throws(() => reactHooksRules({}), /set-state-in-effect/)
 })
 
-test("the blocks refuse inline directives and register the canon plugin", () => {
-  for (const block of single) {
+test("the source block refuses inline directives and registers the canon plugin", () => {
+  for (const block of single.slice(0, 1)) {
     assert.deepEqual(block.linterOptions, { noInlineConfig: true, reportUnusedDisableDirectives: "error" })
     assert.equal(block.plugins["starci-fe"], plugin)
   }
@@ -215,4 +217,13 @@ test("every workspace package is linted, whatever its name", () => {
   for (const pkg of ["nivo-ui", "ui", "design-system"]) {
     assert.ok(eslintFiles.some((glob) => glob.startsWith("packages/*/")), `packages/${pkg} is not reached by the source block`)
   }
+})
+
+test("the Sonar way block lints the source outside the specs with the pinned sonarjs and unicorn plugins", () => {
+  const sonar = config[2]
+  assert.ok(sonar.ignores.some((glob) => glob.includes(".spec.")), "a spec is outside the scan")
+  assert.ok(sonar.plugins.sonarjs?.rules && sonar.plugins.unicorn?.rules)
+  assert.deepEqual(sonar.rules["sonarjs/cognitive-complexity"], ["error", 15])
+  for (const name of ["sonarjs/no-nested-template-literals", "max-params", "no-duplicate-imports", "@typescript-eslint/prefer-optional-chain", "unicorn/prefer-set-has"]) assert.ok(name in sonar.rules, `${name} is mapped`)
+  assert.equal(single[0].rules["starci-fe/media-has-caption"], "error")
 })

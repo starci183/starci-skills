@@ -484,6 +484,8 @@ Absent or disabled Sonar normalizes to `null`. Enabled Sonar uses the public hos
 
 `services.sonar.optional` defaults to true for self-hosted SonarQube and false for SonarCloud. Optional Sonar probes system status with a ten-second timeout before CI scanning or `starci app release gate --sonar`; an unavailable provider produces a skipped row and notice. `services.codecov.optional` defaults to false; when true, unavailable upload or OIDC authentication produces a notice without failing CI. Set either option to false to keep provider failures strict.
 
+The sonar row of `starci app release gate --sonar` passes only on the server's quality gate, never on the scanner's exit code alone: after the scanner uploads, the row reads `.scannerwork/report-task.txt`, polls `api/ce/task` until the analysis ends, then reads `api/qualitygates/project_status` for that analysis with the same token. `ERROR` is red as `RELEASE_SONAR_GATE_FAILED` and names each failed condition; an analysis still running after 600 seconds is `RELEASE_SONAR_GATE_TIMEOUT`, and an unreadable answer or a project without a quality gate is `RELEASE_SONAR_GATE_UNREADABLE`.
+
 Absent Codecov defaults to enabled, OIDC, no token, target 100, automatic components, required coverage and required CI wiring. Disabled Codecov sets enabled to false. Token auth requires `ci.token`. Absent Dependabot defaults to the ecosystems, weekly schedule, groups, ignore and security settings above; absent audit defaults to high severity, development dependencies omitted, and both release-gate and CI consumers. Dependabot and audit may omit `ci`; all services still require `ownerAction`.
 
 ### r299

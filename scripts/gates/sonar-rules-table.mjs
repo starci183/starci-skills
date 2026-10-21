@@ -8,10 +8,9 @@ import sonarjs from 'eslint-plugin-sonarjs';
 import unicorn from 'eslint-plugin-unicorn';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { SONAR_SYNTAX_RULES } from '../lib/sonar-syntax-rules.mjs';
+import { COGNITIVE_COMPLEXITY_LIMIT, MAX_PARAMETERS } from '../lib/sonar-way.mjs';
 import { ownRules } from './sonar-own-rules.mjs';
 
-const COGNITIVE_COMPLEXITY_LIMIT = 15;
-const MAX_PARAMETERS = 7;
 const REGEX_COMPLEXITY_LIMIT = 20;
 
 /** {sonar, rule, options?, type, note?}: `rule` is `<plugin>/<name>` (the core rules have no plugin). */

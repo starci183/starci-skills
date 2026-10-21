@@ -9,13 +9,16 @@
  * The factory owns everything else: typed linting on every tracked TypeScript and JavaScript file
  * (`parserOptions.projectService`), the ignores (`dist/`, `coverage/`, `node_modules/` and nothing more), the
  * linter options that make a disable comment impossible, the borrowed typescript-eslint rules, every canon rule at
- * `error`, and `settings.starci.hfs` - the slot view each path-scoped rule asks instead of a path pattern.
+ * `error`, the Sonar way rules over the files the scan judges (scripts/lib/sonar-way.mjs: eslint-plugin-sonarjs and unicorn), and
+ * `settings.starci.hfs` - the slot view each path-scoped rule asks instead of a path pattern.
  *
  * NO RULE IS OFF OR WARN. The recommendation itself ships `error`; the factory refuses one that carries anything
  * else, so a rule cannot be published weakened and still look adopted. The factory takes no rule overrides, globs
  * or ignores: there is no parameter through which a repository could weaken the canon.
  */
 import tsParser from "@typescript-eslint/parser"
+import { OUTSIDE_THE_SCAN_FILES } from "../runtime/scripts/lib/sonar-syntax-rules.mjs"
+import { sonarWayRules } from "../runtime/scripts/lib/sonar-way.mjs"
 
 /** A disable directive is a weakening of lint, and one that suppresses nothing is dead weight. */
 export const linterOptions = Object.freeze({ noInlineConfig: true, reportUnusedDisableDirectives: "error" })
@@ -56,7 +59,7 @@ const levelOf = (setting) => (Array.isArray(setting) ? setting[0] : setting)
  * @param {object} input.hfs - The HFS view of the repository (`loadHfs(import.meta.url)`).
  * @param {object} input.plugin - The canon plugin.
  * @param {Record<string, unknown>} input.recommended - The canon levels.
- * @returns {Promise<Array<object>>} The flat config (ESLint awaits an exported promise): one ignore block and one rule block.
+ * @returns {Promise<Array<object>>} The flat config (ESLint awaits an exported promise): one ignore block, one rule block and the Sonar way block.
  */
 export const buildBeConfig = async ({ hfs, plugin, recommended }) => {
     if (!hfs || typeof hfs.slotOf !== "function" || typeof hfs.repoRoot !== "string") {
@@ -70,6 +73,7 @@ export const buildBeConfig = async ({ hfs, plugin, recommended }) => {
     if (weak.length > 0) throw new Error(`starciBeConfig refuses a recommendation with rules not at error: ${weak.join(", ")}`)
     // Loaded here, not at import: the rule catalog check imports this package to list its rules and needs no linter plugin.
     const { default: tsPlugin } = await import("@typescript-eslint/eslint-plugin")
+    const [{ default: sonarjs }, { default: unicorn }] = await Promise.all([import("eslint-plugin-sonarjs"), import("eslint-plugin-unicorn")])
     return [
         { ignores: [...IGNORED] },
         {
@@ -85,5 +89,7 @@ export const buildBeConfig = async ({ hfs, plugin, recommended }) => {
             settings: { starci: { hfs } },
             rules: { ...rules, ...BORROWED },
         },
+        // Sonar way: what the scan raises is refused while the code is written; a spec is outside the scan, so outside this block.
+        { files: [...SOURCE_FILES], ignores: [...OUTSIDE_THE_SCAN_FILES], plugins: { sonarjs, unicorn }, rules: sonarWayRules(sonarjs).rules },
     ]
 }

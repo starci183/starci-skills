@@ -1,5 +1,8 @@
 # Changelog
 
+## 4.7.17 - 2026-10-21
+- Fixed: the sonar row of `starci app release gate --sonar` no longer passes on the scanner's exit code alone: it reads `.scannerwork/report-task.txt`, polls `api/ce/task` until the analysis ends and reads `api/qualitygates/project_status` with the same token; ERROR is red as `RELEASE_SONAR_GATE_FAILED` naming each failed condition, a 600-second wait is `RELEASE_SONAR_GATE_TIMEOUT` and an unreadable answer `RELEASE_SONAR_GATE_UNREADABLE`; canon pins follow the matching package cohort.
+
 ## 4.7.16 - 2026-10-21
 - Fixed: `DB_MIGRATION_DESTRUCTIVE` counts a be/src source as a reference of a dropped or altered column only when the source names the column's table too, so a same-named column of another table (`public.brain_lessons.origin` beside a drop of `transactions.origin`) no longer blocks a contract migration; table and other object drops keep the leaf match; canon pins follow the matching package cohort.
 

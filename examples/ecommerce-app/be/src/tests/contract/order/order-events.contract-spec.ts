@@ -24,7 +24,7 @@ describe("order event contract", () => {
         })
 
         it.each(Object.keys(event.payload))("is refused by its consumer without %s", (field) => {
-            const { [field]: _dropped, ...rest } = samplePayload(event)
+            const rest = Object.fromEntries(Object.entries(samplePayload(event)).filter(([key]) => key !== field))
             expect(consumer?.parse({ eventId: "e1", payload: rest })).toBeNull()
         })
     })

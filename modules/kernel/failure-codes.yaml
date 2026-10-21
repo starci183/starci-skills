@@ -19594,6 +19594,37 @@ CI_STANDARD:
   owner: op-retry
   kind: check-finding
 
+RELEASE_SONAR_GATE_FAILED:
+  title: "The Sonar quality gate of the release analysis is red"
+  title_vi: "Quality gate Sonar của lượt phân tích phát hành bị đỏ"
+  meaning_vi: "Scanner đã tải báo cáo lên và thoát 0, nhưng máy chủ Sonar tính xong lượt phân tích với quality gate ERROR (dòng sonar liệt kê từng điều kiện hỏng), hoặc tác vụ compute-engine kết thúc FAILED hay CANCELED."
+  causes_vi:
+    - "Mã mới có lỗi nghiêm trọng, độ bao phủ hay trùng lặp vượt ngưỡng của quality gate"
+    - "Máy chủ từ chối hoặc huỷ tác vụ phân tích"
+  nextStep_vi: "Sửa các điều kiện hỏng được liệt kê trong mã sản phẩm, chạy lại starci app release gate --sonar; không nới quality gate để qua."
+  owner: op-retry
+  kind: verb-refusal
+
+RELEASE_SONAR_GATE_TIMEOUT:
+  title: "The Sonar analysis did not finish within the release wait"
+  title_vi: "Lượt phân tích Sonar chưa xong trong thời gian chờ của cổng phát hành"
+  meaning_vi: "Tác vụ compute-engine của báo cáo vừa tải lên vẫn PENDING hoặc IN_PROGRESS khi hết hạn chờ, nên cổng phát hành không đọc được quality gate và không coi dòng sonar là đạt."
+  causes_vi:
+    - "Hàng đợi compute-engine của máy chủ Sonar bị nghẽn hoặc máy chủ quá tải"
+  nextStep_vi: "Kiểm tra hàng đợi tác vụ của dự án trên máy chủ Sonar, rồi chạy lại starci app release gate --sonar khi máy chủ rảnh."
+  owner: op-retry
+  kind: verb-refusal
+
+RELEASE_SONAR_GATE_UNREADABLE:
+  title: "The Sonar quality gate of the release analysis cannot be read"
+  title_vi: "Không đọc được quality gate Sonar của lượt phân tích phát hành"
+  meaning_vi: "Scanner không ghi .scannerwork/report-task.txt có ceTaskId, máy chủ trả lỗi HTTP hoặc câu trả lời không đọc được, hoặc dự án không có quality gate (trạng thái NONE); dòng sonar không bao giờ đạt khi chưa đọc được quality gate."
+  causes_vi:
+    - "Token không có quyền đọc dự án hoặc tác vụ, host sai, hoặc dự án chưa gán quality gate"
+  nextStep_vi: "Cấp cho token quyền Browse dự án, gán quality gate cho dự án trên máy chủ Sonar, rồi chạy lại starci app release gate --sonar."
+  owner: op-retry
+  kind: verb-refusal
+
 SONAR_UNREACHABLE:
   title: "Sonar provider is unreachable"
   title_vi: "Khong the ket noi dich vu Sonar"

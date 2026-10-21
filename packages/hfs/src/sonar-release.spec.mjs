@@ -13,6 +13,19 @@ const lintFixture = (t, name) => {
   return root;
 };
 let lintExit = 0;
+/** The scanner's report-task.txt under `cwd`, as @sonar/scan writes it after an upload. */
+const writeReportTask = (cwd) => {
+  fs.mkdirSync(path.join(cwd, '.scannerwork'), {recursive: true});
+  fs.writeFileSync(path.join(cwd, '.scannerwork', 'report-task.txt'), ['projectKey=product', 'serverUrl=https://quality.example.invalid', 'ceTaskId=AX-task',
+    'dashboardUrl=https://quality.example.invalid/dashboard?id=product', ''].join('\n'));
+};
+/** A Sonar server: status UP, the compute-engine task SUCCESS, the quality gate `gate` with its conditions. */
+const sonarServer = (gate, conditions = []) => async (url) => ({ok: true, json: async () => {
+  if (url.includes('/api/system/status')) return {status: 'UP'};
+  if (url.includes('/api/ce/task')) return {task: {status: 'SUCCESS', analysisId: 'AN-1'}};
+  if (url.includes('/api/qualitygates/project_status')) return {projectStatus: {status: gate, conditions}};
+  throw new Error(`unexpected Sonar request ${url}`);
+}});
 
 test('native release sends selected Sonar credentials only to its scanner and keeps them out of other gate logs', async t => {
   lintExit = 0;
@@ -36,7 +49,7 @@ test('native release sends selected Sonar credentials only to its scanner and ke
       fs.writeFileSync(file, JSON.stringify({rules: [{id: 'shared', side}, {id: `only-${side}`}], issues: [{ruleId: `only-${side}`}]}));
       return {status: 0, stdout: `lint ${side} ok`};
     }
-    if (command === 'npx') return {status: 0, stdout: `scanner output ${options.env.SONAR_TOKEN}`};
+    if (command === 'npx') { writeReportTask(options.cwd); return {status: 0, stdout: `scanner output ${options.env.SONAR_TOKEN}`}; }
     throw new Error('Unexpected native gate command');
   };
   const services = {audit: {mode: 'disabled'}, sonar: {provider: 'sonarqube', mode: 'hosted', optional: false,
@@ -46,7 +59,7 @@ test('native release sends selected Sonar credentials only to its scanner and ke
     {name: 'lint', command: ['lint-probe']},
   ]}, {}, services);
   assert.ok(normalized.config);
-  const result = await releaseGate({cwd: root, spawn, now: () => 1000, fetch: async () => ({ok: true, json: async () => ({status: 'UP'})}),
+  const result = await releaseGate({cwd: root, spawn, now: () => 1000, fetch: sonarServer('OK'),
     get sops() {throw new Error('A release gate must not open unrelated stack custody');},
     env: {SONAR_TOKEN: secret, SONAR_NIVO_TOKEN: secret, KEEP_PUBLIC: 'retained', SONAR_SCANNER_JSON_PARAMS: '{"sonar.qualitygate.wait":"true"}'}},
   {...normalized.config, version: '1.0.0'}, {execute: true, sonar: true, platform: 'linux'});
@@ -107,4 +120,38 @@ test('a failing lint fails the sonar row and the scanner never runs', async t =>
   assert.equal(sonar.pass, false);
   assert.match(fs.readFileSync(sonar.log, 'utf8'), /lint be failed: exit 1; the scanner was not run/u);
   assert.equal(calls.some(call => call.command === 'npx' && !call.args.includes('starci')), false);
+});
+
+test('a quality gate ERROR fails the sonar row after a scanner exit 0 and names the failed conditions', async t => {
+  const root = lintFixture(t, 'hfs-sonar-gate-red-');
+  const head = 'c'.repeat(40);
+  const spawn = (command, args, options = {}) => {
+    if (command === 'git') {
+      if (args[1] === 'HEAD') return {status: 0, stdout: head};
+      if (args[1] === '--abbrev-ref') return {status: 0, stdout: 'main'};
+      if (args[1] === '--git-common-dir') return {status: 0, stdout: path.join(root, '.git')};
+      return {status: 0, stdout: ''};
+    }
+    if (command === 'npx' && args[0] === 'starci') {
+      const file = path.join(options.cwd, args[args.indexOf('--sonar') + 1]);
+      fs.mkdirSync(path.dirname(file), {recursive: true});
+      fs.writeFileSync(file, JSON.stringify({rules: [], issues: []}));
+      return {status: 0, stdout: 'lint ok'};
+    }
+    if (command === 'npx') { writeReportTask(options.cwd); return {status: 0, stdout: 'ANALYSIS SUCCESSFUL'}; }
+    return {status: 0, stdout: ''};
+  };
+  const services = {audit: {mode: 'disabled'}, sonar: {provider: 'sonarqube', mode: 'hosted', optional: false,
+    host: {public: 'https://quality.example.invalid'}, ci: {token: 'SONAR_NIVO_TOKEN'}}};
+  const normalized = normalizeRelease({gates: [{name: 'build', command: ['build-probe']}]}, {}, services);
+  const conditions = [{status: 'ERROR', metricKey: 'new_critical_violations', comparator: 'GT', errorThreshold: '0', actualValue: '5'},
+    {status: 'OK', metricKey: 'new_coverage', comparator: 'LT', errorThreshold: '80', actualValue: '91'}];
+  const result = await releaseGate({cwd: root, spawn, now: () => 1000, fetch: sonarServer('ERROR', conditions),
+    env: {SONAR_NIVO_TOKEN: 'fixture-private-analysis-value'}}, {...normalized.config, version: '1.0.0'}, {execute: true, sonar: true, platform: 'linux'});
+  assert.equal(result.ok, false);
+  const sonar = result.data.results.find(row => row.name === 'sonar');
+  assert.equal(sonar.pass, false);
+  assert.match(sonar.detail, /^RELEASE_SONAR_GATE_FAILED: quality gate ERROR \(new_critical_violations GT 0 \(actual 5\)\)/u);
+  assert.doesNotMatch(sonar.detail, /new_coverage/u);
+  assert.match(fs.readFileSync(sonar.log, 'utf8'), /failed: new_critical_violations GT 0 \(actual 5\)/u);
 });

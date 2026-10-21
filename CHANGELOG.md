@@ -6,11 +6,14 @@ until every S* row in `docs/goal.md` holds with fresh evidence, then `1.0.0` fre
 
 ## [Unreleased]
 
-## [1.0.0-alpha.24] — 2026-10-20
+## [1.0.0-alpha.25] — 2026-10-21
+
+1.0.0-alpha.24 was never cut (no tag and no published runtime package); its work ships in alpha.25.
 
 Code-quality release: the runtime's SonarCloud project goes from 175 open code smells (3 critical) at alpha.23 to none, and a coding agent can no longer commit code first and fix lint or specs afterwards.
 
 ### Added
+- Both lint canons switch on the Sonar way TypeScript profile at lint time: every Sonar way rule with an ESLint equivalent (`scripts/lib/sonar-way.mjs`, eslint-plugin-sonarjs' Sonar way set plus the core, typescript-eslint and unicorn rules SonarSource builds on) is an error over the scanned source, so `starci app lint` in the op loop reports what the scan would instead of the release gate. The front-end canon adds `media-has-caption` (S4084). The example apps are clean against it.
 - `starci npm ci` and `starci npm install` install the checkout's git hooks after every finished install, skipped and workspace installs included: when `core.hooksPath` names a missing or empty folder and the root `prepare` script runs husky, `npm run prepare` runs even when lifecycle scripts were ignored; the receipt reports the hooks, and hooks still missing fail the verb. NIVO worktrees installed with `npm ci --ignore-scripts` committed 8 branches without any pre-commit check.
 - `starci app check` reports `HFS_HOOKS_NOT_INSTALLED` (R13) when a set `core.hooksPath` names a hooks folder that is missing or holds no husky dispatcher in the checkout.
 - `starci app hygiene`, run by the managed pre-commit hook, refuses a new back-end logic file (a role of the coverage scope below a measured root) staged without its unit spec beside it, naming the file (`BE_UNIT_SPEC_NOT_STAGED`, R47).
@@ -19,9 +22,10 @@ Code-quality release: the runtime's SonarCloud project goes from 175 open code s
 
 ### Changed
 - The local `sonar-rules` gate enforces every Sonar rule id SonarCloud raised on alpha.23 that has a type-free local port, calibrated against those findings, so the smells cannot return unseen before the next scan.
-- Candidate package pins select HFS 4.7.16, CLI 1.7.16, back-end canon 3.4.24 and front-end canon 8.4.23 (3.4.21 and 8.4.20 were published alone by an interrupted publication and are superseded); CLI depends exactly on its matching HFS package.
+- Candidate package pins select HFS 4.7.17, CLI 1.7.17, back-end canon 3.4.25 and front-end canon 8.4.24 (3.4.21 and 8.4.20 were published alone by an interrupted publication and are superseded); CLI depends exactly on its matching HFS package.
 
 ### Fixed
+- The sonar row of `starci app release gate --sonar` waits for the server's quality gate instead of trusting the scanner's exit code: NIVO HEAD d02e117a passed the row while its quality gate on the server was ERROR (29 open issues, 5 new critical). ERROR is red as `RELEASE_SONAR_GATE_FAILED` with the failed conditions, a task still running after 600 seconds is `RELEASE_SONAR_GATE_TIMEOUT`, an unreadable answer `RELEASE_SONAR_GATE_UNREADABLE`.
 - `DB_MIGRATION_DESTRUCTIVE` matches a dropped or altered column against be/src only where a source names the column together with its table; NIVO's `origin` contract drop over seven tables was reported as still referenced by `public.brain_lessons.origin`, another table's column. Table and other object drops keep the leaf-name match.
 - `starci gate run` no longer stops with `GATE_TSC_CONFIG_MISSING` on the generated `supabase/types/database.types.ts` of a lite app: a TypeScript file with no tsconfig.json of its own under a `hfs.json` `sides.<side>.reads` tree affects every compiler program of each side that reads it, which typecheck it through their imports. The gate's `--changed` semantics (it extends the delta from `--base`, never narrows it) are stated in the catalog and the delegation brief.
 - `starci release publish --plan` no longer blocks an already-published bundling canon whose registry integrity equals its local pack: identical bytes already carry the final canon-pins copy, so a publish of another package cannot change them; a canon whose bytes differ is blocked as before (lead ruling release-plan-identical-bundler, 2026-10-21, owner-delegated).

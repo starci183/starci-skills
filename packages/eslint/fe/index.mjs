@@ -183,6 +183,13 @@ const loadReactHooks = () => {
 /** The typescript-eslint plugin whose type-aware rules the factory borrows (Sonar S1874, S6551 and S7503); a dependency of this package. */
 const loadTsPlugin = () => createRequire(import.meta.url)("@typescript-eslint/eslint-plugin")
 
+/** The Sonar way plugins (scripts/lib/sonar-way.mjs); dependencies of this package, pinned exactly. */
+const loadSonarPlugins = () => {
+  const require = createRequire(import.meta.url)
+  const unicorn = require("eslint-plugin-unicorn")
+  return { sonarjs: require("eslint-plugin-sonarjs"), unicorn: unicorn.default ?? unicorn }
+}
+
 /**
  * The React Hooks rules of a plugin, all at error.
  *
@@ -234,6 +241,7 @@ export const starciFeConfig = ({ hfs } = {}) => {
     plugin,
     reactHooks,
     tsPlugin: loadTsPlugin(),
+    sonar: loadSonarPlugins(),
     source: { ...recommended, ...reactHooksRules(reactHooks) },
   })
 }

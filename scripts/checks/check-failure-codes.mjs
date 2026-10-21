@@ -39,7 +39,7 @@ const OWNERS = Object.freeze(['op-retry', 'runtime-core', 'supervisor', 'owner']
 const ownerValid = (owner) => OWNERS.includes(owner) || /^other-op:[a-z][a-z0-9.-]*$/.test(String(owner ?? ''));
 const SCAN_DIRS = ['scripts', 'engine', 'modules'];
 // The HFS rule catalog names the code of every rule, including rules whose checker is still owed, so it emits them too.
-const SCAN_FILES = ['knowledge/hfs/rules.yaml', 'packages/hfs/release/gate.mjs'];
+const SCAN_FILES = ['knowledge/hfs/rules.yaml', 'packages/hfs/release/gate.mjs', 'packages/hfs/release/sonar-quality-gate.mjs'];
 const SCAN_EXT = /\.(mjs|yaml)$/;
 // The scanner does not read its own catalog checker, the catalog, or the ui/ harness.
 const SKIP_FILES = new Set([CATALOG_FILE, 'scripts/checks/check-failure-codes.mjs']);

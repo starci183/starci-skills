@@ -11,6 +11,6 @@ export const createRetryLink = () =>
         delay: { initial: RETRY_POLICY.initialDelayMs, max: RETRY_POLICY.maxDelayMs, jitter: true },
         attempts: {
             max: RETRY_POLICY.maxAttempts,
-            retryIf: (error) => error !== undefined && !CombinedGraphQLErrors.is(error),
+            retryIf: (error) => !CombinedGraphQLErrors.is(error),
         },
     })

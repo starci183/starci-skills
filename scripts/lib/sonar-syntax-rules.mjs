@@ -206,8 +206,28 @@ const noUnusedPropTypes = {
   },
 };
 
-/** The files the example scans leave out: a unit spec and an end-to-end spec. */
+/** S4084: a `<video>` or `<audio>` element plays captions: a `<track kind="captions">` child, or it is `muted`. */
+const MEDIA = new Set(['video', 'audio']);
+const jsxName = (node) => (node?.name?.type === 'JSXIdentifier' ? node.name.name : null);
+const attributeOf = (opening, name) => opening.attributes.find((attribute) => attribute.type === 'JSXAttribute' && attribute.name?.name === name);
+const isCaptionTrack = (child) => child.type === 'JSXElement' && jsxName(child.openingElement) === 'track'
+  && attributeOf(child.openingElement, 'kind')?.value?.value === 'captions';
+const mediaHasCaption = {
+  meta: { type: 'problem', schema: [], messages: { caption: 'S4084: give this <{{ name }}> a <track kind="captions"> child (or make it muted) so it can be followed without sound.' } },
+  create(context) {
+    return {
+      JSXElement(node) {
+        const name = jsxName(node.openingElement);
+        if (!MEDIA.has(name) || attributeOf(node.openingElement, 'muted') || node.children.some(isCaptionTrack)) return;
+        context.report({ node: node.openingElement, messageId: 'caption', data: { name } });
+      },
+    };
+  },
+};
+
+/** The files the example scans leave out: a unit spec and an end-to-end spec (the regex, and the flat-config globs of the same set). */
 const OUTSIDE_THE_SCAN = /\.(?:e2e-)?spec\.[cm]?[jt]sx?$/;
+export const OUTSIDE_THE_SCAN_FILES = Object.freeze(['**/*.spec.{js,mjs,cjs,ts,mts,cts,jsx,tsx}', '**/*.e2e-spec.{js,mjs,cjs,ts,mts,cts,jsx,tsx}']);
 
 /** The rule judging only the files the scan judges. */
 const scanned = (rule) => ({ ...rule, create: (context) => (OUTSIDE_THE_SCAN.test(context.filename) ? {} : rule.create(context)) });
@@ -222,4 +242,5 @@ export const SONAR_SYNTAX_RULES = Object.freeze({
   'no-unused-import': scanned(noUnusedImport),
   'prefer-export-from': scanned(preferExportFrom),
   'no-unused-prop-types': scanned(noUnusedPropTypes),
+  'media-has-caption': scanned(mediaHasCaption),
 });

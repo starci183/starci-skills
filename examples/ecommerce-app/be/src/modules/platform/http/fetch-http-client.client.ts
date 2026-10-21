@@ -55,8 +55,12 @@ export class FetchHttpClient implements HttpClient {
     }
 
     private bodyOf(request: HttpRequest): string | Buffer | undefined {
+        return request.bytes ?? this.textOf(request)
+    }
+
+    /** The text body of a request that carries no bytes: the form encoded, else the JSON body, else none. */
+    private textOf(request: HttpRequest): string | undefined {
         if (request.form !== undefined) return new URLSearchParams(request.form).toString()
-        if (request.bytes !== undefined) return request.bytes
         return request.body === undefined ? undefined : JSON.stringify(request.body)
     }
 
