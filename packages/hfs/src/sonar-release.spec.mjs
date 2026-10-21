@@ -84,6 +84,8 @@ test('native release sends selected Sonar credentials only to its scanner and ke
   const record = JSON.parse(fs.readFileSync(result.data.record, 'utf8'));
   assert.equal(record.schema, 'starci-app-l4-record/1');
   assert.equal(record.head, head);
+  assert.equal(record.ci.required, false, 'release.requireCi defaults to false');
+  assert.match(record.ci.note, /^CI not required by release\.requireCi=false \(owner ruling release-require-ci-per-project\)/u);
   assert.deepEqual(record.gates.map(row => row.name), ['build', 'lint', 'sonar']);
   for (const row of record.gates) assert.equal(fs.readFileSync(row.log, 'utf8').includes(secret), false);
   const merged = JSON.parse(fs.readFileSync(path.join(root, 'reports', 'lint.sonar.json'), 'utf8'));

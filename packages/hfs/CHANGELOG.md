@@ -1,5 +1,8 @@
 # Changelog
 
+## 4.7.19 - 2026-10-21
+- Added: `release.requireCi` (default false, owner ruling release-require-ci-per-project): `starci app release push` waits for the candidate CI only for an app that sets it true; with false it needs the annotated tag and the green L4 record, runs the dry run and pushes atomically, and the L4 record and the output state that CI was not required; canon pins follow the matching package cohort.
+
 ## 4.7.18 - 2026-10-21
 - Changed: supersedes 4.7.17, published from a lane whose history the owner refused (an unapproved allowlist entry) and therefore a superseded orphan that is not used; this version carries the same work plus the standalone scaffold fix.
 - Fixed: the managed CI's coverage job runs `starci app coverage verify <lcov>`, the coverage judgement alone over the merged report, instead of `npm run codegen && starci app check --coverage-from` (the whole app check the fast and lint jobs already ran); its default timeout is 15 minutes (`knowledge/hfs/ci-standard.yaml`). NIVO v0.3.0's coverage job took 18m43s of 20 and the tag run was cancelled.

@@ -16,7 +16,9 @@ import { sonarQualityGate } from './sonar-quality-gate.mjs';
 export const RELEASE_CODE = 'RELEASE_CONFIG_INVALID';
 const SONAR_UNREACHABLE = 'SONAR_UNREACHABLE';
 
-const FIELDS = new Set(['gates', 'tagPrefix', 'defaultBranch', 'tagMatchesVersion']);
+const FIELDS = new Set(['gates', 'tagPrefix', 'defaultBranch', 'tagMatchesVersion', 'requireCi']);
+/** The note a release that does not wait for CI carries in its L4 record and its push output (owner ruling release-require-ci-per-project). */
+export const CI_NOT_REQUIRED = 'CI not required by release.requireCi=false (owner ruling release-require-ci-per-project): the local release gate, this L4 record and the annotated tag, is the release proof';
 const GATE_FIELDS = new Set(['name', 'command', 'summary', 'env']);
 const GATE_NAME = /^[a-z][a-z0-9-]*$/u;
 const TOKEN = /^[A-Za-z0-9_@%+=:,./\\-]+$/u;
@@ -117,14 +119,17 @@ export function normalizeRelease(block, scripts = {}, services = {}, options = {
   const tagPrefix = raw.tagPrefix ?? 'v';
   const defaultBranch = raw.defaultBranch ?? 'main';
   const tagMatchesVersion = raw.tagMatchesVersion ?? false;
+  // The candidate CI of `release push` is an app's choice and off by default (owner ruling release-require-ci-per-project); the local gate never is.
+  const requireCi = raw.requireCi ?? false;
   if (typeof tagPrefix !== 'string' || !PREFIX.test(tagPrefix)) problems.push(`release.tagPrefix: must match ${PREFIX}`);
   if (!refName(defaultBranch)) problems.push(`release.defaultBranch: must match ${REF_NAME}`);
   if (typeof tagMatchesVersion !== 'boolean') problems.push('release.tagMatchesVersion: must be true or false');
+  if (typeof requireCi !== 'boolean') problems.push('release.requireCi: must be true or false');
   const quality = releaseServices(services, options);
   const audit = auditGate(quality.audit);
   const gates = raw.gates === undefined ? defaultGates(scripts, audit) : gatesOf(raw.gates, problems);
   if (raw.gates !== undefined && audit && !gates.some((gate) => gate.name === 'audit')) gates.push(audit);
-  return problems.length === 0 ? { config: { gates, tagPrefix, defaultBranch, tagMatchesVersion, services: quality } } : { problems };
+  return problems.length === 0 ? { config: { gates, tagPrefix, defaultBranch, tagMatchesVersion, requireCi, services: quality } } : { problems };
 }
 
 /* ---- git through the seam */
@@ -345,10 +350,11 @@ function assertUnmoved(ctx, head) {
   if (dirty.length > 0) throw failure('RELEASE_TREE_DIRTY', `the gates left ${dirty.length} changed or untracked path(s) (first: ${dirty[0].slice(0, 100)}): generated files differ from HEAD. Commit or ignore them properly, then rerun. No record.`);
 }
 
-function writeRecord(ctx, { head, tag, results, recordPath }) {
+function writeRecord(ctx, { head, tag, results, recordPath, requireCi }) {
   const record = {
     schema: 'starci-app-l4-record/1', head, tag, createdAt: new Date(ctx.now()).toISOString(), producedBy: 'starci app release gate',
     note: 'Required gates passed on a clean HEAD; optional provider skips are explicit and every entry links its log and sha256.',
+    ci: requireCi === true ? { required: true, note: 'starci app release push waits for the candidate CI of this sha (release.requireCi=true)' } : { required: false, note: CI_NOT_REQUIRED },
     gates: results,
   };
   fs.mkdirSync(path.dirname(recordPath), { recursive: true });
@@ -394,7 +400,7 @@ export async function releaseGate(ctx, config, options = {}) {
   const failed = results.filter((result) => !result.pass && !result.skipped);
   if (failed.length > 0) return { ok: false, lines: [...plan, ...report, `gate(s) red: ${failed.map((item) => item.name).join(', ')}. No L4 record, no tag.`], data: { ...base, executed: true, results } };
   assertUnmoved(ctx, facts.head);
-  writeRecord(ctx, { head: facts.head, tag: facts.chosen.tag, results, recordPath });
+  writeRecord(ctx, { head: facts.head, tag: facts.chosen.tag, results, recordPath, requireCi: config.requireCi });
   const created = facts.chosen.state !== 'on-head';
   if (created) git(ctx, ['tag', '-a', facts.chosen.tag, '-m', `release ${facts.chosen.tag}: required gates passed on ${facts.head.slice(0, 12)} (L4 record ${path.basename(recordPath)})`, facts.head]);
   const tagged = created ? `annotated tag ${facts.chosen.tag} created on ${facts.head.slice(0, 10)}` : `annotated tag ${facts.chosen.tag} already on ${facts.head.slice(0, 10)}`;

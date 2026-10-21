@@ -648,6 +648,13 @@ rulings:
     supersedes: []
     enforcedBy: [knowledge/op-gate.yaml, skills/starci/references/code-delegation.md]
 
+  - id: release-require-ci-per-project
+    date: '2026-10-21'
+    source: "the owner in chat, relayed by the lead (the owner's words in Vietnamese: leave CI, check locally and push; add a require-CI option per project; make require CI false by default and false for NIVO and starci-next; the StarCi runtime itself has no require-CI setting)"
+    ruling: "An app's application-stacks.yaml release.requireCi (true or false, default false) decides whether starci app release push waits for the candidate CI of the release sha. With false the push still needs the annotated release tag and the green L4 record of the local release gate, still runs git push --dry-run --atomic first through the pre-push hook, then pushes the default branch and the tag atomically; the L4 record and the push output state that CI was not required by release.requireCi=false. With true the candidate CI path and starci release ci-override keep their meaning. NIVO, starci-next, the example apps and the scaffold inherit false. The StarCi runtime release (starci release cut and its candidate CI) is not affected and has no such setting."
+    supersedes: []
+    enforcedBy: [packages/hfs/release/gate.mjs, packages/hfs/release/push.mjs]
+
 supersedes:
   'ruling:R212/case-2': ['ruling:R212/case-1']
   'ruling:R212/case-4': ['ruling:R212/case-1', 'ruling:R212/case-2']

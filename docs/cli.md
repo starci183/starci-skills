@@ -499,7 +499,9 @@ Conventions:
 - OK passes; ERROR is red as RELEASE_SONAR_GATE_FAILED naming each failed condition, as is a FAILED or CANCELED task
 - a task still running after 600 s is RELEASE_SONAR_GATE_TIMEOUT; no report-task, an HTTP error or no gate is RELEASE_SONAR_GATE_UNREADABLE
 - OWNER RULING candidate-ci (2026-10-18): the gate no longer reads the default-branch CI; the verdict is the candidate run of the sha
-- push --execute sends HEAD to refs/heads/release/candidate-<version> first and waits for its ci.yml run (it triggers on release/candidate-*)
+- release.requireCi (default false, owner ruling release-require-ci-per-project) decides whether push waits for CI; the local gate is never skipped
+- requireCi false: push needs the tag and the green L4 record, runs the dry run, pushes atomically and states CI was not required
+- requireCi true: push --execute sends HEAD to refs/heads/release/candidate-<version> first and waits for its ci.yml run
 - green moves the branch and the tag in one atomic push; red refuses RELEASE_CANDIDATE_CI_RED naming the failing jobs
 - no run, or no end in time, refuses RELEASE_CANDIDATE_CI_TIMEOUT; unreadable GitHub refuses RELEASE_CI_UNKNOWN; nothing reaches the branch
 - only the owner's starci release ci-override --sha <sha> --reason <text> record lets a red candidate through; there is no --no-ci-check flag

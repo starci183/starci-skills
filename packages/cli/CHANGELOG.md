@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.7.19 - 2026-10-21
+- Changed: the `starci app release` catalog states `release.requireCi` (default false); pins @starci/hfs 4.7.19.
+
 ## 1.7.18 - 2026-10-21
 - Changed: supersedes 1.7.17, published from a lane whose history the owner refused (an unapproved allowlist entry) and therefore a superseded orphan that is not used; this version carries the same work plus the standalone scaffold fix.
 - Added: `starci app coverage verify <lcov>` in the catalog (exit 0 proved, 1 refused, 2 bad usage), the coverage proof alone.

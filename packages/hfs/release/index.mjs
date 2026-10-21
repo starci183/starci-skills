@@ -53,7 +53,7 @@ function readPackage(root) {
   try { return JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')); } catch { throw refusal('RELEASE_PACKAGE_UNREADABLE', 'package.json is not readable JSON'); }
 }
 
-/** The normalised `release:` block (tolerant of absence) with the package version: { root, version, gates, tagPrefix, defaultBranch, tagMatchesVersion }. */
+/** The normalised `release:` block (tolerant of absence) with the package version: { root, version, gates, tagPrefix, defaultBranch, tagMatchesVersion, requireCi }. */
 function loadReleaseConfig(root) {
   const pkg = readPackage(root);
   if (typeof pkg.version !== 'string' || !VERSION.test(pkg.version)) throw refusal(RELEASE_CODE, 'package.json needs a version like 1.2.3 (the release tag derives from it)');
