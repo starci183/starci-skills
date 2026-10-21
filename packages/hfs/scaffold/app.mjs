@@ -216,7 +216,7 @@ const LITE_FE_APP_DEPENDENCIES = Object.freeze({
  * ./routing, client-safe: the default locale a client boundary reads).
  */
 const FE_PACKAGES = Object.freeze({
-  ui: { exports: ['.'], dependencies: { '@heroui/react': null, '@starci/grammar': null, '@starci/heroicons': null, '@xyflow/react': null, 'next-intl': null, react: null } },
+  ui: { exports: ['.'], dependencies: { '@heroui/react': null, '@starci/grammar': null, '@starci/heroicons': null, '@xyflow/react': null, 'next-intl': null, react: null, 'react-dom': null } },
   i18n: { exports: ['.', './proxy', './routing'], dependencies: { next: null, 'next-intl': null, 'server-only': null } },
 });
 

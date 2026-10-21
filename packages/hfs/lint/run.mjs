@@ -137,8 +137,35 @@ const onSide = (changed, side) => changed.filter((file) => file.startsWith(`${si
 const fileKey = (file) => process.platform === 'win32' ? path.resolve(file).toLowerCase() : path.resolve(file);
 const inside = (root, file) => { const rel = path.relative(root, file); return rel !== '..' && !rel.startsWith(`..${path.sep}`) && !path.isAbsolute(rel); };
 
+/**
+ * The lint scope a flat config declares: `ignored(file)` for its global ignores (a block holding only `ignores` and `name`), which prune
+ * the walk, and `source(file)` for a file some block's `files` select while that block's own `ignores` do not (standard flat-config
+ * semantics: the Sonar-way block of the canons narrows itself to the scanned files). Negated or non-string selectors cannot prove a
+ * scope and are refused.
+ */
+export function canonScope(config) {
+  const blocks = [], ignored = [];
+  for (const block of config) {
+    if (!block || typeof block !== 'object') throw new Error('the installed canon returned an invalid config block');
+    for (const field of ['files', 'ignores']) {
+      if (block[field] === undefined) continue;
+      if (!Array.isArray(block[field]) || block[field].some((glob) => typeof glob !== 'string' || glob.startsWith('!'))) throw new Error(`unsupported canon ${field} selectors`);
+    }
+    const patterns = (globs) => (globs ?? []).flatMap((glob) => braceVariants(glob).map(globExpression));
+    const global = block.ignores !== undefined && Object.keys(block).every((key) => ['ignores', 'name'].includes(key));
+    if (global) ignored.push(...patterns(block.ignores));
+    else if (block.files !== undefined) blocks.push({ files: patterns(block.files), ignores: patterns(block.ignores) });
+  }
+  if (!blocks.length) throw new Error('the installed canon has no source selectors');
+  const matches = (list, file) => list.some((pattern) => pattern.test(file));
+  return {
+    ignored: (file) => matches(ignored, file),
+    source: (file) => blocks.some((block) => matches(block.files, file) && !matches(block.ignores, file)),
+  };
+}
+
 /** Read the installed canon's source selectors, then enumerate that scope; unavailable or unsupported selectors cannot prove coverage. */
-async function sourceFiles({ repoRoot, cwd, side, scope }) {
+async function sourceFiles({ repoRoot, cwd, side, scope: folderScope }) {
   const entry = createRequire(path.join(cwd, 'package.json')).resolve(`@starci/eslint-canon-${side}`);
   // The canon must be the app's own install: resolved inside the app root, or inside the app's node_modules when that folder is a link to the install
   // (the runtime's examples lint in a sealed copy whose node_modules links the example's own install, scripts/hfs/example-secrets.mjs).
@@ -149,30 +176,19 @@ async function sourceFiles({ repoRoot, cwd, side, scope }) {
   if (typeof factory !== 'function' || typeof canon.loadHfs !== 'function') throw new Error('the installed canon has no supported config factory');
   const config = await factory({ hfs: canon.loadHfs(pathToFileURL(path.join(cwd, 'eslint.config.mjs')).href) });
   if (!Array.isArray(config)) throw new Error('the installed canon did not return a flat config');
-  const selectors = [], ignored = [];
-  for (const block of config) {
-    if (!block || typeof block !== 'object') throw new Error('the installed canon returned an invalid config block');
-    for (const [field, target] of [['files', selectors], ['ignores', ignored]]) {
-      if (block[field] === undefined) continue;
-      if (!Array.isArray(block[field]) || block[field].some((glob) => typeof glob !== 'string' || glob.startsWith('!'))) throw new Error(`unsupported canon ${field} selectors`);
-      if (field === 'ignores' && Object.keys(block).some((key) => !['ignores', 'name'].includes(key))) throw new Error('unsupported non-global canon ignores');
-      target.push(...block[field].flatMap((glob) => braceVariants(glob).map(globExpression)));
-    }
-  }
-  if (!selectors.length) throw new Error('the installed canon has no source selectors');
-  const matches = (patterns, file) => patterns.some((pattern) => pattern.test(file));
+  const scope = canonScope(config);
   const files = [];
   const visit = (folder) => {
     for (const child of fs.readdirSync(path.join(cwd, folder), { withFileTypes: true })) {
       const file = posix(path.join(folder, child.name));
       // Ask the canon's global ignore patterns before entering output or installed-package trees.
-      if (matches(ignored, file) || matches(ignored, `${file}/__starci_scope_probe__`)) continue;
+      if (scope.ignored(file) || scope.ignored(`${file}/__starci_scope_probe__`)) continue;
       if (child.isSymbolicLink()) throw new Error(`cannot enumerate symlink ${file}`);
       if (child.isDirectory()) visit(file);
-      else if (child.isFile() && matches(selectors, file)) files.push(file);
+      else if (child.isFile() && scope.source(file)) files.push(file);
     }
   };
-  visit(scope ?? '');
+  visit(folderScope ?? '');
   return files.sort(byCodeUnit);
 }
 
