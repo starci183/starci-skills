@@ -25,7 +25,7 @@ describe("migrateConnections", () => {
     it("runs the pending migrations of each connection in order and answers their names by connection", async () => {
         const client = await setup()
         const primary = mock<ConnectionSource>()
-        primary.runMigrations.mockResolvedValue([{ id: 1, timestamp: 1, name: "Init1" }])
+        primary.runMigrations.mockResolvedValue([{ name: "Init1" }])
         const archive = mock<ConnectionSource>()
         archive.runMigrations.mockResolvedValue([])
         const sources = new Map([
