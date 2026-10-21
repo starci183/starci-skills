@@ -1,5 +1,8 @@
 # Changelog
 
+## 4.7.20 - 2026-10-22
+- Changed: the bundled failure-code catalog carries the Sonar quality-gate ensure results (`sonar-gate-*`); canon pins follow the matching package cohort.
+
 ## 4.7.19 - 2026-10-21
 - Changed: supersedes 4.7.18 (app lint broken: the canons' Sonar way block carries its own ignores, which `starci app lint` refused as an unsupported source scope, so it exited 2 without running ESLint and reported 0 findings); 4.7.18 is not used.
 - Fixed: `starci app lint` reads the canons' flat config as flat config defines it: global ignores prune the source walk and a block's own ignores narrow only that block, so the Sonar way block no longer makes the source scope unavailable (exit 2 without ESLint); a file is a source when some block's files match it and that block's ignores do not.
