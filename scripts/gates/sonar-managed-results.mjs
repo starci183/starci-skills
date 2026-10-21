@@ -2,7 +2,9 @@
 export const resultCodes = new Set([
   'sonar-action-unsupported', 'sonar-analysis-not-verified', 'sonar-analysis-processed',
   'sonar-analysis-readback-unreconciled', 'sonar-analysis-revision-mismatch', 'sonar-analysis-revision-required',
-  'sonar-analysis-source-mismatch', 'sonar-browse-incomplete', 'sonar-browse-read', 'sonar-browse-unavailable',
+  'sonar-analysis-source-mismatch', 'sonar-browse-incomplete', 'sonar-browse-read', 'sonar-browse-unavailable', 'sonar-gate-api-unsupported', 'sonar-gate-condition-unreconciled',
+  'sonar-gate-create-unreconciled', 'sonar-gate-name-mismatch', 'sonar-gate-not-observed', 'sonar-gate-read-unavailable',
+  'sonar-gate-readback', 'sonar-gate-select-unreconciled',
   'sonar-local-users-readback', 'sonar-new-user-password-required', 'sonar-project-api-unsupported',
   'sonar-project-conflict', 'sonar-project-create-unreconciled', 'sonar-project-exists',
   'sonar-project-not-observed', 'sonar-project-read-unavailable', 'sonar-project-readback',

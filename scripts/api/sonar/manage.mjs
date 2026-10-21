@@ -39,6 +39,17 @@ export function manage({target, credentials, request}) {
     project: key => call('GET', '/api/components/show', 'admin', {params: {component: key}}),
     createProject: ({key, name, visibility, organization}) => call('POST', '/api/projects/create', 'admin',
       {form: {project: key, name, visibility, organization}}),
+    // Quality gates: the organization parameter scopes each call on SonarQube Cloud and is omitted on a server. `ref` is the
+    // gate reference the server's API declares for the action ({gateName} or {gateId}).
+    gate: (name, organization) => call('GET', '/api/qualitygates/show', 'admin', {params: {name, organization}}),
+    createGate: (name, organization) => call('POST', '/api/qualitygates/create', 'admin', {form: {name, organization}}),
+    createCondition: ({ref, metric, op, error, organization}) => call('POST', '/api/qualitygates/create_condition', 'admin',
+      {form: {...ref, metric, op, error, organization}}),
+    updateCondition: ({id, metric, op, error, organization}) => call('POST', '/api/qualitygates/update_condition', 'admin',
+      {form: {id, metric, op, error, organization}}),
+    deleteCondition: ({id, organization}) => call('POST', '/api/qualitygates/delete_condition', 'admin', {form: {id, organization}}),
+    selectGate: ({ref, projectKey, organization}) => call('POST', '/api/qualitygates/select', 'admin', {form: {...ref, projectKey, organization}}),
+    projectGate: (projectKey, organization) => call('GET', '/api/qualitygates/get_by_project', 'admin', {params: {project: projectKey, organization}}),
     settingDefinitions: key => call('GET', '/api/settings/list_definitions', 'admin', {params: {component: key}}),
     settings: (key, keys) => call('GET', '/api/settings/values', 'admin', {params: {component: key, keys: keys.join(',')}}),
     setSetting: (key, setting, value) => call('POST', '/api/settings/set', 'admin',

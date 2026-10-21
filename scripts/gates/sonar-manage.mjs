@@ -12,6 +12,7 @@ import {findInOrder} from '../lib/in-order.mjs';
 import {emailAddress} from '../lib/email-address.mjs';
 import {resultCodes, fail, verified, uncertain} from './sonar-managed-results.mjs';
 import {sonarTokenAction} from './sonar-token-actions.mjs';
+import {loadSonarGate, serverConditions} from './sonar-gate.mjs';
 
 const PROVIDERS = new Set(['sonar-server', 'sonar-community', 'sonar-cloud']);
 const TOKEN_TYPES = new Set(['USER_TOKEN', 'PROJECT_ANALYSIS_TOKEN', 'GLOBAL_ANALYSIS_TOKEN']);
@@ -48,12 +49,23 @@ const closed = (value, names) => Object.keys(value).every(key => names.includes(
 const publicScalar = value => typeof value === 'number' ? Number.isFinite(value) : ['string', 'boolean'].includes(typeof value);
 const validPublicValue = value => publicScalar(value) || Array.isArray(value) && value.every(publicScalar);
 
-const projectRequest = (resource, args) => {
+/**
+ * The quality gate a project target declares (resource.qualityGate): its name must be the gate knowledge/sonar-gate.yaml gives the
+ * repository's edition, and its conditions are exactly that file's server conditions. Undefined when the target declares none.
+ */
+const declaredGate = (resource, target) => {
+  if (resource.qualityGate === undefined) return undefined;
+  if (typeof resource.qualityGate !== 'string' || !namePattern.test(resource.qualityGate)) throw new Error('Invalid declared quality gate');
+  const gate = loadSonarGate({cwd: target.repoRoot});
+  return {name: resource.qualityGate, canonical: gate.gate.name, conditions: serverConditions(gate)};
+};
+
+const projectRequest = (resource, args, target) => {
   const name = resource.name ?? resource.projectKey, visibility = resource.visibility;
   if (typeof name !== 'string' || !name.trim() || name.length > 200
       || (visibility !== undefined && !['public', 'private'].includes(visibility)) || (args.name !== undefined && args.name !== name))
     throw new Error('Invalid declared project configuration');
-  return {name, visibility};
+  return {name, visibility, qualityGate: declaredGate(resource, target)};
 };
 
 const settingsRequest = (resource, args) => {
@@ -114,7 +126,7 @@ const requestBuilders = {project: projectRequest, settings: settingsRequest, use
 
 export const sonarManagedRequest = (target, verb, args) => {
   const resource = target.resource ?? {};
-  if (!closed(resource, ['projectKey', 'organization', 'name', 'visibility', 'settings', 'localUsers', 'userManagement', 'tokens', 'release']))
+  if (!closed(resource, ['projectKey', 'organization', 'name', 'visibility', 'qualityGate', 'settings', 'localUsers', 'userManagement', 'tokens', 'release']))
     throw new Error('Undeclared Sonar resource fields');
   if (verb !== 'user' && (!projectPattern.test(resource.projectKey ?? '') || (args.key !== undefined && args.key !== resource.projectKey)))
     throw new Error('Sonar action requires the exact declared project key');
@@ -150,6 +162,14 @@ const projectMatches = (component, request) => component?.key === request.projec
   && (request.organization === undefined || component.organization === request.organization);
 
 async function projectAction(client, request, callbacks, reconcile) {
+  const ensured = await projectEnsured(client, request, callbacks, reconcile);
+  if (ensured.outcome !== 'verified' || !request.qualityGate) return ensured;
+  const gated = await gateAction(client, request, callbacks, reconcile);
+  return gated.outcome === 'verified' ? {...gated, writeAck: ensured.writeAck || gated.writeAck, proof: {...gated.proof, project: ensured.code}}
+    : {...gated, writeAck: ensured.writeAck || gated.writeAck};
+}
+
+async function projectEnsured(client, request, callbacks, reconcile) {
   const before = await client.project(request.projectKey);
   if (before.ok) return projectMatches(before.data?.component, request)
     ? verified('sonar-project-exists', {resourceId: request.projectKey}) : fail('sonar-project-conflict');
@@ -164,6 +184,100 @@ async function projectAction(client, request, callbacks, reconcile) {
   const after = await client.project(request.projectKey);
   if (after.ok && projectMatches(after.data?.component, request)) return verified('sonar-project-readback', {writeAck: answer.ok, resourceId: request.projectKey});
   return uncertain('sonar-project-create-unreconciled', {writeAck: answer.ok});
+}
+
+/** A gate condition as the server reports it and as knowledge/sonar-gate.yaml wants it: metric, operator and threshold. */
+const sameCondition = (actual, wanted) => actual.op === wanted.op && String(actual.error) === wanted.error;
+const conditionsMatch = (shown, wanted) => {
+  const have = new Map((shown?.conditions ?? []).map(row => [row.metric, row]));
+  return have.size === wanted.length && wanted.every(row => have.has(row.metric) && sameCondition(have.get(row.metric), row));
+};
+
+/** The gate reference an action takes: {gateName} where the server's API declares it, else {gateId} of the shown gate. */
+const gateRef = (capabilities, action, name, shown) => has(capabilities, 'api/qualitygates', action, ['gateName'])
+  ? {gateName: name} : {gateId: shown?.id};
+
+/** Create the missing conditions, update the differing ones and delete the extra ones, in order; null or the unreconciled result. */
+async function syncGateConditions(client, request, shown, ref, callbacks) {
+  const {name, conditions} = request.qualityGate, organization = request.organization;
+  const have = new Map((shown?.conditions ?? []).map(row => [row.metric, row]));
+  const writes = [
+    ...conditions.filter(row => !have.has(row.metric)).map(row => () => client.createCondition({ref, ...row, organization})),
+    ...conditions.filter(row => have.has(row.metric) && !sameCondition(have.get(row.metric), row))
+      .map(row => () => client.updateCondition({id: have.get(row.metric).id, ...row, organization})),
+    ...[...have.values()].filter(row => !conditions.some(want => want.metric === row.metric))
+      .map(row => () => client.deleteCondition({id: row.id, organization})),
+  ];
+  let failure = null;
+  await findInOrder(writes, async write => {
+    callbacks.checkpoint({phase: 'gate-condition-write-intent', resourceId: name});
+    const answer = await write();
+    if (!answer.ok) {failure = uncertain('sonar-gate-condition-unreconciled', {writeAck: true}); return true;}
+    callbacks.acknowledge({phase: 'gate-condition-write-acknowledged', resourceId: name});
+    return false;
+  });
+  return {failure, wrote: writes.length > 0};
+}
+
+/** The gate as shown, created when absent: {shown, writeAck} or {failure}. */
+async function gateExisting(client, request, callbacks, reconcile) {
+  const {name} = request.qualityGate, organization = request.organization;
+  const shown = await client.gate(name, organization);
+  if (shown.ok) return {shown, writeAck: false};
+  if (![400, 404].includes(shown.status)) return {failure: fail('sonar-gate-read-unavailable')};
+  if (reconcile) return {failure: uncertain('sonar-gate-not-observed')};
+  callbacks.checkpoint({phase: 'gate-create-intent', resourceId: name});
+  const created = await client.createGate(name, organization);
+  if (created.ok) callbacks.acknowledge({phase: 'gate-create-acknowledged', resourceId: name});
+  const after = await client.gate(name, organization);
+  return after.ok ? {shown: after, writeAck: created.ok} : {failure: uncertain('sonar-gate-create-unreconciled', {writeAck: created.ok})};
+}
+
+/** The gate selected for the project: {writeAck} or {failure}. */
+async function gateSelected(client, request, ref, callbacks, reconcile) {
+  const assigned = await client.projectGate(request.projectKey, request.organization);
+  if (!assigned.ok) return {failure: fail('sonar-gate-read-unavailable')};
+  if (assigned.data?.qualityGate?.name === request.qualityGate.name) return {writeAck: false};
+  if (reconcile) return {failure: uncertain('sonar-gate-select-unreconciled')};
+  callbacks.checkpoint({phase: 'gate-select-intent', resourceId: request.projectKey});
+  const selected = await client.selectGate({ref, projectKey: request.projectKey, organization: request.organization});
+  if (selected.ok) callbacks.acknowledge({phase: 'gate-select-acknowledged', resourceId: request.projectKey});
+  return {writeAck: selected.ok};
+}
+
+/** The verdict from the gate and project readback after every write. */
+async function gateReadback(client, request, writeAck) {
+  const {name, conditions} = request.qualityGate, organization = request.organization;
+  const after = await client.gate(name, organization), project = await client.projectGate(request.projectKey, organization);
+  if (!after.ok || !conditionsMatch(after.data, conditions)) return uncertain('sonar-gate-condition-unreconciled', {writeAck});
+  if (!project.ok || project.data?.qualityGate?.name !== name) return uncertain('sonar-gate-select-unreconciled', {writeAck});
+  return verified('sonar-gate-readback', {writeAck, resourceId: request.projectKey,
+    proof: {qualityGate: name, conditions: conditions.length, projectKey: request.projectKey}});
+}
+
+/**
+ * Ensure the declared quality gate of a project: it exists (organization-scoped on SonarQube Cloud), carries exactly the conditions of
+ * knowledge/sonar-gate.yaml and is selected for the project. Idempotent; verified only by the gate and project readback.
+ */
+async function gateAction(client, request, callbacks, reconcile) {
+  const {name, canonical, conditions} = request.qualityGate;
+  if (name !== canonical) return fail('sonar-gate-name-mismatch');
+  const capabilities = await client.capabilities();
+  if (!capabilities.ok || !has(capabilities.data, 'api/qualitygates', 'show', ['name'])
+      || !has(capabilities.data, 'api/qualitygates', 'select', ['projectKey'], true)) return fail('sonar-gate-api-unsupported');
+  const existing = await gateExisting(client, request, callbacks, reconcile);
+  if (existing.failure) return existing.failure;
+  let writeAck = existing.writeAck;
+  const shown = existing.shown.data;
+  if (!conditionsMatch(shown, conditions)) {
+    if (reconcile) return uncertain('sonar-gate-condition-unreconciled', {writeAck});
+    const synced = await syncGateConditions(client, request, shown, gateRef(capabilities.data, 'create_condition', name, shown), callbacks);
+    writeAck = writeAck || synced.wrote;
+    if (synced.failure) return {...synced.failure, writeAck};
+  }
+  const selected = await gateSelected(client, request, gateRef(capabilities.data, 'select', name, shown), callbacks, reconcile);
+  if (selected.failure) return {...selected.failure, writeAck: writeAck || selected.failure.writeAck};
+  return gateReadback(client, request, writeAck || selected.writeAck);
 }
 
 const settingMatches = (actual, expected) => Array.isArray(expected)

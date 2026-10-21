@@ -21415,6 +21415,86 @@ sonar-new-user-password-required:
   owner: owner
   kind: verb-refusal
 
+sonar-gate-api-unsupported:
+  title: "The Sonar server does not declare the quality gate API"
+  title_vi: "Máy chủ Sonar không khai báo API quality gate"
+  meaning_vi: "API webservices của máy chủ không có qualitygates show hoặc select với tham số cần dùng, nên gate khai báo không được tạo hay chọn."
+  causes_vi:
+    - "Phiên bản máy chủ hoặc quyền token không cho đọc danh sách API"
+  nextStep_vi: "Kiểm tra phiên bản và quyền quản trị của token admin, rồi chạy lại project ensure."
+  owner: runtime-core
+  kind: verb-refusal
+
+sonar-gate-condition-unreconciled:
+  title: "The quality gate conditions could not be reconciled"
+  title_vi: "Không đối chiếu được điều kiện của quality gate"
+  meaning_vi: "Ghi một điều kiện của gate bị lỗi, hoặc sau khi ghi, điều kiện đọc lại khác knowledge/sonar-gate.yaml."
+  causes_vi:
+    - "Quyền ghi gate thiếu hoặc máy chủ từ chối một metric"
+  nextStep_vi: "Đọc lại gate trên máy chủ, sửa quyền rồi chạy lại project ensure; không sửa ngưỡng bằng tay."
+  owner: runtime-core
+  kind: check-status
+
+sonar-gate-create-unreconciled:
+  title: "The created quality gate could not be read back"
+  title_vi: "Không đọc lại được quality gate vừa tạo"
+  meaning_vi: "Lệnh tạo gate đã gửi nhưng không đọc lại được gate cùng tên (trong organization trên SonarQube Cloud)."
+  causes_vi:
+    - "Thiếu quyền quản trị quality gate hoặc organization sai"
+  nextStep_vi: "Kiểm tra quyền và organization khai báo rồi chạy lại với --reconcile."
+  owner: runtime-core
+  kind: check-status
+
+sonar-gate-name-mismatch:
+  title: "The declared quality gate is not the canonical gate of the edition"
+  title_vi: "Gate khai báo khác gate chuẩn của edition"
+  meaning_vi: "resource.qualityGate của target khác tên gate mà knowledge/sonar-gate.yaml quy định cho edition của app."
+  causes_vi:
+    - "Tên gate gõ sai hoặc app đổi edition"
+  nextStep_vi: "Khai báo đúng tên gate của edition trong target rồi chạy lại."
+  owner: op-retry
+  kind: verb-refusal
+
+sonar-gate-not-observed:
+  title: "The declared quality gate was not observed"
+  title_vi: "Chưa quan sát được quality gate khai báo"
+  meaning_vi: "Lần reconcile không thấy gate khai báo trên máy chủ; một lần tạo trước đó chưa được xác nhận."
+  causes_vi:
+    - "Lần chạy trước bị ngắt trước khi tạo xong"
+  nextStep_vi: "Chạy lại project ensure với authority hiện tại để tạo gate."
+  owner: runtime-core
+  kind: check-status
+
+sonar-gate-read-unavailable:
+  title: "The quality gate could not be read"
+  title_vi: "Không đọc được quality gate"
+  meaning_vi: "Máy chủ không trả về gate hoặc gate đang gán cho project (lỗi HTTP khác 400/404)."
+  causes_vi:
+    - "Máy chủ không truy cập được hoặc token bị từ chối"
+  nextStep_vi: "Kiểm tra máy chủ và token admin rồi chạy lại."
+  owner: runtime-core
+  kind: check-status
+
+sonar-gate-readback:
+  title: "The declared quality gate is in place"
+  title_vi: "Quality gate khai báo đã đúng"
+  meaning_vi: "Gate tồn tại với đúng điều kiện của knowledge/sonar-gate.yaml và đang được chọn cho project."
+  causes_vi:
+    - "Gate đọc lại khớp"
+  nextStep_vi: "Giữ nguyên; lần quét tiếp theo được chấm bằng gate này."
+  owner: runtime-core
+  kind: check-status
+
+sonar-gate-select-unreconciled:
+  title: "The quality gate is not selected for the project"
+  title_vi: "Quality gate chưa được chọn cho project"
+  meaning_vi: "Sau lệnh chọn gate, project vẫn dùng gate khác (thường là gate mặc định của organization)."
+  causes_vi:
+    - "Thiếu quyền quản trị project hoặc gateName không được máy chủ nhận"
+  nextStep_vi: "Kiểm tra quyền và chạy lại project ensure."
+  owner: runtime-core
+  kind: check-status
+
 sonar-project-api-unsupported:
   title: "Sonar project API unsupported"
   title_vi: "Sonar project API không được hỗ trợ"

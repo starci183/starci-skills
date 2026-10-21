@@ -73,6 +73,12 @@ includes first owner creation carries `--bootstrap-owner` explicitly. This input
 effect and grants no authority by itself. Reconciliation performs authenticated readback and
 private session cleanup without repeating account or membership mutations.
 
+`sonar project ensure` also ensures the project's quality gate when its target resource declares
+`qualityGate`: the name must be the gate `knowledge/sonar-gate.yaml` gives the app's edition, the gate
+is created when absent (organization-scoped on SonarQube Cloud), its conditions are made exactly that
+file's server conditions, and it is selected for the project. The result is verified only by the gate
+and project readback (`sonar-gate-readback`); a reconcile repeats no write.
+
 `sonar release gate` runs the native application release gate with the target's separate analysis
 and Browse roles. Its accepted plan includes native release records and local tag effects. It
 waits for processed Sonar evidence for the exact revision; remote publication remains with the
