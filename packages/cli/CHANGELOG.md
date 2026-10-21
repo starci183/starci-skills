@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.7.21 - 2026-10-22
+- Changed: pins @starci/hfs 4.7.21.
+
 ## 1.7.20 - 2026-10-22
 - Changed: the generated runtime installer selects 1.0.0-alpha.26; pins @starci/hfs 4.7.20.
 

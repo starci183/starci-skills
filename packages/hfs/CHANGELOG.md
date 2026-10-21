@@ -1,5 +1,8 @@
 # Changelog
 
+## 4.7.21 - 2026-10-22
+- Fixed: the bundled stacks gate validates a declaration's `operations` block with the composed provision-operation schema instead of crashing on its cross-file `$ref`; the bundled schema lets a SonarCloud admin credential name a runtime secret.env variable (`hostConnection: sonar-runtime-secret-env`).
+
 ## 4.7.20 - 2026-10-22
 - Changed: the bundled failure-code catalog carries the Sonar quality-gate ensure results (`sonar-gate-*`); canon pins follow the matching package cohort.
 
