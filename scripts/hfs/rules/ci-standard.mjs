@@ -28,6 +28,9 @@ const DIGEST_PIN = /@sha256:[0-9a-f]{64}$/;
 
 let cached = null;
 /** The standard (knowledge/hfs/ci-standard.yaml), read once. */
+/** The coverage proof step: the coverage judgement over the merged lcov (`starci app coverage verify`), never the whole app check. */
+const COVERAGE_PROOF = /app coverage verify\b/;
+
 function ciStandard() {
   if (!cached) {
     const doc = parseYaml(fs.readFileSync(STANDARD_FILE, 'utf8'));
@@ -56,7 +59,7 @@ function jobShape(doc, edition, standard, say) {
   const withStep = (match) => jobsOf(doc).filter(([, job]) => stepsOf(job).some((step) => match(step))).map(([id]) => id);
   const unit = withStep((step) => step.name === 'unit');
   const upload = withStep((step) => usesOf(step).startsWith('codecov/codecov-action@'));
-  const proof = withStep((step) => /app check --coverage-from/.test(runOf(step)));
+  const proof = withStep((step) => COVERAGE_PROOF.test(runOf(step)));
   if (unit.join() !== 'test') out.push(say('job-shape', `the unit run must be a step of the test job alone, not of ${unit.join(', ') || 'no job'}`));
   if (proof.join() !== 'coverage') out.push(say('job-shape', `the coverage proof must be a step of the coverage job alone, not of ${proof.join(', ') || 'no job'}`));
   if (upload.length && upload.join() !== 'coverage') out.push(say('job-shape', `the Codecov upload must be a step of the coverage job alone, not of ${upload.join(', ')}`));
@@ -79,7 +82,7 @@ function testSharding(doc, say) {
   if (unit && !runOf(unit).includes('--coverageThreshold={}')) out.push(say('test-sharding', 'a shard measures without the per-file threshold (--coverageThreshold={}); the coverage job proves it on the merged report'));
   const coverage = record(doc.jobs?.coverage) ? stepsOf(doc.jobs.coverage) : [];
   const merge = coverage.findIndex((step) => /app coverage merge\b/.test(runOf(step)));
-  const proof = coverage.findIndex((step) => /app check --coverage-from/.test(runOf(step)));
+  const proof = coverage.findIndex((step) => COVERAGE_PROOF.test(runOf(step)));
   if (merge < 0 || (proof >= 0 && merge > proof)) out.push(say('test-sharding', 'the coverage job must merge the shard reports (starci app coverage merge) before the coverage proof'));
   return out;
 }

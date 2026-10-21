@@ -319,7 +319,7 @@ function assertCoverageContract(app) {
   assert.deepEqual(jobs.coverage.needs, 'test', 'the coverage job waits for every shard');
   const { steps } = jobs.coverage;
   const merge = steps.findIndex((step) => String(step.run ?? '').includes(`app coverage merge --out ${LCOV} `));
-  const proof = steps.findIndex((step) => String(step.run ?? '').includes(`app check --coverage-from ${LCOV}`));
+  const proof = steps.findIndex((step) => String(step.run ?? '').includes(`app coverage verify ${LCOV}`));
   const upload = steps.findIndex(isUpload);
   assert.ok(merge >= 0 && proof > merge && upload > proof, 'the coverage job merges the shards, proves the merged report, then uploads it');
   assert.equal(steps[upload].with.files, LCOV, 'the upload sends the lcov Sonar imports');

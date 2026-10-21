@@ -19,15 +19,17 @@ jobs:
 # The per-job settings the managed CI renders when .starcistacks/application-stacks.yaml ci.jobs leaves them out (ci.jobs.<job>.timeoutMinutes,
 # ci.jobs.test.shards). Sized from a real run (NIVO v0.2.3 on the 2-vCPU GitHub runner, 2026-10-18): the be lint with the Sonar import took 11.5 minutes and the
 # fe lint more than 8 in one 20-minute job, and ~900 unit suites ran at ~4 s each (670 of 904 in 45 minutes). One lint job per side, and 6 shards of ~150 suites
-# (~10 minutes each plus the install) leave each job well inside its timeout.
+# (~10 minutes each plus the install) leave each job well inside its timeout. The coverage job installs, downloads the shards, merges them and runs
+# the coverage judgement alone (starci app coverage verify, seconds): ~5 minutes, so 15 leaves three times that. Its earlier whole app check took
+# 18m43s on NIVO v0.3.0 and the 20-minute bound cancelled the tag run (39592175266).
 defaults:
   shards: 6
-  timeoutMinutes: {fast: 20, lint: 30, test: 25, coverage: 20, build: 30, sonar: 20, db-types: 30}
+  timeoutMinutes: {fast: 20, lint: 30, test: 25, coverage: 15, build: 30, sonar: 20, db-types: 30}
 
 # The steps that need a raised Node heap on the GitHub runner, matched on their `run` text, and the least heap they must declare in NODE_OPTIONS.
 heap:
   minMiB: 6144
-  steps: ['npm run typecheck', 'npm run lint', 'app lint', 'app check --coverage-from', 'npm run db:lint']
+  steps: ['npm run typecheck', 'npm run lint', 'app lint', 'app coverage verify', 'npm run db:lint']
 
 items:
   - id: candidate-trigger

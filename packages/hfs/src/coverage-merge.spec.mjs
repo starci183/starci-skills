@@ -32,3 +32,24 @@ test('a merge that found no report, a bad usage and an app without the preset re
   assert.equal(await coverageMain(['merge', '--out', 'be/coverage/lcov.info', 'be/coverage/shards'], { cwd: empty, ...missing }), 2);
   assert.match(missing.out.stderr, /@starci\/jest-preset\/merge is not installed/);
 });
+
+test('verify proves the merged report with the coverage judgement alone: exit 0 proved, 1 refused, 2 when it cannot run', async () => {
+  const calls = [];
+  const proved = io();
+  const ok = (args) => { calls.push(args); return { ok: true, measured: ['src/modules/domain/a/a.service.ts'], unmeasured: [], unmeasuredScopes: [], findings: [], scope: { roots: [], roles: ['service'] } }; };
+  assert.equal(await coverageMain(['verify', 'be/coverage/lcov.info'], { cwd: '/app', ...proved, prove: ok }), 0, proved.out.stderr);
+  assert.deepEqual(calls, [{ repoRoot: path.resolve('/app'), coverageFrom: 'be/coverage/lcov.info' }]);
+  assert.match(proved.out.stdout, /^coverage: passed \(1 measured logic files/u);
+  const refused = io();
+  const below = () => ({ ok: false, measured: ['src/modules/domain/a/a.service.ts'], unmeasured: [], unmeasuredScopes: [], scope: { roots: [], roles: ['service'] },
+    findings: [{ code: 'BE_COVERAGE_BELOW', path: 'be/src/modules/domain/a/a.service.ts', message: 'lines 90' }] });
+  assert.equal(await coverageMain(['verify', 'be/coverage/lcov.info'], { cwd: '/app', ...refused, prove: below }), 1);
+  assert.match(refused.out.stdout, /BE_COVERAGE_BELOW be\/src\/modules\/domain\/a\/a\.service\.ts: lines 90/u);
+  const broken = io();
+  assert.equal(await coverageMain(['verify', 'be/coverage/lcov.info'], { cwd: '/app', ...broken, prove: () => { throw new Error('coverage proof requires an app root or its be side'); } }), 2);
+  assert.match(broken.out.stderr, /requires an app root/u);
+  for (const argv of [['verify'], ['verify', 'a.info', 'b.info'], ['verify', '--out', 'be/coverage/lcov.info', 'a.info']]) {
+    const bad = io();
+    assert.equal(await coverageMain(argv, { cwd: '/app', ...bad, prove: ok }), 2, argv.join(' '));
+  }
+});

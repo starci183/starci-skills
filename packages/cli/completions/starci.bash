@@ -58,7 +58,7 @@ _starci() {
         access:workspace) COMPREPLY=( $(compgen -W "ensure role" -- "$cur") ); return 0;;
         app:add) COMPREPLY=( $(compgen -W "api webhook realtime saga job reactor queue projection cli table app" -- "$cur") ); return 0;;
         app:ci) COMPREPLY=( $(compgen -W "secret var verify local" -- "$cur") ); return 0;;
-        app:coverage) COMPREPLY=( $(compgen -W "merge" -- "$cur") ); return 0;;
+        app:coverage) COMPREPLY=( $(compgen -W "merge verify" -- "$cur") ); return 0;;
         app:db) COMPREPLY=( $(compgen -W "baseline restamp plan migrate post-cutover dump reset" -- "$cur") ); return 0;;
         app:new) COMPREPLY=( $(compgen -W "service image spec" -- "$cur") ); return 0;;
         app:release) COMPREPLY=( $(compgen -W "gate push" -- "$cur") ); return 0;;

@@ -312,7 +312,7 @@ Register-ArgumentCompleter -Native -CommandName starci -ScriptBlock {
         'access workspace' = @('ensure','role')
         'app add' = @('api','webhook','realtime','saga','job','reactor','queue','projection','cli','table','app')
         'app ci' = @('secret','var','verify','local')
-        'app coverage' = @('merge')
+        'app coverage' = @('merge','verify')
         'app db' = @('baseline','restamp','plan','migrate','post-cutover','dump','reset')
         'app new' = @('service','image','spec')
         'app release' = @('gate','push')

@@ -182,7 +182,7 @@ jobs:
 
   coverage:
     needs: test
-    timeout-minutes: 20
+    timeout-minutes: 15
     runs-on: ubuntu-latest
     # Codecov OIDC authentication requires a job-scoped identity token.
     permissions:
@@ -220,7 +220,7 @@ jobs:
       - name: merge coverage
         run: npx starci app coverage merge --out be/coverage/lcov.info be/coverage/shards
       - name: coverage proof
-        run: npm run codegen --silent && node node_modules/@starci/hfs/runtime/scripts/hfs/example-secrets.mjs --run . -- npx starci app check --coverage-from be/coverage/lcov.info
+        run: node node_modules/@starci/hfs/runtime/scripts/hfs/example-secrets.mjs --run . -- npx starci app coverage verify be/coverage/lcov.info
         env:
           NODE_OPTIONS: --max-old-space-size=6144
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
