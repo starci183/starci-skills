@@ -10,7 +10,8 @@
 // is in sync by construction. The lockfile is never written by hand: once the files are written, npm resolves the real one
 // (`npm install --package-lock-only`, no node_modules, no scripts), so `npm ci` installs the new app as it is. When npm cannot
 // resolve it the scaffold fails (HFS_SCAFFOLD_LOCK_FAILED), names the step and unlinks its own generated entries. Replaced or
-// occupied entries are retained with a cleanup message. The only existing root accepted is an empty unborn main Git repository.
+// occupied entries are retained with a cleanup message. The only existing root accepted is an empty unborn main Git repository; a
+// new path is made one first (git init, branch main).
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -27,6 +28,7 @@ import { initializeAppIdentity } from '../runtime/scripts/hfs/secret-init.mjs';
 import { declaredSealedMembers, materializeDeclaredPlaceholders } from '../runtime/scripts/hfs/sealed-members.mjs';
 import { revParseQuery } from '../runtime/scripts/api/git/rev-parse-query.mjs';
 import { lsFiles } from '../runtime/scripts/api/git/ls-files.mjs';
+import { init as gitInit } from '../runtime/scripts/api/git/init.mjs';
 import { insidePath, samePath } from '../runtime/scripts/lib/path-key.mjs';
 import { byCodeUnit } from '../report/order.mjs';
 import { sonarGateName } from '../sync/sonar-key.mjs';
@@ -629,8 +631,9 @@ function emitScaffoldDatabaseTypes(root, name, writes, emitTypes) {
 
 /**
  * `starci app scaffold <name>`: writes the new app under `into`, resolves its lockfile with npm (`lock`, npmLock), and returns
- * `{ root, files }` (app-relative paths, sorted). `presets` is what sync loads from the installed @starci/jest-preset (the Sonar
- * exclusions); the CLI passes the one it resolves. Failure removes only scaffold-owned entries, retaining an existing .git.
+ * `{ root, files }` (app-relative paths, sorted). A new path is first made an empty repository with unborn main (`initGit`), so the
+ * app always lives in its own Git repository. `presets` are the jest preset's Sonar exclusions; the CLI passes the copy @starci/hfs
+ * ships (bundledPresets). Failure removes only scaffold-owned entries, retaining the .git.
  */
 /** Seal declared starter members to a fresh app recipient through the scaffold rollback owner. */
 function initializeScaffoldSecrets(root, writes) {
@@ -641,13 +644,25 @@ function initializeScaffoldSecrets(root, writes) {
   return [...initialized.files, ...materialized.members];
 }
 
-export function scaffoldApp({ name, into, presets, edition = 'full', authCallback = false, registryVisibility = 'public', manifest = loadSlotManifest(), pins = bundledPins(), lock = npmLock, emitTypes = generateDbTypes, now = () => new Date() }) {
+/**
+ * A new app path becomes the one accepted existing root first: an empty repository with unborn main (git init), so the app is always
+ * created inside its own Git repository and `starci npm ci` can install the hooks. A failed init is a refusal before any file is written.
+ */
+function bornRepository(root, initGit) {
+  fs.mkdirSync(root, { recursive: true });
+  const made = initGit(root, { branch: 'main' });
+  if (!made?.ok) throw new ScaffoldError('HFS_SCAFFOLD_GIT_INIT_FAILED', `git init could not create the repository of ${root} (${String(made?.stderr ?? '').trim() || 'no output'}); remove ${root}, check git, then run starci app scaffold again`);
+  return fs.lstatSync(root);
+}
+
+export function scaffoldApp({ name, into, presets, edition = 'full', authCallback = false, registryVisibility = 'public', manifest = loadSlotManifest(), pins = bundledPins(), lock = npmLock, emitTypes = generateDbTypes, initGit = gitInit, now = () => new Date() }) {
   if (!NAME.test(String(name))) throw new ScaffoldError('HFS_SCAFFOLD_NAME_INVALID', `the app name ${name} must be kebab-case (a project name: ${NAME})`);
   const root = path.resolve(into, name);
-  const original = fs.lstatSync(root, { throwIfNoEntry: false });
-  if (original && !emptyUnbornGit(root, original)) throw new ScaffoldError('HFS_SCAFFOLD_EXISTS', `${root} already exists; only a plain directory containing solely .git with unborn main and an empty index can be scaffolded`);
+  const existing = fs.lstatSync(root, { throwIfNoEntry: false });
+  if (existing && !emptyUnbornGit(root, existing)) throw new ScaffoldError('HFS_SCAFFOLD_EXISTS', `${root} already exists; only a plain directory containing solely .git with unborn main and an empty index can be scaffolded`);
   if (!['public', 'private'].includes(registryVisibility)) throw new ScaffoldError('HFS_SCAFFOLD_REGISTRY_VISIBILITY', `--registry-visibility accepts public or private (got ${registryVisibility})`);
   if (typeof authCallback !== 'boolean') throw new ScaffoldError('HFS_SCAFFOLD_NAME_INVALID', 'authCallback must be a boolean');
+  const original = existing ?? bornRepository(root, initGit);
   const declaration = starterDeclaration(name, manifest, edition);
   if (authCallback) enableAuthCallback(declaration);
   const app = resolveRepoDeclaration(manifest, declaration);

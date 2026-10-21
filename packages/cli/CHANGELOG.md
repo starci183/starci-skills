@@ -1,7 +1,7 @@
 # Changelog
 
 ## 1.7.17 - 2026-10-21
-- Changed: the generated runtime installer selects 1.0.0-alpha.25; the `starci app release gate` catalog states that the sonar row waits for the server's quality gate; pins @starci/hfs 4.7.17.
+- Changed: the generated runtime installer selects 1.0.0-alpha.25; the `starci app release gate` catalog states that the sonar row waits for the server's quality gate; pins @starci/hfs 4.7.17; `starci app scaffold` runs standalone through npx and creates the app inside its own Git repository (unborn main).
 
 ## 1.7.16 - 2026-10-21
 - Changed: pins @starci/hfs 4.7.16 for the column-reference fix of `DB_MIGRATION_DESTRUCTIVE`.

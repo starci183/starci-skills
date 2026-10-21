@@ -53,7 +53,8 @@ export function scaffoldInvocation(pins, into) {
     if (!pins?.[name]?.version) throw new Error(`no canon pin for ${name}`);
     return `${name}@${pins[name].version}`;
   };
-  return ['-y', '-p', pinned('@starci/cli'), '-p', pinned('@starci/jest-preset'), 'starci', 'app', 'scaffold', 'release-app', '--into', into];
+  // The CLI alone, as docs/installation.md tells a user: @starci/hfs ships the jest preset's Sonar exclusions the scaffold renders.
+  return ['-y', '-p', pinned('@starci/cli'), 'starci', 'app', 'scaffold', 'release-app', '--into', into];
 }
 
 export function appInstallsStep({ runtime = runtimeRoot, node = defaultNode } = {}) {

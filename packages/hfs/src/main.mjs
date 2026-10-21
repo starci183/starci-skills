@@ -69,7 +69,7 @@ import { formatCoverageReport } from '../runtime/scripts/hfs/coverage-from.mjs';
 import { HFS_DECLARATION_FILE, HfsSlotsError, loadSlotManifest, readRepoDeclaration } from '../runtime/scripts/hfs/slots.mjs';
 import { formatFindings } from '../sync/format.mjs';
 import { main as syncMain } from '../sync/cli.mjs';
-import { SyncError, loadPresets } from '../sync/index.mjs';
+import { SyncError, bundledPresets } from '../sync/index.mjs';
 import { managedFindings } from '../sync/managed.mjs';
 import { emitContracts } from '../emit/contracts.mjs';
 import { dbTypesEmitter } from '../emit/db-types.mjs';
@@ -282,14 +282,10 @@ async function lintMain(argv, { cwd, stdout, presets, prettier }) {
 }
 
 /**
- * The jest preset a new app renders its Sonar exclusions from: the one installed beside this @starci/hfs. None is a refusal,
- * never a render without it.
+ * The jest preset a new app renders its Sonar exclusions from: the copy this @starci/hfs ships (bundledPresets), the same version the
+ * scaffold pins, so `npx @starci/cli app scaffold` works before any dependency of the app is installed.
  */
-async function scaffoldPresets() {
-  try { return await loadPresets(path.dirname(fileURLToPath(import.meta.url))); } catch (error) {
-    throw new SyncError('HFS_SYNC_PRESET_MISSING', `${error.message.replace(/^[A-Z_]+: /, '')}; install @starci/jest-preset beside @starci/cli, then run starci app scaffold <name>`);
-  }
-}
+const scaffoldPresets = () => bundledPresets();
 
 function globalValueArgument(arg, args) {
   const inline = arg.startsWith('--cwd=') || arg.startsWith('--edition=');
@@ -389,7 +385,7 @@ function addMain(opts, { cwd: repoRoot, stdout: out }) {
 async function scaffoldMain(opts, { cwd, edition = 'full', presets, lock, stdout: out }) {
   const [name, ...extra] = opts.positional;
   if (!name || extra.length) throw new Error('starci app scaffold takes `<name> [--into <dir>] [--edition full|lite] [--registry-visibility public|private]`');
-  const { root: created, files } = scaffoldApp({ name, into: path.resolve(cwd, opts.into ?? '.'), edition, presets: presets ?? await scaffoldPresets(), ...(opts['registry-visibility'] === undefined ? {} : { registryVisibility: opts['registry-visibility'] }), ...(lock ? { lock } : {}) });
+  const { root: created, files } = scaffoldApp({ name, into: path.resolve(cwd, opts.into ?? '.'), edition, presets: presets ?? scaffoldPresets(), ...(opts['registry-visibility'] === undefined ? {} : { registryVisibility: opts['registry-visibility'] }), ...(lock ? { lock } : {}) });
   out(`starci app scaffold: created ${created} (${files.length} files); next: starci npm ci (the lockfile, then the git hooks through npm run prepare; after a raw npm ci --ignore-scripts run npm run prepare), then starci app lint\n`);
   return 0;
 }

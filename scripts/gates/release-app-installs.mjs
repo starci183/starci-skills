@@ -86,7 +86,7 @@ try {
     registry = await startSourceCanonRegistry({ root });
     await sourceScaffold(registry);
   } else {
-    // Scaffold with the PUBLISHED cli, the way a user does (npx -p @starci/cli -p @starci/jest-preset starci app scaffold), at the canon-pins
+    // Scaffold with the PUBLISHED cli, the way a user does (npx -p @starci/cli starci app scaffold), at the canon-pins
     // versions: this proves the registry packages, not the runtime's source copy.
     const pins = parseYaml(fs.readFileSync(path.join(root, 'knowledge/hfs/canon-pins.yaml'), 'utf8')).pins;
     step(`npx @starci/cli@${pins['@starci/cli'].version} app scaffold release-app`, runNpx, scaffoldInvocation(pins, into), { cwd: into });

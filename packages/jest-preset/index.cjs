@@ -37,8 +37,12 @@ function collectCoverageFrom(coverage) {
   return [...coverage.roots.map((root) => rootGlob(root, coverage.roles)), ...[...coverage.excludes, ...COVERAGE_EXCLUDES].map((glob) => `!${glob}`)]
 }
 
-/** Sonar `sonar.exclusions`: specs, e2e specs, dist and coverage output are not analysed at all. */
-const SONAR_EXCLUSIONS = ["**/*.spec.ts", "**/*.e2e-spec.ts", "**/dist/**", "**/coverage/**"]
+/**
+ * Sonar `sonar.exclusions`: specs, e2e specs, dist and coverage output are not analysed at all. The list lives in sonar-exclusions.cjs, a
+ * require-free module @starci/hfs also ships byte for byte (packages/hfs/runtime, scripts/hfs/sync-runtime.mjs), so `starci app scaffold`
+ * renders the same exclusions before any app dependency is installed.
+ */
+const SONAR_EXCLUSIONS = require("./sonar-exclusions.cjs")
 
 function sonarExclusions() {
   return SONAR_EXCLUSIONS.join(",")

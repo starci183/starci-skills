@@ -88,7 +88,11 @@ export async function npmCi(ctx, deps = {}) {
 
   const dirty = api.status(cwd, { pathspecs: ['package.json', 'package-lock.json'], untracked: 'all', literal: true });
   if (!dirty?.ok) return refusal(cwd, `cannot inspect package.json and package-lock.json: ${dirty?.stderr || 'git status failed'}`);
-  if (String(dirty.stdout ?? '').trim()) {
+  // A repository with no commit yet (unborn HEAD: a fresh `starci app scaffold`) has no committed manifest to compare with; its first
+  // install is what installs the hooks the first commit needs, so the manifests are taken as written.
+  const head = api.revParse(['--verify', '--quiet', 'HEAD'], { cwd });
+  const unborn = !head?.error && head?.status === 1;
+  if (!unborn && String(dirty.stdout ?? '').trim()) {
     return refusal(cwd, 'package.json or package-lock.json has uncommitted changes; commit or revert it before npm ci');
   }
 

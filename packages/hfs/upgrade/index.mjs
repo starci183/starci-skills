@@ -18,6 +18,7 @@ import { byCodeUnit } from "../report/order.mjs";
 import {
   TEMPLATES_DIR,
   appSource,
+  bundledPresets,
   checkTargets,
   imageFiles,
   loadHfs,
@@ -48,7 +49,7 @@ const FULL_DEPENDENCIES = Object.freeze(["nest-commander"]);
 // ruling lacks (a current lite app already has it, and the e2e world's @starci/test-world is what full adds). These are the preset's two
 // public sync inputs; once apply resolves the new dependency, normal full sync reads them from @starci/jest-preset again.
 export const UPGRADE_PRESETS = Object.freeze({
-  sonarExclusions: "**/*.spec.ts,**/*.e2e-spec.ts,**/dist/**,**/coverage/**",
+  sonarExclusions: bundledPresets().sonarExclusions,
   coverageSources: Object.freeze([
     "src/**/*.service.ts",
     "src/features/cli/**/*.cli.ts",

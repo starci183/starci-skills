@@ -19,6 +19,7 @@ import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { braceVariants } from '../runtime/scripts/lib/glob.mjs';
 import { codecovPaths, coverageComponents, jestCoverage, sonarCoverageExclusions } from '../runtime/scripts/hfs/coverage-scope.mjs';
 import { APP_SCOPE, SIDES, litePresenceOf, loadSlotManifest, resolveRepoDeclaration, slotInEdition } from '../runtime/scripts/hfs/slots.mjs';
@@ -156,6 +157,24 @@ export async function loadPresets(root) {
     throw new SyncError('HFS_SYNC_PRESET_MISSING', `${name} is not installed under ${root}; set it to the exact version in knowledge/hfs/canon-pins.yaml and reinstall`);
   }
   return { sonarExclusions: require(resolved).sonarExclusions() };
+}
+
+/**
+ * The jest preset's Sonar exclusions as @starci/hfs ships them: `@starci/jest-preset/sonar-exclusions.cjs` (a require-free module),
+ * copied byte for byte into packages/hfs/runtime by scripts/hfs/sync-runtime.mjs, so a fresh `starci app scaffold` (nothing installed
+ * yet) and an upgrade render the same list the app's installed preset answers. A missing copy is a refusal, never a render without it.
+ */
+const BUNDLED_SONAR_EXCLUSIONS = new URL('../runtime/packages/jest-preset/sonar-exclusions.cjs', import.meta.url);
+
+/** The presets ({ sonarExclusions }) of the jest preset version this @starci/hfs pins, read from its bundled copy. */
+export function bundledPresets() {
+  let list;
+  try {
+    list = createRequire(import.meta.url)(fileURLToPath(BUNDLED_SONAR_EXCLUSIONS));
+  } catch {
+    throw new SyncError('HFS_SYNC_PRESET_MISSING', '@starci/hfs ships no runtime/packages/jest-preset/sonar-exclusions.cjs; reinstall @starci/hfs at its published version');
+  }
+  return { sonarExclusions: list.join(',') };
 }
 
 /** Where the be unit run writes the lcov report (jest `coverageDirectory` coverage under be/, reporter lcov), from the app root. */

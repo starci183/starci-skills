@@ -62,7 +62,7 @@ pins:
     side: both
     source: packages/prettier-config/package.json
   '@starci/jest-preset':
-    version: 2.3.2
+    version: 2.3.3
     group: starci
     install: registry
     side: be
