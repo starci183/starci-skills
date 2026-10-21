@@ -12,7 +12,7 @@ export const MAX_PARAMETERS = 7;
 
 /**
  * sonarjs rules of Sonar way the local lint does not run: another canon owner reports the same Sonar id, or the port does not match what the
- * server reports on the same source and is left to the server. Parity is measured, not assumed: NIVO 7c4bd5d1 has 0 issues on sonar.starci.org
+ * server reports on the same source and is left to the server. Parity is measured, not assumed: a product scan with 0 issues on the server
  * (Sonar way, 2026-10-21) while these ports reported 130 findings on it; a rule that cannot match the server is not a lint error.
  */
 const SONAR_WAY_OWNED = Object.freeze({

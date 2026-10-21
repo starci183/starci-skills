@@ -61,7 +61,7 @@ test("a nested template literal or an eighth parameter is refused in scanned sou
     assert.deepEqual(lint("src/a.service.ts", "export const label = (a: string) => `x ${a}`\n"), [])
 })
 
-// Parity with the server: NIVO 7c4bd5d1 has 0 issues on sonar.starci.org (Sonar way) and these forms are what the 1.7.19 lint reported
+// Parity with the server: a product scan with 0 issues on the server (Sonar way) and these forms are what the 1.7.19 lint reported
 // there. The injected constructor and the narrowed comparison are clean source to the server, so they are clean to the lint.
 const SERVER_CLEAN = [
     "function Injectable(): ClassDecorator { return () => undefined }",
