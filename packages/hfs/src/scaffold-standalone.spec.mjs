@@ -43,6 +43,14 @@ test('a new path is git-initialised with an unborn main before the app files are
   assert.match(fs.readFileSync(path.join(root, 'sonar-project.properties'), 'utf8'), /\*\*\/\*\.spec\.ts/);
 });
 
+test('the full ui package pins react-dom beside react, the peer @heroui/react needs, so a later install never resolves a newer react-dom', (t) => {
+  const into = tempRoot(t);
+  const { root } = scaffoldApp({ name: 'demo', into, edition: 'full', presets: bundledPresets(), lock: lockedOk, initGit: init });
+  const ui = JSON.parse(fs.readFileSync(path.join(root, 'fe', 'packages', 'demo-ui', 'package.json'), 'utf8'));
+  assert.ok(ui.dependencies['@heroui/react'], 'the ui package declares @heroui/react');
+  assert.equal(ui.dependencies['react-dom'], ui.dependencies.react, 'react-dom is pinned at the react version');
+});
+
 test('a failed git init refuses before any app file is written', (t) => {
   const into = tempRoot(t);
   const initGit = () => ({ ok: false, stderr: 'git: not found' });
