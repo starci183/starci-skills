@@ -1,6 +1,6 @@
 {
   "name": "starci",
-  "version": "1.0.0-alpha.25",
+  "version": "1.0.0-alpha.26",
   "description": "StarCi: kernel-agent workflow runtime — one long-lived kernel agent per workflow, one ephemeral op agent per job, a sqlite ledger as the only state.",
   "license": "MIT",
   "type": "module",
@@ -39,6 +39,8 @@
     "packages/cli/",
     "packages/hfs/",
     "packages/grammar/scripts/build-stamp.mjs",
+    "packages/prettier-config/index.cjs",
+    "e2e/helpers/source-canon-registry.mjs",
     "packages/eslint/be/runtime/",
     "packages/eslint/fe/runtime/",
     "!packages/cli/**/*.spec.mjs",
