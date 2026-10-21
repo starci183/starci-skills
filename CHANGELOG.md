@@ -13,6 +13,7 @@ until every S* row in `docs/goal.md` holds with fresh evidence, then `1.0.0` fre
 
 ### Fixed
 - The root runtime package `starci` installs from its own archive: it now ships `packages/prettier-config/index.cjs` (the readme-badges check formats with it) and `e2e/helpers/source-canon-registry.mjs` (the release app-installs gate imports it); the clean proof of `release publish --runtime-package` refused the 1.0.0-alpha.25 archive for these two missing imports.
+- The package clean proof reads a packed `.gitignore` at the `.npmignore` name npm installs it under (with the same bytes), so the runtime archive's example Work allowlists (`examples/*/.starciwork/.gitignore`) no longer fail the install stage.
 - `starci sonar project ensure` ensures a project's declared quality gate on SonarQube Server and Cloud: the gate named by the target's `qualityGate` exists (organization-scoped on Cloud), carries exactly the conditions of `knowledge/sonar-gate.yaml` and is selected for the project, verified by readback. The SonarCloud example projects were left on the implicit default gate because the gate was only ensured on a local SonarQube.
 - SonarCloud code smells: `normPath` and `citedIncidents` declare string inputs (S6551), and the failure classifier reads its codes with `matchAll` (S6594).
 

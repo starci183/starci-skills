@@ -258,11 +258,19 @@ function preparePackedDependencies({ dirs, own, temp, locked, env, pack }) {
   return { payloads };
 }
 
+/**
+ * npm installs a packed `.gitignore` as `.npmignore` beside it (npm's own rename, so a published ignore file never ignores the
+ * consumer's files): the installed name of a packed path under node_modules, with that one rename applied to its last segment.
+ */
+const installedParts = (parts) => (parts.at(-1) === '.gitignore' ? [...parts.slice(0, -1), '.npmignore'] : parts);
+
 /** The installed payload must equal the packed file: a failure string, or null when it does. */
 const checkPayloadFile = ({ name, version, file, expected, packageRoot, installRoot }) => {
   if (!file.startsWith('package/') || file.includes('\\') || file.includes(':') || file.split('/').some((part) => !part || part === '.' || part === '..')) return `${name}@${version}: invalid packed path ${file}`;
   let target = packageRoot ?? installRoot;
-  const parts = [...(packageRoot ? [] : ['node_modules', ...name.split('/')]), ...file.slice('package/'.length).split('/')];
+  // A source package root holds the file under its packed name; only an npm install renames it.
+  const packed = [...(packageRoot ? [] : ['node_modules', ...name.split('/')]), ...file.slice('package/'.length).split('/')];
+  const parts = packageRoot ? packed : installedParts(packed);
   for (const [index, part] of parts.entries()) {
     target = path.join(target, part);
     const stat = fs.lstatSync(target, { throwIfNoEntry: false });
