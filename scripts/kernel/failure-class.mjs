@@ -16,7 +16,7 @@ const RETRY_BOUND = { ref: 'modules/models/kinds.yaml#routes[id=rejected-report-
 const classOfCode = (code) => CLASS_OF_KIND[failureCodeCatalog()[code]?.kind] ?? null;
 
 /** The catalogued codes a text names, each with its class. */
-const codesIn = (text) => [...new Set(String(text ?? '').match(CODE) ?? [])].map((code) => ({ code, class: classOfCode(code) })).filter((entry) => entry.class);
+const codesIn = (text) => [...new Set([...String(text ?? '').matchAll(CODE)].map((match) => match[0]))].map((code) => ({ code, class: classOfCode(code) })).filter((entry) => entry.class);
 
 const refusalTexts = (db, jobId) => db.prepare("SELECT payload_json FROM events WHERE entity_type='job' AND entity_id=? AND (kind LIKE '%-refused' OR kind LIKE '%needs-kernel' OR kind='job-result') ORDER BY seq DESC LIMIT 8").all(jobId).map((row) => row.payload_json);
 

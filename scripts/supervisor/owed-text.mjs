@@ -5,7 +5,7 @@ import { altOf } from '../lib/source-phrases.mjs';
 
 /**
  * Incident ids an incident's text cites (escalations, recurrences, addenda).
- * @param {unknown} text
+ * @param {string|null|undefined} text
  * @param {string|null} [own]
  */
 export const citedIncidents = (text, own = null) => [...new Set((text == null ? '' : String(text)).match(/\binc-[0-9a-f]{12}\b/g) ?? [])].filter((id) => id !== own);

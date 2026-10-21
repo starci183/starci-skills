@@ -40,7 +40,7 @@ export const pathsOverlap = (a, b) => sameOrUnder(a, b) || sameOrUnder(b, a);
  * `trim` blanks at the ends, `collapse` folds '//' runs to '/', `dot` drops a leading './',
  * `glob` strips a trailing glob ('star': '*'/'**' with their slash, 'double': a '/**' only),
  * `fold` lowercases. A trailing '/' always goes. Null reads as ''.
- * @param {unknown} p
+ * @param {string|number|null|undefined} p
  * @param {{trim?: boolean, collapse?: boolean, dot?: boolean, glob?: string|null, fold?: boolean}} [options]
  */
 export const normPath = (p, { trim = false, collapse = false, dot = false, glob = null, fold = false } = {}) => {
