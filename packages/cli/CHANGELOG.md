@@ -2,7 +2,7 @@
 
 ## 1.7.19 - 2026-10-21
 - Changed: supersedes 1.7.18 (app lint broken: the canons' Sonar way block carries its own ignores, which `starci app lint` refused as an unsupported source scope, so it exited 2 without running ESLint and reported 0 findings); 1.7.18 is not used.
-- Changed: the `starci app release` catalog states `release.requireCi` (default false); pins @starci/hfs 4.7.19.
+- Changed: the `starci app release` catalog states `release.requireCi` (default false); pins @starci/hfs 4.7.19, which restores `starci app lint` (the canons' Sonar way block no longer makes its source scope unavailable) and pins react-dom in the full scaffold's ui package.
 
 ## 1.7.18 - 2026-10-21
 - Changed: supersedes 1.7.17, published from a lane whose history the owner refused (an unapproved allowlist entry) and therefore a superseded orphan that is not used; this version carries the same work plus the standalone scaffold fix.
