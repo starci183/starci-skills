@@ -6,6 +6,12 @@ until every S* row in `docs/goal.md` holds with fresh evidence, then `1.0.0` fre
 
 ## [Unreleased]
 
+### Fixed
+- `starci workflow start` (and every command that loads `scripts/agent/trust-launch.mjs`) died at module link time: the alpha.25 export cleanup (4f2e99a0b) had dropped the `export` of `TOOL_GUARD_MATCHER` from `scripts/agent/trust.mjs` while `trust-launch.mjs` still imported it. The name is exported again.
+
+### Added
+- `starci runtime check --only export-used` also reports `RT_IMPORT_UNBOUND`: a runtime module that imports or re-exports a name a relative module of the tree does not export, which Node refuses at link time. Dropping an export can no longer leave an importer behind.
+
 ## [1.0.0-alpha.25] — 2026-10-21
 
 1.0.0-alpha.24 was never cut (no tag and no published runtime package); its work ships in alpha.25.
