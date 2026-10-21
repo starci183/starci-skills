@@ -11,7 +11,7 @@
  */
 import { SONAR_SYNTAX_RULES } from "./runtime/scripts/lib/sonar-syntax-rules.mjs"
 
-const NAMES = ["no-await-in-loop", "prefer-code-point", "prefer-string-raw", "no-nested-conditional", "no-void-operator", "no-unused-import", "prefer-export-from"]
+const NAMES = ["no-await-in-loop", "prefer-code-point", "prefer-string-raw", "no-nested-conditional", "no-void-operator", "no-unused-import", "prefer-export-from", "max-params"]
 
 /** The rules this law contributes to the plugin. */
 export const rules = Object.fromEntries(NAMES.map((name) => [name, SONAR_SYNTAX_RULES[name]]))

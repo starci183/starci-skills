@@ -10,23 +10,30 @@
 export const COGNITIVE_COMPLEXITY_LIMIT = 15;
 export const MAX_PARAMETERS = 7;
 
-/** sonarjs rules of Sonar way another canon rule already reports: the owner that reports the same Sonar id. */
+/**
+ * sonarjs rules of Sonar way the local lint does not run: another canon owner reports the same Sonar id, or the port does not match what the
+ * server reports on the same source and is left to the server. Parity is measured, not assumed: NIVO 7c4bd5d1 has 0 issues on sonar.starci.org
+ * (Sonar way, 2026-10-21) while these ports reported 130 findings on it; a rule that cannot match the server is not a lint error.
+ */
 const SONAR_WAY_OWNED = Object.freeze({
   'sonarjs/no-nested-conditional': 'S3358, the canon syntax rule no-nested-conditional',
   'sonarjs/unused-import': 'S1128, the canon syntax rule no-unused-import',
   'sonarjs/void-use': 'S3735, the canon syntax rule no-void-operator',
   'sonarjs/deprecation': 'S1874, the borrowed @typescript-eslint/no-deprecated',
+  'sonarjs/no-unused-vars': 'S1481, the TypeScript compiler (noUnusedLocals in @starci/tsconfig); the port also reports a rest-sibling omit the server accepts',
+  'sonarjs/different-types-comparison': 'S3403, the server: the port reads control-flow-narrowed types (`x !== null` after an aliased guard) the server does not report',
+  'sonarjs/function-return-type': 'S3800, the server: the port reports nullable and union returns the server accepts',
+  'sonarjs/argument-type': 'S3782, the server: the port reports optional arguments the server accepts',
 });
 
 /**
- * The Sonar way rules SonarSource implements on an ESLint rule outside eslint-plugin-sonarjs: `{ sonar, rule, options? }`. S4084 (a
- * `<video>`/`<audio>` without captions) is the front-end canon's syntax rule media-has-caption. S7785 (top-level await) is left out: an
- * app's TypeScript compiles to CommonJS (`module: nodenext` without `type: module`), where top-level await does not exist.
+ * The Sonar way rules SonarSource implements on an ESLint rule outside eslint-plugin-sonarjs: `{ sonar, rule, options? }`. The canon syntax
+ * rules carry S107 (`max-params`, which spares the constructor of an injectable class as the server does) and S4084 (`media-has-caption`,
+ * front end). Left out: S7785 (top-level await; an app's TypeScript compiles to CommonJS, `module: nodenext` without `type: module`) and
+ * S6582 (typescript-eslint's optional-chain rule reports guards whose optional chain would change the value's type, which the server accepts).
  */
 export const SONAR_WAY_EXTRA = Object.freeze([
-  { sonar: 'S107', rule: 'max-params', options: [{ max: MAX_PARAMETERS }] },
   { sonar: 'S3863', rule: 'no-duplicate-imports', options: [{ allowSeparateTypeImports: true }] },
-  { sonar: 'S6582', rule: '@typescript-eslint/prefer-optional-chain' },
   { sonar: 'S4138', rule: 'unicorn/no-for-loop' },
   { sonar: 'S7721', rule: 'unicorn/consistent-function-scoping', options: [{ checkArrowFunctions: false }] },
   { sonar: 'S7732', rule: 'unicorn/no-instanceof-builtins' },

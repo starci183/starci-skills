@@ -5,6 +5,8 @@
 // scan (`sonar.exclusions`), so it is outside these rules. The rules that need the type checker (S1874, S6551, S7503) are borrowed from
 // typescript-eslint by the canon factories; the one that needs a regex ambiguity analysis (S8786) runs in the runtime's own `sonar-rules` check.
 
+import { MAX_PARAMETERS } from './sonar-way.mjs';
+
 const FUNCTIONS = new Set(['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression']);
 const REPEATED = Object.freeze({
   ForStatement: ['body', 'test', 'update'],
@@ -206,6 +208,26 @@ const noUnusedPropTypes = {
   },
 };
 
+/** The decorators of a class whose constructor parameters are injected (Sonar's S107 spares these constructors). */
+const INJECTED = new Set(['Injectable', 'Component', 'Directive', 'Pipe']);
+const decoratorName = (decorator) => {
+  const expression = decorator.expression.type === 'CallExpression' ? decorator.expression.callee : decorator.expression;
+  return expression.type === 'Identifier' ? expression.name : null;
+};
+const injectedConstructor = (node) => node.parent?.type === 'MethodDefinition' && node.parent.kind === 'constructor'
+  && (node.parent.parent?.parent?.decorators ?? []).some((decorator) => INJECTED.has(decoratorName(decorator)));
+
+/** S107: a function takes at most MAX_PARAMETERS parameters; the constructor of an injectable class is a dependency list, not a call shape. */
+const maxParams = {
+  meta: { type: 'suggestion', schema: [], messages: { many: 'S107: this function has {{count}} parameters; at most {{max}} are allowed. Pass an options object.' } },
+  create(context) {
+    const check = (node) => {
+      if (node.params.length > MAX_PARAMETERS && !injectedConstructor(node)) context.report({ node, messageId: 'many', data: { count: String(node.params.length), max: String(MAX_PARAMETERS) } });
+    };
+    return { FunctionDeclaration: check, FunctionExpression: check, ArrowFunctionExpression: check };
+  },
+};
+
 /** S4084: a `<video>` or `<audio>` element plays captions: a `<track kind="captions">` child, or it is `muted`. */
 const MEDIA = new Set(['video', 'audio']);
 const jsxName = (node) => (node?.name?.type === 'JSXIdentifier' ? node.name.name : null);
@@ -243,4 +265,5 @@ export const SONAR_SYNTAX_RULES = Object.freeze({
   'prefer-export-from': scanned(preferExportFrom),
   'no-unused-prop-types': scanned(noUnusedPropTypes),
   'media-has-caption': scanned(mediaHasCaption),
+  'max-params': scanned(maxParams),
 });

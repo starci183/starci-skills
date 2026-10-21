@@ -9,6 +9,10 @@ const tester = new RuleTester({ languageOptions: { parser: tsParser, ecmaVersion
 
 for (const edition of ['lite', 'full']) {
   test(`${edition} accepts valid syntax and rejects every back-end Sonar smell`, () => {
+    tester.run('max-params', rules['max-params'], {
+      valid: ['function seven(a, b, c, d, e, f, g) { return a }', '@Injectable() class Service { constructor(a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) {} }'],
+      invalid: [{ code: 'function eight(a, b, c, d, e, f, g, h) { return a }', errors: [{ messageId: 'many' }] }],
+    });
     tester.run('no-await-in-loop', rules['no-await-in-loop'], {
       valid: ['async function sendAll(items) { await Promise.all(items.map(send)) }'],
       invalid: [{ code: 'async function sendAll(items) { for (const item of items) await send(item) }', errors: [{ messageId: 'loop' }] }],

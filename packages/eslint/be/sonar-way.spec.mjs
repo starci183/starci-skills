@@ -6,13 +6,14 @@
  */
 import assert from "node:assert/strict"
 import test from "node:test"
+import path from "node:path"
 import { Linter } from "eslint"
 import tsParser from "@typescript-eslint/parser"
 import sonarjs from "eslint-plugin-sonarjs"
 import unicorn from "eslint-plugin-unicorn"
 import { starciBeConfig } from "./index.mjs"
 import { SOURCE_FILES } from "./lib/config.mjs"
-import { OUTSIDE_THE_SCAN_FILES } from "./runtime/scripts/lib/sonar-syntax-rules.mjs"
+import { OUTSIDE_THE_SCAN_FILES, SONAR_SYNTAX_RULES } from "./runtime/scripts/lib/sonar-syntax-rules.mjs"
 import { SONAR_WAY_EXTRA, sonarWayRules } from "./runtime/scripts/lib/sonar-way.mjs"
 import { fixtureHfs } from "./fixtures/typed/tester.mjs"
 
@@ -25,12 +26,12 @@ test("the factory's third block is Sonar way over the scanned source, every rule
     assert.ok(block.plugins.sonarjs?.rules && block.plugins.unicorn?.rules)
     for (const [name, setting] of Object.entries(block.rules)) assert.equal(levelOf(setting), "error", `${name} is not an error`)
     assert.deepEqual(block.rules["sonarjs/cognitive-complexity"], ["error", 15])
-    assert.deepEqual(block.rules["max-params"], ["error", { max: 7 }])
     for (const name of ["sonarjs/slow-regex", "sonarjs/super-linear-regex", "sonarjs/no-alphabetical-sort", "sonarjs/no-nested-template-literals",
-        "no-duplicate-imports", "@typescript-eslint/prefer-optional-chain", "unicorn/prefer-native-coercion-functions", "unicorn/prefer-includes", "unicorn/prefer-set-has"]) {
+        "no-duplicate-imports", "unicorn/prefer-native-coercion-functions", "unicorn/prefer-includes", "unicorn/prefer-set-has"]) {
         assert.ok(name in block.rules, `${name} is mapped`)
     }
-    for (const owned of ["sonarjs/no-nested-conditional", "sonarjs/unused-import", "sonarjs/void-use", "sonarjs/deprecation", "unicorn/prefer-top-level-await"]) {
+    for (const owned of ["sonarjs/no-nested-conditional", "sonarjs/unused-import", "sonarjs/void-use", "sonarjs/deprecation", "unicorn/prefer-top-level-await",
+        "sonarjs/no-unused-vars", "sonarjs/different-types-comparison", "sonarjs/function-return-type", "sonarjs/argument-type", "max-params", "@typescript-eslint/prefer-optional-chain"]) {
         assert.ok(!(owned in block.rules), `${owned} stays with its owner or is not judged`)
     }
 })
@@ -39,15 +40,15 @@ test("every mapped row names a Sonar id and every sonarjs rule Sonar way switche
     const { rules, mapped } = sonarWayRules(sonarjs)
     assert.ok(mapped.every((row) => /^S\d+$/.test(row.sonar)), "a row without its Sonar id")
     const on = Object.entries(sonarjs.configs.recommended.rules).filter(([, setting]) => levelOf(setting) === "error").map(([name]) => name)
-    assert.equal(on.filter((name) => !(name in rules)).length, 4, "only the four owned rules are left to their owner")
+    assert.equal(on.filter((name) => !(name in rules)).length, 8, "only the owned and the server-parity left-outs are not run")
     for (const row of SONAR_WAY_EXTRA.filter((entry) => entry.rule.startsWith("unicorn/"))) assert.ok(unicorn.rules[row.rule.slice("unicorn/".length)], `${row.rule} exists in the pinned unicorn`)
 })
 
 const linter = new Linter({ configType: "flat" })
 const lint = (filename, code) => {
     const { rules } = sonarWayRules(sonarjs)
-    const syntaxOnly = Object.fromEntries(Object.entries(rules).filter(([name]) => ["sonarjs/no-nested-template-literals", "max-params"].includes(name)))
-    const config = [{ files: ["**/*.ts"], languageOptions: { parser: tsParser } }, { files: ["**/*.ts"], ignores: [...OUTSIDE_THE_SCAN_FILES], plugins: { sonarjs }, rules: syntaxOnly }]
+    const syntaxOnly = Object.fromEntries(Object.entries(rules).filter(([name]) => name === "sonarjs/no-nested-template-literals"))
+    const config = [{ files: ["**/*.ts"], languageOptions: { parser: tsParser } }, { files: ["**/*.ts"], ignores: [...OUTSIDE_THE_SCAN_FILES], plugins: { sonarjs, "starci-be": { rules: { "max-params": SONAR_SYNTAX_RULES["max-params"] } } }, rules: { ...syntaxOnly, "starci-be/max-params": "error" } }]
     return linter.verify(code, config, { filename }).map((message) => message.ruleId)
 }
 const NESTED = "export const label = (a: string, b: string) => `x ${`y ${a}`} ${b}`\n"
@@ -55,7 +56,32 @@ const MANY = "export function eight(a: number, b: number, c: number, d: number, 
 
 test("a nested template literal or an eighth parameter is refused in scanned source and passes in a spec", () => {
     assert.deepEqual(lint("src/a.service.ts", NESTED), ["sonarjs/no-nested-template-literals"])
-    assert.deepEqual(lint("src/a.service.ts", MANY), ["max-params"])
+    assert.deepEqual(lint("src/a.service.ts", MANY), ["starci-be/max-params"])
     assert.deepEqual(lint("src/a.service.spec.ts", NESTED + MANY), [])
     assert.deepEqual(lint("src/a.service.ts", "export const label = (a: string) => `x ${a}`\n"), [])
+})
+
+// Parity with the server: NIVO 7c4bd5d1 has 0 issues on sonar.starci.org (Sonar way) and these forms are what the 1.7.19 lint reported
+// there. The injected constructor and the narrowed comparison are clean source to the server, so they are clean to the lint.
+const SERVER_CLEAN = [
+    "function Injectable(): ClassDecorator { return () => undefined }",
+    "@Injectable()",
+    "export class DeskDailyService {",
+    "    constructor(private readonly a: number, private readonly b: number, private readonly c: number, private readonly d: number,",
+    "        private readonly e: number, private readonly f: number, private readonly g: number, private readonly h: number, private readonly i: number) {}",
+    "}",
+    "export const promoOf = (plan: { promo: number | null }, open: boolean) => {",
+    "    const promo = open && plan.promo !== null",
+    "    return promo && plan.promo !== null ? plan.promo : 0",
+    "}",
+    "export const without = (row: { isGlobal: boolean; name: string }) => { const { isGlobal: _isGlobal, ...rest } = row; return rest }",
+    "",
+].join("\n")
+
+test("source the server passes is clean to the Sonar way rules: an injected constructor, a narrowed comparison, a rest-sibling omit", () => {
+    const { rules } = sonarWayRules(sonarjs)
+    const syntax = Object.fromEntries(Object.entries(rules).filter(([name]) => !name.startsWith("@typescript-eslint/") && !(sonarjs.rules[name.slice("sonarjs/".length)]?.meta?.docs?.requiresTypeChecking)))
+    const config = [{ files: ["**/*.ts"], languageOptions: { parser: tsParser } },
+        { files: ["**/*.ts"], plugins: { sonarjs, unicorn, "starci-be": { rules: { "max-params": SONAR_SYNTAX_RULES["max-params"] } } }, rules: { ...syntax, "starci-be/max-params": "error" } }]
+    assert.deepEqual(linter.verify(SERVER_CLEAN, config, { filename: path.join(process.cwd(), "src", "desk-daily.service.ts") }).map((message) => `${message.ruleId}:${message.line}`), [])
 })

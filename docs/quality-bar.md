@@ -214,9 +214,12 @@ A `<video>` or `<audio>` element carries a `<track kind="captions">` child or is
 muted. Beyond these, both canons switch on every rule of the Sonar way
 TypeScript profile that has an ESLint equivalent (`scripts/lib/sonar-way.mjs`:
 eslint-plugin-sonarjs' Sonar way set with the cognitive complexity limit 15, and
-the core, typescript-eslint and unicorn rules SonarSource builds on, such as
-seven parameters at most, no duplicate import, optional chaining and
-`Set#has`), so `starci app lint` in the op loop reports what the scan would. The
+the core and unicorn rules SonarSource builds on, such as no duplicate import and
+`Set#has`), so `starci app lint` in the op loop reports what the scan would. A
+function takes at most seven parameters; the constructor of an injectable class
+is spared, as the server spares it. A port that reports what the server does not
+on the same source (S1481, S3403, S3782, S3800, S6582) is left to the server: the
+parity sample is NIVO, 0 issues on the server and 0 findings in the lint. The
 dedicated RuleTester specs exercise each published enforcer with passing
 and violating source in both editions; unit and end-to-end source specs retain
 the scan exclusion declared by the rule.

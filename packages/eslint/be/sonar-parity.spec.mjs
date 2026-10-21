@@ -145,3 +145,20 @@ test("S7763: an import that is only handed on is re-exported with export from", 
     ],
   })
 })
+
+test("S107: at most seven parameters; the constructor of an injectable class is a dependency list and is spared", () => {
+    const eight = "a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number"
+    tester.run("max-params", SONAR_SYNTAX_RULES["max-params"], {
+        valid: [
+            "function seven(a, b, c, d, e, f, g) { return a }",
+            `@Injectable() class Service { constructor(${eight}) {} }`,
+            `@Component({ selector: "x" }) class Widget { constructor(${eight}) {} }`,
+            { filename: "src/a.service.spec.ts", code: `function eight(${eight}) { return a }` },
+        ],
+        invalid: [
+            { code: `function eight(${eight}) { return a }`, errors: [{ messageId: "many" }] },
+            { code: `class Plain { constructor(${eight}) {} }`, errors: [{ messageId: "many" }] },
+            { code: `@Injectable() class Service { run(${eight}) {} }`, errors: [{ messageId: "many" }] },
+        ],
+    })
+})
