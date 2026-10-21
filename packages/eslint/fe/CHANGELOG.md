@@ -1,5 +1,8 @@
 # Changelog
 
+## 8.4.28 - 2026-10-22
+- Changed: the bundled canon pins select @starci/hfs 4.7.21 and @starci/cli 1.7.21.
+
 ## 8.4.27 - 2026-10-22
 - Fixed: Sonar way parity with the server: the injected-constructor-aware `max-params` (S107) replaces core `max-params`, and the ports that report what the server does not on the same source (S1481 `no-unused-vars`, S3403 `different-types-comparison`, S3782 `argument-type`, S3800 `function-return-type`, S6582 `prefer-optional-chain`) are left to the server; NIVO (0 issues on the server) lints at 0 instead of 205 under 1.7.19.
 - Changed: the bundled canon-pins and failure-code copies follow the 1.7.20 cohort; lint behavior is unchanged.

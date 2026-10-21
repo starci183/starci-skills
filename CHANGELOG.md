@@ -6,6 +6,9 @@ until every S* row in `docs/goal.md` holds with fresh evidence, then `1.0.0` fre
 
 ## [Unreleased]
 
+### Changed
+- Candidate package pins select HFS 4.7.21, CLI 1.7.21, back-end canon 3.4.29 and front-end canon 8.4.28.
+
 ### Added
 - A SonarCloud operations target may take its admin credential from the runtime's untracked secret.env by name (`hostConnection: sonar-runtime-secret-env`, `env: SONAR_TOKEN`), read through the same `runtimeSecretEnv` reader as `starci gate sonar up`; the value is never printed or written, and an absent or empty variable refuses with `sonar-host-credential-unavailable`. No sealed secret enters the public runtime repository.
 - The three examples declare the operations target `sonarcloud`, so `starci sonar project ensure --target sonarcloud` puts ecommerce-app and shape-slot on `starci-quality` and lite-app on `starci-quality-lite` with the conditions of `knowledge/sonar-gate.yaml`.
