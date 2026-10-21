@@ -1,6 +1,7 @@
 # Changelog
 
 ## 4.7.19 - 2026-10-21
+- Changed: supersedes 4.7.18 (app lint broken: the canons' Sonar way block carries its own ignores, which `starci app lint` refused as an unsupported source scope, so it exited 2 without running ESLint and reported 0 findings); 4.7.18 is not used.
 - Added: `release.requireCi` (default false, owner ruling release-require-ci-per-project): `starci app release push` waits for the candidate CI only for an app that sets it true; with false it needs the annotated tag and the green L4 record, runs the dry run and pushes atomically, and the L4 record and the output state that CI was not required; canon pins follow the matching package cohort.
 
 ## 4.7.18 - 2026-10-21

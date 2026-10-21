@@ -1,6 +1,7 @@
 # Changelog
 
 ## 1.7.19 - 2026-10-21
+- Changed: supersedes 1.7.18 (app lint broken: the canons' Sonar way block carries its own ignores, which `starci app lint` refused as an unsupported source scope, so it exited 2 without running ESLint and reported 0 findings); 1.7.18 is not used.
 - Changed: the `starci app release` catalog states `release.requireCi` (default false); pins @starci/hfs 4.7.19.
 
 ## 1.7.18 - 2026-10-21

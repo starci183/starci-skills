@@ -16,6 +16,7 @@ import { nextBuildEnv } from '../scripts/gates/build-env.mjs';
 import { runNpx } from '../scripts/api/npm/run-npx.mjs';
 import { mkdtemp } from './helpers/tmpdir.mjs';
 import { startSourceCanonRegistry } from './helpers/source-canon-registry.mjs';
+import { assertLintRan } from './helpers/lint-report.mjs';
 import { OWNER_FILE, reclaimStaleStack, removeProjectStack } from './helpers/supabase-project-stack.mjs';
 
 const tail = (run, lines = 30) => `${run.stdout ?? ''}\n${run.stderr ?? ''}`.trim().split(/\r?\n/).slice(-lines).join('\n');
@@ -154,7 +155,8 @@ test('hfs lite scaffold end to end: clean app, builds, isolated Supabase data, t
   // The back end's unit run with its per-file coverage thresholds (ruling:R212/case-1, amended by ruling:R212/case-4): every scaffolded logic file is at 100.
   step('npm test', ['test']);
   step('npm run typecheck', ['run', 'typecheck']);
-  step('npm run lint', ['run', 'lint']);
+  // The JSON report proves ESLint ran on both sides: a lint that could not read its source scope exits 2 and is red here too.
+  assertLintRan(step('npm run lint', ['run', 'lint', '--', '--format', 'json']).stdout);
   step('npm run build:be', ['run', 'build:be']);
   step('npm run build:fe', ['run', 'build:fe'], { timeout: 900_000, env: nextBuildEnv() });
 

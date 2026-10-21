@@ -26,6 +26,7 @@ import { runNpm } from '../scripts/api/npm/run-npm.mjs';
 import { mkdtemp } from './helpers/tmpdir.mjs';
 import { runNpmAsync } from './helpers/hfs-hfs-scaffold-app-e2e-fixture.mjs';
 import { startSourceCanonRegistry } from './helpers/source-canon-registry.mjs';
+import { assertLintRan } from './helpers/lint-report.mjs';
 
 const RUNTIME = path.resolve(import.meta.dirname, '..');
 const require_ = createRequire(import.meta.url);
@@ -122,7 +123,8 @@ test('starci app scaffold end to end: npm ci, codegen + typecheck, starci app li
     return run;
   };
   // Lint reads the scaffold before independent commands create their build caches.
-  await step('npm run lint', ['run', 'lint']);
+  // The JSON report proves ESLint ran on both sides: a lint that could not read its source scope exits 2 and is red here too.
+  assertLintRan((await step('npm run lint', ['run', 'lint', '--', '--format', 'json'])).stdout);
   await Promise.all([
     step('npm run typecheck', ['run', 'typecheck']),
     // Jest's default cache lives in the OS temp root, which this suite keeps empty: the app's run keeps it inside the fixture.

@@ -1,6 +1,7 @@
 # Changelog
 
 ## 3.4.27 - 2026-10-21
+- Changed: supersedes 3.4.26 (app lint broken: the canons' Sonar way block carries its own ignores, which `starci app lint` refused as an unsupported source scope, so it exited 2 without running ESLint and reported 0 findings); 3.4.26 is not used.
 - Changed: the bundled canon-pins copy follows the 1.7.19 cohort (cli 1.7.19, hfs 4.7.19); lint behavior is unchanged.
 
 ## 3.4.26 - 2026-10-21
