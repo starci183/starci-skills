@@ -19,7 +19,7 @@ ci:
     - {name: VPS_KNOWN_HOSTS, scope: environment, environment: production, purpose: Optional demonstration SSH host verification; no real deploy, optional: true}
   vars:
     - {name: SONAR_HOST_URL, scope: repository, value: 'https://sonarcloud.io', purpose: Optional example SonarCloud host, optional: true}
-    - {name: SONAR_ORGANIZATION, scope: repository, value: starci183, purpose: The SonarCloud organization of the runtime repository (starci183/starci-skills), optional: true}
+    - {name: SONAR_ORGANIZATION, scope: repository, value: starcidapride, purpose: The SonarCloud organization of the runtime repository (starci183/starci-skills), optional: true}
     - {name: VPS_HOST, scope: environment, environment: production, value: '203.0.113.10', purpose: Documentation address for demonstration deployment; no real deploy, optional: true}
     - {name: VPS_USER, scope: environment, environment: production, value: deploy, purpose: Documentation user for demonstration deployment; no real deploy, optional: true}
 sources:
@@ -184,16 +184,17 @@ k8s:
 operations:
   # `starci sonar project ensure --target sonarcloud` ensures this project on SonarCloud and its quality gate starci-quality-lite: the gate exists in the
   # organization with exactly the conditions of knowledge/sonar-gate.yaml and is selected for the project. The admin credential is the
-  # variable SONAR_TOKEN of the runtime's untracked secret.env (the public runtime repository tracks no sealed secret).
+  # variable SONAR_TOKEN of the runtime's untracked secret.env (the public runtime repository tracks no sealed secret). The organization and
+  # key are the ones the examples workflow scans with (vars.SONAR_ORGANIZATION, <organization>_starci-example-<app>); name is the project's name there.
   targets:
     sonarcloud:
       provider: sonar-cloud
       context: production
       origin: https://sonarcloud.io
       resource:
-        projectKey: starci183_starci-example-lite-app
-        name: starci183_starci-example-lite-app
-        organization: starci183
+        projectKey: starcidapride_starci-example-lite-app
+        name: lite-app
+        organization: starcidapride
         qualityGate: starci-quality-lite
       credentials:
         - {id: admin, hostConnection: sonar-runtime-secret-env, env: SONAR_TOKEN, purpose: The SonarCloud token of the runtime's secret.env}

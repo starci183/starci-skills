@@ -4,7 +4,7 @@
 
 [![CI](https://github.com/starci183/starci-skills/actions/workflows/examples.yml/badge.svg?branch=main)](https://github.com/starci183/starci-skills/actions/workflows/examples.yml)
 [![Codecov](https://codecov.io/gh/starci183/starci-skills/branch/main/graph/badge.svg?flag=ecommerce-app)](https://codecov.io/gh/starci183/starci-skills)
-[![Quality Gate](https://sonarcloud.io/api/project_badges/measure?project=starci183_starci-example-ecommerce-app&metric=alert_status)](https://sonarcloud.io/dashboard?id=starci183_starci-example-ecommerce-app)
+[![Quality Gate](https://sonarcloud.io/api/project_badges/measure?project=starcidapride_starci-example-ecommerce-app&metric=alert_status)](https://sonarcloud.io/dashboard?id=starcidapride_starci-example-ecommerce-app)
 [![Dependabot](https://github.com/starci183/starci-skills/actions/workflows/dependabot/dependabot-updates/badge.svg)](https://github.com/starci183/starci-skills/actions/workflows/dependabot/dependabot-updates)
 
 <!-- <<< starci app sync <<< -->

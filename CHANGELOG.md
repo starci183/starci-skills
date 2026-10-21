@@ -11,9 +11,10 @@ until every S* row in `docs/goal.md` holds with fresh evidence, then `1.0.0` fre
 
 ### Added
 - A SonarCloud operations target may take its admin credential from the runtime's untracked secret.env by name (`hostConnection: sonar-runtime-secret-env`, `env: SONAR_TOKEN`), read through the same `runtimeSecretEnv` reader as `starci gate sonar up`; the value is never printed or written, and an absent or empty variable refuses with `sonar-host-credential-unavailable`. No sealed secret enters the public runtime repository.
-- The three examples declare the operations target `sonarcloud`, so `starci sonar project ensure --target sonarcloud` puts ecommerce-app and shape-slot on `starci-quality` and lite-app on `starci-quality-lite` with the conditions of `knowledge/sonar-gate.yaml`.
+- The three examples declare the operations target `sonarcloud` (organization `starcidapride`, project `starcidapride_starci-example-<app>`, the organization and key the examples workflow scans with), so `starci sonar project ensure --target sonarcloud` puts ecommerce-app and shape-slot on `starci-quality` and lite-app on `starci-quality-lite` with the conditions of `knowledge/sonar-gate.yaml`.
 
 ### Fixed
+- The examples declared the SonarCloud organization as `starci183` (the GitHub owner): their `SONAR_ORGANIZATION` CI variable value and README quality-gate badges now name `starcidapride`, the organization the repository variable holds and the examples workflow scans under.
 - The stacks gate no longer crashes on a declaration with an `operations` block: its schema walker resolved only local `#/` references, so the block's `$ref` to `provision-operation.schema.yaml` failed with a TypeError. The block is validated with the composed schema the provision target owner uses (`scripts/lib/provision-operation-schema.mjs`, one home for both readers), and any other cross-file reference is a finding instead of a crash.
 
 ## [1.0.0-alpha.26] — 2026-10-22
