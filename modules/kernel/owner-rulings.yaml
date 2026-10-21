@@ -641,6 +641,13 @@ rulings:
     supersedes: []
     enforcedBy: [scripts/gates/release-plan.mjs]
 
+  - id: lite-chat-full-op
+    date: '2026-10-21'
+    source: "the owner in chat, relayed by the lead to the smells3 lane (the owner's words in Vietnamese: lite apps are coded directly in Claude or Codex, not through an op, but a full app still goes through ops)"
+    ruling: "An HFS app of edition lite (hfs.json `edition: lite`) is coded directly by a chat agent (Claude or Codex), not through a Kernel op or workflow: no starci kernel dispatch, op ledger or op settle. The agent still runs the app's own gates: starci gate read before editing, the specs written with the code, starci gate run, starci app lint and starci app check before the commit, and the managed pre-commit hook; these are app gates, not ops. An app of edition full is changed only through Kernel ops, with the op loop of knowledge/op-gate.yaml inside the op; an agent does not hand-code a full app outside an op."
+    supersedes: []
+    enforcedBy: [knowledge/op-gate.yaml, skills/starci/references/code-delegation.md]
+
 supersedes:
   'ruling:R212/case-2': ['ruling:R212/case-1']
   'ruling:R212/case-4': ['ruling:R212/case-1', 'ruling:R212/case-2']

@@ -21,6 +21,7 @@ Code-quality release: the runtime's SonarCloud project goes from 175 open code s
 - Every code-writing delegation, a Kernel op or a plain-chat subagent alike, runs the op loop of `knowledge/op-gate.yaml` (`starci gate read`, code with specs, `starci gate run`, fix, report both JSON documents); `skills/starci/references/code-delegation.md` holds the reusable brief.
 
 ### Changed
+- Who codes an app follows its `hfs.json` edition (owner ruling `lite-chat-full-op`): a lite app is coded directly by a chat agent (Claude or Codex) with no Kernel op, ledger or settle, through its standalone app gates (`starci gate read`, specs with the code, `starci gate run`, `starci app lint`, `starci app check`, the pre-commit hook); a full app is changed only through Kernel ops. CONTEXT.md, the StarCi entry, the code-delegation brief, `knowledge/op-gate.yaml` and the code-pattern doc say so.
 - The local `sonar-rules` gate enforces every Sonar rule id SonarCloud raised on alpha.23 that has a type-free local port, calibrated against those findings, so the smells cannot return unseen before the next scan.
 - Candidate package pins select HFS 4.7.17, CLI 1.7.17, back-end canon 3.4.25 and front-end canon 8.4.24 (3.4.21 and 8.4.20 were published alone by an interrupted publication and are superseded); CLI depends exactly on its matching HFS package.
 

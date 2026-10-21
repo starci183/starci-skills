@@ -33,7 +33,7 @@ shim, the three Windows tasks with whether their action is current, the Supervis
 
 Verification of runtime changes is `starci runtime verify` (`starci runtime check`, `starci release clean-test` of the packages the change touches and `starci release scaffold-e2e` on one commit; the check line alone runs no test and is not a verdict). The runtime has no specs of its own (owner ruling `no-runtime-specs`): never write a runtime test; `RT_SPEC_PLACEMENT` refuses a spec outside the package slots, `examples/` and `e2e/`.
 
-Any delegation that writes product code, from a Kernel or from this chat, runs the op loop: `starci gate read --root <app> --touch <files>`, code with its specs, `starci gate run --root <app> --changed <files> --tests <pattern>`, fix, and report both JSON documents (`references/code-delegation.md`).
+Who writes product code follows the app's `hfs.json` edition (owner ruling `lite-chat-full-op`): a lite app is coded directly in this chat or a chat subagent, with no op, but through its app gates (`starci gate read --root <app> --touch <files>`, code with its specs, `starci gate run --root <app> --changed <files> --tests <pattern>`, `starci app lint` and `starci app check`, the pre-commit hook); a full app is changed only through Kernel ops, never hand-coded here. See `references/code-delegation.md`.
 
 Load only the reference needed for the requested action:
 
@@ -47,7 +47,7 @@ Load only the reference needed for the requested action:
 | Release or push authorized work | `references/release.md` |
 | Owner chat host operations | `references/orca-cli.md` |
 | Owner chat worker coordination | `references/orchestration.md` |
-| Delegate code writing (Kernel op, plain-chat subagent or lane worker) | `references/code-delegation.md` |
+| Write or delegate app code (lite: chat with app gates; full: Kernel ops) | `references/code-delegation.md` |
 | Owner chat visible computer inspection | `references/computer-use.md` |
 | Inspect a selected action's credential requirements | `<Source>/.claude/docs/host-secrets.md` |
 | Inspect or recover host readiness | `<Source>/.claude/skills/starci/references/host-startup.md` |

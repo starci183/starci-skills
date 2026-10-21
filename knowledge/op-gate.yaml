@@ -9,6 +9,10 @@ schema: starci/op-gate@1
 #                                    is red, could not run, or skipped READ
 # The round bound is each op's `params.gateRounds`; nothing here restates it.
 purpose: >-
+  Who runs the loop follows the app's hfs.json edition (owner ruling lite-chat-full-op): an app of edition full is changed only by
+  the ops of enforcedOps, which run the loop below inside the op and settle it; an app of edition lite is coded directly by a chat
+  agent with no op, ledger or settle, and runs the same READ, CODE with specs, CHECK (starci gate run, starci app lint, starci app
+  check) and FIX as standalone app gates before each commit through the managed pre-commit hook, reporting both JSON documents.
   The loop an op runs: READ only what the slice needs (the pattern files of the file kinds it will touch, the example files of
   the same slots, the slot map of its folders from `starci app explain`), CODE, FORCE THE CHECKS with `starci gate run`, FIX and repeat up to
   params.gateRounds rounds, REPORT with the gate JSON and the READ digest attached. Still red after the last round is

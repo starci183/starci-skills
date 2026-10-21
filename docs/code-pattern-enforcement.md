@@ -33,9 +33,11 @@ reject a handler that branches and makes a second delegation.
 
 ## Command and operation
 
-The lint of a repository is `starci app lint` (the ESLint canon plus `starci app check`, one `starci/lint@1` report); any code-writing
-delegation, a Kernel op or a plain-chat subagent alike, runs it over its changed files through `starci gate run --root <app> --changed <files...>` (ops name it
-`starci-gate`) inside the op loop of `knowledge/op-gate.yaml`, whose brief template is [code delegation](../skills/starci/references/code-delegation.md). The layout and public owners come from `hfs.json` and the slot manifest. The gate prints one
+The lint of a repository is `starci app lint` (the ESLint canon plus `starci app check`, one `starci/lint@1` report); code runs it over its changed
+files through `starci gate run --root <app> --changed <files...>` (ops name it `starci-gate`). Who runs it follows the app's edition (owner ruling
+`lite-chat-full-op`): a full app is changed only by a Kernel op, with the gate inside the op loop of `knowledge/op-gate.yaml`; a lite app is coded
+directly by a chat agent, which runs the same gate, `starci app lint`, `starci app check` and the managed pre-commit hook as standalone app gates, with
+no op. The brief template of both is [code delegation](../skills/starci/references/code-delegation.md). The layout and public owners come from `hfs.json` and the slot manifest. The gate prints one
 `starci/gate@1` JSON report: exit `0` clean, `1` findings new against the base, `2` a tool could not run.
 `review.verify` in `lint` mode runs the whole-repository `starci app lint --format json` plus the selected Work/stack checks and
 any additional project checks. The manifest `modules/models/code-patterns.yaml` is the rule inventory the check-hfs-rules
