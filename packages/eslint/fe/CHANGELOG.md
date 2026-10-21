@@ -1,5 +1,8 @@
 # Changelog
 
+## 8.4.23 - 2026-10-21
+- Changed: the bundled canon-pins copy follows the 1.7.16 cohort (cli 1.7.16, hfs 4.7.16); lint behavior is unchanged.
+
 ## 8.4.22 - 2026-10-21
 - Changed: bundled runtime copies carry slot manifest 3.4.0 (`be.contract.mcp-tools`); lint behavior is unchanged; canon pins follow the matching package cohort.
 

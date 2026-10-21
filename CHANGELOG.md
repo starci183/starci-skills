@@ -19,9 +19,10 @@ Code-quality release: the runtime's SonarCloud project goes from 175 open code s
 
 ### Changed
 - The local `sonar-rules` gate enforces every Sonar rule id SonarCloud raised on alpha.23 that has a type-free local port, calibrated against those findings, so the smells cannot return unseen before the next scan.
-- Candidate package pins select HFS 4.7.15, CLI 1.7.15, back-end canon 3.4.23 and front-end canon 8.4.22 (3.4.21 and 8.4.20 were published alone by an interrupted publication and are superseded); CLI depends exactly on its matching HFS package.
+- Candidate package pins select HFS 4.7.16, CLI 1.7.16, back-end canon 3.4.24 and front-end canon 8.4.23 (3.4.21 and 8.4.20 were published alone by an interrupted publication and are superseded); CLI depends exactly on its matching HFS package.
 
 ### Fixed
+- `DB_MIGRATION_DESTRUCTIVE` matches a dropped or altered column against be/src only where a source names the column together with its table; NIVO's `origin` contract drop over seven tables was reported as still referenced by `public.brain_lessons.origin`, another table's column. Table and other object drops keep the leaf-name match.
 - `starci gate run` no longer stops with `GATE_TSC_CONFIG_MISSING` on the generated `supabase/types/database.types.ts` of a lite app: a TypeScript file with no tsconfig.json of its own under a `hfs.json` `sides.<side>.reads` tree affects every compiler program of each side that reads it, which typecheck it through their imports. The gate's `--changed` semantics (it extends the delta from `--base`, never narrows it) are stated in the catalog and the delegation brief.
 - `starci release publish --plan` no longer blocks an already-published bundling canon whose registry integrity equals its local pack: identical bytes already carry the final canon-pins copy, so a publish of another package cannot change them; a canon whose bytes differ is blocked as before (lead ruling release-plan-identical-bundler, 2026-10-21, owner-delegated).
 - R165 `HFS_SERVICE_STACK_DECLARATION` accepts a `role: service` component tied to the app by `environments.<env>.deploy.images.<component>.app` (any environment) as well as one named like the app; NIVO v0.3.0 declares `nivo-api: {app: api}`, and renaming that component to `api` would rename the live service and put the short alias on the shared edge network (R294).

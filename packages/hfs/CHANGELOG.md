@@ -1,5 +1,8 @@
 # Changelog
 
+## 4.7.16 - 2026-10-21
+- Fixed: `DB_MIGRATION_DESTRUCTIVE` counts a be/src source as a reference of a dropped or altered column only when the source names the column's table too, so a same-named column of another table (`public.brain_lessons.origin` beside a drop of `transactions.origin`) no longer blocks a contract migration; table and other object drops keep the leaf match; canon pins follow the matching package cohort.
+
 ## 4.7.15 - 2026-10-21
 - Added: slot `be.contract.mcp-tools` (opt-in, slot manifest 3.4.0) for the committed MCP tool catalog `be/contracts/<app>/<contract>.tools.json`, and R302 `HFS_MCP_TOOLS_SNAPSHOT`: the catalog names a declared be app, its contract is `<server>@<major>` equal to the file name and the server name, and every tool has a unique name, a description and an object `inputSchema`; canon pins follow the matching package cohort.
 

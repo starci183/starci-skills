@@ -392,8 +392,15 @@ function sourceNames(ts, text, file) {
   return names;
 }
 
+/**
+ * Whether a be/src source references a destroyed object. A column (`<schema>.<table>.<column>`) is referenced only by a source that
+ * names both its table and the column, so a same-named column of another table is not a reference; the check stays conservative,
+ * since any mention of the table beside the column counts. Every other object kind is referenced by its leaf name.
+ */
+const referencesObject = (names, object) => names.has(object.leaf) && (object.kind !== 'column' || !object.table || names.has(object.table));
+
 function destructiveObjectFinding(file, object, contract, references) {
-  const reference = references.find(({ names }) => names.has(object.leaf));
+  const reference = references.find(({ names }) => referencesObject(names, object));
   if (contract && !reference) return null;
   const reason = reference && contract ? `${reference.file} still references this object; remove the reference before the contract migration`
     : 'use a *_contract_* migration after the application stops using this object';

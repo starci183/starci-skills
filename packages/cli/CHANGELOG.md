@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.7.16 - 2026-10-21
+- Changed: pins @starci/hfs 4.7.16 for the column-reference fix of `DB_MIGRATION_DESTRUCTIVE`.
+
 ## 1.7.15 - 2026-10-21
 - Changed: the `starci gate run` catalog states the slice: every file that differs from the base plus the `--changed` files, so `--changed` extends the slice and `--base` narrows it; a TypeScript file under a `sides.<side>.reads` tree is checked by that side's programs.
 - Changed: pins @starci/hfs 4.7.15 for the MCP tool-catalog slot and R302.
