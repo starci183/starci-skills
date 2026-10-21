@@ -27,6 +27,11 @@ self-hosted Sonar instance have separate targets and custody; an administrator c
 fills a missing analysis or browse role.
 A self-hosted Sonar admin role may explicitly select `hostConnection: sonar-selfhost-admin` through
 the existing native host owner. This fixed bridge supplies no Cloud, analysis or Browse fallback.
+A SonarCloud admin role may select `hostConnection: sonar-runtime-secret-env` with `env: <NAME>`: the
+value is the variable of the runtime's untracked secret.env (the reader `starci gate sonar up` uses),
+never printed or written, and an absent variable refuses with `sonar-host-credential-unavailable`.
+The runtime's examples declare this for `sonar project ensure`, because the public runtime repository
+tracks no sealed secret.
 After authority is established, the native custody owner can project its configured AGE material
 privately for the selected application's encrypted member.
 

@@ -3,6 +3,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { lsFiles } from '../api/git/ls-files.mjs';
 import {parseYaml} from '../../engine/yaml.mjs';
+import { validateAgainstSchema } from '../lib/json-schema.mjs';
+import { PROVISION_OPERATION_SCHEMA_REF, provisionOperationSchema } from '../lib/provision-operation-schema.mjs';
 import {slash} from '../lib/path-key.mjs';
 import { isInside, walkFiles } from '../lib/walk.mjs';
 import { composeIncludePaths, swarmInventoryIssues, swarmModelIssues } from '../lib/swarm-stack.mjs';
@@ -92,7 +94,13 @@ function validateSchema(value){
     if(shape.minItems&&node.length<shape.minItems)errors.push({path:at,message:'array too short'});
     node.forEach((item,index)=>shape.items&&check(item,shape.items,`${at}/${index}`));
   };
+  // The operations block refers to its own schema file: its owner's composed schema validates it, as the provision target owner does.
+  const checkOperations=(node,at)=>{
+    for(const error of validateAgainstSchema(node,provisionOperationSchema()))errors.push({path:at,message:error});
+  };
   const check=(node,shape,at)=>{
+    if(shape?.$ref===PROVISION_OPERATION_SCHEMA_REF)return checkOperations(node,at);
+    if(shape?.$ref&&!shape.$ref.startsWith('#/')){errors.push({path:at,message:`unresolved schema reference ${shape.$ref}`});return;}
     if(shape?.$ref)return check(node,resolve(shape.$ref),at);
     if(Array.isArray(shape?.anyOf)){
       checkAlternatives(node,shape,at,check);

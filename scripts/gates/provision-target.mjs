@@ -1,11 +1,10 @@
 // Public operation targets reuse the app's one stack declaration and credential schema.
 import fs from 'node:fs';
 import path from 'node:path';
-import { parseYaml } from '../../engine/yaml.mjs';
 import { sha256 } from '../../engine/digest.mjs';
-import { skillRoot } from '../../engine/runtime-root.mjs';
 import { findStackDeclaration } from '../lib/stack-declaration.mjs';
 import { validateAgainstSchema } from '../lib/json-schema.mjs';
+import { provisionOperationSchema } from '../lib/provision-operation-schema.mjs';
 import { isLoopbackHost } from '../lib/loopback-host.mjs';
 import { invocationDir } from '../lib/roots.mjs';
 import { repositoryHome } from '../hfs/repo-identity.mjs';
@@ -14,11 +13,6 @@ import { openMachineReader } from '../../engine/db/machine.mjs';
 
 const refuse = code => Object.assign(new Error(code), { code });
 
-function targetSchema() {
-  const schema = parseYaml(fs.readFileSync(path.join(skillRoot, 'modules/schemas/provision-operation.schema.yaml'), 'utf8'));
-  const stacks = parseYaml(fs.readFileSync(path.join(skillRoot, 'modules/schemas/application-stacks.schema.yaml'), 'utf8'));
-  return { ...schema, $defs: { ...schema.$defs, serviceCredential: stacks.$defs.serviceCredential } };
-}
 
 function assertRegisteredWorktree(repoRoot, ledgerRoot) {
   if (pathKey(canonicalPath(repoRoot)) === pathKey(canonicalPath(ledgerRoot))) return;
@@ -35,7 +29,7 @@ function readTargetDeclaration(repoRoot, targetId, provider) {
   const declaration = findStackDeclaration(repoRoot);
   if (declaration.missing || declaration.error) throw refuse('provision-declaration-unavailable');
   const operations = declaration.doc.operations;
-  if (!operations || validateAgainstSchema(operations, targetSchema()).length) throw refuse('provision-declaration-invalid');
+  if (!operations || validateAgainstSchema(operations, provisionOperationSchema()).length) throw refuse('provision-declaration-invalid');
   const selected = operations.targets[targetId];
   if (!selected) throw refuse('provision-target-unknown');
   if (provider && !(Array.isArray(provider) ? provider : [provider]).includes(selected.provider)) throw refuse('provision-provider-mismatch');

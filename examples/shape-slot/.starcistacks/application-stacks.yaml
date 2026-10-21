@@ -12,6 +12,23 @@ ci:
     - {name: SONAR_ORGANIZATION, scope: repository, value: starci183, purpose: Public SonarCloud organization key for the runtime example, optional: true}
     - {name: VPS_HOST, scope: repository, value: '203.0.113.10', purpose: Documentation-only deploy host; this example has no real deploy, optional: true}
     - {name: VPS_USER, scope: repository, value: deploy, purpose: Documentation-only deploy user; this example has no real deploy, optional: true}
+operations:
+  # `starci sonar project ensure --target sonarcloud` ensures this project on SonarCloud and its quality gate starci-quality: the gate exists in the
+  # organization with exactly the conditions of knowledge/sonar-gate.yaml and is selected for the project. The admin credential is the
+  # variable SONAR_TOKEN of the runtime's untracked secret.env (the public runtime repository tracks no sealed secret).
+  targets:
+    sonarcloud:
+      provider: sonar-cloud
+      context: production
+      origin: https://sonarcloud.io
+      resource:
+        projectKey: starci183_starci-example-shape-slot
+        name: starci183_starci-example-shape-slot
+        organization: starci183
+        qualityGate: starci-quality
+      credentials:
+        - {id: admin, hostConnection: sonar-runtime-secret-env, env: SONAR_TOKEN, purpose: The SonarCloud token of the runtime's secret.env}
+      actions: [sonar.project.ensure]
 services:
   sonar:
     provider: sonarcloud

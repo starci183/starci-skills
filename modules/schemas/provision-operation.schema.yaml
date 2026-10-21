@@ -34,12 +34,25 @@ $defs:
   serviceCredential:
     $ref: application-stacks.schema.yaml#/$defs/serviceCredential
   hostCredential:
-    type: object
-    additionalProperties: false
-    required: [id, hostConnection]
-    properties:
-      id: {const: admin}
-      hostConnection: {const: sonar-selfhost-admin}
+    description: >-
+      A fixed host bridge for the admin role, never a value. sonar-selfhost-admin is the native self-hosted Sonar administrator;
+      sonar-runtime-secret-env is the variable `env` of the runtime's untracked secret.env (the reader `starci gate sonar up` uses),
+      for a SonarCloud target only.
+    oneOf:
+      - type: object
+        additionalProperties: false
+        required: [id, hostConnection]
+        properties:
+          id: {const: admin}
+          hostConnection: {const: sonar-selfhost-admin}
+      - type: object
+        additionalProperties: false
+        required: [id, hostConnection, env]
+        properties:
+          id: {const: admin}
+          hostConnection: {const: sonar-runtime-secret-env}
+          env: {type: string, pattern: '^[A-Z][A-Z0-9_]{0,63}$'}
+          purpose: {type: string, minLength: 1}
   target:
     type: object
     additionalProperties: false
