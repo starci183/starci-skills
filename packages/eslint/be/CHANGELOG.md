@@ -1,8 +1,9 @@
 # Changelog
 
-## 3.4.25 - 2026-10-21
+## 3.4.26 - 2026-10-21
+- Changed: supersedes 3.4.25, published from a lane whose history the owner refused (an unapproved allowlist entry) and therefore a superseded orphan that is not used; this version carries the same work plus the standalone scaffold fix.
 - Added: Sonar way at lint time: every rule of the Sonar way TypeScript profile with an ESLint equivalent is on at error over the files the scan judges (a unit or end-to-end spec is outside), from the shared `scripts/lib/sonar-way.mjs`: eslint-plugin-sonarjs' Sonar way set (cognitive complexity 15, super-linear and slow regex, sort compare, nested template literals, ...) and the rules SonarSource builds on (`max-params` 7, `no-duplicate-imports`, `@typescript-eslint/prefer-optional-chain`, unicorn's `prefer-native-coercion-functions`, `prefer-includes`, `prefer-set-has` and the other S77xx rules). New exact dependencies eslint-plugin-sonarjs 4.2.1 and eslint-plugin-unicorn 65.0.0 (the last line for ESLint 9).
-- Changed: the bundled canon-pins copy follows the 1.7.17 cohort (cli 1.7.17, hfs 4.7.17).
+- Changed: the bundled canon-pins copy follows the 1.7.18 cohort (cli 1.7.18, hfs 4.7.18, jest-preset 2.3.4).
 
 ## 3.4.24 - 2026-10-21
 - Changed: the bundled canon-pins copy follows the 1.7.16 cohort (cli 1.7.16, hfs 4.7.16); lint behavior is unchanged.

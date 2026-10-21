@@ -1,6 +1,7 @@
 # Changelog
 
-## 4.7.17 - 2026-10-21
+## 4.7.18 - 2026-10-21
+- Changed: supersedes 4.7.17, published from a lane whose history the owner refused (an unapproved allowlist entry) and therefore a superseded orphan that is not used; this version carries the same work plus the standalone scaffold fix.
 - Fixed: the sonar row of `starci app release gate --sonar` no longer passes on the scanner's exit code alone: it reads `.scannerwork/report-task.txt`, polls `api/ce/task` until the analysis ends and reads `api/qualitygates/project_status` with the same token; ERROR is red as `RELEASE_SONAR_GATE_FAILED` naming each failed condition, a 600-second wait is `RELEASE_SONAR_GATE_TIMEOUT` and an unreadable answer `RELEASE_SONAR_GATE_UNREADABLE`; canon pins follow the matching package cohort.
 
 - Fixed: `npx @starci/cli app scaffold` works from the published packages alone: the Sonar exclusions come from the jest preset copy @starci/hfs ships (`runtime/packages/jest-preset/sonar-exclusions.cjs`, `bundledPresets`), not from a @starci/jest-preset installed beside the CLI (it was `HFS_SYNC_PRESET_MISSING`); `starci app upgrade` reads the same copy instead of a hand-kept list.
