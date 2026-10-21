@@ -69,7 +69,7 @@ complete -c starci -n '__starci_needs_verb app' -a 'hygiene' -d 'judge staged wo
 complete -c starci -n '__starci_needs_verb app' -a 'lint' -d 'lint both app sides and report repository, ESLint and stylelint findings together'
 complete -c starci -n '__starci_needs_verb app' -a 'new' -d 'create a canonical service, unit spec or app image definition'
 complete -c starci -n '__starci_needs_verb app' -a 'release' -d 'run the release gates and write the L4 record and tag, or push branch and tag atomically'
-complete -c starci -n '__starci_needs_verb app' -a 'scaffold' -d 'create a full or lite StarCi app, including an empty unborn main Git repository'
+complete -c starci -n '__starci_needs_verb app' -a 'scaffold' -d 'create a full or lite StarCi app in its own Git repository (unborn main)'
 complete -c starci -n '__starci_needs_verb app' -a 'secret' -d 'initialize, seal, edit, materialize and verify app secrets'
 complete -c starci -n '__starci_needs_verb app' -a 'stack' -d 'Swarm deploy tooling of an app (prepare to rollback) and the full edition test-world infrastructure'
 complete -c starci -n '__starci_needs_verb app' -a 'sync' -d 'compare or write every managed app file from its canonical template'

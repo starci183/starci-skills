@@ -1,7 +1,7 @@
 group: app
 verb: scaffold
 owner: "@starci/hfs"
-summary: create a full or lite StarCi app, including an empty unborn main Git repository
+summary: create a full or lite StarCi app in its own Git repository (unborn main)
 impl: null
 positional:
   - {name: name, required: true, variadic: false}

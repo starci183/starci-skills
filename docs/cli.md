@@ -519,7 +519,7 @@ starci app release push --execute
 
 ### starci app scaffold
 
-create a full or lite StarCi app, including an empty unborn main Git repository
+create a full or lite StarCi app in its own Git repository (unborn main)
 
 | flag | type | |
 | --- | --- | --- |

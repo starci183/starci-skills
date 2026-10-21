@@ -1,5 +1,8 @@
 # Changelog
 
+## 2.3.3 - 2026-10-21
+- Changed: the Sonar exclusions live in `sonar-exclusions.cjs` (published, require-free), which `sonarExclusions()` reads; @starci/hfs ships the same file byte for byte so `npx @starci/cli app scaffold` renders them without installing this preset. The list is unchanged.
+
 ## 2.3.2 - 2026-10-18
 - Added: shard mode `STARCI_COVERAGE_SHARD=1` (only the loaded files are measured, no per-file threshold, istanbul JSON) and `@starci/jest-preset/merge` (istanbul-lib-coverage merge by source location, lcov through the preset reporter): the coverage job of the sharded managed CI.
 

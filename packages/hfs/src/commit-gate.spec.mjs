@@ -55,7 +55,7 @@ test('BE_UNIT_SPEC_NOT_STAGED: the staged hygiene run refuses a new measured log
   const lines = [];
   const hygiene = async () => { lines.length = 0; return runWorkHygiene({ cwd: root, out: (line) => lines.push(line) }); };
   const policy = 'be/src/modules/domain/order/order.policy.ts';
-  write(root, policy, 'export const allowed = true;\n');
+  write(root, policy, 'export const allowed = (amount) => amount > 0;\n');
   write(root, 'be/src/features/order/order.handler.ts', 'export const handler = 1;\n');
   git(root, 'add', '-A');
   assert.equal(await hygiene(), 1);
@@ -65,6 +65,14 @@ test('BE_UNIT_SPEC_NOT_STAGED: the staged hygiene run refuses a new measured log
   write(root, 'be/src/modules/domain/order/order.policy.spec.ts', 'it("allows", () => undefined);\n');
   git(root, 'add', '-A');
   assert.equal(await hygiene(), 0, lines.join('\n'));
+});
+
+test('BE_UNIT_SPEC_NOT_STAGED owes no spec for a measured file with nothing to execute (constants and types only)', async (t) => {
+  const root = appRepo(t, 'hfs-staged-constants-');
+  write(root, 'be/src/modules/domain/order/order-status.policy.ts', 'export type Status = "open" | "paid";\nexport const STATUS_CODE: Readonly<Record<Status, number>> = { open: 1, paid: 2 };\n');
+  git(root, 'add', '-A');
+  const lines = [];
+  assert.equal(await runWorkHygiene({ cwd: root, out: (line) => lines.push(line) }), 0, lines.join('\n'));
 });
 
 test('BE_UNIT_SPEC_NOT_STAGED is judged only at an HFS app root', async (t) => {

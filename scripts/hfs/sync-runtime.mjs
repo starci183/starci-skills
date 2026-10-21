@@ -2,7 +2,7 @@
 // sync-runtime.mjs - refreshes the self-contained copies of the runtime files the published packages read, so each package
 // works in a product repository that has no runtime checkout. Every copy mirrors the runtime layout (engine/,
 // scripts/lib/, knowledge/hfs/, modules/kernel/) byte for byte, so the imports need no rewriting.
-//   packages/hfs/runtime         what `hfs` reads (with the one Sonar gate, knowledge/sonar-gate.yaml, whose name starci app check holds a stack declaration to): the slot loader, the check, the architecture machine and every file either
+//   packages/hfs/runtime         what `hfs` reads (with the jest preset's sonar-exclusions.cjs and the one Sonar gate, knowledge/sonar-gate.yaml, whose name starci app check holds a stack declaration to): the slot loader, the check, the architecture machine and every file either
 //                                imports (computed from the import graph, not listed), plus the failure-code catalog slice
 //                                holding the codes `starci app check` can emit and every code its bundled rule catalog owns
 //   packages/eslint/be/runtime   what @starci/eslint-canon-be reads through lib/hfs.mjs (loadHfs: slots, hfs.json, the view), the shared Sonar syntax rules and the project graph
@@ -85,11 +85,13 @@ const RULE_CATALOG_FILE = 'knowledge/hfs/rules.yaml';
  * the pin and Sonar gate declarations. Without them the canon's rules fail to load outside the runtime checkout.
  */
 const MACHINE_DATA = Object.freeze(['packages/hfs/templates/app/package-scripts/package.json', 'knowledge/hfs/canon-pins.yaml', 'knowledge/hfs/fe-stack.yaml', 'knowledge/sonar-gate.yaml']);
+/** The jest preset's Sonar exclusions: @starci/hfs renders them in a fresh scaffold and an upgrade before the app has installed the preset. */
+const JEST_PRESET_SONAR = 'packages/jest-preset/sonar-exclusions.cjs';
 /** The shipped config example the bundled engine/config.mjs falls back to (loadConfig, read by the temp-root owner on every child spawn). */
 const CONFIG_EXAMPLE = 'config.example.yaml';
 /** bundle directory (runtime-relative) -> the files it copies and whether it carries the failure-code slice. */
 export const BUNDLES = Object.freeze({
-  'packages/hfs/runtime': Object.freeze({ files: Object.freeze([...new Set([...SLOT_FILES, ...importClosure(CHECK_ENTRIES), 'knowledge/hfs/canon-pins.yaml', 'knowledge/hfs/fe-stack.yaml', 'knowledge/sonar-gate.yaml', CONFIG_EXAMPLE, RULE_CATALOG_FILE, ...patternTopicFiles()])].sort(byCodeUnit)), catalog: true }),
+  'packages/hfs/runtime': Object.freeze({ files: Object.freeze([...new Set([...SLOT_FILES, ...importClosure(CHECK_ENTRIES), 'knowledge/hfs/canon-pins.yaml', JEST_PRESET_SONAR, 'knowledge/hfs/fe-stack.yaml', 'knowledge/sonar-gate.yaml', CONFIG_EXAMPLE, RULE_CATALOG_FILE, ...patternTopicFiles()])].sort(byCodeUnit)), catalog: true }),
   'packages/eslint/be/runtime': Object.freeze({ files: Object.freeze([...new Set([...SLOT_FILES, ...importClosure(['scripts/api/git/recorded-lines.mjs', 'scripts/lib/language.mjs', 'scripts/lib/jsdoc.mjs', 'scripts/lib/sonar-syntax-rules.mjs', 'scripts/lib/sonar-way.mjs', 'scripts/hfs/project-rule.mjs']), ...MACHINE_DATA, CONFIG_EXAMPLE, RULE_CATALOG_FILE])].sort(byCodeUnit)), catalog: false }),
   'packages/eslint/fe/runtime': Object.freeze({ files: Object.freeze([...new Set([...SLOT_FILES, ...importClosure(['scripts/api/git/recorded-lines.mjs', 'scripts/lib/next-contract.mjs', 'scripts/lib/language.mjs', 'scripts/lib/jsdoc.mjs', 'scripts/lib/sonar-syntax-rules.mjs', 'scripts/lib/sonar-way.mjs', 'scripts/hfs/project-rule.mjs']), ...MACHINE_DATA, CONFIG_EXAMPLE])].sort(byCodeUnit)), catalog: false }),
 });

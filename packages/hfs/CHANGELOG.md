@@ -3,6 +3,11 @@
 ## 4.7.17 - 2026-10-21
 - Fixed: the sonar row of `starci app release gate --sonar` no longer passes on the scanner's exit code alone: it reads `.scannerwork/report-task.txt`, polls `api/ce/task` until the analysis ends and reads `api/qualitygates/project_status` with the same token; ERROR is red as `RELEASE_SONAR_GATE_FAILED` naming each failed condition, a 600-second wait is `RELEASE_SONAR_GATE_TIMEOUT` and an unreadable answer `RELEASE_SONAR_GATE_UNREADABLE`; canon pins follow the matching package cohort.
 
+- Fixed: `npx @starci/cli app scaffold` works from the published packages alone: the Sonar exclusions come from the jest preset copy @starci/hfs ships (`runtime/packages/jest-preset/sonar-exclusions.cjs`, `bundledPresets`), not from a @starci/jest-preset installed beside the CLI (it was `HFS_SYNC_PRESET_MISSING`); `starci app upgrade` reads the same copy instead of a hand-kept list.
+- Fixed: a new scaffold path is git-initialised with an unborn main before any file is written (`HFS_SCAFFOLD_GIT_INIT_FAILED` when git cannot), as the verb promised, so `starci npm ci` can install the hooks; an existing empty unborn main repository is still accepted.
+
+- Fixed: `BE_UNIT_SPEC_NOT_STAGED` exempts a measured file with nothing to execute (constants and types only), which has nothing a spec could call and whose spec the spec rules refuse; every measured file with a function, method, constructor or accessor still needs its spec staged beside it. It refused the scaffold's own first commit on the constant-only `http-status.policy.ts`; the scaffold now also ships `migrate-connections.client.spec.ts`.
+
 ## 4.7.16 - 2026-10-21
 - Fixed: `DB_MIGRATION_DESTRUCTIVE` counts a be/src source as a reference of a dropped or altered column only when the source names the column's table too, so a same-named column of another table (`public.brain_lessons.origin` beside a drop of `transactions.origin`) no longer blocks a contract migration; table and other object drops keep the leaf match; canon pins follow the matching package cohort.
 

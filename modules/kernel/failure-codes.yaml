@@ -13372,7 +13372,7 @@ BE_TEST_TOPOLOGY:
 BE_UNIT_SPEC_NOT_STAGED:
   title: "A new back-end logic file is committed without its unit spec"
   title_vi: "Tệp logic back-end mới được commit mà không có unit spec"
-  meaning_vi: "Commit thêm `<file>`, một tệp `<name>.<role>.ts` có vai trò logic mà unit coverage đo ở mức 100 mỗi tệp, nhưng index không có `<name>.<role>.spec.ts` bên cạnh nó: mã được viết trước, spec để sau."
+  meaning_vi: "Commit thêm `<file>`, một tệp `<name>.<role>.ts` có vai trò logic mà unit coverage đo ở mức 100 mỗi tệp, nhưng index không có `<name>.<role>.spec.ts` bên cạnh nó: mã được viết trước, spec để sau. Tệp chỉ có hằng số và kiểu (không có hàm, phương thức nào để chạy) không cần spec riêng."
   causes_vi:
     - "Agent viết mã trước rồi định sửa lint và spec sau, thay vì chạy vòng op `starci gate read` → mã + spec → `starci gate run`"
     - "Spec đã viết nhưng chưa được stage cùng tệp"
