@@ -10,6 +10,11 @@
 // package.json names under `main`, `exports`, `bin` and `types` are API for consumers outside the repository, and the one call
 // function a scripts/api/<system>/<call>.mjs file exports (named after the file, RT_API_SHAPE: the call's own contract). There
 // is no pending list and no allowlist.
+//
+// RT_IMPORT_UNBOUND, the mirror finding over the same files: a runtime `.mjs` file imports (or re-exports) a name from a
+// relative module of the tree that the module does not export. Node refuses such a module at link time (SyntaxError: does not
+// provide an export named ...), so every command that loads it dies before it runs; dropping an `export` above must never leave
+// an importer behind. A star re-export from outside the tree makes the source's names unknowable, and is not judged.
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
@@ -49,6 +54,65 @@ export function exportedNames(text, parse = acorn().parse) {
     else if (!stmt.source) for (const s of stmt.specifiers) out.push({ name: s.exported.name, line: stmt.loc.start.line });
   }
   return out;
+}
+
+const RELATIVE = /^\.\.?\//;
+const parseModule = (text, parse) => {
+  try { return parse(text, { ecmaVersion: 'latest', sourceType: 'module', allowHashBang: true, allowReturnOutsideFunction: true, locations: true }); } catch { return null; }
+};
+
+const specifierName = (node) => node.name ?? node.value;
+
+/** The names one top-level statement of `rel` binds for importers into `names`; false when they cannot be known. */
+function addStatementNames(stmt, rel, modules, seen, names) {
+  if (stmt.type === 'ExportDefaultDeclaration') names.add('default');
+  else if (stmt.type === 'ExportNamedDeclaration') {
+    const own = stmt.declaration ? declaredNames(stmt.declaration) : stmt.specifiers.map((s) => specifierName(s.exported));
+    own.forEach((name) => names.add(name));
+  } else if (stmt.type === 'ExportAllDeclaration' && stmt.exported) names.add(specifierName(stmt.exported));
+  else if (stmt.type === 'ExportAllDeclaration') {
+    const from = RELATIVE.test(stmt.source.value) ? bindableNames(path.posix.join(path.posix.dirname(rel), stmt.source.value), modules, seen) : null;
+    if (!from) return false;
+    from.forEach((name) => names.add(name));
+  }
+  return true;
+}
+
+/** The names a module of the tree binds for its importers, or null when they cannot be known (unparsed, or a star re-export from outside the tree). */
+function bindableNames(rel, modules, seen = new Set()) {
+  if (seen.has(rel)) return new Set();
+  const ast = modules.get(rel);
+  if (!ast) return null;
+  seen.add(rel);
+  const names = new Set();
+  return ast.body.every((stmt) => addStatementNames(stmt, rel, modules, seen, names)) ? names : null;
+}
+
+/** The name an import or re-export specifier asks its source module for (null for a namespace import). */
+const requestedName = (stmt, s) => {
+  if (stmt.type === 'ExportNamedDeclaration') return specifierName(s.local);
+  if (s.type === 'ImportSpecifier') return specifierName(s.imported);
+  return s.type === 'ImportDefaultSpecifier' ? 'default' : null;
+};
+
+/** The RT_IMPORT_UNBOUND findings of one import or re-export statement of `rel` (none when its source is outside the tree or unknowable). */
+function unboundOf(rel, stmt, modules) {
+  const from = stmt.source?.value;
+  if (!(stmt.type === 'ImportDeclaration' || stmt.type === 'ExportNamedDeclaration') || !RELATIVE.test(from ?? '')) return [];
+  const target = path.posix.join(path.posix.dirname(rel), from);
+  const bound = modules.has(target) ? bindableNames(target, modules) : null;
+  if (!bound) return [];
+  return stmt.specifiers.map((s) => requestedName(stmt, s)).filter((name) => name !== null && !bound.has(name)).map((name) => ({
+    code: 'RT_IMPORT_UNBOUND', path: rel, line: stmt.loc.start.line, name,
+    message: `${rel} imports ${name} from ${target}, which does not export it: Node refuses the module at link time; export the name from ${target} or import what it does export`,
+  }));
+}
+
+/** RT_IMPORT_UNBOUND findings: [{code, path, line, name, message}] for every name a runtime module asks a relative module of the tree for and it does not bind. */
+function importBoundFindings(files, parse = acorn().parse) {
+  const modules = new Map(files.filter((f) => f.rel.endsWith('.mjs')).map((f) => [f.rel, parseModule(f.text, parse)]));
+  const judged = [...modules].filter(([rel, ast]) => ast && !isSpec(rel) && EXPORT_ROOTS.some((r) => rel.startsWith(`${r}/`)));
+  return judged.flatMap(([rel, ast]) => ast.body.flatMap((stmt) => unboundOf(rel, stmt, modules)));
 }
 
 /** The files a package.json names as its public entry (main, module, types, exports, bin), as repo-relative paths. */
@@ -116,14 +180,17 @@ function readTracked(root = skillRoot) {
 }
 
 /** Run export reachability against the actual current working tree. */
-const checkExportUsed = (root = skillRoot) => exportUsedFindings(readTracked(root));
+const checkExportUsed = (root = skillRoot) => {
+  const files = readTracked(root);
+  return [...exportUsedFindings(files), ...importBoundFindings(files)];
+};
 
 if (isMain(import.meta.url)) {
   const findings = checkExportUsed();
   if (process.argv.includes('--json')) console.log(JSON.stringify({ ok: findings.length === 0, findings }, null, 2));
   else {
     for (const f of findings) console.error(`${f.code} ${f.path}:${f.line} ${f.message}`);
-    if (!findings.length) console.log('OK: every export is used by another file.');
+    if (!findings.length) console.log('OK: every export is used by another file, and every relative import is bound.');
   }
   process.exit(findings.length ? 1 : 0);
 }

@@ -11,7 +11,11 @@ until every S* row in `docs/goal.md` holds with fresh evidence, then `1.0.0` fre
 ### Changed
 - Candidate package pins select HFS 4.7.20, CLI 1.7.20, jest preset 2.3.4, back-end canon 3.4.28 and front-end canon 8.4.27; the CLI's runtime installer selects 1.0.0-alpha.26.
 
+### Added
+- `starci runtime check --only export-used` also reports `RT_IMPORT_UNBOUND`: a runtime module that imports or re-exports a name a relative module of the tree does not export, which Node refuses at link time. Dropping an export can no longer leave an importer behind.
+
 ### Fixed
+- `starci workflow start` (and every command that loads `scripts/agent/trust-launch.mjs`) died at module link time: the alpha.25 export cleanup (4f2e99a0b) had dropped the `export` of `TOOL_GUARD_MATCHER` from `scripts/agent/trust.mjs` while `trust-launch.mjs` still imported it. The name is exported again.
 - The lint canons' Sonar way block matches the server: `max-params` (S107) spares the constructor of an injectable class as the server does, and the sonarjs and typescript-eslint ports that report what the server does not on the same source (S1481, S3403, S3782, S3800, S6582) are left to the server. NIVO 7c4bd5d1, 0 issues on sonar.starci.org, linted 205 findings under 1.7.19 and lints 0 now.
 - The root runtime package `starci` installs from its own archive: it now ships `packages/prettier-config/index.cjs` (the readme-badges check formats with it) and `e2e/helpers/source-canon-registry.mjs` (the release app-installs gate imports it); the clean proof of `release publish --runtime-package` refused the 1.0.0-alpha.25 archive for these two missing imports.
 - The package clean proof reads a packed `.gitignore` at the `.npmignore` name npm installs it under (with the same bytes), so the runtime archive's example Work allowlists (`examples/*/.starciwork/.gitignore`) no longer fail the install stage.

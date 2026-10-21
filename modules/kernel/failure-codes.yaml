@@ -5041,6 +5041,17 @@ RT_EXPORT_UNUSED:
   owner: supervisor
   kind: check-finding
 
+RT_IMPORT_UNBOUND:
+  title: "Import of a name the module does not export"
+  title_vi: "Import một tên mà mô-đun không export"
+  meaning_vi: "Một tệp .mjs của runtime (scripts, engine, modules, bin, ext, ui, packages) import hoặc re-export một tên từ một mô-đun tương đối trong cây mà mô-đun đó không export. Node từ chối nạp tệp ở bước liên kết (SyntaxError: does not provide an export named ...), nên mọi lệnh nạp nó đều chết trước khi chạy. Re-export dạng sao từ ngoài cây khiến tên của nguồn không biết được và không bị xét."
+  causes_vi:
+    - "Bỏ từ khóa export của một tên (ví dụ khi dọn RT_EXPORT_UNUSED) trong khi một tệp khác vẫn import nó"
+    - "Đổi tên hoặc xóa một export mà không sửa nơi import"
+  nextStep_vi: "Người giám sát export lại tên từ mô-đun nguồn, hoặc sửa nơi import theo tên mô-đun thực sự export, qua một lane đã land."
+  owner: supervisor
+  kind: check-finding
+
 RT_ENV_UNCATALOGUED:
   title: "Environment variable not catalogued"
   title_vi: "Biến môi trường chưa có trong danh mục"

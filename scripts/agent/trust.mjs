@@ -439,7 +439,7 @@ export function writeCodexNoModelNudge({ file, hooks }) {
 
 /* ------------------------------------------------------ the command guard */
 
-const TOOL_GUARD_MATCHER = 'Bash|PowerShell|Edit|Write|MultiEdit|NotebookEdit', TOOL_GUARD_TIMEOUT_S = 30; // the tracked .claude/settings.json registers the same entry
+export const TOOL_GUARD_MATCHER = 'Bash|PowerShell|Edit|Write|MultiEdit|NotebookEdit'; const TOOL_GUARD_TIMEOUT_S = 30; // the tracked .claude/settings.json registers the same entry
 const isGuardHandler = (h) => typeof h?.command === 'string' && (isGuardCommand(h.command) || h.command.includes('command-guard.mjs'));
 const isGuardGroup = (g) => Array.isArray(g?.hooks) && g.hooks.some(isGuardHandler);
 
