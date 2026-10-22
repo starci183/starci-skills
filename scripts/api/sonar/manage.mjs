@@ -39,6 +39,8 @@ export function manage({target, credentials, request}) {
     project: key => call('GET', '/api/components/show', 'admin', {params: {component: key}}),
     createProject: ({key, name, visibility, organization}) => call('POST', '/api/projects/create', 'admin',
       {form: {project: key, name, visibility, organization}}),
+    // Moves a project to a new key in place: its analyses, issues and quality gate stay with it.
+    updateKey: ({from, to}) => call('POST', '/api/projects/update_key', 'admin', {form: {from, to}}),
     // Quality gates: the organization parameter scopes each call on SonarQube Cloud and is omitted on a server. `ref` is the
     // gate reference the server's API declares for the action ({gateName} or {gateId}).
     gate: (name, organization) => call('GET', '/api/qualitygates/show', 'admin', {params: {name, organization}}),

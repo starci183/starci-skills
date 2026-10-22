@@ -21576,6 +21576,66 @@ sonar-project-read-unavailable:
   owner: runtime-core
   kind: check-status
 
+sonar-project-rekey-conflict:
+  title: "Sonar project exists at both keys"
+  title_vi: "Sonar project tồn tại ở cả hai key"
+  meaning_vi: "Cả previousKey và projectKey đều đọc được một project, nên không thể chuyển key mà không chạm vào project khác."
+  causes_vi:
+    - "Một project mới đã được tạo ở key mới (ví dụ một lần scan trước khi chuyển key)."
+  nextStep_vi: "Owner quyết định giữ project nào; không chạy update_key đè lên project đang có."
+  owner: runtime-core
+  kind: verb-refusal
+
+sonar-project-rekey-not-observed:
+  title: "Sonar project key move not observed"
+  title_vi: "Chưa quan sát được việc chuyển key"
+  meaning_vi: "Reconcile thấy project vẫn ở previousKey; không có write nào được lặp lại."
+  causes_vi:
+    - "Lần chạy trước dừng trước hoặc trong lúc update_key."
+  nextStep_vi: "Chạy lại cùng --operation với --execute khi owner cho phép."
+  owner: runtime-core
+  kind: check-status
+
+sonar-project-rekey-readback:
+  title: "Sonar project is at its declared key"
+  title_vi: "Sonar project đã ở key khai báo"
+  meaning_vi: "Key mới đọc được project và key cũ trả 404; history của project đi theo nó."
+  causes_vi:
+    - "update_key thành công hoặc project đã ở key mới từ trước."
+  nextStep_vi: "Tên hiển thị của project là của server; đổi nó trên SonarCloud nếu cần."
+  owner: runtime-core
+  kind: check-status
+
+sonar-project-rekey-source-missing:
+  title: "Sonar project to move is missing"
+  title_vi: "Không có project ở previousKey"
+  meaning_vi: "Cả previousKey và projectKey đều không có project."
+  causes_vi:
+    - "previousKey khai báo sai hoặc project đã bị xoá."
+  nextStep_vi: "Sửa previousKey trong target hoặc dùng `sonar project ensure` để tạo project mới."
+  owner: runtime-core
+  kind: verb-refusal
+
+sonar-project-rekey-undeclared:
+  title: "Sonar project key move undeclared"
+  title_vi: "Target không khai báo previousKey"
+  meaning_vi: "`sonar project rekey` cần resource.previousKey của target."
+  causes_vi:
+    - "Target chỉ khai báo projectKey."
+  nextStep_vi: "Khai báo previousKey (key cũ trên server) trong target."
+  owner: runtime-core
+  kind: verb-refusal
+
+sonar-project-rekey-unreconciled:
+  title: "Sonar project key move unreconciled"
+  title_vi: "Chuyển key chưa được xác nhận"
+  meaning_vi: "update_key đã gửi nhưng readback chưa cho thấy key mới có project và key cũ trả 404."
+  causes_vi:
+    - "Provider lỗi, quyền thiếu hoặc readback chậm."
+  nextStep_vi: "Reconcile cùng --operation; không gửi lại update_key khi chưa đọc trạng thái."
+  owner: runtime-core
+  kind: check-status
+
 sonar-project-readback:
   title: "Sonar project readback"
   title_vi: "Đã xác minh Sonar project readback"

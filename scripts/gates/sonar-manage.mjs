@@ -83,7 +83,10 @@ const projectRequest = (resource, args, target) => {
   if (typeof name !== 'string' || !name.trim() || name.length > 200
       || (visibility !== undefined && !['public', 'private'].includes(visibility)) || (args.name !== undefined && args.name !== name))
     throw new Error('Invalid declared project configuration');
-  return {name, visibility, qualityGate: declaredGate(resource, target)};
+  const previousKey = resource.previousKey;
+  if (previousKey !== undefined && (typeof previousKey !== 'string' || !projectPattern.test(previousKey) || previousKey === resource.projectKey))
+    throw new Error('Invalid declared previous project key');
+  return {name, visibility, qualityGate: declaredGate(resource, target), previousKey};
 };
 
 const settingsRequest = (resource, args) => {
@@ -144,7 +147,7 @@ const requestBuilders = {project: projectRequest, settings: settingsRequest, use
 
 export const sonarManagedRequest = (target, verb, args) => {
   const resource = target.resource ?? {};
-  if (!closed(resource, ['projectKey', 'organization', 'name', 'visibility', 'qualityGate', 'settings', 'localUsers', 'userManagement', 'tokens', 'release']))
+  if (!closed(resource, ['projectKey', 'previousKey', 'organization', 'name', 'visibility', 'qualityGate', 'settings', 'localUsers', 'userManagement', 'tokens', 'release']))
     throw new Error('Undeclared Sonar resource fields');
   if (verb !== 'user' && (!projectPattern.test(resource.projectKey ?? '') || (args.key !== undefined && args.key !== resource.projectKey)))
     throw new Error('Sonar action requires the exact declared project key');
@@ -178,6 +181,44 @@ const projectMatches = (component, request) => component?.key === request.projec
   && component.qualifier === 'TRK' && component.name === request.name
   && (request.visibility === undefined || component.visibility === request.visibility)
   && (request.organization === undefined || component.organization === request.organization);
+
+/** The project identity a key move keeps: key, kind and organization (the display name is the server's own and stays). */
+const projectAt = (component, key, organization) => component?.key === key && component.qualifier === 'TRK'
+  && (organization === undefined || component.organization === organization);
+
+/** Observe both keys before a move: {after} when the declared key already holds the project, {before} when only the old one does, or {failure}. */
+async function rekeyObserved(client, request) {
+  const {projectKey, previousKey, organization} = request;
+  const now = await client.project(projectKey), old = await client.project(previousKey);
+  if ((!now.ok && now.status !== 404) || (!old.ok && old.status !== 404)) return {failure: fail('sonar-project-read-unavailable')};
+  if (now.ok && old.ok) return {failure: fail('sonar-project-rekey-conflict')};
+  if (now.ok) return projectAt(now.data?.component, projectKey, organization) ? {after: now.data.component} : {failure: fail('sonar-project-conflict')};
+  if (!old.ok) return {failure: fail('sonar-project-rekey-source-missing')};
+  return projectAt(old.data?.component, previousKey, organization) ? {before: old.data.component} : {failure: fail('sonar-project-conflict')};
+}
+
+/**
+ * Move the project of the declared previousKey to the declared projectKey (api/projects/update_key). Idempotent: a project already
+ * at the new key, with the old key gone, is verified without a write. Verified only when the new key reads back and the old one is 404.
+ */
+async function projectRekey(client, request, callbacks, reconcile) {
+  const {projectKey, previousKey, organization} = request;
+  if (!previousKey) return fail('sonar-project-rekey-undeclared');
+  const observed = await rekeyObserved(client, request);
+  if (observed.failure) return observed.failure;
+  const proof = component => ({projectKey, name: component.name});
+  if (observed.after) return verified('sonar-project-rekey-readback', {resourceId: projectKey, proof: proof(observed.after)});
+  if (reconcile) return uncertain('sonar-project-rekey-not-observed');
+  const capabilities = await client.capabilities();
+  if (!capabilities.ok || !has(capabilities.data, 'api/projects', 'update_key', ['from', 'to'], true)) return fail('sonar-project-api-unsupported');
+  callbacks.checkpoint({phase: 'project-rekey-intent', resourceId: previousKey});
+  const answer = await client.updateKey({from: previousKey, to: projectKey});
+  if (answer.ok) callbacks.acknowledge({phase: 'project-rekey-acknowledged', resourceId: projectKey});
+  const after = await client.project(projectKey), gone = await client.project(previousKey);
+  if (after.ok && projectAt(after.data?.component, projectKey, organization) && gone.status === 404)
+    return verified('sonar-project-rekey-readback', {writeAck: answer.ok, resourceId: projectKey, proof: proof(after.data.component)});
+  return uncertain('sonar-project-rekey-unreconciled', {writeAck: answer.ok});
+}
 
 async function projectAction(client, request, callbacks, reconcile) {
   const ensured = await projectEnsured(client, request, callbacks, reconcile);
@@ -480,7 +521,7 @@ export async function runSonarManage(ctx) {
 
 const executeAction = async ({verb, action, target, request, callbacks, reconcile, env}) => {
   const client = manage({target, credentials: callbacks.credentials, request: requestJson});
-  if (verb === 'project') return projectAction(client, request, callbacks, reconcile);
+  if (verb === 'project') return action === 'rekey' ? projectRekey(client, request, callbacks, reconcile) : projectAction(client, request, callbacks, reconcile);
   if (verb === 'settings') return settingsAction(client, request, callbacks, {write: action === 'set', reconcile});
   if (verb === 'user') return userAction(client, request, callbacks, {action, reconcile});
   if (verb === 'token') return sonarTokenAction(client, target, request, callbacks, {action, reconcile, env, has});

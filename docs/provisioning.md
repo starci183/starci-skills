@@ -32,6 +32,10 @@ value is the variable of the runtime's untracked secret.env (the reader `starci 
 never printed or written, and an absent variable refuses with `sonar-host-credential-unavailable`.
 The runtime's examples declare this for `sonar project ensure`, because the public runtime repository
 tracks no sealed secret.
+`sonar project rekey` moves a project to a new key in place (`api/projects/update_key`): the target
+declares the old key as `previousKey`, and the project keeps its analyses, issues and quality gate. It
+is verified when the new key reads back and the old key no longer does. The display name is the
+server's own and does not change with the key.
 After authority is established, the native custody owner can project its configured AGE material
 privately for the selected application's encrypted member.
 

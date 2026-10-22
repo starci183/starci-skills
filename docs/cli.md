@@ -4305,7 +4305,7 @@ starci sonar browse read --target quality --revision <sha>
 
 ### starci sonar project
 
-ensure a declared Sonar project through its provider adapter
+ensure a declared Sonar project, or move it to its declared key, through its provider adapter
 
 | flag | type | |
 | --- | --- | --- |
@@ -4325,10 +4325,13 @@ Roles: worker, lead, coordinator, owner
 | action | operation | effect | required credential roles | destination |
 | --- | --- | --- | --- | --- |
 | ensure | sonar.project.ensure | remote | admin | none |
+| rekey | sonar.project.rekey | remote | admin | none |
 
 Conventions:
 
 - a target and existing accepted operation scope bind provider effects; execute grants no authority
+- rekey moves the project at previousKey to projectKey (api/projects/update_key); its analyses, issues and quality gate stay with it
+- rekey is verified when the new key reads back and the old key no longer does
 
 exit: 0 plan prepared or operation completed; 1 provider effect failed or remains uncertain; 2 policy or input refused
 
@@ -4336,6 +4339,7 @@ json: always
 
 ```sh
 starci sonar project ensure --target quality --operation project-bootstrap
+starci sonar project rekey --target quality --operation project-rename
 ```
 
 ### starci sonar release

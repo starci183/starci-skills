@@ -79,7 +79,7 @@ _starci() {
         runtime:machine-db) COMPREPLY=( $(compgen -W "init status ledgers register resolve" -- "$cur") ); return 0;;
         sonar:analysis) COMPREPLY=( $(compgen -W "run" -- "$cur") ); return 0;;
         sonar:browse) COMPREPLY=( $(compgen -W "read" -- "$cur") ); return 0;;
-        sonar:project) COMPREPLY=( $(compgen -W "ensure" -- "$cur") ); return 0;;
+        sonar:project) COMPREPLY=( $(compgen -W "ensure rekey" -- "$cur") ); return 0;;
         sonar:release) COMPREPLY=( $(compgen -W "gate" -- "$cur") ); return 0;;
         sonar:settings) COMPREPLY=( $(compgen -W "read set" -- "$cur") ); return 0;;
         sonar:token) COMPREPLY=( $(compgen -W "ensure rotate revoke" -- "$cur") ); return 0;;

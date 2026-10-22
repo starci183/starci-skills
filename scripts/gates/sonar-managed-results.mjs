@@ -8,6 +8,8 @@ export const resultCodes = new Set([
   'sonar-local-users-readback', 'sonar-new-user-password-required', 'sonar-project-api-unsupported',
   'sonar-project-conflict', 'sonar-project-create-unreconciled', 'sonar-project-exists',
   'sonar-project-not-observed', 'sonar-project-read-unavailable', 'sonar-project-readback',
+  'sonar-project-rekey-conflict', 'sonar-project-rekey-not-observed', 'sonar-project-rekey-readback',
+  'sonar-project-rekey-source-missing', 'sonar-project-rekey-undeclared', 'sonar-project-rekey-unreconciled',
   'sonar-setting-api-unsupported', 'sonar-setting-read-unavailable', 'sonar-setting-readback-mismatch',
   'sonar-setting-readback', 'sonar-setting-write-unreconciled', 'sonar-token-absent',
   'sonar-token-api-unsupported', 'sonar-token-existing-credential-unverified',

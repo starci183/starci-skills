@@ -333,7 +333,7 @@ Register-ArgumentCompleter -Native -CommandName starci -ScriptBlock {
         'runtime machine-db' = @('init','status','ledgers','register','resolve')
         'sonar analysis' = @('run')
         'sonar browse' = @('read')
-        'sonar project' = @('ensure')
+        'sonar project' = @('ensure','rekey')
         'sonar release' = @('gate')
         'sonar settings' = @('read','set')
         'sonar token' = @('ensure','rotate','revoke')
