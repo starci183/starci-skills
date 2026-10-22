@@ -31,7 +31,7 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import { validateAgainstSchema } from '../lib/json-schema.mjs';
 import { canonContentDigest, packedFiles } from '../gates/canon-digest.mjs';
 import { PINS_FILE, PROFILES_FILE, SCHEMA_FILE, loadPins } from '../gates/canon-pins.mjs';
-import { nodeSpawn } from '../api/node/lib.mjs';
+import { runNode } from '../api/node/run-node.mjs';
 
 const BINDING = Object.freeze({ version: 'CANON_BINDING_VERSION', digest: 'CANON_BINDING_DIGEST', invalid: 'CANON_BINDING_INVALID' });
 const DEP_KEYS = ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies'];
@@ -76,7 +76,7 @@ function regenerateRuntimeCopies(root) {
   const syncScript = path.join(root, 'scripts', 'hfs', 'sync-runtime.mjs');
   if (!fs.existsSync(syncScript)) return [];
   // The generator's progress line is captured, not inherited: under --json this process's stdout is one JSON document.
-  const run = nodeSpawn([syncScript], { cwd: root, stdio: ['ignore', 'pipe', 'inherit'] });
+  const run = runNode([syncScript], { cwd: root, stdio: ['ignore', 'pipe', 'inherit'] });
   const status = run.error ? 1 : (run.status ?? 1);
   return status === 0 ? [] : [`${BINDING.invalid} the generated runtime copies could not be regenerated (the runtime copy generator exited ${status})`];
 }
