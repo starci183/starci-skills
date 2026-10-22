@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.7.23 - 2026-10-22
+- Changed: pins @starci/hfs 4.7.23.
+
 ## 1.7.22 - 2026-10-22
 - Changed: pins @starci/hfs 4.7.22.
 
