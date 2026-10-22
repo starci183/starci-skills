@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.0.5 - 2026-10-22
+
+- Fixed: next.json sets `noUnusedLocals` and `noUnusedParameters`, as be.json does: the lint canons leave Sonar S1481 (unused local) to the compiler, which no front end ran (owner ruling 2026-10-22, no loosening). The three example front ends compile with 0 unused-declaration errors.
+
 ## 2.0.4 - 2026-10-13
 
 - Fixed: next.json sets `noUncheckedSideEffectImports`, so a missing non-CSS side-effect import of a Next app is a type error (TS2882); stylesheets are declared by the app's ambient owner (the alpha.12 CI red of the registry-install scaffold spec).

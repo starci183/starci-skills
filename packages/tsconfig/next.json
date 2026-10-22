@@ -9,6 +9,8 @@
     "jsx": "react-jsx",
     "noEmit": true,
     "noUncheckedSideEffectImports": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
     "incremental": true,
     "plugins": [{ "name": "next" }]
   }
