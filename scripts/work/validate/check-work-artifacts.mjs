@@ -7,7 +7,7 @@ import {appRootOf, loadRecords, indexInlineCriteria} from '../record-ownership.m
 import {slash} from '../../lib/path-key.mjs';
 import { repoRoot } from './work-consistency-shared.mjs';
 import { trimTrailing } from './trailing-text.mjs';
-import {exampleArtifactReadOptions, exampleWorkRoots} from '../../lib/example-refs.mjs'; import { isMain } from '../../lib/is-main.mjs'; import { byCodeUnit } from '../../lib/list.mjs';
+import {exampleArtifactReadOptions, exampleCheckoutOf, exampleWorkRoots} from '../../lib/example-refs.mjs'; import { isMain } from '../../lib/is-main.mjs'; import { byCodeUnit } from '../../lib/list.mjs';
 import {verifyDeclaration,checkRunMedia,checkReceipt} from './work-artifact-verification.mjs';
 import {declarationsOf, RECORD_DECLARATIONS, EVIDENCE_DECLARATIONS, RECEIPT_DECLARATIONS, MANIFEST_DECLARATIONS, RESOURCE_DECLARATIONS} from './work-artifact-declarations.mjs';
 
@@ -261,7 +261,7 @@ function reportArtifactCensus(state) {
  * `{refuse, suspect, info}` arrays of `file: message [CODE]`, the shape check-work-deep prints and the
  * CLI reads. Exported so the fixture test can point it at a throwaway tree instead of the real trees.
  */
-export function checkWorkArtifacts(workRoot, out, { runtimeRoot = root } = {}) {
+export function checkWorkArtifacts(workRoot, out, { runtimeRoot = exampleCheckoutOf(workRoot) ?? root } = {}) {
   out ??= {refuse: [], suspect: [], info: []};
   const emit = {
     refuse: (file, code, msg) => out.refuse.push(relativeToRoot(file) + ': ' + msg + ' [' + code + ']'),

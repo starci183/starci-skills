@@ -35,10 +35,10 @@ export function discoverExampleApps(root) {
 export const STACK_DECLARATION_TEMPLATE = `${EXAMPLES_ROOT}/starcistacks-services/template.services.yaml`;
 
 /** The reference app declaration scripts/hfs/derived-fields.mjs samples for per-field slot ownership. */
-export const REFERENCE_APP_MANIFEST = `${EXAMPLES_ROOT}/ecommerce-app/hfs.json`;
+export const REFERENCE_APP_MANIFEST = `${EXAMPLES_ROOT}/full-app/hfs.json`;
 
 /** The example app whose installed tree an fe-kit peer link points at by default. */
-export const REFERENCE_EXAMPLE_APP = 'ecommerce-app';
+export const REFERENCE_EXAMPLE_APP = 'full-app';
 
 /** The grammar css families a product repository may declare (`[data-grammar-family="<id>"]`); the
  *  runtime's own product maps to the core sheet. */
@@ -49,7 +49,7 @@ export const PRODUCT_NAME_SEGMENT = /^(nivo|starci|mia)[-\w]*$/i;
 
 /** The closed list of product names this runtime shipped against - the names R206
  *  (check-example-coupling.mjs) refuses anywhere in runtime source outside this file. */
-export const PRODUCT_NAMES = Object.freeze(['mia-mia', 'miamia', 'nivo', 'starci-academy', 'ecommerce-app', 'shape-slot']);
+export const PRODUCT_NAMES = Object.freeze(['mia-mia', 'miamia', 'nivo', 'starci-academy', 'full-app', 'shape-slot']);
 
 /** The catalog of stable pattern IDs pointing at actual executable example source. */
 export const EXAMPLE_CATALOG_FILE = `${EXAMPLES_ROOT}/index.yaml`;
@@ -154,6 +154,20 @@ export function exampleWorkRoots(root) {
     if (!isLiteWorkRoot(directory)) referenceFile(root, relative);
     return [directory];
   });
+}
+
+/**
+ * The runtime checkout that holds `workRoot` when it is one of that checkout's example Work trees
+ * (`<checkout>/examples/<app>/.starciwork` beside `<checkout>/examples/.runtimes`), else null. An example is judged against its
+ * own checkout's fixture store: a lane's example by the lane's store, whichever runtime runs the check (the shared pre-commit hook
+ * runs the canonical runtime over a lane's staged files).
+ */
+export function exampleCheckoutOf(workRoot) {
+  if (typeof workRoot !== 'string') return null;
+  const work = path.resolve(workRoot);
+  const appDir = path.dirname(work), examplesDir = path.dirname(appDir), checkout = path.dirname(examplesDir);
+  if (path.basename(work) !== '.starciwork' || path.basename(examplesDir) !== EXAMPLES_ROOT) return null;
+  return fs.existsSync(path.join(examplesDir, '.runtimes')) && fs.existsSync(path.join(appDir, 'hfs.json')) ? checkout : null;
 }
 
 /** Per-call READ options for an actual HFS app's own Work tree. A real project

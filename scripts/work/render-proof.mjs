@@ -9,7 +9,7 @@ import {containedPath, slash} from '../lib/path-key.mjs';
 import {objectList} from '../lib/list.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { walkFiles } from '../lib/walk.mjs';
-import { exampleArtifactReadOptions } from '../lib/example-refs.mjs';
+import { exampleArtifactReadOptions, exampleCheckoutOf } from '../lib/example-refs.mjs';
 
 /**
  * Grit item 55: scripts/work/ui/render.mjs and scripts/work/brand/brand.mjs are real - a
@@ -207,7 +207,7 @@ if (isMain(import.meta.url)) {
   const workspaceDoc = readWorkspace(workRoot);
   const rec = records.get(args.record);
   if (!rec) { console.error(`REFUSED no record with id ${args.record} was found under ${workRoot}`); process.exit(1); }
-  const problems = renderProofProblems({rec, records, workspaceDoc, workRoot, blobOptions: exampleArtifactReadOptions(root, workRoot)});
+  const problems = renderProofProblems({rec, records, workspaceDoc, workRoot, blobOptions: exampleArtifactReadOptions(exampleCheckoutOf(workRoot) ?? root, workRoot)});
   for (const problem of problems) console.log(`REFUSED ${slash(path.relative(workRoot, rec.dir))}: ${problem}`);
   const outcome = problems.length ? `${problems.length} refused` : 'render/brand proof holds for every capture';
   console.log(`${args.record}: ${outcome}`);
