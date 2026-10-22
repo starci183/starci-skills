@@ -69,9 +69,9 @@ default args (Orca settings `agentDefaultArgs`: claude
 devin `--permission-mode bypass --respect-workspace-trust false`); the runtime
 passes only `--agent`, and `--model`/`--effort` where the card takes them.
 `orchestration dispatch` remains forbidden for agent orchestration (`api.yaml` `forbiddenForStarciOrchestration`), and no
-agent is ever launched with `terminal create`. The runtime creates plain shells: `starci workflow start-in-orca` opens a
+agent is ever launched with `terminal create`. The runtime creates plain shells: `starci workflow start` run outside Orca opens a
 PowerShell terminal in the runtime's worktree whose startup command is the start relay, so an owner or Supervisor start asked
-for outside Orca gets the Orca sender terminal `starci workflow start` needs. A release cut runs from a plain shell.
+for outside Orca gets the Orca sender terminal it needs. A release cut runs from a plain shell.
 
 ## Card anatomy
 

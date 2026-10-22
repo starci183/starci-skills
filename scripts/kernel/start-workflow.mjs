@@ -20,7 +20,7 @@
 // Router refusal or exhaustion is a typed failure, never an implicit Devin kernel.
 //
 // Every Kernel is an Orca worker (modules/kernel/start-workflow.yaml): the launching
-// terminal (the owner's chat, the Supervisor, the watchdog's run; ORCA_TERMINAL_HANDLE) creates the Kernel's entry Run
+// Orca terminal (ORCA_TERMINAL_HANDLE; a start outside Orca relays itself into one, orca-relay.mjs) creates the entry Run
 // and coordinates it, the Kernel's Task carries its prompt, and `orca orchestration worker-start --agent <agent>
 // [--model <id> --effort <level>]` starts it (scripts/agent/lib.mjs startAgent). worker-show attests the effective
 // agent and model. The Kernel then creates its workflow Run from its own terminal and coordinates its ops there
@@ -49,7 +49,7 @@ import { prepareProviderBudget } from '../agent/provider-budget.mjs';
 import { workerShow } from '../api/orca/worker-show.mjs';
 import { releaseWorkflowWorker as releaseManagedWorker, recoverWorkflowLaunch, rollbackUnpublishedKernel } from './workflow-launch-custody.mjs';
 import { DEFAULT_OWNER_LANGUAGE } from '../machine/home.mjs';
-import { parseJson, parseJsonOr, readJsonFile } from '../lib/json.mjs';
+import { parseJson, parseJsonOr } from '../lib/json.mjs';
 import { workflowDisplayName, workflowNameOf } from '../lib/display-names.mjs';
 import { KERNEL_BOOT_FILES, currentRuntimeRev, revRootOf, shortRev } from './runtime-rev.mjs';
 import { ensureWorkflowWorktree, workflowAppRepo } from './workflow-worktree.mjs';
@@ -58,7 +58,8 @@ import { ensureWorkflowHost, installWorkflowTree, workflowStartAuthority, commit
 import { guardLaunch, bindGuardTerminal, unbindGuardTerminal, guardReceiptErrors } from '../guards/hook-install.mjs';
 import { readEnv } from '../lib/env.mjs';
 import { arg as argvValue } from '../lib/cli-arg.mjs';
-import { foldCase, realPath } from '../lib/path-key.mjs';
+import { projectBindingOf } from './project-binding.mjs';
+import { relayIntoOrca } from './orca-relay.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 const sourceRoot = path.dirname(skillRoot);
@@ -76,6 +77,8 @@ if (!Object.hasOwn(LAUNCHERS, launchedBy)) {
   console.error(`start-workflow: --launched-by must be one of ${Object.keys(LAUNCHERS).join(', ')} (got ${launchedBy})`);
   process.exit(2);
 }
+// An owner or Supervisor start outside Orca has no sender terminal: it relays itself into a plain Orca terminal.
+if (!planOnly && launchedBy === 'supervisor' && !String(readEnv('ORCA_TERMINAL_HANDLE') ?? '').trim()) relayIntoOrca({ repo, goal: goalId, agent: agentOverride, asJson });
 
 // How long a Kernel launch holds its startup reservation: worker-start blocks until the agent is ready (calls.yaml
 // worker-start timeoutMs 150000), plus the Run and Task calls around it.
@@ -95,26 +98,7 @@ const { resolveKernelRoute, memberLabel, memberSummary } = createKernelRoute({ s
 // its own entry Run (the launching terminal coordinates it), attested from worker-show. No caller assembles a provider
 // command: Orca composes it, with the owner's per-agent default args.
 
-const samePath = (left, right) => foldCase(realPath(left)) === foldCase(realPath(right));
-
-function projectContext() {
-  const projects = path.join(sourceRoot, '.workspaces', 'projects');
-  if (!fs.existsSync(projects)) return null;
-  for (const entry of fs.readdirSync(projects, { withFileTypes: true })) {
-    if (!entry.isDirectory()) continue;
-    const file = path.join(projects, entry.name, 'work.json');
-    const doc = readJsonFile(file);
-    if (doc?.schema !== 'starci/workspace-binding@2' || typeof doc?.repository?.pathFromSource !== 'string') continue;
-    const app = path.resolve(sourceRoot, doc.repository.pathFromSource);
-    if (!samePath(app, repo)) continue;
-    const fe = path.resolve(app, doc.sides?.fe ?? 'fe');
-    const be = path.resolve(app, doc.sides?.be ?? 'be');
-    return { file, project: doc.project ?? entry.name, be, fe };
-  }
-  return null;
-}
-
-const context = projectContext();
+const context = projectBindingOf({ sourceRoot, repo });
 const apiFile = path.join(skillRoot, 'scripts', 'kernel', 'cli.mjs');
 const promptTemplate = fs.readFileSync(path.join(skillRoot, 'modules', 'kernel', 'kernel-prompt.md'), 'utf8');
 // The runtime rev this boot reads its kernel files at (runtime-rev.mjs): named in the prompt and recorded as

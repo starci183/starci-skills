@@ -55,7 +55,7 @@ export function workflowSender({ env = process.env, launchedBy = 'supervisor', l
   phase('sender');
   const handle = String(readEnv('ORCA_TERMINAL_HANDLE', env) ?? '').trim();
   if (handle) return { ok: true, handle, source: 'caller' };
-  if (launchedBy !== 'watchdog') return SENDER_MISSING('run starci workflow start inside an Orca terminal (ORCA_TERMINAL_HANDLE is not set here)');
+  if (launchedBy !== 'watchdog') return SENDER_MISSING('ORCA_TERMINAL_HANDLE is not set here; without --plan, starci workflow start relays itself into a plain Orca terminal');
   const runId = parseJsonOr(ledger?.db.prepare('SELECT payload_json FROM jobs WHERE job_id=?').get(`kernel-${workflowId}`)?.payload_json)?.managed?.runId ?? null;
   const listing = list({});
   if (!listing?.ok) return SENDER_MISSING(`the terminal listing is unavailable (${listing?.error ?? 'host-unavailable'})`);
