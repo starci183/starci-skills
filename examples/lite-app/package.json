@@ -33,7 +33,7 @@
     "@graphql-codegen/cli": "7.4.6",
     "@graphql-codegen/client-preset": "6.2.3",
     "@nestjs/testing": "11.2.5",
-    "@starci/cli": "1.7.21",
+    "@starci/cli": "1.7.22",
     "@starci/eslint-canon-be": "3.4.29",
     "@starci/eslint-canon-fe": "8.4.28",
     "@starci/jest-preset": "2.3.4",
