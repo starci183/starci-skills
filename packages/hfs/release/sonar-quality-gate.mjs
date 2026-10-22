@@ -2,7 +2,8 @@
 // that the report was uploaded; the server computes the analysis afterwards. This reads the task the scanner wrote
 // (`.scannerwork/report-task.txt`), polls `api/ce/task` until the compute-engine task ends, then reads the quality gate of that
 // analysis from `api/qualitygates/project_status` with the same token. OK passes; ERROR is red and names every failed condition;
-// a task that ends FAILED or CANCELED, an unreadable answer and a deadline passed are typed refusals in the row's detail.
+// a task that ends FAILED or CANCELED, an unreadable answer and a deadline passed are typed refusals in the row's detail. A transient
+// read failure (a network error or an HTTP 5xx) is retried with a bounded backoff inside the same wait before it is unreadable.
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -21,11 +22,34 @@ function reportTask(cwd) {
   return Object.fromEntries(text.split(/\r?\n/u).map((line) => line.split('=')).filter(([key, ...rest]) => key && rest.length).map(([key, ...rest]) => [key.trim(), rest.join('=').trim()]));
 }
 
-/** One authenticated JSON GET; a failed request or a non-JSON body throws. */
-async function getJson(ctx, url, token) {
-  const response = await ctx.fetch(url, { headers: { Authorization: `Basic ${Buffer.from(`${token}:`).toString('base64')}` }, signal: AbortSignal.timeout(30_000) });
-  if (!response.ok) throw new Error(`HTTP ${response.status} from ${url.split('?')[0]}`);
+/** The bound of a transient read failure: attempts per request and the first pause, doubled after each retry (milliseconds). */
+const TRANSIENT_RETRY = Object.freeze({ attempts: 5, firstPause: 2_000 });
+
+/** One authenticated JSON GET; a failed request or a non-JSON body throws. A network error or an HTTP 5xx is marked transient. */
+async function getJsonOnce(ctx, url, token) {
+  let response;
+  try {
+    response = await ctx.fetch(url, { headers: { Authorization: `Basic ${Buffer.from(`${token}:`).toString('base64')}` }, signal: AbortSignal.timeout(30_000) });
+  } catch (error) {
+    throw Object.assign(new Error(`${String(error?.message ?? error)} (${url.split('?')[0]})`), { transient: true });
+  }
+  if (!response.ok) throw Object.assign(new Error(`HTTP ${response.status} from ${url.split('?')[0]}`), { transient: response.status >= 500 });
   return response.json();
+}
+
+/**
+ * getJsonOnce, retried only when the failure is transient (a network error or an HTTP 5xx): at most TRANSIENT_RETRY.attempts
+ * tries, pausing 2 s, 4 s, 8 s, ... between them, and never past `deadline`. A 4xx (401 and 403 included) and an unreadable body
+ * throw at once; the last transient failure throws as itself, so a retry never turns an unreadable answer into a verdict.
+ */
+async function getJson(ctx, url, token, { sleep, deadline }) {
+  for (let attempt = 1, pause = TRANSIENT_RETRY.firstPause; ; attempt += 1, pause *= 2) {
+    try { return await getJsonOnce(ctx, url, token); }
+    catch (error) {
+      if (!error.transient || attempt >= TRANSIENT_RETRY.attempts || ctx.now() + pause > deadline) throw error;
+      await sleep(pause);
+    }
+  }
 }
 
 /** The failed conditions of a quality gate answer, as `metric comparator threshold (actual value)` lines. */
@@ -42,10 +66,11 @@ export async function sonarQualityGate(ctx, { cwd, host, token, wait = QUALITY_G
   const server = String(task.serverUrl || host).replace(/\/$/u, '');
   const sleep = ctx.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
   const deadline = ctx.now() + wait.deadline;
+  const retry = { sleep, deadline };
   let analysisId = null;
   try {
     for (;;) {
-      const state = (await getJson(ctx, `${server}/api/ce/task?id=${encodeURIComponent(task.ceTaskId)}`, token))?.task;
+      const state = (await getJson(ctx, `${server}/api/ce/task?id=${encodeURIComponent(task.ceTaskId)}`, token, retry))?.task;
       if (DONE.has(state?.status)) {
         if (state.status !== 'SUCCESS') return { pass: false, detail: `${SONAR_GATE_FAILED}: compute-engine task ${task.ceTaskId} ended ${state.status}${state.errorMessage ? `: ${state.errorMessage}` : ''}` };
         analysisId = state.analysisId;
@@ -55,7 +80,7 @@ export async function sonarQualityGate(ctx, { cwd, host, token, wait = QUALITY_G
       await sleep(wait.interval);
     }
     const query = analysisId ? `analysisId=${encodeURIComponent(analysisId)}` : `projectKey=${encodeURIComponent(task.projectKey ?? '')}`;
-    const status = (await getJson(ctx, `${server}/api/qualitygates/project_status?${query}`, token))?.projectStatus;
+    const status = (await getJson(ctx, `${server}/api/qualitygates/project_status?${query}`, token, retry))?.projectStatus;
     if (status?.status === 'OK') return { pass: true, detail: 'exit 0, quality gate OK' };
     if (status?.status === 'ERROR') {
       const conditions = failedConditions(status);

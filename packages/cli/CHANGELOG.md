@@ -1,6 +1,7 @@
 # Changelog
 
 ## 1.7.21 - 2026-10-22
+- Changed: the catalog documents the release gate's bounded retry of a transient Sonar read.
 - Changed: pins @starci/hfs 4.7.21.
 
 ## 1.7.20 - 2026-10-22
