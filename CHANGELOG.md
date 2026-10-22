@@ -6,13 +6,11 @@ until every S* row in `docs/goal.md` holds with fresh evidence, then `1.0.0` fre
 
 ## [Unreleased]
 
-### Changed
-- Rendered `sonar-project.properties` leaves the message catalogs (`**/messages/*.messages.ts`, `**/messages/*.json`) out of Sonar copy-paste detection only (`sonar.cpd.exclusions`, owner ruling 2026-10-22): a catalog repeats its keys once per language. HFS 4.7.23, CLI 1.7.23, back-end canon 3.4.30 and front-end canon 8.4.29; the three examples carry the line.
-
 ## [1.0.0-alpha.26] — 2026-10-22
 
 ### Changed
-- Candidate package pins select HFS 4.7.22, CLI 1.7.22, jest preset 2.3.4, tsconfig 2.0.5, back-end canon 3.4.29 and front-end canon 8.4.28; the CLI's runtime installer selects 1.0.0-alpha.26.
+- Candidate package pins select HFS 4.7.23, CLI 1.7.23, jest preset 2.3.4, tsconfig 2.0.5, back-end canon 3.4.30 and front-end canon 8.4.29; the CLI's runtime installer selects 1.0.0-alpha.26.
+- Rendered `sonar-project.properties` leaves the message catalogs (`**/messages/*.messages.ts`, `**/messages/*.json`) out of Sonar copy-paste detection only (`sonar.cpd.exclusions`, owner ruling 2026-10-22): a catalog repeats its keys once per language. The three examples carry the line.
 
 ### Added
 - `starci runtime check --only export-used` also reports `RT_IMPORT_UNBOUND`: a runtime module that imports or re-exports a name a relative module of the tree does not export, which Node refuses at link time. Dropping an export can no longer leave an importer behind.
