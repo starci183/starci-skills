@@ -29,6 +29,7 @@ import { readEnv } from '../../lib/env.mjs';
 import { byCodeUnit } from '../../lib/list.mjs';
 import { trimTrailing } from './trailing-text.mjs';
 import { isWorkTemplatePath } from '../../lib/work-edition.mjs';
+import { WORK_DIR_NAME } from '../../lib/roots.mjs';
 
 export const WORK_YAML_UNPARSEABLE = 'WORK_YAML_UNPARSEABLE';
 export const WORK_VALIDATE_REFUSED = 'WORK_VALIDATE_REFUSED';
@@ -195,11 +196,24 @@ function parseWorkYaml(rels, reader, checked, findings) {
   return parsed;
 }
 
-// Validate: each directory that holds a parsed file, once; a refusal counts only when it names one of the given files.
+/**
+ * The Work root a file belongs to: its nearest `.starciwork` ancestor. A record is validated against its whole tree, as
+ * `starci work validate` does: validated from its own directory, a record under features/ read features/ as the root (a
+ * catalog entry doubled to features/features/<id>), saw no _resources (an accounts identity did not resolve) and anchored
+ * owner paths at the wrong directory. Falls back to the file's directory for a file outside any `.starciwork`.
+ */
+function workRootOf(file) {
+  for (let dir = path.dirname(file); ; dir = path.dirname(dir)) {
+    if (path.basename(dir) === WORK_DIR_NAME) return dir;
+    if (path.dirname(dir) === dir) return path.dirname(file);
+  }
+}
+
+// Validate: each Work root that holds a parsed file, once; a refusal counts only when it names one of the given files.
 function validateParsedDirs(root, parsed, strict, checked, findings) {
   // The normal Work tree checks exclude scaffold templates; hygiene still parses and scans their bytes.
   const records = parsed.map((rel) => path.join(root, rel)).filter((file) => !isWorkTemplatePath(file));
-  const dirs = [...new Set(records.map((file) => path.dirname(file)))].filter((d) => fs.existsSync(d));
+  const dirs = [...new Set(records.map(workRootOf))].filter((d) => fs.existsSync(d));
   const owned = records;
   for (const dir of dirs) {
     let report;

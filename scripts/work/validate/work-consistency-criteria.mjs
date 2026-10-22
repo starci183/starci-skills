@@ -83,12 +83,18 @@ function namesReachableFrom(owner) {
   return named;
 }
 
+/** An entry that only points at a criterion (`ref`, or nothing but `id`/`name`/`ref`), not an inline criterion of its own. */
+const POINTER_KEYS = new Set(['id', 'name', 'ref']);
+const isPointerEntry = entry => entry && typeof entry === 'object' && pointersOf(entry).length > 0
+  && Object.keys(entry).every(key => POINTER_KEYS.has(key));
+
 // The current business-rule schema has no acceptanceCriteria reverse list. A criterion's rule id
 // and its place under that rule's ac/ directory are sufficient; only records that actually
-// author a reverse list or explicit pointer can disagree with it.
+// author a reverse list or an explicit pointer can disagree with it. An inline criterion's own `id`
+// names that inline criterion, not the rule's list of others: a rule may hold inline criteria and
+// a criterion kept under its ac/ directory side by side.
 const hasReverseLink = owner => Object.hasOwn(owner.data, 'acceptanceCriteria') ||
-  INLINE_CRITERION_FIELDS.some(field => Array.isArray(owner.data[field]) &&
-    owner.data[field].some(e => pointersOf(e).length > 0));
+  INLINE_CRITERION_FIELDS.some(field => Array.isArray(owner.data[field]) && owner.data[field].some(isPointerEntry));
 
 function checkCriterionPlace({ records, refuse }, criterionId, rec) {
   const owner = records.get(rec.data.rule);
