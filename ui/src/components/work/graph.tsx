@@ -20,6 +20,63 @@ const severity: UiState[] = ['bad', 'warn', 'running', 'waiting', 'unknown', 'ok
 const nodeWidth = 256, nodeHeight = 160, colGap = 48, rowGap = 16;
 const edgeDash = (kind: string) => kind === 'seam' ? '6 3' : kind === 'dependsOn' ? '3 3' : kind === 'peer-wait' ? '1 3' : undefined;
 
+function addTo(map: Map<string, string[]>, key: string, value: string) {
+  const list = map.get(key);
+  if (list) list.push(value);
+}
+
+/** Iterative depth-first finishing order, without a recursion limit. */
+function finishOrderOf(nodeIds: readonly string[], outgoing: ReadonlyMap<string, string[]>): string[] {
+  const seen = new Set<string>();
+  const order: string[] = [];
+  for (const root of nodeIds) {
+    if (seen.has(root)) continue;
+    seen.add(root);
+    const stack = [{ id: root, cursor: 0 }];
+    for (let top = stack.at(-1); top; top = stack.at(-1)) {
+      const next = (outgoing.get(top.id) ?? [])[top.cursor];
+      top.cursor += 1;
+      if (next === undefined) {
+        order.push(top.id);
+        stack.pop();
+      } else if (!seen.has(next)) {
+        seen.add(next);
+        stack.push({ id: next, cursor: 0 });
+      }
+    }
+  }
+  return order;
+}
+
+function collectComponent(root: string, componentId: number, reverse: ReadonlyMap<string, string[]>, component: Map<string, number>): string[] {
+  const members: string[] = [];
+  const stack = [root];
+  component.set(root, componentId);
+  for (let id = stack.pop(); id !== undefined; id = stack.pop()) {
+    members.push(id);
+    for (const next of reverse.get(id) ?? []) {
+      if (component.has(next)) continue;
+      component.set(next, componentId);
+      stack.push(next);
+    }
+  }
+  return members;
+}
+
+/** Strongly connected components (Kosaraju) that retain exact cycle membership. */
+function cycleMembersOf(order: readonly string[], reverse: ReadonlyMap<string, string[]>) {
+  const component = new Map<string, number>();
+  const cycleNodes = new Set<string>();
+  let componentId = 0;
+  for (const root of [...order].reverse()) {
+    if (component.has(root)) continue;
+    const members = collectComponent(root, componentId, reverse, component);
+    if (members.length > 1) for (const id of members) cycleNodes.add(id);
+    componentId++;
+  }
+  return { component, cycleNodes };
+}
+
 /** Structural evidence over recorded IDs, independent of runtime readiness or color. */
 export function graphEvidenceOf<T extends Dependency>(nodeIds: string[], recordedEdges: T[]) {
   const ids = new Set(nodeIds);
@@ -29,58 +86,35 @@ export function graphEvidenceOf<T extends Dependency>(nodeIds: string[], recorde
   const outgoing = new Map(nodeIds.map(id => [id, [] as string[]]));
   const reverse = new Map(nodeIds.map(id => [id, [] as string[]]));
   for (const edge of drawable) {
-    outgoing.get(edge.from)!.push(edge.to);
-    reverse.get(edge.to)!.push(edge.from);
+    addTo(outgoing, edge.from, edge.to);
+    addTo(reverse, edge.to, edge.from);
   }
-  // Iterative strongly connected components retain exact cycle edges without a recursion limit.
-  const seen = new Set<string>();
-  const order: string[] = [];
-  for (const root of nodeIds) {
-    if (seen.has(root)) continue;
-    seen.add(root);
-    const stack = [{ id: root, cursor: 0 }];
-    while (stack.length) {
-      const top = stack.at(-1)!;
-      const next = outgoing.get(top.id)![top.cursor++];
-      if (next != null) {
-        if (!seen.has(next)) { seen.add(next); stack.push({ id: next, cursor: 0 }); }
-      } else { order.push(top.id); stack.pop(); }
-    }
-  }
-  const component = new Map<string, number>();
-  const cycleNodes = new Set<string>();
-  let componentId = 0;
-  for (let i = order.length - 1; i >= 0; i--) {
-    const root = order[i];
-    if (component.has(root)) continue;
-    const members: string[] = [];
-    const stack = [root];
-    component.set(root, componentId);
-    while (stack.length) {
-      const id = stack.pop()!;
-      members.push(id);
-      for (const next of reverse.get(id)!) if (!component.has(next)) { component.set(next, componentId); stack.push(next); }
-    }
-    if (members.length > 1) for (const id of members) cycleNodes.add(id);
-    componentId++;
-  }
+  const { component, cycleNodes } = cycleMembersOf(finishOrderOf(nodeIds, outgoing), reverse);
   const cyclic = drawable.filter(edge => cycleNodes.has(edge.from) && component.get(edge.from) === component.get(edge.to));
   const unresolved = new Set([...cycleNodes, ...self.filter(edge => ids.has(edge.to)).map(edge => edge.to), ...dangling.filter(edge => ids.has(edge.to)).map(edge => edge.to)]);
   const queue = [...unresolved];
-  for (const unit of queue) for (const next of outgoing.get(unit) ?? []) {
-    if (!unresolved.has(next)) { unresolved.add(next); queue.push(next); }
+  for (const unit of queue) {
+    for (const next of outgoing.get(unit) ?? []) {
+      if (unresolved.has(next)) continue;
+      unresolved.add(next);
+      queue.push(next);
+    }
   }
   return { drawable, dangling, self, cyclic, unresolved };
 }
 
-function buildLayout(graph: WorkGraph, measuredHeights: ReadonlyMap<string, number>) {
-  const evidence = graphEvidenceOf(graph.nodes.map(node => node.unit), graph.edges);
+function predecessorsByUnit(edges: readonly GraphEdge[]): Map<string, Map<string, Predecessor>> {
   const incomingByUnit = new Map<string, Map<string, Predecessor>>();
-  for (const edge of graph.edges) {
+  for (const edge of edges) {
     const incoming = incomingByUnit.get(edge.to) ?? new Map<string, Predecessor>();
     incoming.set(JSON.stringify([edge.from, edge.kind]), { unit: edge.from, kind: edge.kind });
     incomingByUnit.set(edge.to, incoming);
   }
+  return incomingByUnit;
+}
+
+function groupUnits(graph: WorkGraph) {
+  const incomingByUnit = predecessorsByUnit(graph.edges);
   const grouped = new Map<string, GraphGroup>();
   const unitGroup = new Map<string, string>();
   for (const node of graph.nodes) {
@@ -88,24 +122,31 @@ function buildLayout(graph: WorkGraph, measuredHeights: ReadonlyMap<string, numb
       .sort((a, b) => a.unit.localeCompare(b.unit) || a.kind.localeCompare(b.kind));
     // Group only the same operation and exact predecessor Unit ID/kind pairs.
     const id = JSON.stringify([node.op, predecessors.map(edge => [edge.unit, edge.kind])]);
-    if (!grouped.has(id)) grouped.set(id, { id, op: node.op, nodes: [], incoming: [], recordedEdges: [], predecessors, ui: 'unknown', orderUnresolved: false });
-    grouped.get(id)!.nodes.push(node);
+    let group = grouped.get(id);
+    if (!group) {
+      group = { id, op: node.op, nodes: [], incoming: [], recordedEdges: [], predecessors, ui: 'unknown', orderUnresolved: false };
+      grouped.set(id, group);
+    }
+    group.nodes.push(node);
     unitGroup.set(node.unit, id);
   }
   const groups = [...grouped.values()].map(group => ({ ...group, ui: severity.find(state => group.nodes.some(node => node.ui === state)) ?? 'unknown' }));
+  return { groups, unitGroup };
+}
+
+function groupEdgesOf(drawable: readonly GraphEdge[], unitGroup: ReadonlyMap<string, string>): GroupEdge[] {
   const dedupe = new Map<string, GroupEdge>();
-  for (const edge of evidence.drawable) {
+  for (const edge of drawable) {
     const from = unitGroup.get(edge.from), to = unitGroup.get(edge.to);
-    if (from && to && from !== to) {
-      const id = JSON.stringify([from, to, edge.kind]);
-      dedupe.set(id, { ...edge, from, to, records: [...(dedupe.get(id)?.records ?? []), edge] });
-    }
+    if (!from || !to || from === to) continue;
+    const id = JSON.stringify([from, to, edge.kind]);
+    dedupe.set(id, { ...edge, from, to, records: [...(dedupe.get(id)?.records ?? []), edge] });
   }
-  const edges = [...dedupe.values()];
-  for (const group of groups) {
-    group.incoming = edges.filter(edge => edge.to === group.id);
-    group.recordedEdges = graph.edges.filter(edge => unitGroup.get(edge.to) === group.id);
-  }
+  return [...dedupe.values()];
+}
+
+/** Longest-path layering applies only where the recorded dependency order is resolved. */
+function layerGroups(groups: readonly GraphGroup[], edges: readonly GraphEdge[], unresolvedUnits: ReadonlySet<string>) {
   const depth = new Map(groups.map(group => [group.id, 0]));
   const outgoing = new Map<string, GraphEdge[]>();
   const remaining = new Map(groups.map(group => [group.id, 0]));
@@ -113,7 +154,7 @@ function buildLayout(graph: WorkGraph, measuredHeights: ReadonlyMap<string, numb
     outgoing.set(edge.from, [...(outgoing.get(edge.from) ?? []), edge]);
     remaining.set(edge.to, (remaining.get(edge.to) ?? 0) + 1);
   }
-  const orderUnknown = new Set(groups.filter(group => group.nodes.some(node => evidence.unresolved.has(node.unit))).map(group => group.id));
+  const orderUnknown = new Set(groups.filter(group => group.nodes.some(node => unresolvedUnits.has(node.unit))).map(group => group.id));
   const queue = groups.filter(group => remaining.get(group.id) === 0 && !orderUnknown.has(group.id)).map(group => group.id);
   for (const from of queue) {
     for (const edge of outgoing.get(from) ?? []) {
@@ -124,15 +165,16 @@ function buildLayout(graph: WorkGraph, measuredHeights: ReadonlyMap<string, numb
     }
   }
   for (const group of groups) if ((remaining.get(group.id) ?? 0) > 0) orderUnknown.add(group.id);
-  for (const group of groups) group.orderUnresolved = orderUnknown.has(group.id);
   const ordered = groups.filter(group => !orderUnknown.has(group.id));
-  const layers = [...new Set(ordered.map(group => depth.get(group.id)!))].sort((a, b) => a - b).map(level => ordered.filter(group => depth.get(group.id) === level));
-  const unresolvedColumn = orderUnknown.size ? layers.length : null;
-  if (orderUnknown.size) layers.push(groups.filter(group => orderUnknown.has(group.id)));
+  const levels = [...new Set(ordered.map(group => depth.get(group.id) ?? 0))].sort((a, b) => a - b);
+  const layers = levels.map(level => ordered.filter(group => depth.get(group.id) === level));
+  return { layers, orderUnknown };
+}
+
+function positionLayers(layers: readonly (readonly GraphGroup[])[], measuredHeights: ReadonlyMap<string, number>, top: number) {
   const positions = new Map<string, { x: number; y: number; height: number }>();
-  const top = orderUnknown.size ? 48 : 24;
   let bottom = top + nodeHeight;
-  layers.forEach((layer, x) => {
+  for (const [x, layer] of layers.entries()) {
     let y = top;
     for (const group of layer) {
       const height = Math.max(nodeHeight, measuredHeights.get(group.id) ?? nodeHeight);
@@ -140,11 +182,27 @@ function buildLayout(graph: WorkGraph, measuredHeights: ReadonlyMap<string, numb
       y += height + rowGap;
     }
     bottom = Math.max(bottom, y - rowGap);
-  });
+  }
+  return { positions, bottom };
+}
+
+function buildLayout(graph: WorkGraph, measuredHeights: ReadonlyMap<string, number>) {
+  const evidence = graphEvidenceOf(graph.nodes.map(node => node.unit), graph.edges);
+  const { groups, unitGroup } = groupUnits(graph);
+  const edges = groupEdgesOf(evidence.drawable, unitGroup);
+  for (const group of groups) {
+    group.incoming = edges.filter(edge => edge.to === group.id);
+    group.recordedEdges = graph.edges.filter(edge => unitGroup.get(edge.to) === group.id);
+  }
+  const { layers, orderUnknown } = layerGroups(groups, edges, evidence.unresolved);
+  for (const group of groups) group.orderUnresolved = orderUnknown.has(group.id);
+  const unresolvedColumn = orderUnknown.size ? layers.length : null;
+  if (orderUnknown.size) layers.push(groups.filter(group => orderUnknown.has(group.id)));
+  const { positions, bottom } = positionLayers(layers, measuredHeights, orderUnknown.size ? 48 : 24);
   return { groups: layers.flat(), edges, positions, evidence, orderUnknown, unresolvedColumn, width: Math.max(1, layers.length) * (nodeWidth + colGap) - colGap + 48, height: bottom + 24 };
 }
 
-export function GraphView({ graph, onUnit, onGroupSelect, selectionInInspector = false, opLabels }: { readonly graph: WorkGraph; readonly onUnit: (unit: string) => void; readonly onGroupSelect?: (group: GraphGroup | null) => void; readonly selectionInInspector?: boolean; readonly opLabels?: ContractInfo['opLabels'] }) {
+export function GraphView({ graph, onUnit, onGroupSelect, selectionInInspector = false, opLabels }: { readonly graph: WorkGraph; readonly onUnit: (unit: string) => void; readonly onGroupSelect?: (group: GraphGroup | null) => void; readonly selectionInInspector?: boolean; readonly opLabels?: NonNullable<ContractInfo['opLabels']> }) {
   const arrowId = useId();
   const holder = useRef<HTMLDivElement>(null);
   const [selected, setSelected] = useState<string | null>(null);
@@ -181,10 +239,16 @@ export function GraphView({ graph, onUnit, onGroupSelect, selectionInInspector =
         <div className="relative" style={{ width: layout.width, height: layout.height }}>
           {layout.unresolvedColumn != null && <p className="absolute top-3 text-xs text-muted-foreground" style={{ left: 24 + layout.unresolvedColumn * (nodeWidth + colGap), width: nodeWidth }}>{t('Dependency order unresolved')}</p>}
           <svg className="pointer-events-none absolute inset-0 h-full w-full overflow-visible text-muted-foreground" width={layout.width} height={layout.height} aria-hidden="true"><defs><marker id={arrowId} viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor" /></marker></defs>
-            {layout.edges.map(edge => { const a = layout.positions.get(edge.from), b = layout.positions.get(edge.to); if (!a || !b) return null; const x1 = a.x + nodeWidth, y1 = a.y + a.height / 2, x2 = b.x - 5, y2 = b.y + b.height / 2, mid = x1 + Math.max(20, (x2 - x1) / 2); return <path key={JSON.stringify([edge.from, edge.to, edge.kind])} d={`M ${x1} ${y1} C ${mid} ${y1}, ${mid} ${y2}, ${x2} ${y2}`} fill="none" stroke="currentColor" strokeWidth="1.5" strokeDasharray={edgeDash(edge.kind)} markerEnd={`url(#${arrowId})`}><title>{`${groupName(edge.from)} → ${groupName(edge.to)} (${edge.kind})\n${edge.records.map(edgeLabel).join('\n')}`}</title></path>; })}
+            {layout.edges.map(edge => {
+              const a = layout.positions.get(edge.from), b = layout.positions.get(edge.to);
+              if (!a || !b) return null;
+              const x1 = a.x + nodeWidth, y1 = a.y + a.height / 2, x2 = b.x - 5, y2 = b.y + b.height / 2, mid = x1 + Math.max(20, (x2 - x1) / 2);
+              return <path key={JSON.stringify([edge.from, edge.to, edge.kind])} d={`M ${x1} ${y1} C ${mid} ${y1}, ${mid} ${y2}, ${x2} ${y2}`} fill="none" stroke="currentColor" strokeWidth="1.5" strokeDasharray={edgeDash(edge.kind)} markerEnd={`url(#${arrowId})`}><title>{`${groupName(edge.from)} → ${groupName(edge.to)} (${edge.kind})\n${edge.records.map(edgeLabel).join('\n')}`}</title></path>;
+            })}
           </svg>
           {layout.groups.map(group => {
-            const pos = layout.positions.get(group.id); if (!pos) return null;
+            const pos = layout.positions.get(group.id);
+            if (!pos) return null;
             const unknown = group.nodes.filter(node => node.ui === 'unknown').length;
             return <Card key={group.id} data-graph-group={group.id} title={`${predecessorsLabel(group)}\n${countsLabel(group)}`} style={{ left: pos.x, top: pos.y, width: nodeWidth, minHeight: nodeHeight }} className={`absolute min-w-0 p-0 ${selected === group.id ? 'ring-1 ring-foreground' : ''}`}><Button variant="ghost" onPress={() => selectGroup(group)} aria-expanded={selected === group.id}
               aria-label={`${formatOpLabel(group.op, opLabels)} (${group.op}) · ${countsLabel(group)}`}

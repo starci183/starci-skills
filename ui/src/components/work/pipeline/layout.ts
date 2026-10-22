@@ -15,7 +15,7 @@ const domainLabels: [RegExp, string][] = [
 export const columnLabel = (legs: LegRow[]) => {
   const labels = legs.map(leg => {
     const label = domainLabels.find(([re]) => re.test(leg.op))?.[1];
-    return label ? t(label) : leg.op.split('.')[0].toUpperCase();
+    return label ? t(label) : (leg.op.split('.')[0] ?? leg.op).toUpperCase();
   });
   return [...new Set(labels)].join(' · ');
 };
@@ -62,7 +62,8 @@ export function layoutPipeline(pipeline: PipelineView, availWidth = 1050, measur
 
 export const legTries = (leg: LegRow) => {
   const budgets = [...new Set(leg.units.map(unit => unit.tryBudget))];
-  const budget = budgets.length === 1 && budgets[0] > 0 ? budgets[0] : null;
+  const only = budgets.length === 1 ? budgets[0] : undefined;
+  const budget = only !== undefined && only > 0 ? only : null;
   const max = Math.max(0, ...leg.units.map(unit => unit.tries), ...(leg.units.length ? [] : leg.attempts.map(attempt => attempt.try)));
   return { tries: max, budget };
 };

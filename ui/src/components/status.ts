@@ -30,6 +30,7 @@ export function statusFromUi(ui: UiState | 'awaiting-owner' | 'rejected'): Statu
     case 'waiting': return 'queued';
     case 'warn': return 'warning';
     case 'bad': return 'failed';
+    case 'unknown':
     default: return 'unknown';
   }
 }

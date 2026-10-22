@@ -33,7 +33,8 @@ export function DecisionDrawer({ id, store, ledger, onClose }: Readonly<{ id: st
   const params = new URLSearchParams();
   if (store) params.set('store', store);
   if (ledger) params.set('ledger', ledger);
-  const url = `/api/decisions/${encodeURIComponent(id ?? '')}${params.size ? `?${params}` : ''}`;
+  const search = params.size ? `?${params}` : '';
+  const url = `/api/decisions/${encodeURIComponent(id ?? '')}${search}`;
   const detail = useApiQuery<DecisionDetail>(url, { topics: ['decisions'], enabled: Boolean(id), intervalMs: 20_000 });
   const row = detail.data;
   const credential = row?.kind === 'credential-missing';

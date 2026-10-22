@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils"
 
 const DelayContext = React.createContext(0)
 
-function TooltipProvider({ delayDuration = 0, children }: { delayDuration?: number; children?: React.ReactNode }) {
+function TooltipProvider({ delayDuration = 0, children }: Readonly<{ delayDuration?: number; children?: React.ReactNode }>) {
   return <DelayContext value={delayDuration}>{children}</DelayContext>
 }
 

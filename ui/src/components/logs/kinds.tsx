@@ -11,10 +11,10 @@ const familyIcons: Record<string, LucideIcon> = {
   check: ListChecks, land: GitMerge, reconciler: Cog, incident: AlertTriangle, warning: AlertTriangle, report: FileText,
   gc: Trash2, invariant: ShieldAlert,
 };
-export function kindIcon(kind: string): LucideIcon {
-  const family = kind.split('.')[0];
-  if (kind === 'step.end') return Check;
-  return familyIcons[family] ?? Dot;
+export function KindIcon({ kind, className }: Readonly<{ kind: string; className?: string }>) {
+  const family = kind.split('.')[0] ?? kind;
+  const Icon = kind === 'step.end' ? Check : (familyIcons[family] ?? Dot);
+  return <Icon className={className} aria-hidden="true" />;
 }
 
 export const levelLabels: Record<LogRow['level'], string> = { debug: 'DEBUG', info: 'INFO', warn: 'WARN', error: 'ERROR' };
@@ -29,6 +29,8 @@ export const kindFamilies: { value: string; label: string }[] = [
   { value: 'reconciler.', label: t('reconciler.* — reconciler') }, { value: 'incident', label: t('incident — incident') },
 ];
 
-const ansiPattern = /\x1b(?:\[[0-?]*[ -/]*[@-~]|\][^\x07\x1b]*(?:\x07|\x1b\\)|[@-Z\\-_])/g;
+const ESC = String.fromCodePoint(27);
+const BEL = String.fromCodePoint(7);
+const ansiPattern = new RegExp(String.raw`${ESC}(?:\[[0-?]*[ -/]*[@-~]|\][^${BEL}${ESC}]*(?:${BEL}|${ESC}\\)|[@-Z\\-_])`, 'g');
 /** Strip ANSI escape sequences so terminal output reads as plain text. */
 export const stripAnsi = (text: string) => text.replace(ansiPattern, '');

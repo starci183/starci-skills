@@ -14,8 +14,8 @@ export type JobDiff = { files: DiffFile[]; baseSha?: string | null; headSha?: st
 
 export function DiffView({ diff }: Readonly<{ diff: JobDiff | null }>) {
   const [selected, setSelected] = useState<string | null>(null);
-  if (!diff?.files?.length) return <FeedbackState>{t('No diff recorded yet.')}</FeedbackState>;
-  const file = diff.files.find(item => item.path === selected) ?? diff.files[0];
+  const file = diff?.files?.find(item => item.path === selected) ?? diff?.files?.[0];
+  if (!diff || !file) return <FeedbackState>{t('No diff recorded yet.')}</FeedbackState>;
   return <ConceptBlock concept="C11" className="grid min-w-0 gap-3 md:grid-cols-[13rem_minmax(0,1fr)]">
     <div className="min-w-0 space-y-2">{diff.files.map(item => <Button key={item.path} type="button" variant="ghost" aria-pressed={file.path === item.path} onClick={() => setSelected(item.path)} className={`h-auto w-full min-w-0 justify-start gap-2 px-3 py-3 text-left text-xs ${file.path === item.path ? 'bg-default' : ''}`}><FileCode2 className="size-4 shrink-0" /><span className="min-w-0 flex-1 truncate" title={item.path}>{item.path}</span><span className="text-muted-foreground">+{item.added} −{item.removed}</span></Button>)}</div>
     <Card className={`min-w-0 overflow-hidden gap-0 p-0${!file.image && !file.binary ? ' evidence-code-frame' : ''}`}><Card.Header className="bg-default px-3 py-2"><Card.Title className="break-all text-xs font-medium">{file.status} · {file.path}</Card.Title></Card.Header>

@@ -80,15 +80,16 @@ export function Ticker({ value, format = (n: number) => new Intl.NumberFormat('v
   const inView = useInView(ref, { once: true });
   const reduce = useReducedMotion();
   const from = useRef(0);
+  const [settled, setSettled] = useState(0);
   useEffect(() => {
     const node = ref.current;
     if (!node || !inView) return;
     if (reduce) { node.textContent = format(value); from.current = value; return; }
-    const controls = animate(from.current, value, { duration: DURATION.enter, ease: EASE, onUpdate: latest => { node.textContent = format(latest); } });
+    const controls = animate(from.current, value, { duration: DURATION.enter, ease: EASE, onUpdate: latest => { node.textContent = format(latest); }, onComplete: () => setSettled(value) });
     from.current = value;
     return () => controls.stop();
   }, [value, inView, reduce, format]);
-  return <span ref={ref} className={className}>{format(reduce || !inView ? value : from.current)}</span>;
+  return <span ref={ref} className={className}>{format(reduce || !inView ? value : settled)}</span>;
 }
 
 /** Bar segment / progress that grows from the left on first render. */

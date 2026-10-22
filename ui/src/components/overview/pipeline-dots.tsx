@@ -17,7 +17,7 @@ export function legTry(leg: { tries: number | null; tryBudget?: number | null; u
 }
 
 /** Mini pipeline: one dot per leg in chain order. Current leg is ringed; deferred/external are dashed. */
-export function PipelineDots({ pipeline, opLabels }: Readonly<{ pipeline: MiniPipeline; opLabels?: ContractInfo['opLabels'] }>) {
+export function PipelineDots({ pipeline, opLabels }: Readonly<{ pipeline: MiniPipeline; opLabels?: NonNullable<ContractInfo['opLabels']> }>) {
   const legs = pipeline.legs.filter(leg => leg.inPlan);
   return <ol className="flex flex-wrap items-center gap-2" aria-label={t("The workflow's leg chain")}>
     {legs.map((leg, index) => {
@@ -26,7 +26,10 @@ export function PipelineDots({ pipeline, opLabels }: Readonly<{ pipeline: MiniPi
       const hollow = status === 'planned' || status === 'queued' || status === 'unknown';
       const binding = leg.binding === 'unbound' ? t('Planner instance binding has not been recorded.') : t('Recorded units for goal revision {n}', { n: leg.goalRevision ?? '—' });
       const name = formatOpLabel(leg.op, opLabels);
-      const tip = `${name}${name !== leg.op ? ` (${leg.op})` : ''}: ${statusLabels[status]} · ${binding}${leg.tries > 0 ? ` · ${legTry(leg)}` : ''}${leg.units > 1 ? t(' · {n} units', { n: leg.units }) : ''}`;
+      const alias = name === leg.op ? '' : ` (${leg.op})`;
+      const triesNote = leg.tries > 0 ? ` · ${legTry(leg)}` : '';
+      const unitsNote = leg.units > 1 ? t(' · {n} units', { n: leg.units }) : '';
+      const tip = `${name}${alias}: ${statusLabels[status]} · ${binding}${triesNote}${unitsNote}`;
       return <motion.li key={`${leg.op}-${index}`} initial={{ scale: 0.4 }} animate={{ scale: 1 }} transition={{ duration: DURATION.base, ease: EASE, delay: Math.min(index * 0.02, 0.4) }} data-tone={statusTone[status] ?? 'queued'} title={tip} aria-label={tip}
         className={`size-3.5 rounded-full border-2 ${dashed ? 'border-dashed bg-transparent' : hollow ? 'bg-transparent' : 'bg-[var(--tone)]'} ${leg.current ? 'outline outline-2 outline-offset-2 outline-[var(--tone)]' : ''}`}
         style={{ borderColor: 'var(--tone)' }} />;

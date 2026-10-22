@@ -115,7 +115,7 @@ export function UsageView({ usage: raw, compact = false }: { readonly usage: Usa
     {total.completeness ? <Advanced title={t('Measurement coverage')} keepMounted className="text-xs text-muted-foreground"><dl className="m-0 grid grid-cols-2 gap-2">{Object.entries(total.completeness.fields).map(([field, coverage]) => <div key={field}><dt className="font-mono">{field}</dt><dd className="m-0">{coverage.known}/{coverage.total}</dd></div>)}</dl></Advanced> : null}
     {usage.byModel.length ? <UsageTable title={t('By model')} first="Model" rows={usage.byModel} getKey={((row: Usage['byModel'][number]) => `${row.subject_type}:${row.model}`) as never}
       label={byModelLabel as never} /> : null}
-    {byOp.length > 0 && (byOp.length > 1 || byOp[0].op !== 'kernel') ? <UsageTable title={t('By op (leg)')} first="Op" rows={byOp} getKey={((row: UsageRow & { op: string }) => row.op) as never}
+    {byOp.length > 0 && (byOp.length > 1 || byOp[0]?.op !== 'kernel') ? <UsageTable title={t('By op (leg)')} first="Op" rows={byOp} getKey={((row: UsageRow & { op: string }) => row.op) as never}
       label={((row: (typeof byOp)[number]) => row.op === 'kernel' ? t('Kernel (coordinator turns)') : row.op) as never} /> : null}
     {rows.length > 0 ? <UsageTable title={t('By record')} first={t('Record')} rows={rows} getKey={((row: NonNullable<UsageV3['rows']>[number]) => String(row.id)) as never}
       label={byRecordLabel as never} /> : null}

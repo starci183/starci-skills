@@ -9,24 +9,18 @@ import { Card, Toolbar as HeroToolbar } from '@heroui/react';
 
 export const toolbarBtn = 'text-xs';
 
+/** Copies text through the async clipboard API (available on the https and localhost origins the harness is served from); false when the browser refuses. */
 export async function copyText(value: string): Promise<boolean> {
-  try { await navigator.clipboard.writeText(value); return true; } catch { /* clipboard blocked: fall through */ }
-  try {
-    const area = document.createElement('textarea');
-    area.value = value; area.style.position = 'fixed'; area.style.opacity = '0';
-    document.body.appendChild(area); area.select();
-    const ok = document.execCommand('copy');
-    area.remove();
-    return ok;
-  } catch { return false; }
+  try { await navigator.clipboard.writeText(value); return true; } catch { return false; }
 }
 
 export function CopyButton({ value, label = t('Copy text'), title, className = toolbarBtn, icon, labelClassName, disabled }: Readonly<{ value: string | (() => string); label?: string; title?: string; className?: string; icon?: ReactNode; labelClassName?: string; disabled?: boolean }>) {
   const [done, setDone] = useState(false);
+  const copy = async () => {
+    if (await copyText(typeof value === 'function' ? value() : value)) { setDone(true); setTimeout(() => setDone(false), 1200); }
+  };
   return (
-    <Button type="button" variant="outline" size="xs" disabled={disabled} className={className} title={title ?? label} aria-label={title ?? label} onClick={async () => {
-      if (await copyText(typeof value === 'function' ? value() : value)) { setDone(true); setTimeout(() => setDone(false), 1200); }
-    }}>
+    <Button type="button" variant="outline" size="xs" disabled={disabled} className={className} title={title ?? label} aria-label={title ?? label} onClick={() => { void copy(); }}>
       {done ? <CheckIcon className="size-3" /> : (icon ?? <CopyIcon className="size-3" />)}
       <span className={labelClassName}>{done ? t('Copied') : label}</span>
     </Button>

@@ -76,6 +76,10 @@ export function PipelineGraph({ pipeline, selected, onSelect }: { readonly pipel
   </div>;
 }
 
+const columnLeft = (col: { readonly legs: readonly LegRow[] }, placed: ReadonlyMap<string, { readonly x: number }>) => {
+  const first = col.legs[0];
+  return first ? placed.get(first.op)?.x : undefined;
+};
 const edgeStroke = (tone: 'current' | 'done' | 'plain') => tone === 'current' ? toneVar('running') : tone === 'done' ? toneVar('success', '-line') : 'var(--muted-foreground)';
 
 function PipelineCanvas({ pipeline, selected, onSelect }: { readonly pipeline: PipelineView; readonly selected: string | null; readonly onSelect: (leg: LegRow) => void }) {
@@ -94,7 +98,7 @@ function PipelineCanvas({ pipeline, selected, onSelect }: { readonly pipeline: P
   return <div ref={holder} tabIndex={0} role="region" aria-label={t('A chain of {legs} legs in {cols} columns', { legs: pipeline.legs.length, cols: columns.length })}
     className="max-w-full overflow-x-auto pb-2 focus-visible:outline-2 focus-visible:outline-ring" data-pipeline-graph data-scrolls={width > measured}>
     <div className="relative" style={{ width, height }}>
-      {columns.map(col => <p key={col.level} className="absolute top-0 break-words text-xs font-semibold text-muted-foreground" style={{ left: placed.get(col.legs[0].op)!.x, width: nodeW }}>{col.index + 1}. {col.label}</p>)}
+      {columns.map(col => <p key={col.level} className="absolute top-0 break-words text-xs font-semibold text-muted-foreground" style={{ left: columnLeft(col, placed), width: nodeW }}>{col.index + 1}. {col.label}</p>)}
       <svg width={width} height={height} className="pointer-events-none absolute inset-0" aria-hidden="true">
         <defs>{(['plain', 'current', 'done'] as const).map(kind => <marker key={kind} id={`${arrowId}-${kind}`} viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill={edgeStroke(kind)} /></marker>)}</defs>
         <g fill="none">{edges.map((edge, index) => <path key={`${edge.from}>${edge.to}:${index}`} d={edge.path} markerEnd={`url(#${arrowId}-${edge.tone})`} stroke={edgeStroke(edge.tone)} strokeWidth={edge.tone === 'current' ? 1.8 : 1.2}><title>{`${edge.from} → ${edge.to}`}</title></path>)}</g>

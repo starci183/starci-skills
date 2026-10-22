@@ -34,23 +34,26 @@ export function parseRoute(hash = window.location.hash): Route {
   let url: URL;
   try { url = new URL(raw || '/', window.location.origin); }
   catch { return { kind: 'not-found' }; }
-  const parts = url.pathname.split('/').filter(Boolean);
+  return parseSegments(url.pathname.split('/').filter(Boolean), url.searchParams);
+}
+
+function parseSegments(parts: readonly string[], params: URLSearchParams): Route {
   if (parts.length === 0) return { kind: 'overview' };
   if (parts[0] === '_kit' && parts.length === 1) return { kind: 'kit' };
   if (parts[0] === 'w' && parts.length === 3) {
-    return { kind: 'workflow', project: decode(parts[1]), wf: decode(parts[2]), tab: oneOf(url.searchParams.get('tab'), workflowTabs, 'units') };
+    return { kind: 'workflow', project: decode(parts[1]), wf: decode(parts[2]), tab: oneOf(params.get('tab'), workflowTabs, 'units') };
   }
   if (parts[0] === 'a' && parts.length === 3) {
-    return { kind: 'attempt', project: decode(parts[1]), attemptId: decode(parts[2]), step: oneOf(url.searchParams.get('step'), attemptSteps, 'run'), q: url.searchParams.get('q') ?? '' };
+    return { kind: 'attempt', project: decode(parts[1]), attemptId: decode(parts[2]), step: oneOf(params.get('step'), attemptSteps, 'run'), q: params.get('q') ?? '' };
   }
   if (parts[0] === 'decisions' && parts.length === 1) {
-    return { kind: 'decisions', tab: oneOf(url.searchParams.get('tab'), decisionTabs, 'di'), decider: url.searchParams.get('decider') ?? '', status: url.searchParams.get('status') ?? '', kindFilter: url.searchParams.get('kind') ?? '' };
+    return { kind: 'decisions', tab: oneOf(params.get('tab'), decisionTabs, 'di'), decider: params.get('decider') ?? '', status: params.get('status') ?? '', kindFilter: params.get('kind') ?? '' };
   }
   if (parts[0] === 'system' && parts.length <= 2) {
     return { kind: 'system', tab: oneOf(parts[1] ?? null, systemTabs, 'engine') };
   }
-  if (parts[0] === 'logs' && parts.length === 1) return { kind: 'logs', filters: url.searchParams };
-  if (parts[0] === 'analytics' && parts.length === 1) return { kind: 'analytics', project: url.searchParams.get('project') ?? '' };
+  if (parts[0] === 'logs' && parts.length === 1) return { kind: 'logs', filters: params };
+  if (parts[0] === 'analytics' && parts.length === 1) return { kind: 'analytics', project: params.get('project') ?? '' };
   return { kind: 'not-found' };
 }
 
@@ -72,8 +75,14 @@ export function routeHref(route: Route): string {
       return `#/decisions?${query}`;
     }
     case 'system': return `#/system/${route.tab}`;
-    case 'logs': return `#/logs${route.filters.size ? `?${route.filters}` : ''}`;
-    case 'analytics': return `#/analytics${route.project ? `?project=${enc(route.project)}` : ''}`;
+    case 'logs': {
+      const suffix = route.filters.size ? `?${route.filters}` : '';
+      return `#/logs${suffix}`;
+    }
+    case 'analytics': {
+      const suffix = route.project ? `?project=${enc(route.project)}` : '';
+      return `#/analytics${suffix}`;
+    }
     case 'kit': return '#/_kit';
     case 'not-found': return '#/';
   }

@@ -7,7 +7,7 @@ import { FeedbackState } from './feedback-state';
 import { ConceptBlock, type Concept } from './concept';
 import { StateChip } from './state-chip';
 import { JsonTree } from './logs/json-tree';
-import { kindIcon, levelLabels, levelTone } from './logs/kinds';
+import { KindIcon, levelLabels, levelTone } from './logs/kinds';
 import { formatAbsolute } from '../i18n/vi';
 import type { LogRow, TimelineItem } from '../contract';
 import { AgentAvatar } from './agent/agent-avatar';
@@ -26,7 +26,6 @@ function RefLinks({ refs }: Readonly<{ refs: LogRow['refs'] }>) {
 
 export function LogRowItem({ row, fresh = false }: Readonly<{ row: LogRow; fresh?: boolean }>) {
   const tone = levelTone[row.level];
-  const Icon = kindIcon(row.kind);
   const wfRef = row.refs.find((ref) => ref.kind === 'workflow');
   const attemptRef = row.refs.find((ref) => ref.kind === 'attempt');
   const { forAttempt } = useAttemptAgents();
@@ -44,7 +43,7 @@ export function LogRowItem({ row, fresh = false }: Readonly<{ row: LogRow; fresh
       <div className="flex min-w-0 flex-wrap items-center gap-2 font-mono text-[11px] text-muted-foreground">
         {linked ? <AgentAvatar agent={attemptAgent(linked)} size={18} /> : null}
         <Badge variant="outline" className="min-w-0 max-w-full truncate font-mono text-[11px]">{row.actor}</Badge>
-        <Icon className="size-3.5 shrink-0" aria-hidden="true" /><span className="min-w-0 truncate" title={row.kind}>{row.kind}</span>
+        <KindIcon kind={row.kind} className="size-3.5 shrink-0" /><span className="min-w-0 truncate" title={row.kind}>{row.kind}</span>
       </div>
       <div><h3 className="mb-2 font-medium">{t('References')}</h3><RefLinks refs={row.refs} /></div>
       <Advanced summary={t('Source, workflow, job, trace and raw data')}>

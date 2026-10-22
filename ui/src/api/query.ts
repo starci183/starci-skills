@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import type { Envelope, ReadErrorEnvelope, ReadErrorMeta, ReadSource } from '../contract';
 import { t } from '../i18n/t';
 import { byCodeUnit } from '../lib/utils';
@@ -134,6 +134,55 @@ function schedule(record: QueryRecord): void {
   }
 }
 
+type ReadOutcome = { code: string; meta: ReadErrorMeta | null };
+
+/** Reads the failure message, code and provenance from a non-OK response; a status code alone is enough when the body is not JSON. */
+async function readHttpFailure(response: Response): Promise<{ message: string; code: string; meta: ReadErrorMeta | null }> {
+  const failure = { message: `HTTP ${response.status}`, code: `HTTP_${response.status}`, meta: null as ReadErrorMeta | null };
+  try {
+    const body: unknown = await response.json();
+    if (isReadErrorEnvelope(body)) {
+      failure.message = body.error.message;
+      failure.code = body.error.code;
+      failure.meta = body.meta ?? null;
+    }
+  }
+  catch { /* A status code is enough when the response is not JSON. */ }
+  return failure;
+}
+
+function applyNotModified(record: QueryRecord, outcome: ReadOutcome): void {
+  if (record.state.meta === null) {
+    outcome.code = 'INVALID_RESPONSE';
+    throw new Error(t('The API returned an invalid response.'));
+  }
+  record.readVersion += 1;
+  publish(record, { loading: false, observedAt: Date.now(), error: null, errorCode: null, errorMeta: null });
+}
+
+async function readRecord(record: QueryRecord, controller: AbortController, outcome: ReadOutcome): Promise<void> {
+  const response = await fetch(record.url, {
+    method: 'GET',
+    headers: record.etag ? { 'If-None-Match': record.etag } : undefined,
+    signal: controller.signal,
+  });
+  if (controller.signal.aborted) return;
+  if (response.status === 304) { applyNotModified(record, outcome); return; }
+  if (!response.ok) {
+    const failure = await readHttpFailure(response);
+    outcome.code = failure.code;
+    outcome.meta = failure.meta;
+    throw new Error(failure.message);
+  }
+  outcome.code = 'INVALID_RESPONSE';
+  const envelope: unknown = await response.json();
+  if (controller.signal.aborted) return;
+  if (!isEnvelope(envelope) || [...record.listeners.values()].some((subscription) => !subscription.validate(envelope.data))) throw new Error(t('The API returned an invalid response.'));
+  record.etag = response.headers.get('ETag') ?? envelope.meta.etag ?? null;
+  record.readVersion += 1;
+  publish(record, { data: envelope.data, meta: envelope.meta, loading: false, observedAt: Date.now(), error: null, errorCode: null, errorMeta: null });
+}
+
 async function request(record: QueryRecord, refreshAfterCurrent = false): Promise<void> {
   if (document.hidden || record.listeners.size === 0) return;
   if (record.controller) {
@@ -144,48 +193,12 @@ async function request(record: QueryRecord, refreshAfterCurrent = false): Promis
   record.pendingRefresh = false;
   const controller = new AbortController();
   record.controller = controller;
-  let errorCode = 'READ_FAILED';
-  let errorMeta: ReadErrorMeta | null = null;
+  const outcome: ReadOutcome = { code: 'READ_FAILED', meta: null };
   publish(record, { loading: record.state.meta === null });
   try {
-    const response = await fetch(record.url, {
-      method: 'GET',
-      headers: record.etag ? { 'If-None-Match': record.etag } : undefined,
-      signal: controller.signal,
-    });
-    if (controller.signal.aborted) return;
-    if (response.status === 304) {
-      if (record.state.meta === null) {
-        errorCode = 'INVALID_RESPONSE';
-        throw new Error(t('The API returned an invalid response.'));
-      }
-      record.readVersion += 1;
-      publish(record, { loading: false, observedAt: Date.now(), error: null, errorCode: null, errorMeta: null });
-      return;
-    }
-    if (!response.ok) {
-      let message = `HTTP ${response.status}`;
-      errorCode = `HTTP_${response.status}`;
-      try {
-        const body: unknown = await response.json();
-        if (isReadErrorEnvelope(body)) {
-          message = body.error.message;
-          errorCode = body.error.code;
-          errorMeta = body.meta ?? null;
-        }
-      }
-      catch { /* A status code is enough when the response is not JSON. */ }
-      throw new Error(message);
-    }
-    errorCode = 'INVALID_RESPONSE';
-    const envelope: unknown = await response.json();
-    if (controller.signal.aborted) return;
-    if (!isEnvelope(envelope) || [...record.listeners.values()].some((subscription) => !subscription.validate(envelope.data))) throw new Error(t('The API returned an invalid response.'));
-    record.etag = response.headers.get('ETag') ?? envelope.meta.etag ?? null;
-    record.readVersion += 1;
-    publish(record, { data: envelope.data, meta: envelope.meta, loading: false, observedAt: Date.now(), error: null, errorCode: null, errorMeta: null });
+    await readRecord(record, controller, outcome);
   } catch (error) {
-    if (!controller.signal.aborted) publish(record, { loading: false, error: error instanceof Error ? error.message : t('Could not read the data.'), errorCode, errorMeta });
+    if (!controller.signal.aborted) publish(record, { loading: false, error: error instanceof Error ? error.message : t('Could not read the data.'), errorCode: outcome.code, errorMeta: outcome.meta });
   } finally {
     record.controller = null;
     if (controller.signal.aborted && record.state.loading) publish(record, { loading: false });
@@ -263,26 +276,24 @@ export function useApiQuery<T>(url: string, options: { topics?: string[]; interv
   const { intervalMs = 30_000, enabled = true } = options;
   const topicKey = (options.topics ?? []).join('\u0000');
   const validate = useRef(options.validate);
-  validate.current = options.validate;
-  const [snapshot, setSnapshot] = useState<{ url: string; state: QuerySnapshot<T> }>(() => ({ url, state: getRecord(url).state as QuerySnapshot<T> }));
-  useEffect(() => {
+  useEffect(() => { validate.current = options.validate; }, [options.validate]);
+  const subscribe = useCallback((onChange: () => void) => {
+    if (!enabled) return () => undefined;
     const record = getRecord(url);
-    setSnapshot({ url, state: record.state as QuerySnapshot<T> });
-    if (!enabled) return;
-    const listener = () => setSnapshot({ url, state: record.state as QuerySnapshot<T> });
-    record.listeners.set(listener, { topics: topicKey ? topicKey.split('\u0000') : [], intervalMs, validate: (data) => validate.current?.(data) ?? true });
+    record.listeners.set(onChange, { topics: topicKey ? topicKey.split('\u0000') : [], intervalMs, validate: (data) => validate.current?.(data) ?? true });
     updateHealth();
     if (record.state.meta === null) void request(record);
     else schedule(record);
     syncLive();
     return () => {
-      record.listeners.delete(listener);
+      record.listeners.delete(onChange);
       if (record.listeners.size === 0) { clearSchedule(record); record.controller?.abort(); }
       updateHealth();
       syncLive();
     };
   }, [url, topicKey, intervalMs, enabled]);
-  return snapshot.url === url ? snapshot.state : getRecord(url).state as QuerySnapshot<T>;
+  const getSnapshot = useCallback(() => getRecord(url).state as QuerySnapshot<T>, [url]);
+  return useSyncExternalStore(subscribe, getSnapshot);
 }
 
 export function refreshQuery(url: string): void {
@@ -298,30 +309,62 @@ export type PagedQuerySnapshot<T> = QuerySnapshot<T[]> & {
   pageMeta: Envelope<T[]>['meta'][];
 };
 
+type PagedState<T> = { url: string; pages: Envelope<T[]>[]; next?: string | null; loading: boolean; error: string | null;
+  errorCode?: string | null; errorMeta?: ReadErrorMeta | null; observedAt: number | null; firstReadVersion?: number };
+
+function rowsValidator<T>(validateRow: ((row: unknown) => row is T) | undefined): (data: unknown) => data is T[] {
+  return (data): data is T[] => Array.isArray(data) && (!validateRow || data.every(validateRow));
+}
+
+/** Drops this owner's claim on each held additional page and forgets pages nobody else holds. */
+function releaseHeldPages(token: symbol, held: Set<string>): void {
+  for (const pageUrl of held) {
+    const read = pageReads.get(pageUrl);
+    read?.owners.delete(token);
+    if (read?.owners.size === 0) pageReads.delete(pageUrl);
+  }
+  held.clear();
+  updateHealth();
+}
+
+/** Fetches one additional page; resolves null once the request is no longer current. */
+async function fetchPageEnvelope<T>(pageUrl: string, signal: AbortSignal, stillCurrent: () => boolean,
+  validateRow: ((row: unknown) => row is T) | undefined, outcome: ReadOutcome): Promise<Envelope<T[]> | null> {
+  const response = await fetch(pageUrl, { method: 'GET', signal });
+  if (!stillCurrent()) return null;
+  if (!response.ok) {
+    const failure = await readHttpFailure(response);
+    outcome.code = failure.code;
+    outcome.meta = failure.meta;
+    throw new Error(failure.message);
+  }
+  outcome.code = 'INVALID_RESPONSE';
+  const payload: unknown = await response.json();
+  const envelope = readEnvelope<T[]>(payload, rowsValidator(validateRow));
+  return stillCurrent() ? envelope : null;
+}
+
+function uniqueRows<T>(rows: T[] | null, keyOf: ((row: T) => string) | undefined): T[] | null {
+  if (!rows || !keyOf) return rows;
+  const unique = new Map<string, T>();
+  for (const row of rows) { const key = keyOf(row); if (!unique.has(key)) unique.set(key, row); }
+  return [...unique.values()];
+}
+
 /** Additional pages retain their own read provenance; changing the base URL invalidates their epoch. */
 export function usePagedApiQuery<T>(url: string, options: PagedOptions<T> = {}): PagedQuerySnapshot<T> {
-  const base = useApiQuery<T[]>(url, { ...options, validate: (data): data is T[] => Array.isArray(data) && (!options.validateRow || data.every(options.validateRow)) });
-  const [more, setMore] = useState<{ url: string; pages: Envelope<T[]>[]; next?: string | null; loading: boolean; error: string | null;
-    errorCode?: string | null; errorMeta?: ReadErrorMeta | null; observedAt: number | null; firstReadVersion?: number }>({ url, pages: [], loading: false, error: null, observedAt: null });
+  const base = useApiQuery<T[]>(url, { ...options, validate: rowsValidator(options.validateRow) });
+  const [more, setMore] = useState<PagedState<T>>({ url, pages: [], loading: false, error: null, observedAt: null });
   const identity = useRef(url);
-  identity.current = url;
   const controller = useRef<AbortController | null>(null);
   const epoch = useRef(0);
   const heldPages = useRef(new Set<string>());
   const owner = useRef(Symbol('page-reader'));
   const enabled = options.enabled !== false;
-  const current = more.url === url ? more : { url, pages: [], loading: false, error: null, observedAt: null, next: undefined };
-  const releasePages = () => {
-    const token = owner.current;
-    const held = heldPages.current;
-    for (const pageUrl of held) {
-        const read = pageReads.get(pageUrl);
-        read?.owners.delete(token);
-        if (read?.owners.size === 0) pageReads.delete(pageUrl);
-    }
-    held.clear(); updateHealth();
-  };
+  const current: PagedState<T> = more.url === url ? more : { url, pages: [], loading: false, error: null, observedAt: null, next: undefined };
+  const releasePages = () => releaseHeldPages(owner.current, heldPages.current);
   useEffect(() => {
+    identity.current = url;
     const token = owner.current;
     const held = heldPages.current;
     const hidden = () => {
@@ -339,12 +382,7 @@ export function usePagedApiQuery<T>(url: string, options: PagedOptions<T> = {}):
       document.removeEventListener('visibilitychange', hidden);
       epoch.current += 1;
       controller.current?.abort(); controller.current = null;
-      for (const pageUrl of held) {
-        const read = pageReads.get(pageUrl);
-        read?.owners.delete(token);
-        if (read?.owners.size === 0) pageReads.delete(pageUrl);
-      }
-      held.clear(); updateHealth();
+      releaseHeldPages(token, held);
     };
   }, [url, enabled]);
   const awaitingFirstRead = current.firstReadVersion !== undefined && getRecord(url).readVersion <= current.firstReadVersion;
@@ -373,24 +411,10 @@ export function usePagedApiQuery<T>(url: string, options: PagedOptions<T> = {}):
     read.owners.add(owner.current); pageReads.set(pageUrl, read); heldPages.current.add(pageUrl); updateHealth();
     setMore({ ...current, loading: true, error: null });
     void (async () => {
-      let errorCode = 'READ_FAILED';
-      let errorMeta: ReadErrorMeta | null = null;
+      const outcome: ReadOutcome = { code: 'READ_FAILED', meta: null };
       try {
-        const response = await fetch(pageUrl, { method: 'GET', signal: requestController.signal });
-        if (!stillCurrent()) return;
-        if (!response.ok) {
-          let message = `HTTP ${response.status}`;
-          errorCode = `HTTP_${response.status}`;
-          try {
-            const body: unknown = await response.json();
-            if (isReadErrorEnvelope(body)) { message = body.error.message; errorCode = body.error.code; errorMeta = body.meta ?? null; }
-          } catch { /* Retain the HTTP status for a non-JSON failure. */ }
-          throw new Error(message);
-        }
-        errorCode = 'INVALID_RESPONSE';
-        const payload: unknown = await response.json();
-        const envelope = readEnvelope<T[]>(payload, (data): data is T[] => Array.isArray(data) && (!options.validateRow || data.every(options.validateRow)));
-        if (!stillCurrent()) return;
+        const envelope = await fetchPageEnvelope<T>(pageUrl, requestController.signal, stillCurrent, options.validateRow, outcome);
+        if (envelope === null) return;
         const observedAt = Date.now();
         read.state = { data: envelope.data, meta: envelope.meta, loading: false, error: null, errorCode: null, errorMeta: null, observedAt }; updateHealth();
         setMore((previousState) => {
@@ -400,18 +424,15 @@ export function usePagedApiQuery<T>(url: string, options: PagedOptions<T> = {}):
       } catch (error) {
         if (!stillCurrent()) return;
         const message = error instanceof Error ? error.message : t('Could not load the next page.');
-        read.state = { ...read.state, loading: false, error: message, errorCode, errorMeta }; updateHealth();
-        setMore({ ...current, loading: false, error: message, errorCode, errorMeta });
+        read.state = { ...read.state, loading: false, error: message, errorCode: outcome.code, errorMeta: outcome.meta }; updateHealth();
+        setMore({ ...current, loading: false, error: message, errorCode: outcome.code, errorMeta: outcome.meta });
       } finally {
         if (controller.current === requestController) controller.current = null;
       }
     })();
   };
   const rows = base.data === null && !current.pages.length ? null : [...(base.data ?? []), ...current.pages.flatMap((page) => page.data)];
-  const keyOf = options.getKey;
-  const unique = new Map<string, T>();
-  if (rows && keyOf) for (const row of rows) { const key = keyOf(row); if (!unique.has(key)) unique.set(key, row); }
-  const data = rows && keyOf ? [...unique.values()] : rows;
+  const data = uniqueRows(rows, options.getKey);
   const metas = [...(base.meta ? [base.meta] : []), ...current.pages.map((page) => page.meta)];
   const meta = base.meta && current.pages.length ? {
     ...base.meta,
@@ -424,24 +445,20 @@ export function usePagedApiQuery<T>(url: string, options: PagedOptions<T> = {}):
     loadMoreErrorCode: current.errorCode ?? null, loadMoreErrorMeta: current.errorMeta ?? null, refresh, resetPages: refresh, pageMeta: metas };
 }
 
+function subscribeLive(listener: () => void): () => void {
+  liveListeners.add(listener);
+  return () => { liveListeners.delete(listener); };
+}
+
+function subscribeHealth(listener: () => void): () => void {
+  healthListeners.add(listener);
+  return () => { healthListeners.delete(listener); };
+}
+
 export function useLiveStatus(): typeof liveStatus {
-  const [status, setStatus] = useState(liveStatus);
-  useEffect(() => {
-    const listener = () => setStatus(liveStatus);
-    liveListeners.add(listener);
-    setStatus(liveStatus);
-    return () => { liveListeners.delete(listener); };
-  }, []);
-  return status;
+  return useSyncExternalStore(subscribeLive, () => liveStatus);
 }
 
 export function useQueryHealth(): typeof queryHealth {
-  const [health, setHealth] = useState(queryHealth);
-  useEffect(() => {
-    const listener = () => setHealth(queryHealth);
-    healthListeners.add(listener);
-    setHealth(queryHealth);
-    return () => { healthListeners.delete(listener); };
-  }, []);
-  return health;
+  return useSyncExternalStore(subscribeHealth, () => queryHealth);
 }

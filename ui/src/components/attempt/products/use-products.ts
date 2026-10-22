@@ -14,12 +14,19 @@ export function splitDiff(text: string): Map<string, string> {
   const parts = text.replaceAll('\r', '').split(/^(?=diff --git )/m);
   for (const part of parts) {
     const m = /^diff --git a\/(.+?) b\/(.+)$/m.exec(part);
-    if (m) out.set(m[2].trim(), part.trimEnd());
+    const newPath = m?.[2];
+    if (newPath) out.set(newPath.trim(), part.trimEnd());
   }
   return out;
 }
 
-const joinHost = (repo: string | null, rel: string) => (repo ? `${repo.replace(/[\\/]+$/, '')}\\${rel.replaceAll('/', '\\')}` : null);
+function trimTrailingSlashes(path: string): string {
+  let end = path.length;
+  while (end > 0 && (path[end - 1] === '/' || path[end - 1] === '\\')) end -= 1;
+  return path.slice(0, end);
+}
+
+const joinHost = (repo: string | null, rel: string) => (repo ? `${trimTrailingSlashes(repo)}\\${rel.replaceAll('/', '\\')}` : null);
 
 /**
  * `/api/attempts/:p/:id/products`; when the server has no such route yet, the same shape is built from

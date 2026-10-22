@@ -45,18 +45,27 @@ export function TranscriptSection({ project, attemptId, attempt }: Readonly<{ pr
   </Card>;
 }
 
+function DiffBody({ data, pending, failed, mainCheckout }: Readonly<{ data: JobDiff | null | undefined; pending: boolean; failed: boolean; mainCheckout: boolean | null }>) {
+  if (data?.files?.length) return <DiffView diff={data} />;
+  if (pending) return <Empty>{t('Reading diff…')}</Empty>;
+  if (failed) return null;
+  return <Empty>{t('No diff recorded yet. A diff exists only when the runtime kept the op\'s changes{extra}.', { extra: mainCheckout ? t('; this op ran on the main checkout so there is no separate worktree to compare') : '' })}</Empty>;
+}
+
+const shasDiffer = (recorded: string | null, current: string | null | undefined) => Boolean(recorded && current && recorded !== current);
+
 export function DiffSection({ project, attemptId, attempt }: Readonly<{ project: string; attemptId: string; attempt: AttemptDetailV2 }>) {
   const diffUrl = `/api/attempts/${encodeURIComponent(project)}/${encodeURIComponent(attemptId)}/diff`;
   const diff = useApiQuery<JobDiff | null>(diffUrl, { intervalMs: 60_000 });
   const where = attempt.where;
   const fileCount = diff.data?.files?.length ?? 0;
   const baseSha = diff.data?.baseSha ?? null, headSha = diff.data?.headSha ?? null;
-  const mismatch = Boolean(baseSha && where.baseSha && baseSha !== where.baseSha) || Boolean(headSha && where.headSha && headSha !== where.headSha);
+  const mismatch = shasDiffer(baseSha, where.baseSha) || shasDiffer(headSha, where.headSha);
   return <Card id="attempt-step-diff" concept="C11" title="Diff" hint={fileCount ? t('{n} files changed', { n: fileCount }) : t('changes the op wrote to the repo')}
     right={baseSha || headSha ? <span className="font-mono text-[11px] text-muted-foreground">{baseSha?.slice(0, 8) ?? '—'} → {headSha?.slice(0, 8) ?? '—'}</span> : null}>
     <ReadWarning read={diff} url={diffUrl} retained={Boolean(diff.data)} />
     {diff.data ? <p className="text-xs text-muted-foreground">{baseSha || headSha ? t('Diff base and head are recorded in the patch artifact.') : t('The patch artifact has no recorded base or head.')}{mismatch ? ` ${t('Patch provenance differs from the Attempt checkout SHA.')}` : ''}</p> : null}
-    {diff.data?.files?.length ? <DiffView diff={diff.data} /> : !diff.meta && !diff.error ? <Empty>{t('Reading diff…')}</Empty> : !diff.error ? <Empty>{t('No diff recorded yet. A diff exists only when the runtime kept the op\'s changes{extra}.', { extra: where.mainCheckout ? t('; this op ran on the main checkout so there is no separate worktree to compare') : '' })}</Empty> : null}
+    <DiffBody data={diff.data} pending={!diff.meta && !diff.error} failed={Boolean(diff.error)} mainCheckout={where.mainCheckout} />
   </Card>;
 }
 
@@ -80,6 +89,12 @@ export function LandSection({ attempt }: Readonly<{ attempt: AttemptDetailV2 }>)
   </Card>;
 }
 
+function clockText(at: number | null, first: number | null): string {
+  if (!at) return '—';
+  const since = first ? ` · +${formatSpan(at - first)}` : '';
+  return `${formatClock(at)}${since}`;
+}
+
 export function TimelineCard({ attempt }: Readonly<{ attempt: AttemptDetailV2 }>) {
   const first = attempt.timeline.find(item => item.at)?.at ?? null;
   return <Card concept="C7" title={t('Timeline')} hint={t('milestones measured from the ledger, with SLA deadlines')}>
@@ -87,7 +102,7 @@ export function TimelineCard({ attempt }: Readonly<{ attempt: AttemptDetailV2 }>
       <span className="size-2 shrink-0 rounded-full bg-[var(--tone)]" aria-hidden="true" />
       <span className="min-w-0 flex-1">{timelineLabels[item.step] ?? item.step}</span>
       {item.late ? <span className="inline-flex items-center gap-1 text-xs" style={{ color: 'var(--tone)' }}><CircleAlert className="size-3.5" aria-hidden="true" />{t('over SLA')}{item.slaMs ? ` ${formatSpan(item.slaMs)}` : ''}</span> : null}
-      <span className="font-mono text-xs text-muted-foreground">{item.at ? `${formatClock(item.at)}${first ? ` · +${formatSpan(item.at - first)}` : ''}` : '—'}</span>
+      <span className="font-mono text-xs text-muted-foreground">{clockText(item.at, first)}</span>
     </li>)}</ol>
   </Card>;
 }

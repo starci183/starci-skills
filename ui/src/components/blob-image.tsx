@@ -8,7 +8,7 @@ export const concept: Concept = 'C11';
 
 export function BlobImage({ blob, alt, className = '' }: { readonly blob: BlobLink | null; readonly alt: string; readonly className?: string }) {
   const [failedHref, setFailedHref] = useState<string | null>(null);
-  const failed = blob != null && failedHref === blob.href;
+  const failed = failedHref !== null && failedHref === blob?.href;
   if (!blob || failed) return <div className={className}><FeedbackState error={failed}>
     {blob?.archived ? t('The image is archived and cannot be read right now.') : failed ? t('Could not load image {name}.', { name: alt }) : t('No image to show yet.')}
   </FeedbackState></div>;

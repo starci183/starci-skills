@@ -58,7 +58,8 @@ export const learningStateLabels: Record<string, string> = {
 };
 
 export function formatOpLabel(op: string, labels: ContractInfo['opLabels']): string {
-  return labels?.[op]?.vi?.trim() || labels?.[op.split('#')[0]]?.vi?.trim() || op;
+  const base = op.split('#')[0] ?? op;
+  return labels?.[op]?.vi?.trim() || labels?.[base]?.vi?.trim() || op;
 }
 
 export const reasonLabels: Record<string, string> = {
@@ -108,12 +109,17 @@ function reasonTitle(code: string): string {
   return code;
 }
 
+function hasParamValue(value: unknown): boolean {
+  return value !== '' && value !== null && value !== undefined;
+}
+
 export function formatReason(reason: Reason | null | undefined): string {
   if (!reason) return t('No reason recorded.');
   const title = reasonTitle(reason.code);
-  const params = Object.entries(reason.params ?? {}).filter(([, value]) => value !== '' && value !== null && value !== undefined);
+  const params = Object.entries(reason.params ?? {}).filter(([, value]) => hasParamValue(value));
   if (!params.length) return title;
-  return `${title} · ${params.map(([key, value]) => `${reasonParamLabels[key] ?? key}: ${reasonParamValues[String(value)] ?? value}`).join(' · ')}`;
+  const described = params.map(([key, value]) => `${reasonParamLabels[key] ?? key}: ${reasonParamValues[String(value)] ?? value}`);
+  return `${title} · ${described.join(' · ')}`;
 }
 
 function validTimestamp(at: unknown): at is number {

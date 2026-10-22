@@ -1,6 +1,7 @@
+import type { ReactNode } from 'react';
 import { ArrowRight } from 'lucide-react';
 import { Card, Link } from '@heroui/react';
-import type { ContractInfo, WorkflowRowV2 } from '../../contract';
+import type { ContractInfo, MiniPipeline, Reason, WorkflowRowV2 } from '../../contract';
 import { useApiQuery } from '../../api/query';
 import { StatusChip, StatusDot } from '../status-chip';
 import { statusLabels, type Status } from '../status';
@@ -8,7 +9,7 @@ import { formatAbsolute, formatOpLabel, formatReason } from '../../i18n/vi';
 import { TimeAgo } from '../time-ago';
 import { legTry, PipelineDots } from './pipeline-dots';
 import type { Concept } from '../concept';
-import { AgentStack } from '../agent/agent-avatar';
+import { AgentStack, type LinkedAgent } from '../agent/agent-avatar';
 import { attemptAgent, useAttemptAgents } from '../agent/use-running-agents';
 import { hasUnavailableSources } from './read-state';
 import { Advanced, Lift, Swap } from '../motion';
@@ -33,32 +34,165 @@ function overall(row: WorkflowRowV2): { status: Status; label?: string } {
   return { status: 'unknown', label: row.phase || t('Unknown') };
 }
 
-/** Recorded lifecycle, current legs, scoped explanation and acting role stay independent of goal progress and approval. */
-export function WorkflowCard({ row }: Readonly<{ row: WorkflowRowV2 }>) {
-  const pipeline = row.pipeline;
-  const contract = useApiQuery<ContractInfo>('/api/contract', { topics: ['system'], intervalMs: 60_000 });
-  const opLabel = (op: string) => formatOpLabel(op, contract.data?.opLabels);
-  const agents = useAttemptAgents();
-  const { running: activeAttempts, settling: reportedAttempts } = agents;
-  const runningAgents = activeAttempts.filter(item => item.project === row.project && item.wf === row.id).map(item => attemptAgent(item, true));
-  const settlingAgents = reportedAttempts.filter(item => item.project === row.project && item.wf === row.id).map(item => attemptAgent(item));
-  const state = overall(row);
-  const legs = pipeline?.legs ?? [];
+type Pipeline = MiniPipeline | undefined;
+type Leg = MiniPipeline['legs'][number];
+type OpLabel = (op: string) => string;
+const factRowClass = 'grid min-w-0 grid-cols-[88px_minmax(0,1fr)] items-start gap-3 min-[760px]:grid-cols-[96px_minmax(0,1fr)]';
+const detailRowClass = 'flex flex-wrap items-center gap-x-2';
+const legHref = (base: string, op: string) => `${base}?leg=${encodeURIComponent(op)}`;
+const approvalLabel = (pipeline: MiniPipeline) => pipeline.approvalState === 'recorded' ? t('Recorded approval') : t('Approval has not been proven.');
+
+function Fact({ label, ddClassName, children }: Readonly<{ label: string; ddClassName?: string; children: ReactNode }>) {
+  return <div className={factRowClass}>
+    <dt className="text-muted-foreground">{label}</dt>
+    <dd className={ddClassName}>{children}</dd>
+  </div>;
+}
+
+function DetailRow({ label, ddClassName, children }: Readonly<{ label: string; ddClassName?: string; children: ReactNode }>) {
+  return <div className={detailRowClass}><dt className="text-muted-foreground">{label}</dt><dd className={ddClassName}>{children}</dd></div>;
+}
+
+function LegLink({ base, op, opLabel }: Readonly<{ base: string; op: string; opLabel: OpLabel }>) {
+  return <span title={op}><Link href={legHref(base, op)} className="inline break-words font-medium">{opLabel(op)}</Link></span>;
+}
+
+function CurrentLegsList({ legs, base, opLabel }: Readonly<{ legs: readonly Leg[]; base: string; opLabel: OpLabel }>) {
+  if (!legs.length) return <span className="text-muted-foreground">{t('No current leg recorded.')}</span>;
+  return <ul className="flex list-none flex-col gap-1 p-0">{legs.map(leg => <li key={leg.op} className="break-words">
+    <LegLink base={base} op={leg.op} opLabel={opLabel} />
+    <span className="text-muted-foreground"> · {statusLabels[leg.status]}{!leg.inPlan ? ` · ${t('Operation-scope history')}` : ''}</span>
+  </li>)}</ul>;
+}
+
+function excludedSummary(excluded: readonly Leg[]): string {
+  return (['deferred', 'external', 'dropped'] as const)
+    .filter(status => excluded.some(leg => leg.status === status))
+    .map(status => `${count(excluded.filter(leg => leg.status === status).length)} ${statusLabels[status]}`)
+    .join(' · ');
+}
+
+function GoalProgress({ pipeline, excluded }: Readonly<{ pipeline: Pipeline; excluded: readonly Leg[] }>) {
+  if (!pipeline) return <span className="text-muted-foreground">{t('The recorded plan has not been observed.')}</span>;
+  const progress = pipeline.progress;
+  const countedNote = progress?.available ? ` · ${t('{n} counted legs', { n: count(progress.total) })}` : '';
+  return <>
+    <p>{progress?.available ? <><strong className="tabular-nums">{count(progress.done)}/{count(progress.total)}</strong> {t('legs passed')}</> : t('Plan progress is unavailable.')}</p>
+    <p className="text-xs text-muted-foreground">{t('Goal revision {n}', { n: pipeline.goalRevision ?? '—' })}{countedNote}</p>
+    {excluded.length > 0 && <p className="text-xs text-muted-foreground">{t('Excluded:')} {excludedSummary(excluded)}</p>}
+  </>;
+}
+
+function approvalFact(pipeline: Pipeline) {
+  if (!pipeline) return <span aria-label={t('Not observed.')}>—</span>;
+  return <>{approvalLabel(pipeline)}</>;
+}
+
+type Groups = { planLegs: Leg[]; historyLegs: Leg[]; unboundLegs: Leg[]; currentLegs: Leg[]; waiting: string[]; excluded: Leg[] };
+
+function groupLegs(legs: readonly Leg[]): Groups {
   const planLegs = legs.filter(leg => leg.inPlan);
-  const historyLegs = legs.filter(leg => !leg.inPlan);
-  const unboundLegs = planLegs.filter(leg => leg.binding === 'unbound');
-  const currentLegs = legs.filter(leg => leg.current);
-  const waiting = planLegs.filter(leg => !leg.current && (leg.status === 'queued' || leg.status === 'retry')).map(leg => leg.op);
+  return {
+    planLegs,
+    historyLegs: legs.filter(leg => !leg.inPlan),
+    unboundLegs: planLegs.filter(leg => leg.binding === 'unbound'),
+    currentLegs: legs.filter(leg => leg.current),
+    waiting: planLegs.filter(leg => !leg.current && (leg.status === 'queued' || leg.status === 'retry')).map(leg => leg.op),
+    excluded: planLegs.filter(leg => ['deferred', 'external', 'dropped'].includes(leg.status)),
+  };
+}
+
+function nextAction(row: WorkflowRowV2, base: string, leadOp: string | undefined, opLabel: OpLabel): { label: string; href: string } {
+  if (row.onIt?.who === 'owner') return { label: t('Inspect decision'), href: row.onIt.ref?.href ?? base };
+  if (!leadOp) return { label: t('Open workflow'), href: base };
   const troubled = row.ui === 'bad' || row.ui === 'warn';
+  const label = troubled ? t('View leg {op}', { op: opLabel(leadOp) }) : t('Open leg {op}', { op: opLabel(leadOp) });
+  return { label, href: legHref(base, leadOp) };
+}
+
+function WhyFact({ legWhy, base, why, opLabel }: Readonly<{ legWhy: MiniPipeline['why']; base: string; why: Reason | null | undefined; opLabel: OpLabel }>) {
+  if (!legWhy) return <>{formatReason(why)}</>;
+  return <><LegLink base={base} op={legWhy.op} opLabel={opLabel} /><span className="text-muted-foreground"> · </span>{legWhy.headline}</>;
+}
+
+function Facts({ row, pipeline, groups, base, opLabel }: Readonly<{ row: WorkflowRowV2; pipeline: Pipeline; groups: Groups; base: string; opLabel: OpLabel }>) {
   const why = row.onIt?.reason ?? row.reason;
   const legWhy = pipeline?.why ?? null;
   const role = legWhy?.owner ?? row.onIt?.who ?? null;
-  const leadOp = legWhy?.op ?? currentLegs[0]?.op;
+  const waitingFor = role === 'owner' || role?.startsWith('other-op:');
+  return <dl className="workflow-card-facts grid min-w-0 gap-3 text-sm">
+    <Fact label={t('Current legs')} ddClassName="min-w-0"><CurrentLegsList legs={groups.currentLegs} base={base} opLabel={opLabel} /></Fact>
+    <Fact label={t('Why:')} ddClassName="min-w-0 whitespace-pre-wrap break-words leading-relaxed"><WhyFact legWhy={legWhy} base={base} why={why} opLabel={opLabel} /></Fact>
+    <Fact label={waitingFor ? t('Waiting for') : t('Handling role')}><WhyOwnerBadge owner={role} /></Fact>
+    <Fact label={t('Goal progress')} ddClassName="min-w-0"><GoalProgress pipeline={pipeline} excluded={groups.excluded} /></Fact>
+    <Fact label={t('Approval:')} ddClassName="min-w-0">{approvalFact(pipeline)}</Fact>
+  </dl>;
+}
+
+function Warnings({ row, contractError, agents }: Readonly<{ row: WorkflowRowV2; contractError: string | null | undefined; agents: ReturnType<typeof useAttemptAgents> }>) {
+  return <>
+    {contractError && <SourceWarning>{t('Operation labels are unavailable: {error}', { error: contractError })}</SourceWarning>}
+    {row.progressReadError && <SourceWarning>{t('Progress observations are unavailable: {error}', { error: row.progressReadError })}</SourceWarning>}
+    {agents.error && <SourceWarning>{t('The source is failing; showing the last read. {error}', { error: agents.error })}</SourceWarning>}
+    {hasUnavailableSources(agents.meta) && <SourceWarning>{t('Some sources are unavailable; showing the recorded part.')}</SourceWarning>}
+  </>;
+}
+
+function GoalPlanText({ pipeline }: Readonly<{ pipeline: Pipeline }>) {
+  if (!pipeline) return <>—</>;
+  return <>{`${t('Goal revision {n}', { n: pipeline.goalRevision ?? '—' })} · ${pipeline.chainStatus} · ${approvalLabel(pipeline)}`}</>;
+}
+
+function HistoryFacts({ row, pipeline, groups, base, agents, runningAgents, settlingAgents }: Readonly<{
+  row: WorkflowRowV2; pipeline: Pipeline; groups: Groups; base: string;
+  agents: ReturnType<typeof useAttemptAgents>; runningAgents: LinkedAgent[]; settlingAgents: LinkedAgent[];
+}>) {
+  const { planLegs, historyLegs, unboundLegs, currentLegs, waiting } = groups;
+  return <dl className="flex flex-col gap-2 text-sm">
+    <DetailRow label={t('Workflow id')} ddClassName="font-mono text-[13px]">{row.id}</DetailRow>
+    <DetailRow label={t('Goal plan')}><GoalPlanText pipeline={pipeline} /></DetailRow>
+    <DetailRow label={t('Recorded plan')}>{t('{n} recorded plan legs', { n: count(planLegs.length) })}</DetailRow>
+    <DetailRow label={t('Workflow units')}>{t('{done}/{total} workflow units · all goal revisions', { done: count(row.units.done), total: count(row.units.total) })}</DetailRow>
+    {pipeline?.approvedBy && <DetailRow label={t('Approved by')}>{pipeline.approvedBy}{pipeline.approvalRef ? ` · ${pipeline.approvalRef}` : ''}</DetailRow>}
+    <DetailRow label={t('Kernel seat')}>{row.seat ? <>{row.seat.state}<span className="ml-2 text-xs text-muted-foreground">{t('Last seen:')} <TimeAgo at={row.seat.lastSeenAt} /></span></> : t('No seat recorded')}</DetailRow>
+    {currentLegs.map(leg => <DetailRow key={leg.op} label={t('Currently at')} ddClassName="font-mono text-[13px]">{leg.op}<span className="text-muted-foreground"> · {legTry(leg)}{leg.units > 1 ? t(' · {n} parallel units', { n: leg.units }) : ''}</span></DetailRow>)}
+    {waiting.length > 0 && <DetailRow label={t('Waiting')} ddClassName="font-mono text-[13px]">{waiting.join(', ')}</DetailRow>}
+    {unboundLegs.length > 0 && <DetailRow label={t('Unbound planner instances')} ddClassName="break-words font-mono text-[13px]">{unboundLegs.map(leg => leg.op).join(', ')}</DetailRow>}
+    {historyLegs.map(leg => <DetailRow key={`history-${leg.op}`} label={leg.runtimeAggregate ? t('Operation-scope history') : t('Recorded operation outside this plan')} ddClassName="break-words font-mono text-[13px]"><Link href={legHref(base, leg.op)} className="inline break-words">{leg.op}</Link><span className="text-muted-foreground"> · {t('{n} workflow-history attempts', { n: count(leg.attempts) })}</span></DetailRow>)}
+    <DetailRow label={t('Loaded executing attempts')}>{agents.activeObserved ? count(runningAgents.length) : '—'}{runningAgents.length ? <span className="ml-2 inline-flex"><AgentStack agents={runningAgents} max={4} size={22} /></span> : null}</DetailRow>
+    {settlingAgents.length > 0 && <DetailRow label={t('Loaded reported attempts awaiting settlement')}>{count(settlingAgents.length)}<span className="ml-2 inline-flex"><AgentStack agents={settlingAgents} max={4} size={22} /></span></DetailRow>}
+  </dl>;
+}
+
+function HistoryFooter({ row, pipeline }: Readonly<{ row: WorkflowRowV2; pipeline: Pipeline }>) {
+  const failing = pipeline?.failures != null && pipeline.failures > 0;
+  return <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 border-t pt-3 text-xs text-muted-foreground">
+    <span>{t('Last event:')} <TimeAgo at={pipeline?.lastEventAt} /></span>
+    <span data-tone={failing ? 'failed' : undefined} style={failing ? { color: 'var(--tone)' } : undefined}>{t('{n} settled failures in workflow history', { n: count(pipeline?.failures) })}</span>
+    <span>{t('{n} workflow-history attempts', { n: count(pipeline?.attempts) })}</span>
+    <span>{t('{n} units/hour', { n: count(row.ratePerHour) })}</span>
+    {row.etaAt ? <span>ETA: {formatAbsolute(row.etaAt)}</span> : null}
+  </div>;
+}
+
+const matchesWorkflow = (row: WorkflowRowV2) => (item: { project: string; wf: string | null }) => item.project === row.project && item.wf === row.id;
+
+/** Recorded lifecycle, current legs, scoped explanation and acting role stay independent of goal progress and approval. */
+export function WorkflowCard({ row }: Readonly<{ row: WorkflowRowV2 }>) {
+  const pipeline: Pipeline = row.pipeline;
+  const contract = useApiQuery<ContractInfo>('/api/contract', { topics: ['system'], intervalMs: 60_000 });
+  const opLabel: OpLabel = op => formatOpLabel(op, contract.data?.opLabels);
+  const agents = useAttemptAgents();
+  const { running: activeAttempts, settling: reportedAttempts } = agents;
+  const ofThisWorkflow = matchesWorkflow(row);
+  const runningAgents = activeAttempts.filter(ofThisWorkflow).map(item => attemptAgent(item, true));
+  const settlingAgents = reportedAttempts.filter(ofThisWorkflow).map(item => attemptAgent(item));
+  const state = overall(row);
+  const groups = groupLegs(pipeline?.legs ?? []);
+  const troubled = row.ui === 'bad' || row.ui === 'warn';
   const base = workflowHref(row);
-  const next = row.onIt?.who === 'owner' ? { label: t('Inspect decision'), href: row.onIt.ref?.href ?? base }
-    : leadOp ? { label: troubled ? t('View leg {op}', { op: opLabel(leadOp) }) : t('Open leg {op}', { op: opLabel(leadOp) }), href: `${base}?leg=${encodeURIComponent(leadOp)}` }
-      : { label: t('Open workflow'), href: base };
-  const excluded = planLegs.filter(leg => ['deferred', 'external', 'dropped'].includes(leg.status));
+  const leadOp = pipeline?.why?.op ?? groups.currentLegs[0]?.op;
+  const next = nextAction(row, base, leadOp, opLabel);
   return <Lift className="h-full min-w-0"><Card className="workflow-card h-full min-w-0 p-4 min-[760px]:p-6">
     <Card.Header className="flex flex-wrap items-start justify-between gap-3">
       <div className="min-w-0 flex-1">
@@ -69,71 +203,18 @@ export function WorkflowCard({ row }: Readonly<{ row: WorkflowRowV2 }>) {
     </Card.Header>
     <Card.Content className="flex min-w-0 flex-col gap-4">
     {troubled && <p className="inline-flex items-center gap-1.5 text-xs text-muted-foreground"><StatusDot status={row.ui === 'bad' ? 'failed' : 'warning'} />{row.ui === 'bad' ? t('Stuck') : t('Slow')}</p>}
-    <dl className="workflow-card-facts grid min-w-0 gap-3 text-sm">
-      <div className="grid min-w-0 grid-cols-[88px_minmax(0,1fr)] items-start gap-3 min-[760px]:grid-cols-[96px_minmax(0,1fr)]">
-        <dt className="text-muted-foreground">{t('Current legs')}</dt>
-        <dd className="min-w-0">{currentLegs.length ? <ul className="flex list-none flex-col gap-1 p-0">{currentLegs.map(leg => <li key={leg.op} className="break-words">
-          <span title={leg.op}><Link href={`${base}?leg=${encodeURIComponent(leg.op)}`} className="inline break-words font-medium">{opLabel(leg.op)}</Link></span>
-          <span className="text-muted-foreground"> · {statusLabels[leg.status]}{!leg.inPlan ? ` · ${t('Operation-scope history')}` : ''}</span>
-        </li>)}</ul> : <span className="text-muted-foreground">{t('No current leg recorded.')}</span>}</dd>
-      </div>
-      <div className="grid min-w-0 grid-cols-[88px_minmax(0,1fr)] items-start gap-3 min-[760px]:grid-cols-[96px_minmax(0,1fr)]">
-        <dt className="text-muted-foreground">{t('Why:')}</dt>
-        <dd className="min-w-0 whitespace-pre-wrap break-words leading-relaxed">{legWhy ? <><span title={legWhy.op}><Link href={`${base}?leg=${encodeURIComponent(legWhy.op)}`} className="inline break-words font-medium">{opLabel(legWhy.op)}</Link></span><span className="text-muted-foreground"> · </span>{legWhy.headline}</> : formatReason(why)}</dd>
-      </div>
-      <div className="grid min-w-0 grid-cols-[88px_minmax(0,1fr)] items-start gap-3 min-[760px]:grid-cols-[96px_minmax(0,1fr)]">
-        <dt className="text-muted-foreground">{role === 'owner' || role?.startsWith('other-op:') ? t('Waiting for') : t('Handling role')}</dt>
-        <dd><WhyOwnerBadge owner={role} /></dd>
-      </div>
-      <div className="grid min-w-0 grid-cols-[88px_minmax(0,1fr)] items-start gap-3 min-[760px]:grid-cols-[96px_minmax(0,1fr)]">
-        <dt className="text-muted-foreground">{t('Goal progress')}</dt>
-        <dd className="min-w-0">{pipeline ? <>
-          <p>{pipeline.progress?.available ? <><strong className="tabular-nums">{count(pipeline.progress.done)}/{count(pipeline.progress.total)}</strong> {t('legs passed')}</> : t('Plan progress is unavailable.')}</p>
-          <p className="text-xs text-muted-foreground">{t('Goal revision {n}', { n: pipeline.goalRevision ?? '—' })}{pipeline.progress?.available ? ` · ${t('{n} counted legs', { n: count(pipeline.progress.total) })}` : ''}</p>
-          {excluded.length > 0 && <p className="text-xs text-muted-foreground">{t('Excluded:')} {(['deferred', 'external', 'dropped'] as const).filter(status => excluded.some(leg => leg.status === status)).map(status => `${count(excluded.filter(leg => leg.status === status).length)} ${statusLabels[status]}`).join(' · ')}</p>}
-        </> : <span className="text-muted-foreground">{t('The recorded plan has not been observed.')}</span>}</dd>
-      </div>
-      <div className="grid min-w-0 grid-cols-[88px_minmax(0,1fr)] items-start gap-3 min-[760px]:grid-cols-[96px_minmax(0,1fr)]">
-        <dt className="text-muted-foreground">{t('Approval:')}</dt>
-        <dd className="min-w-0">{pipeline ? pipeline.approvalState === 'recorded' ? t('Recorded approval') : t('Approval has not been proven.') : <span aria-label={t('Not observed.')}>—</span>}</dd>
-      </div>
-    </dl>
+    <Facts row={row} pipeline={pipeline} groups={groups} base={base} opLabel={opLabel} />
     {pipeline && <PipelineDots pipeline={pipeline} opLabels={contract.data?.opLabels} />}
-    {contract.error && <SourceWarning>{t('Operation labels are unavailable: {error}', { error: contract.error })}</SourceWarning>}
-    {row.progressReadError && <SourceWarning>{t('Progress observations are unavailable: {error}', { error: row.progressReadError })}</SourceWarning>}
-    {agents.error && <SourceWarning>{t('The source is failing; showing the last read. {error}', { error: agents.error })}</SourceWarning>}
-    {hasUnavailableSources(agents.meta) && <SourceWarning>{t('Some sources are unavailable; showing the recorded part.')}</SourceWarning>}
+    <Warnings row={row} contractError={contract.error} agents={agents} />
     </Card.Content>
     <Card.Footer className="mt-auto flex min-w-0 flex-col items-stretch gap-4">
     <Advanced summary={t('Workflow history: {attempts} attempts · {failures} settled failures', { attempts: count(pipeline?.attempts), failures: count(pipeline?.failures) })}>
-      <dl className="flex flex-col gap-2 text-sm">
-        <div className="flex flex-wrap items-center gap-x-2"><dt className="text-muted-foreground">{t('Workflow id')}</dt><dd className="font-mono text-[13px]">{row.id}</dd></div>
-        <div className="flex flex-wrap items-center gap-x-2"><dt className="text-muted-foreground">{t('Goal plan')}</dt><dd>{pipeline ? `${t('Goal revision {n}', { n: pipeline.goalRevision ?? '—' })} · ${pipeline.chainStatus} · ${pipeline.approvalState === 'recorded' ? t('Recorded approval') : t('Approval has not been proven.')}` : '—'}</dd></div>
-        <div className="flex flex-wrap items-center gap-x-2"><dt className="text-muted-foreground">{t('Recorded plan')}</dt><dd>{t('{n} recorded plan legs', { n: count(planLegs.length) })}</dd></div>
-        <div className="flex flex-wrap items-center gap-x-2"><dt className="text-muted-foreground">{t('Workflow units')}</dt><dd>{t('{done}/{total} workflow units · all goal revisions', { done: count(row.units.done), total: count(row.units.total) })}</dd></div>
-        {pipeline?.approvedBy && <div className="flex flex-wrap items-center gap-x-2"><dt className="text-muted-foreground">{t('Approved by')}</dt><dd>{pipeline.approvedBy}{pipeline.approvalRef ? ` · ${pipeline.approvalRef}` : ''}</dd></div>}
-        <div className="flex flex-wrap items-center gap-x-2"><dt className="text-muted-foreground">{t('Kernel seat')}</dt><dd>{row.seat ? <>{row.seat.state}<span className="ml-2 text-xs text-muted-foreground">{t('Last seen:')} <TimeAgo at={row.seat.lastSeenAt} /></span></> : t('No seat recorded')}</dd></div>
-        {currentLegs.map(leg => <div key={leg.op} className="flex flex-wrap items-center gap-x-2">
-          <dt className="text-muted-foreground">{t('Currently at')}</dt>
-          <dd className="font-mono text-[13px]">{leg.op}<span className="text-muted-foreground"> · {legTry(leg)}{leg.units > 1 ? t(' · {n} parallel units', { n: leg.units }) : ''}</span></dd>
-        </div>)}
-        {waiting.length > 0 && <div className="flex flex-wrap items-center gap-x-2"><dt className="text-muted-foreground">{t('Waiting')}</dt><dd className="font-mono text-[13px]">{waiting.join(', ')}</dd></div>}
-        {unboundLegs.length > 0 && <div className="flex flex-wrap items-center gap-x-2"><dt className="text-muted-foreground">{t('Unbound planner instances')}</dt><dd className="break-words font-mono text-[13px]">{unboundLegs.map(leg => leg.op).join(', ')}</dd></div>}
-        {historyLegs.map(leg => <div key={`history-${leg.op}`} className="flex flex-wrap items-center gap-x-2"><dt className="text-muted-foreground">{leg.runtimeAggregate ? t('Operation-scope history') : t('Recorded operation outside this plan')}</dt><dd className="break-words font-mono text-[13px]"><Link href={`${base}?leg=${encodeURIComponent(leg.op)}`} className="inline break-words">{leg.op}</Link><span className="text-muted-foreground"> · {t('{n} workflow-history attempts', { n: count(leg.attempts) })}</span></dd></div>)}
-        <div className="flex flex-wrap items-center gap-x-2"><dt className="text-muted-foreground">{t('Loaded executing attempts')}</dt><dd>{agents.activeObserved ? count(runningAgents.length) : '—'}{runningAgents.length ? <span className="ml-2 inline-flex"><AgentStack agents={runningAgents} max={4} size={22} /></span> : null}</dd></div>
-        {settlingAgents.length > 0 && <div className="flex flex-wrap items-center gap-x-2"><dt className="text-muted-foreground">{t('Loaded reported attempts awaiting settlement')}</dt><dd>{count(settlingAgents.length)}<span className="ml-2 inline-flex"><AgentStack agents={settlingAgents} max={4} size={22} /></span></dd></div>}
-      </dl>
+      <HistoryFacts row={row} pipeline={pipeline} groups={groups} base={base} agents={agents} runningAgents={runningAgents} settlingAgents={settlingAgents} />
       <p className="mt-3 text-xs text-muted-foreground">{t('Try values are recorded ordinals; budgets do not show spent business retries.')}</p>
-      {(historyLegs.length > 0 || unboundLegs.length > 0) && <p className="mt-2 text-xs text-muted-foreground">{t('Workflow history does not prove completion of the current goal plan or an unbound planner instance.')}</p>}
+      {(groups.historyLegs.length > 0 || groups.unboundLegs.length > 0) && <p className="mt-2 text-xs text-muted-foreground">{t('Workflow history does not prove completion of the current goal plan or an unbound planner instance.')}</p>}
       <p className="mt-2 text-xs text-muted-foreground">{t('Progress snapshot:')} {row.progressSnapshot ? <><TimeAgo at={row.progressSnapshot.at} /> · #{row.progressSnapshot.id}</> : t('Not observed.')}</p>
       {agents.meta?.next && <p className="mt-2 text-xs text-muted-foreground">{t('More active attempts are available in the attempt list.')}</p>}
-      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 border-t pt-3 text-xs text-muted-foreground">
-        <span>{t('Last event:')} <TimeAgo at={pipeline?.lastEventAt} /></span>
-        <span data-tone={pipeline?.failures != null && pipeline.failures > 0 ? 'failed' : undefined} style={pipeline?.failures != null && pipeline.failures > 0 ? { color: 'var(--tone)' } : undefined}>{t('{n} settled failures in workflow history', { n: count(pipeline?.failures) })}</span>
-        <span>{t('{n} workflow-history attempts', { n: count(pipeline?.attempts) })}</span>
-        <span>{t('{n} units/hour', { n: count(row.ratePerHour) })}</span>
-        {row.etaAt ? <span>ETA: {formatAbsolute(row.etaAt)}</span> : null}
-      </div>
+      <HistoryFooter row={row} pipeline={pipeline} />
     </Advanced>
     <Link href={next.href} className="min-w-0 items-start gap-2 self-end text-sm font-medium"><span className="min-w-0 break-words">{next.label}</span><ArrowRight className="mt-0.5 size-4 shrink-0" aria-hidden="true" /></Link>
     </Card.Footer>

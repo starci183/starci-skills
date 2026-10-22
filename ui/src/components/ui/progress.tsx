@@ -9,18 +9,25 @@ type ProgressProps = Omit<ProgressBarProps, "value" | "maxValue" | "children" | 
   className?: string
 }
 
+function progressColor(tone: Tone | undefined): "success" | "danger" | "warning" | "default" | "accent" {
+  if (tone === "success") return "success"
+  if (tone === "failed") return "danger"
+  if (tone === "warning") return "warning"
+  if (tone === "skipped") return "default"
+  return "accent"
+}
+
 function Progress({ className, value = null, tone, max = 100, ...props }: ProgressProps) {
   const hasMaximum = Number.isFinite(max) && max > 0
   const maximum = hasMaximum ? max : 100
   const bounded = hasMaximum && typeof value === "number" && Number.isFinite(value)
     ? Math.min(Math.max(value, 0), maximum) : null
-  const color = tone === "success" ? "success" : tone === "failed" ? "danger" : tone === "warning" ? "warning" : tone === "skipped" ? "default" : "accent"
   return <ProgressBar
     {...props}
     value={bounded ?? undefined}
     maxValue={maximum}
     isIndeterminate={bounded == null}
-    color={color}
+    color={progressColor(tone)}
     size="sm"
     data-tone={tone}
     className={cn("min-w-0 gap-0", tone && "[--progress-bar-fill:var(--tone)]", className)}

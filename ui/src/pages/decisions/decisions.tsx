@@ -50,7 +50,8 @@ function hashParams(): URLSearchParams {
 function href(changes: Record<string, string | null>): string {
   const params = hashParams();
   for (const [key, value] of Object.entries(changes)) value ? params.set(key, value) : params.delete(key);
-  return `#/decisions${params.size ? `?${params}` : ''}`;
+  const search = params.size ? `?${params}` : '';
+  return `#/decisions${search}`;
 }
 function navigate(changes: Record<string, string | null>): void { window.location.hash = href(changes).slice(1); }
 function SelectFilter({ label, value, options, onChange }: Readonly<{ label: string; value: string;
@@ -113,6 +114,39 @@ function IncidentCard({ row, selected = false }: Readonly<{ row: IncidentRow; se
   </CardContent></Card></ConceptBlock>;
 }
 
+type DecisionFilters = { decider: string; status: string; kind: string; overdue: boolean };
+
+function decisionsUrlOf(params: URLSearchParams, filters: DecisionFilters): string {
+  const decisionParams = new URLSearchParams();
+  if (filters.decider) decisionParams.set('decider', filters.decider);
+  if (filters.status) decisionParams.set('status', filters.status);
+  if (filters.kind) decisionParams.set('kind', filters.kind);
+  if (filters.overdue) decisionParams.set('overdue', '1');
+  const project = params.get('project'), wf = params.get('wf');
+  if (project) decisionParams.set('project', project);
+  if (wf) decisionParams.set('wf', wf);
+  const search = decisionParams.size ? `?${decisionParams}` : '';
+  return `/api/decisions${search}`;
+}
+
+function scopedUrlsOf(params: URLSearchParams, tab: string, status: string, selectedIncident: string | null): { asksUrl: string; incidentsUrl: string } {
+  const asksParams = new URLSearchParams({ state: 'open' });
+  const incidentsParams = new URLSearchParams({ status: selectedIncident ? 'all' : tab === 'incidents' && status ? status : 'open' });
+  for (const key of ['project', 'wf']) {
+    const value = params.get(key);
+    if (!value) continue;
+    asksParams.set(key, value);
+    incidentsParams.set(key, value);
+  }
+  if (selectedIncident) incidentsParams.set('id', selectedIncident);
+  return { asksUrl: `/api/asks?${asksParams}`, incidentsUrl: `/api/incidents?${incidentsParams}` };
+}
+
+/** True when the first page loaded cleanly from every source and holds no rows. */
+function isEmptyRead<T>(query: PagedQuerySnapshot<T>): boolean {
+  return !query.error && !partialSources(query).length && query.data !== null && !query.data.length;
+}
+
 export function DecisionsPage() {
   const route = useRoute();
   const params = hashParams();
@@ -121,18 +155,8 @@ export function DecisionsPage() {
   const selectedIncident = tab === 'incidents' ? params.get('incident') ?? selectedId : null;
   const decider = params.get('decider') ?? '', status = params.get('status') ?? '', kind = params.get('kind') ?? '';
   const overdue = params.get('overdue') === '1';
-  const decisionParams = new URLSearchParams();
-  if (decider) decisionParams.set('decider', decider);
-  if (status) decisionParams.set('status', status);
-  if (kind) decisionParams.set('kind', kind);
-  if (overdue) decisionParams.set('overdue', '1');
-  if (params.get('project')) decisionParams.set('project', params.get('project')!);
-  if (params.get('wf')) decisionParams.set('wf', params.get('wf')!);
-  const decisionsUrl = `/api/decisions${decisionParams.size ? `?${decisionParams}` : ''}`;
-  const asksParams = new URLSearchParams({ state: 'open' }), incidentsParams = new URLSearchParams({ status: selectedIncident ? 'all' : tab === 'incidents' && status ? status : 'open' });
-  for (const key of ['project', 'wf']) if (params.get(key)) { asksParams.set(key, params.get(key)!); incidentsParams.set(key, params.get(key)!); }
-  if (selectedIncident) incidentsParams.set('id', selectedIncident);
-  const asksUrl = `/api/asks?${asksParams}`, incidentsUrl = `/api/incidents?${incidentsParams}`;
+  const decisionsUrl = decisionsUrlOf(params, { decider, status, kind, overdue });
+  const { asksUrl, incidentsUrl } = scopedUrlsOf(params, tab, status, selectedIncident);
   const decisions = usePagedApiQuery<DecisionRow>(decisionsUrl, { topics: ['decisions'], intervalMs: 20_000, getKey: row => row.key });
   const asks = usePagedApiQuery<AskRow>(asksUrl, { topics: ['decisions'], intervalMs: 30_000, getKey: row => row.id });
   const incidents = usePagedApiQuery<IncidentRow>(incidentsUrl, { topics: ['decisions'], intervalMs: 30_000, getKey: row => `${row.ledgerId}:${row.id}` });
@@ -162,17 +186,17 @@ export function DecisionsPage() {
     <div className="grid gap-4" aria-live="polite"><PageRead query={decisions} url={decisionsUrl} />
       <Stagger className="grid gap-4">{decisions.data?.map(row => <StaggerItem key={row.key}><DecisionCard row={row} /></StaggerItem>)}</Stagger>
       <PageMore query={decisions} />
-      {!decisions.error && !partialSources(decisions).length && decisions.data !== null && !decisions.data.length ? <FeedbackState>{t('No matching decisions.')}</FeedbackState> : null}</div>
+      {isEmptyRead(decisions) ? <FeedbackState>{t('No matching decisions.')}</FeedbackState> : null}</div>
     </Tabs.Panel>
     <Tabs.Panel id="asks"><div className="grid gap-4" aria-live="polite"><PageRead query={asks} url={asksUrl} />
       <Stagger className="grid gap-4">{asks.data?.map(row => <StaggerItem key={row.id}><AskCard row={row} /></StaggerItem>)}</Stagger>
       <PageMore query={asks} />
-      {!asks.error && !partialSources(asks).length && asks.data !== null && !asks.data.length ? <FeedbackState>{t('No open questions.')}</FeedbackState> : null}</div></Tabs.Panel>
+      {isEmptyRead(asks) ? <FeedbackState>{t('No open questions.')}</FeedbackState> : null}</div></Tabs.Panel>
     <Tabs.Panel id="incidents" className="space-y-6"><div className="max-w-xs"><SelectFilter label={t('Incident state')} value={status} options={[{ value: '', label: t('Open') }, { value: 'all', label: t('All') }, { value: 'open', label: t('Open') }, { value: 'resolved', label: t('Resolved') }, { value: 'superseded', label: t('Superseded') }]} onChange={value => navigate({ status: value })} /></div>
     <div className="grid gap-4" aria-live="polite"><PageRead query={incidents} url={incidentsUrl} />
       <Stagger className="grid gap-4">{incidents.data?.map(row => <StaggerItem key={`${row.ledgerId}:${row.id}`}><IncidentCard row={row} selected={row.id === selectedIncident} /></StaggerItem>)}</Stagger>
       <PageMore query={incidents} />
-      {!incidents.error && !partialSources(incidents).length && incidents.data !== null && !incidents.data.length ? <FeedbackState>{t('No matching incidents.')}</FeedbackState> : null}</div></Tabs.Panel>
+      {isEmptyRead(incidents) ? <FeedbackState>{t('No matching incidents.')}</FeedbackState> : null}</div></Tabs.Panel>
     </Tabs>
     <DecisionDrawer id={tab !== 'incidents' ? selectedId : null} store={params.get('store')} ledger={params.get('ledger') ?? params.get('project')} onClose={() => navigate({ id: null, store: null, ledger: null })} />
   </ConceptBlock>;

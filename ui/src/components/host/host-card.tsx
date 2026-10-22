@@ -68,6 +68,83 @@ function Spark({ history }: Readonly<{ history: HostView['history'] }>) {
   </div>;
 }
 
+const modeToneOf = (mode: HostView['throttleMode']): Tone => mode === 'critical' ? 'failed' : mode === 'heavy' ? 'warning' : mode === 'normal' ? 'success' : 'queued';
+const availabilityLabel = (availability: string) => availability === 'pending' ? t('Reading') : availability === 'available' ? t('Available') : t('Unavailable');
+
+function GpuSummary({ gpu }: Readonly<{ gpu: HostView['gpus'][number] | undefined }>) {
+  if (!gpu) return <p className="text-sm text-muted-foreground">{t('No GPU reading recorded.')}</p>;
+  return <div className="flex flex-col gap-1">
+    <div className="flex flex-wrap items-baseline justify-between gap-x-2 text-sm"><span className="min-w-0 truncate font-medium" title={gpu.name}>{gpu.name}</span><span className="tabular-nums"><Temp value={gpu.tempC} />{gpu.utilPct != null ? <span className="text-muted-foreground"> · {t('load {n} %', { n: nf(gpu.utilPct) })}</span> : null}</span></div>
+    <Bar pct={gpu.utilPct} tone={readingTone(gpu.utilPct)} label={t('GPU load')} />
+  </div>;
+}
+
+function GpuList({ gpus }: Readonly<{ gpus: HostView['gpus'] }>) {
+  if (!gpus.length) return null;
+  return <div className="flex flex-col gap-3 border-t pt-3">
+    <p className="text-xs font-medium text-muted-foreground">GPU</p>
+    {gpus.map((g, i) => <div key={`${g.name}-${i}`} className="flex flex-col gap-2">
+      {g.memUsedMb != null && g.memTotalMb ? <Row label={`VRAM · ${g.name}`} value={`${gb(g.memUsedMb)} / ${gb(g.memTotalMb)}`} pct={g.memUsedMb / g.memTotalMb * 100} tone="running" /> : null}
+      <p className="text-xs text-muted-foreground">{t('Power:')} {g.powerW == null ? t('unknown') : `${nf(g.powerW, 1)} W`}</p>
+    </div>)}
+  </div>;
+}
+
+function DiskRow({ disk }: Readonly<{ disk: HostView['disks'][number] }>) {
+  const freePct = Number.isFinite(disk.freeGb) && Number.isFinite(disk.totalGb) && disk.totalGb > 0 && disk.freeGb >= 0 && disk.freeGb <= disk.totalGb
+    ? disk.freeGb / disk.totalGb * 100 : null;
+  const value = t('{free} GB free / {total} GB', { free: nf(disk.freeGb, 1), total: nf(disk.totalGb, 1) });
+  const barValueText = freePct == null ? undefined : `${nf(freePct, 1)}% · ${value}`;
+  return <Row label={disk.mount} value={value} pct={freePct} tone={readingTone(freePct)} barLabel={`${t('Disks (free space)')} · ${disk.mount}`} barValueText={barValueText} />;
+}
+
+function DiskList({ disks }: Readonly<{ disks: HostView['disks'] }>) {
+  if (!disks.length) return null;
+  return <div className="flex flex-col gap-3 border-t pt-3">
+    <p className="text-xs font-medium text-muted-foreground">{t('Disks (free space)')}</p>
+    {disks.map(d => <DiskRow key={d.mount} disk={d} />)}
+  </div>;
+}
+
+function AgentRam({ host }: Readonly<{ host: HostView }>) {
+  const agents = Object.entries(host.agentsRamMb).map(([key, mb]) => [key.replace(/^agent:/, ''), mb] as const).sort((a, b) => b[1] - a[1]);
+  const agentMax = Math.max(1, ...agents.map(([, mb]) => mb));
+  return <div className="flex flex-col gap-3 border-t pt-3">
+    <p className="text-xs font-medium text-muted-foreground">{t('RAM per agent')}{host.running != null ? t(' · {n} ops running', { n: host.running }) : ''}</p>
+    {agents.length ? agents.map(([name, mb]) => <Row key={name} label={name} value={gb(mb)} pct={mb / agentMax * 100} tone="running" />) : <p className="text-sm text-muted-foreground">{t('No per-agent RAM reading yet.')}</p>}
+  </div>;
+}
+
+function SourceObservations({ host }: Readonly<{ host: HostView }>) {
+  return <Advanced title={t('Source observations')} summary={t('Sensor observations retain their own timestamps and read failures.')}>
+    <DataTable rows={Object.entries(host.sources ?? {}).map(([key, source]) => ({ key, ...source }))} getKey={row => row.key} caption={t('Host source observations')} columns={[
+      { key: 'source', header: t('Source'), render: row => <span className="break-words">{row.source}</span> },
+      { key: 'observed', header: t('Observed'), render: row => row.observedAt == null ? '—' : formatAbsolute(row.observedAt) },
+      { key: 'read', header: t('Read at'), render: row => row.readAt == null ? '—' : formatAbsolute(row.readAt) },
+      { key: 'state', header: t('Read availability'), render: row => <span>{availabilityLabel(row.availability)}{row.cached ? t(' · cached observation') : ''}{row.refreshing ? t(' · refreshing') : ''}</span> },
+      { key: 'error', header: t('Read failure'), mobileStack: true, render: row => row.error ?? '—' },
+    ]} />
+  </Advanced>;
+}
+
+function ExpandedSections({ host }: Readonly<{ host: HostView }>) {
+  return <>
+    <GpuList gpus={host.gpus} />
+    <DiskList disks={host.disks} />
+    <AgentRam host={host} />
+    <div className="border-t pt-3"><p className="mb-2 text-xs font-medium text-muted-foreground">{t('CPU and free RAM trend')}</p><Spark history={host.history} /></div>
+  </>;
+}
+
+function HostHeader({ host, bare }: Readonly<{ host: HostView; bare: boolean }>) {
+  const modeTone = modeToneOf(host.throttleMode);
+  const padding = bare ? '' : 'px-4 sm:px-6';
+  return <Card.Header className={`flex-row items-start justify-between gap-3 border-b py-3 ${padding}`}>
+    <div className="min-w-0"><Card.Title<"h2"> render={props => <h2 {...props} />} className="truncate">{host.name ?? t('Host')}</Card.Title><Card.Description className="truncate text-xs">{host.os} · {t('up {uptime}', { uptime: uptime(host.uptimeSec) })}</Card.Description></div>
+    {host.throttleMode ? <Chip size="sm" variant="soft" data-tone={modeTone} className="shrink-0" style={{ color: 'var(--tone)', background: 'var(--tone-bg)' }}><Chip.Label>{t('throttled: {mode}', { mode: host.throttleMode })}</Chip.Label></Chip> : null}
+  </Card.Header>;
+}
+
 /** Host machine card (CPU, RAM, GPU, temperatures, disks, agents' RAM, sparkline) from /api/host. */
 export function HostCard({ compact = false, bare = false }: Readonly<{ compact?: boolean; bare?: boolean }>) {
   const query = useApiQuery<HostView>('/api/host', { topics: ['system'], intervalMs: 10_000 });
@@ -75,20 +152,13 @@ export function HostCard({ compact = false, bare = false }: Readonly<{ compact?:
   if (!host) return <Card<"section"> render={(props) => <section {...props} />} className="p-4 sm:p-6" data-concept="C14">
     {query.error ? <QueryReadNotice query={query} url="/api/host" /> : <PageSkeleton label={t('Reading the host…')} />}
   </Card>;
-  const gpu = host.gpus[0];
   const load = host.cpu.loadPct;
   const usedMb = host.ram.totalMb - host.ram.freeMb;
-  const agents = Object.entries(host.agentsRamMb).map(([key, mb]) => [key.replace(/^agent:/, ''), mb] as const).sort((a, b) => b[1] - a[1]);
-  const agentMax = Math.max(1, ...agents.map(([, mb]) => mb));
   const cpuTemp = host.cpu.tempC == null
     ? <span className="text-muted-foreground">{t('No CPU temperature observation.')}</span> : <Temp value={host.cpu.tempC} />;
-  const modeTone: Tone = host.throttleMode === 'critical' ? 'failed' : host.throttleMode === 'heavy' ? 'warning' : host.throttleMode === 'normal' ? 'success' : 'queued';
 
   return <Card<"section"> render={(props) => <section {...props} />} variant={bare ? 'transparent' : 'default'} data-concept="C14" className="min-w-0 gap-0 p-0">
-    <Card.Header className={`flex-row items-start justify-between gap-3 border-b py-3 ${bare ? "" : "px-4 sm:px-6"}`}>
-      <div className="min-w-0"><Card.Title<"h2"> render={props => <h2 {...props} />} className="truncate">{host.name ?? t('Host')}</Card.Title><Card.Description className="truncate text-xs">{host.os} · {t('up {uptime}', { uptime: uptime(host.uptimeSec) })}</Card.Description></div>
-      {host.throttleMode ? <Chip size="sm" variant="soft" data-tone={modeTone} className="shrink-0" style={{ color: 'var(--tone)', background: 'var(--tone-bg)' }}><Chip.Label>{t('throttled: {mode}', { mode: host.throttleMode })}</Chip.Label></Chip> : null}
-    </Card.Header>
+    <HostHeader host={host} bare={bare} />
     <Card.Content className={`flex flex-col gap-4 ${bare ? 'pt-4' : 'p-4 sm:p-6'}`}>
       <QueryReadNotice query={query} url="/api/host" />
       <div>
@@ -97,43 +167,10 @@ export function HostCard({ compact = false, bare = false }: Readonly<{ compact?:
         <p className="mt-1 text-xs">{t('CPU temperature:')} {cpuTemp}</p>
       </div>
       <Row label="RAM" value={`${gb(usedMb)} / ${gb(host.ram.totalMb)} (${nf(host.ram.usedPct)} %)`} pct={host.ram.usedPct} tone={readingTone(host.ram.usedPct)} />
-      {gpu ? <div className="flex flex-col gap-1">
-        <div className="flex flex-wrap items-baseline justify-between gap-x-2 text-sm"><span className="min-w-0 truncate font-medium" title={gpu.name}>{gpu.name}</span><span className="tabular-nums"><Temp value={gpu.tempC} />{gpu.utilPct != null ? <span className="text-muted-foreground"> · {t('load {n} %', { n: nf(gpu.utilPct) })}</span> : null}</span></div>
-        <Bar pct={gpu.utilPct} tone={readingTone(gpu.utilPct)} label={t('GPU load')} />
-      </div> : <p className="text-sm text-muted-foreground">{t('No GPU reading recorded.')}</p>}
-      {compact ? <p className="text-xs text-muted-foreground">{t('Up {uptime}', { uptime: uptime(host.uptimeSec) })}</p> : <>
-        {host.gpus.length ? <div className="flex flex-col gap-3 border-t pt-3">
-          <p className="text-xs font-medium text-muted-foreground">GPU</p>
-          {host.gpus.map((g, i) => <div key={`${g.name}-${i}`} className="flex flex-col gap-2">
-            {g.memUsedMb != null && g.memTotalMb ? <Row label={`VRAM · ${g.name}`} value={`${gb(g.memUsedMb)} / ${gb(g.memTotalMb)}`} pct={g.memUsedMb / g.memTotalMb * 100} tone="running" /> : null}
-            <p className="text-xs text-muted-foreground">{t('Power:')} {g.powerW == null ? t('unknown') : `${nf(g.powerW, 1)} W`}</p>
-          </div>)}
-        </div> : null}
-        {host.disks.length ? <div className="flex flex-col gap-3 border-t pt-3">
-          <p className="text-xs font-medium text-muted-foreground">{t('Disks (free space)')}</p>
-          {host.disks.map(d => {
-            const freePct = Number.isFinite(d.freeGb) && Number.isFinite(d.totalGb) && d.totalGb > 0 && d.freeGb >= 0 && d.freeGb <= d.totalGb
-              ? d.freeGb / d.totalGb * 100 : null;
-            const value = t('{free} GB free / {total} GB', { free: nf(d.freeGb, 1), total: nf(d.totalGb, 1) });
-            return <Row key={d.mount} label={d.mount} value={value} pct={freePct} tone={readingTone(freePct)} barLabel={`${t('Disks (free space)')} · ${d.mount}`} barValueText={freePct == null ? undefined : `${nf(freePct, 1)}% · ${value}`} />;
-          })}
-        </div> : null}
-        <div className="flex flex-col gap-3 border-t pt-3">
-          <p className="text-xs font-medium text-muted-foreground">{t('RAM per agent')}{host.running != null ? t(' · {n} ops running', { n: host.running }) : ''}</p>
-          {agents.length ? agents.map(([name, mb]) => <Row key={name} label={name} value={gb(mb)} pct={mb / agentMax * 100} tone="running" />) : <p className="text-sm text-muted-foreground">{t('No per-agent RAM reading yet.')}</p>}
-        </div>
-        <div className="border-t pt-3"><p className="mb-2 text-xs font-medium text-muted-foreground">{t('CPU and free RAM trend')}</p><Spark history={host.history} /></div>
-      </>}
+      <GpuSummary gpu={host.gpus[0]} />
+      {compact ? <p className="text-xs text-muted-foreground">{t('Up {uptime}', { uptime: uptime(host.uptimeSec) })}</p> : <ExpandedSections host={host} />}
       <p className="text-xs text-muted-foreground">{t('Host data read {at}', { at: formatAbsolute(host.at) })}</p>
-      <Advanced title={t('Source observations')} summary={t('Sensor observations retain their own timestamps and read failures.')}>
-        <DataTable rows={Object.entries(host.sources ?? {}).map(([key, source]) => ({ key, ...source }))} getKey={row => row.key} caption={t('Host source observations')} columns={[
-          { key: 'source', header: t('Source'), render: row => <span className="break-words">{row.source}</span> },
-          { key: 'observed', header: t('Observed'), render: row => row.observedAt == null ? '—' : formatAbsolute(row.observedAt) },
-          { key: 'read', header: t('Read at'), render: row => row.readAt == null ? '—' : formatAbsolute(row.readAt) },
-          { key: 'state', header: t('Read availability'), render: row => <span>{row.availability === 'pending' ? t('Reading') : row.availability === 'available' ? t('Available') : t('Unavailable')}{row.cached ? t(' · cached observation') : ''}{row.refreshing ? t(' · refreshing') : ''}</span> },
-          { key: 'error', header: t('Read failure'), mobileStack: true, render: row => row.error ?? '—' },
-        ]} />
-      </Advanced>
+      <SourceObservations host={host} />
     </Card.Content>
   </Card>;
 }

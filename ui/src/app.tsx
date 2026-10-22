@@ -6,7 +6,7 @@ import { Badge } from './components/ui/badge';
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuItem, SidebarShell } from './components/ui/sidebar';
 import { SearchBox } from './components/search-box';
 import { FeedbackState, PageSkeleton } from './components/feedback-state';
-import { useApiQuery, useLiveStatus, useQueryHealth } from './api/query';
+import { useApiQuery, useLiveStatus, useQueryHealth, type QuerySnapshot } from './api/query';
 import { formatAbsolute, navLabels } from './i18n/vi';
 import { t } from './i18n/t';
 import { navKind, useRoute, type Route } from './router';
@@ -77,7 +77,7 @@ function useTheme(): [Theme, () => void] {
 
 /** Seconds since the last data refresh, re-rendered every second while the tab is visible. */
 function useAgeSeconds(at: number | null): number | null {
-  const [now, setNow] = useState(Date.now());
+  const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const timer = setInterval(() => { if (!document.hidden) setNow(Date.now()); }, 1000);
     return () => clearInterval(timer);
@@ -89,6 +89,45 @@ function formatAge(seconds: number): string {
   if (seconds < 90) return t('{n} seconds ago', { n: seconds });
   if (seconds < 5400) return t('{n} minutes ago', { n: Math.round(seconds / 60) });
   return t('{n} hours ago', { n: Math.round(seconds / 3600) });
+}
+
+type LiveStatus = ReturnType<typeof useLiveStatus>;
+type QueryHealth = ReturnType<typeof useQueryHealth>;
+
+function liveTitle(live: LiveStatus): string {
+  if (live === 'live') return t('SSE connection established');
+  if (live === 'hidden') return t('Tab hidden, updates paused');
+  return t('Polling periodically');
+}
+
+function liveLabel(live: LiveStatus): string {
+  if (live === 'live') return t('SSE connected');
+  if (live === 'hidden') return t('Paused');
+  return t('Polling');
+}
+
+function describeSources(sources: readonly string[]): string {
+  if (!sources.length) return t('No sources');
+  const shown = sources.slice(0, 8).join(', ');
+  const more = sources.length > 8 ? ` +${sources.length - 8}` : '';
+  return t('Sources: {list}', { list: shown + more });
+}
+
+function describeProvenance(health: QueryHealth): string {
+  const unavailable = health.stale.length ? t('Unavailable sources: {list}', { list: health.stale.join(', ') }) : '';
+  const failing = health.errorCount ? t('{n} failing queries', { n: health.errorCount }) : '';
+  return [describeSources(health.sources), unavailable, failing].filter(Boolean).join(' · ');
+}
+
+function sourceHealthLabel(health: QueryHealth, contractFailed: boolean): string {
+  if (health.errorCount) return t('{n} failing queries', { n: health.errorCount });
+  if (contractFailed) return t('Could not read the API contract');
+  return t('{n} unavailable sources', { n: health.staleCount });
+}
+
+function contractSummary(contract: QuerySnapshot<ContractInfo>): string {
+  if (contract.data) return t('{n} projects from sources', { n: contract.data.projects.length });
+  return contract.error ? t('Could not read the API contract') : t('Reading the API contract…');
 }
 
 export default function App() {
@@ -110,7 +149,7 @@ export default function App() {
   const age = useAgeSeconds(observedAt);
   const hasReadIssues = health.staleCount > 0 || health.errorCount > 0 || Boolean(contract.error);
   const readTime = observedAt == null ? t('No data yet') : t('Last successful API read: {at}', { at: formatAbsolute(observedAt) });
-  const provenance = [health.sources.length ? t('Sources: {list}', { list: `${health.sources.slice(0, 8).join(', ')}${health.sources.length > 8 ? ` +${health.sources.length - 8}` : ''}` }) : t('No sources'), health.stale.length ? t('Unavailable sources: {list}', { list: health.stale.join(', ') }) : '', health.errorCount ? t('{n} failing queries', { n: health.errorCount }) : ''].filter(Boolean).join(' · ');
+  const provenance = describeProvenance(health);
   return <SidebarShell className="app-shell" style={shellStyle}>
     <Link href="#main-content" className="shell-skip-link" onClick={event => { event.preventDefault(); document.getElementById('main-content')?.focus(); }}>{t('Skip to main content')}</Link>
     <Sidebar className="shell-sidebar" aria-label={t('Main navigation')}>
@@ -129,7 +168,7 @@ export default function App() {
       </SidebarContent>
       <SidebarFooter className="shell-sidebar-footer">
         <div className="flex items-center gap-2"><BookOpen size={14} aria-hidden="true" /><span>{t('Read-only UI')}</span></div>
-        <div className="mt-2">{contract.data ? t('{n} projects from sources', { n: contract.data.projects.length }) : contract.error ? t('Could not read the API contract') : t('Reading the API contract…')}</div>
+        <div className="mt-2">{contractSummary(contract)}</div>
       </SidebarFooter>
     </Sidebar>
 
@@ -137,15 +176,15 @@ export default function App() {
       <header className="shell-header">
         <div className="shell-header-left">
           <Link href="#/" className="shell-mobile-brand shrink-0 min-[761px]:hidden" aria-label={t('StarCi · Overview')}><img src="/logos/starci-blue.png" className="size-7 object-contain" alt="" aria-hidden="true" /></Link>
-          <output className="shell-live" data-status={live} title={live === 'live' ? t('SSE connection established') : live === 'hidden' ? t('Tab hidden, updates paused') : t('Polling periodically')}>
+          <output className="shell-live" data-status={live} title={liveTitle(live)}>
             <span className="shell-live-dot" aria-hidden="true" />
-            <span>{live === 'live' ? t('SSE connected') : live === 'hidden' ? t('Paused') : t('Polling')}</span>
+            <span>{liveLabel(live)}</span>
           </output>
           <span className="shell-header-separator" aria-hidden="true" />
           <span className="shell-last-updated min-w-0 truncate" title={[readTime, age == null ? '' : formatAge(age), provenance].filter(Boolean).join(' · ')}>{readTime}</span>
           {hasReadIssues && <output className="shell-source-health" data-status={health.errorCount || contract.error ? 'error' : 'stale'} title={provenance}>
             <CircleAlert size={14} aria-hidden="true" />
-            <span>{health.errorCount ? t('{n} failing queries', { n: health.errorCount }) : contract.error ? t('Could not read the API contract') : t('{n} unavailable sources', { n: health.staleCount })}</span>
+            <span>{sourceHealthLabel(health, Boolean(contract.error))}</span>
           </output>}
         </div>
         <div className="shell-header-right">

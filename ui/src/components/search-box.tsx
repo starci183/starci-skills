@@ -54,13 +54,19 @@ function hitKey(hit: SearchHit): string {
 }
 
 function targetOf(hit: SearchHit): 'route' | 'blob' | null {
-  if (hit.href !== hit.ref?.href) return null;
-  if (/^\/api\/blob\/[a-f0-9]{64}$/.test(hit.ref.href)) return 'blob';
-  return hit.ref.href.startsWith('#/') && parseRoute(hit.ref.href).kind !== 'not-found' ? 'route' : null;
+  const ref = hit.ref;
+  if (!ref) return null;
+  if (hit.href !== ref.href) return null;
+  if (/^\/api\/blob\/[a-f0-9]{64}$/.test(ref.href)) return 'blob';
+  return ref.href.startsWith('#/') && parseRoute(ref.href).kind !== 'not-found' ? 'route' : null;
 }
 
 function initialResult(query: string): SearchResult {
   return { query, data: null, meta: null, loading: false, error: null, errorCode: null, errorMeta: null, observedAt: null };
+}
+
+function beginRead(previous: SearchResult, needle: string): SearchResult {
+  return { ...(previous.query === needle ? previous : initialResult(needle)), loading: true, error: null, errorCode: null, errorMeta: null };
 }
 
 function RestoreSearchFocus({ restore }: Readonly<{ restore: () => void }>) {
@@ -92,15 +98,25 @@ export function SearchBox() {
     meta?.sources.length ? t('Sources: {list}', { list: meta.sources.map(source => `${source.db}:${source.rel}`).join(', ') }) : '',
     meta?.stale?.length ? t('Unavailable sources: {list}', { list: meta.stale.join(', ') }) : '',
   ].filter(Boolean).join(' · ');
-  const shortcut = /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘ K' : 'Ctrl K';
+  const shortcut = /Mac|iPhone|iPad/.test(navigator.userAgent) ? '⌘ K' : 'Ctrl K';
   const changeOpen = useCallback((next: boolean) => {
+    setResult(previous => next && needle ? beginRead(previous, needle) : initialResult(needle));
     if (next) {
       const target = document.activeElement;
       returnFocus.current = target instanceof HTMLElement && target !== document.body && target !== document.documentElement ? target : null;
     }
     isOpen.current = next;
     setOpen(next);
-  }, []);
+  }, [needle]);
+  const changeQuery = (next: string) => {
+    const nextNeedle = next.trim();
+    setQuery(next);
+    setResult(previous => open && nextNeedle ? beginRead(previous, nextNeedle) : initialResult(nextNeedle));
+  };
+  const retryRead = () => {
+    setResult(previous => beginRead(previous, needle));
+    setRetry(value => value + 1);
+  };
   const restoreFocus = useCallback(() => {
     if (isOpen.current) return;
     const target = returnFocus.current?.isConnected ? returnFocus.current : trigger.current;
@@ -119,10 +135,9 @@ export function SearchBox() {
   }, [open, changeOpen]);
 
   useEffect(() => {
-    if (!open || !needle) { setResult(initialResult(needle)); return; }
+    if (!open || !needle) return;
     const controller = new AbortController();
-    setResult(previous => ({ ...(previous.query === needle ? previous : initialResult(needle)), loading: true, error: null, errorCode: null, errorMeta: null }));
-    const timer = setTimeout(async () => {
+    const read = async () => {
       let errorCode = 'READ_FAILED';
       let errorMeta: ReadErrorMeta | null = null;
       try {
@@ -145,7 +160,8 @@ export function SearchBox() {
           ...(previous.query === needle ? previous : initialResult(needle)), loading: false, error: t('Could not read the search.'), errorCode, errorMeta,
         }));
       }
-    }, 180);
+    };
+    const timer = setTimeout(() => { void read(); }, 180);
     return () => { clearTimeout(timer); controller.abort(); };
   }, [open, needle, retry]);
 
@@ -167,7 +183,7 @@ export function SearchBox() {
           <Modal.CloseTrigger aria-label={t('Close')} />
           <Modal.Header><Modal.Heading>{t('Search in StarCi')}</Modal.Heading><Description id={descriptionId}>{t('Paste a workflow, unit, attempt, decision or blob id.')}</Description></Modal.Header>
           <Modal.Body>
-            <Autocomplete.Filter inputValue={query} onInputChange={setQuery}>
+            <Autocomplete.Filter inputValue={query} onInputChange={changeQuery}>
               <SearchField autoFocus fullWidth aria-label={t('Search keywords')}>
                 <SearchField.Group>
                   <SearchField.SearchIcon />
@@ -179,10 +195,10 @@ export function SearchBox() {
                 {!needle && <output>{t('Enter an id to open its evidence.')}</output>}
                 {partial && !error && <output className="flex items-center gap-2 py-2 text-xs text-[var(--status-warning)]" title={provenance}>
                   <CircleAlert className="size-4 shrink-0" aria-hidden="true" /><span className="min-w-0 flex-1">{t('Some search sources could not be read.')}</span>
-                  <Button variant="ghost" size="sm" isDisabled={loading} onPress={() => setRetry(value => value + 1)}>{t('Retry')}</Button>
+                  <Button variant="ghost" size="sm" isDisabled={loading} onPress={retryRead}>{t('Retry')}</Button>
                 </output>}
                 {loading && <output className="flex items-center gap-2 px-3 py-4" aria-live="polite"><LoaderCircle className="size-4 animate-spin" aria-hidden="true" />{t('Searching…')}</output>}
-                {error && <div title={provenance}><FeedbackState error onRetry={() => setRetry(value => value + 1)}>{current?.data ? t('Could not refresh the search. Showing the last successful results.') : error}</FeedbackState></div>}
+                {error && <div title={provenance}><FeedbackState error onRetry={retryRead}>{current?.data ? t('Could not refresh the search. Showing the last successful results.') : error}</FeedbackState></div>}
                 <ListBox items={hits} aria-label={t('Search results')} selectionMode="none" renderEmptyState={() => !loading && !error && needle ? <output className="block py-6 text-center text-sm">{partial ? t('No matching results from the available sources.') : t('No matching results.')}</output> : null}>
                   {hit => {
                     const target = targetOf(hit);

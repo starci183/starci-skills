@@ -40,27 +40,112 @@ export function LegProgress({ pipeline, eta, action }: { readonly pipeline: Pipe
   </div>;
 }
 
+type Problem = { key: string; status: Status; text: string };
+type HeaderRow = WorkflowDetailV2;
+type HeaderLeg = PipelineView['legs'][number];
+
+const phaseStatuses: Readonly<Record<string, Status>> = {
+  paused: 'paused', stopped: 'stopped', running: 'running', 'awaiting-approval': 'awaiting-owner', queued: 'queued', finished: 'success', archived: 'success',
+};
+const phaseTextOf = (phase: string, phaseStatus: Status) => phase === 'archived' ? t('Archived') : phase === 'finished' ? t('Finished') : statusLabels[phaseStatus];
+
+function problemsOf(row: HeaderRow, pipeline: PipelineView | null): Problem[] {
+  const problems: Problem[] = [];
+  if (row.blockedBy.length > 0) problems.push({ key: 'b', status: 'blocked', text: t('{n} blocking points', { n: row.blockedBy.length }) });
+  const failures = pipeline?.failures ?? 0;
+  if (failures > 0) problems.push({ key: 'f', status: 'failed', text: t('{n} settled workflow failures', { n: failures }) });
+  if (row.counts.decisionsOpen > 0) problems.push({ key: 'd', status: 'retry', text: t('{n} decisions waiting', { n: row.counts.decisionsOpen }) });
+  return problems;
+}
+
+function healthChipOf(row: HeaderRow): { status: Status; text: string } | null {
+  if (row.phase !== 'running' || (row.ui !== 'bad' && row.ui !== 'warn')) return null;
+  return row.ui === 'bad' ? { status: 'failed', text: t('Progress: stuck') } : { status: 'warning', text: t('Progress: needs attention') };
+}
+
+function actionOf(row: HeaderRow, root: string, currentOps: readonly string[]): { href: string; label: string } | null {
+  const blocker = row.blockedBy[0];
+  if (blocker) return { href: blocker.ref.href, label: t('View what is blocking') };
+  if (row.counts.decisionsOpen > 0) return { href: `${root}?tab=decisions`, label: t('View pending decisions') };
+  const firstOp = currentOps[0];
+  return firstOp === undefined ? null : { href: `${root}?leg=${encodeURIComponent(firstOp)}`, label: t('View current operation details') };
+}
+
+function whyOf(row: HeaderRow): string | null {
+  if (row.reason) return stuckReasons[row.reason.code] ?? formatReason(row.reason);
+  if (row.phase !== 'running') return row.phaseReason;
+  return row.onIt ? formatReason(row.onIt.reason) : null;
+}
+
+const isWhyLeg = (leg: HeaderLeg) => Boolean(leg.why) && (leg.current || ['failed', 'blocked', 'awaiting-owner', 'retry', 'rejected'].includes(leg.status));
+
+function CurrentOperations({ currentOps, pipeline, root, opLabels }: Readonly<{ currentOps: readonly string[]; pipeline: PipelineView | null; root: string; opLabels: ContractInfo['opLabels'] }>) {
+  return <p className="text-sm text-muted-foreground"><span className="font-medium">{t('Current operations:')}</span> {currentOps.length ? currentOps.map((op, index) => {
+    const leg = pipeline?.legs.find(item => item.op === op);
+    return <span key={op}>{index > 0 ? ' · ' : ''}<Link href={`${root}?leg=${encodeURIComponent(op)}`} className="hover:text-foreground hover:underline">{leg ? legName(leg) : formatOpLabel(op, opLabels)} <span className="font-mono text-xs">({op})</span></Link></span>;
+  }) : t('No current operation recorded.')}</p>;
+}
+
+function LegReason({ leg, root }: Readonly<{ leg: HeaderLeg; root: string }>) {
+  const revision = leg.inPlan ? t('Goal revision {n}', { n: leg.goalRevision ?? t('unknown') }) : t('Recorded operation history');
+  return <div className="flex min-w-0 flex-col gap-1"><Link href={`${root}?leg=${encodeURIComponent(leg.op)}`} className="text-xs text-muted-foreground hover:text-foreground hover:underline">{t('Reason recorded for {op}', { op: legName(leg) })} <span className="font-mono">({leg.op})</span> · {revision}</Link><WhyBlock why={leg.why} compact className="max-w-[80ch]" /></div>;
+}
+
+function GoalSection({ row }: Readonly<{ row: HeaderRow }>) {
+  return <Advanced keepMounted title={t('Goal · revision {n}', { n: row.goal.revision })} summary={row.goal.text ? row.goal.text.slice(0, 160) : t('No goal recorded yet.')}>
+    <p className="mt-2 whitespace-pre-wrap break-words border-t pt-2 leading-relaxed">{row.goal.text || t('No goal recorded yet.')}</p>
+    {row.goal.approvedBy && <p className="mt-2 text-xs text-muted-foreground">{t('Recorded approver: {who}', { who: row.goal.approvedBy })}</p>}
+    {row.goal.approvalRef && <p className="mt-1 break-all font-mono text-xs text-muted-foreground">{t('Approval reference: {ref}', { ref: row.goal.approvalRef })}</p>}</Advanced>;
+}
+
+const noteTime = new Intl.DateTimeFormat('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' });
+
+function KernelNotes({ notes }: Readonly<{ notes: NonNullable<PipelineView['kernelNotes']> }>) {
+  if (!notes.length) return null;
+  return <Advanced summary={t('{n} Kernel notes', { n: notes.length })} title={t('Kernel notes')}>
+    <ol className="m-0 flex list-none flex-col divide-y p-0 text-sm">{notes.slice().reverse().map(note => <li key={note.id} className="flex min-w-0 flex-col gap-1 py-3">
+      <span className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground"><span className="font-medium text-foreground">{note.kind === 'decision' ? t('Decision') : t('Proposal')}</span><span>{note.status}</span><span>{noteTime.format(note.at)}</span></span>
+      <span className="break-words">{note.headline}</span>{note.observed ? <span className="text-xs text-muted-foreground">{t('Result: {text}', { text: note.observed })}</span> : null}
+    </li>)}</ol>
+  </Advanced>;
+}
+
+function RateSummary({ row }: Readonly<{ row: HeaderRow }>) {
+  const minimum = row.minRatePerHour == null ? '' : t(' (minimum {n})', { n: fmt(row.minRatePerHour) });
+  const snapshot = row.progressSnapshot;
+  const windowNote = snapshot?.windowMs == null ? '' : ` · ${t('Window {n} hours', { n: snapshot.windowMs / 3_600_000 })}`;
+  return <>
+    <span>{t('Rate')} <strong className="text-foreground tabular-nums">{row.ratePerHour == null ? t('not recorded') : t('{n}/hour', { n: fmt(row.ratePerHour) })}</strong>{minimum}</span>
+    {snapshot && <span>{t('Rate snapshot #{id} · recorded {at}', { id: snapshot.id, at: formatAbsolute(snapshot.at) })}{windowNote}</span>}
+  </>;
+}
+
+function PipelineDetails({ row, pipeline, phaseText }: Readonly<{ row: HeaderRow; pipeline: PipelineView; phaseText: string }>) {
+  return <Advanced summary={t('rate · parallelism · handling role · Kernel seat · attempts')}>
+    <div className="flex flex-wrap gap-x-4 gap-y-2 text-xs text-muted-foreground">
+      <span>{t('{legs} recorded plan legs · {attempts} workflow attempts · {failures} settled failures', { legs: pipeline.legs.filter(leg => leg.inPlan).length, attempts: pipeline.attempts, failures: pipeline.failures })}</span>
+      <span>{t('{done}/{total} workflow units · all goal revisions', { done: row.units.done, total: row.units.total })}</span>
+      <RateSummary row={row} />
+      <span>{t('Running')} <strong className="text-foreground tabular-nums">{row.running}/{row.allowedParallel ?? '—'}</strong></span>
+      <span className="inline-flex flex-wrap items-center gap-1.5"><span>{t('Handling role:')}</span><WhyOwnerBadge owner={row.onIt?.who} />{row.onIt ? ` · ${formatReason(row.onIt.reason)}` : ''}</span>
+      <span data-concept="C3">{t('Kernel seat · {state}', { state: row.seat?.state ?? t('unknown') })}</span>
+      {row.phase !== 'running' && <span>{phaseText}: {row.phaseReason ?? t('no reason recorded')}</span>}
+    </div>
+  </Advanced>;
+}
+
 export function WorkflowHeader({ row, pipeline }: { readonly row: WorkflowDetailV2; readonly pipeline: PipelineView | null }) {
   const contract = useApiQuery<ContractInfo>('/api/contract', { topics: ['system'], intervalMs: 60_000 });
-  const problems = [
-    row.blockedBy.length > 0 && { key: 'b', status: 'blocked' as Status, text: t('{n} blocking points', { n: row.blockedBy.length }) },
-    (pipeline?.failures ?? 0) > 0 && { key: 'f', status: 'failed' as Status, text: t('{n} settled workflow failures', { n: pipeline!.failures }) },
-    row.counts.decisionsOpen > 0 && { key: 'd', status: 'retry' as Status, text: t('{n} decisions waiting', { n: row.counts.decisionsOpen }) },
-  ].filter(Boolean) as { key: string; status: Status; text: string }[];
+  const problems = problemsOf(row, pipeline);
   // Lifecycle, progress trouble and recorded causes remain independent facts.
-  const running = row.phase === 'running';
-  const phaseStatus: Status = row.phase === 'paused' ? 'paused' : row.phase === 'stopped' ? 'stopped' : running ? 'running' : row.phase === 'awaiting-approval' ? 'awaiting-owner' : row.phase === 'queued' ? 'queued' : row.phase === 'finished' || row.phase === 'archived' ? 'success' : 'unknown';
-  const healthChip = running && (row.ui === 'bad' || row.ui === 'warn')
-    ? { status: (row.ui === 'bad' ? 'failed' : 'warning') as Status, text: row.ui === 'bad' ? t('Progress: stuck') : t('Progress: needs attention') } : null;
-  const phaseText = row.phase === 'archived' ? t('Archived') : row.phase === 'finished' ? t('Finished') : statusLabels[phaseStatus];
+  const phaseStatus: Status = phaseStatuses[row.phase] ?? 'unknown';
+  const healthChip = healthChipOf(row);
+  const phaseText = phaseTextOf(row.phase, phaseStatus);
   const root = `#/w/${encodeURIComponent(row.project)}/${encodeURIComponent(row.id)}`;
   const currentOps = pipeline?.current ?? row.pipeline.current;
-  const action = row.blockedBy[0] ? { href: row.blockedBy[0].ref.href, label: t('View what is blocking') }
-    : row.counts.decisionsOpen > 0 ? { href: `${root}?tab=decisions`, label: t('View pending decisions') }
-    : currentOps.length ? { href: `${root}?leg=${encodeURIComponent(currentOps[0])}`, label: t('View current operation details') } : null;
-  const legWhys = pipeline?.legs.filter(leg => leg.why && (leg.current || ['failed', 'blocked', 'awaiting-owner', 'retry', 'rejected'].includes(leg.status))) ?? [];
-  const notes = pipeline?.kernelNotes ?? [];
-  const why = row.reason ? (stuckReasons[row.reason.code] ?? formatReason(row.reason)) : row.phase !== 'running' ? row.phaseReason : row.onIt ? formatReason(row.onIt.reason) : null;
+  const action = actionOf(row, root, currentOps);
+  const legWhys = pipeline?.legs.filter(isWhyLeg) ?? [];
+  const why = whyOf(row);
   return <header className="flex flex-col gap-4">
     <nav aria-label={t('Location')} className="flex flex-wrap items-center gap-1 text-sm text-muted-foreground"><Link href="#/" className="inline-flex items-center gap-1 hover:text-foreground"><ArrowLeft className="size-4" /> {t('Overview')}</Link><span aria-hidden="true">/</span><span>{row.project}</span></nav>
     <div className="flex flex-col gap-3">
@@ -72,35 +157,14 @@ export function WorkflowHeader({ row, pipeline }: { readonly row: WorkflowDetail
         {healthChip && <span className="inline-flex items-center gap-1.5"><StatusDot status={healthChip.status} />{healthChip.text}</span>}
         {problems.map(item => <span key={item.key} className="inline-flex items-center gap-1.5"><StatusDot status={item.status} />{item.text}</span>)}
       </div>}
-      <p className="text-sm text-muted-foreground"><span className="font-medium">{t('Current operations:')}</span> {currentOps.length ? currentOps.map((op, index) => {
-        const leg = pipeline?.legs.find(item => item.op === op);
-        return <span key={op}>{index > 0 ? ' · ' : ''}<Link href={`${root}?leg=${encodeURIComponent(op)}`} className="hover:text-foreground hover:underline">{leg ? legName(leg) : formatOpLabel(op, contract.data?.opLabels)} <span className="font-mono text-xs">({op})</span></Link></span>;
-      }) : t('No current operation recorded.')}</p>
+      <CurrentOperations currentOps={currentOps} pipeline={pipeline} root={root} opLabels={contract.data?.opLabels} />
       {(why || healthChip) && <p className="text-sm text-muted-foreground"><span className="font-medium">{t('Why:')}</span> {why ?? t('no reason recorded')}</p>}
-      {legWhys.map(leg => <div key={leg.op} className="flex min-w-0 flex-col gap-1"><Link href={`${root}?leg=${encodeURIComponent(leg.op)}`} className="text-xs text-muted-foreground hover:text-foreground hover:underline">{t('Reason recorded for {op}', { op: legName(leg) })} <span className="font-mono">({leg.op})</span> · {leg.inPlan ? t('Goal revision {n}', { n: leg.goalRevision ?? t('unknown') }) : t('Recorded operation history')}</Link><WhyBlock why={leg.why} compact className="max-w-[80ch]" /></div>)}
+      {legWhys.map(leg => <LegReason key={leg.op} leg={leg} root={root} />)}
       {!legWhys.length && <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground"><span>{t('Handling role:')}</span><WhyOwnerBadge owner={row.onIt?.who} /></div>}
     </div>
-    <Advanced keepMounted title={t('Goal · revision {n}', { n: row.goal.revision })} summary={row.goal.text ? row.goal.text.slice(0, 160) : t('No goal recorded yet.')}>
-      <p className="mt-2 whitespace-pre-wrap break-words border-t pt-2 leading-relaxed">{row.goal.text || t('No goal recorded yet.')}</p>
-      {row.goal.approvedBy && <p className="mt-2 text-xs text-muted-foreground">{t('Recorded approver: {who}', { who: row.goal.approvedBy })}</p>}
-      {row.goal.approvalRef && <p className="mt-1 break-all font-mono text-xs text-muted-foreground">{t('Approval reference: {ref}', { ref: row.goal.approvalRef })}</p>}</Advanced>
+    <GoalSection row={row} />
     {pipeline && <Card size="sm"><CardContent><LegProgress pipeline={pipeline} eta={row.etaAt != null ? formatAbsolute(row.etaAt) : t('not estimable')} action={action} />
-      {notes.length ? <Advanced summary={t('{n} Kernel notes', { n: notes.length })} title={t('Kernel notes')}>
-        <ol className="m-0 flex list-none flex-col divide-y p-0 text-sm">{notes.slice().reverse().map(note => <li key={note.id} className="flex min-w-0 flex-col gap-1 py-3">
-          <span className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground"><span className="font-medium text-foreground">{note.kind === 'decision' ? t('Decision') : t('Proposal')}</span><span>{note.status}</span><span>{new Intl.DateTimeFormat('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' }).format(note.at)}</span></span>
-          <span className="break-words">{note.headline}</span>{note.observed ? <span className="text-xs text-muted-foreground">{t('Result: {text}', { text: note.observed })}</span> : null}
-        </li>)}</ol>
-      </Advanced> : null}
-      <Advanced summary={t('rate · parallelism · handling role · Kernel seat · attempts')}>
-        <div className="flex flex-wrap gap-x-4 gap-y-2 text-xs text-muted-foreground">
-          <span>{t('{legs} recorded plan legs · {attempts} workflow attempts · {failures} settled failures', { legs: pipeline.legs.filter(leg => leg.inPlan).length, attempts: pipeline.attempts, failures: pipeline.failures })}</span>
-          <span>{t('{done}/{total} workflow units · all goal revisions', { done: row.units.done, total: row.units.total })}</span>
-          <span>{t('Rate')} <strong className="text-foreground tabular-nums">{row.ratePerHour == null ? t('not recorded') : t('{n}/hour', { n: fmt(row.ratePerHour) })}</strong>{row.minRatePerHour != null ? t(' (minimum {n})', { n: fmt(row.minRatePerHour) }) : ''}</span>
-          {row.progressSnapshot && <span>{t('Rate snapshot #{id} · recorded {at}', { id: row.progressSnapshot.id, at: formatAbsolute(row.progressSnapshot.at) })}{row.progressSnapshot.windowMs != null ? ` · ${t('Window {n} hours', { n: row.progressSnapshot.windowMs / 3_600_000 })}` : ''}</span>}
-          <span>{t('Running')} <strong className="text-foreground tabular-nums">{row.running}/{row.allowedParallel ?? '—'}</strong></span>
-          <span className="inline-flex flex-wrap items-center gap-1.5"><span>{t('Handling role:')}</span><WhyOwnerBadge owner={row.onIt?.who} />{row.onIt ? ` · ${formatReason(row.onIt.reason)}` : ''}</span>
-          <span data-concept="C3">{t('Kernel seat · {state}', { state: row.seat?.state ?? t('unknown') })}</span>
-          {row.phase !== 'running' && <span>{phaseText}: {row.phaseReason ?? t('no reason recorded')}</span>}
-        </div></Advanced></CardContent></Card>}
+      <KernelNotes notes={pipeline.kernelNotes ?? []} />
+      <PipelineDetails row={row} pipeline={pipeline} phaseText={phaseText} /></CardContent></Card>}
   </header>;
 }

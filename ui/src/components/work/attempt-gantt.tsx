@@ -17,15 +17,32 @@ type DispatchedAttempt = AttemptBrief & { dispatchedAt: number };
 const wasDispatched = (attempt: AttemptBrief): attempt is DispatchedAttempt => attempt.dispatchedAt != null && Number.isFinite(attempt.dispatchedAt);
 const recordedTime = (at: number | null | undefined) => at != null && Number.isFinite(at) ? at : null;
 
+const closedAt = (a: DispatchedAttempt) => recordedTime(a.endedAt);
+const isLive = (a: DispatchedAttempt) => a.open && closedAt(a) == null;
+const settlementPending = (a: DispatchedAttempt) => a.open && closedAt(a) != null && recordedTime(a.settledAt) == null;
+
+type TipFacts = { a: DispatchedAttempt; label: string; endpoint: string; elapsed: string; sequence: string; reportedAt: number | null; terminalAt: number | null; settledAt: number | null; pending: boolean };
+function barTip({ a, label, endpoint, elapsed, sequence, reportedAt, terminalAt, settledAt, pending }: TipFacts): string {
+  const lines = [
+    `#${a.id} · ${t('try {n}', { n: a.try })} · ${sequence} · ${label}`,
+    a.model ?? a.agent ?? t('unknown model'),
+    a.unit ?? a.job,
+    `${formatDayTime(a.dispatchedAt)} → ${endpoint}`,
+    elapsed,
+  ];
+  if (reportedAt != null) lines.push(t('Reported at {at}', { at: formatDayTime(reportedAt) }));
+  if (terminalAt != null) lines.push(t('Terminal closed at {at}', { at: formatDayTime(terminalAt) }));
+  if (settledAt != null) lines.push(t('Settled at {at}', { at: formatDayTime(settledAt) }));
+  else if (pending) lines.push(t('No settlement time recorded'));
+  return lines.join('\n');
+}
+
 /** Actual dispatch timeline per leg, independent of the Op and Unit dependency graphs. */
 export function AttemptGantt({ pipeline, now }: { readonly pipeline: PipelineView; readonly now: number }) {
   const hatchId = useId();
   const rows = pipeline.legs.map(leg => ({ leg, atts: leg.attempts.filter(wasDispatched) })).filter(r => r.atts.length);
   if (!rows.length) return <FeedbackState>{t('No attempts to draw a timeline for yet.')}</FeedbackState>;
   const all = rows.flatMap(r => r.atts);
-  const closedAt = (a: DispatchedAttempt) => recordedTime(a.endedAt);
-  const isLive = (a: DispatchedAttempt) => a.open && closedAt(a) == null;
-  const settlementPending = (a: DispatchedAttempt) => a.open && closedAt(a) != null && recordedTime(a.settledAt) == null;
   // Terminal closure stops a dispatched span even when settlement has not been recorded.
   // Closed history with neither milestone remains an observed span, not an invented duration.
   const endOf = (a: DispatchedAttempt) => Math.max(a.dispatchedAt, recordedTime(a.settledAt) ?? closedAt(a) ?? (isLive(a) ? now : recordedTime(a.reportedAt) ?? a.dispatchedAt));
@@ -45,14 +62,19 @@ export function AttemptGantt({ pipeline, now }: { readonly pipeline: PipelineVie
     const bars = [...atts].sort((a, b) => a.dispatchedAt - b.dispatchedAt || a.id - b.id).map(a => {
       let lane = ends.findIndex(e => e <= a.dispatchedAt);
       if (lane < 0) lane = ends.length;
-        // Keep later recorded milestones in the same lane without changing the bar endpoint.
-        ends[lane] = Math.max(observedThrough(a), a.dispatchedAt + 6 * span / plotW);
+      // Keep later recorded milestones in the same lane without changing the bar endpoint.
+      ends[lane] = Math.max(observedThrough(a), a.dispatchedAt + 6 * span / plotW);
       return { a, lane };
     });
     return { leg, bars, lanes: Math.max(1, ends.length) };
   });
+  const placed: ((typeof laid)[number] & { y: number; h: number })[] = [];
   let y = TOP;
-  const placed = laid.map(r => { const h = r.lanes * LANE_H + ROW_PAD * 2; const out = { ...r, y, h }; y += h; return out; });
+  for (const r of laid) {
+    const h = r.lanes * LANE_H + ROW_PAD * 2;
+    placed.push({ ...r, y, h });
+    y += h;
+  }
   const height = y + 8;
   const ticks: number[] = [];
   for (let tick = t0; tick <= t1; tick += STEP_MS * mult) ticks.push(tick);
@@ -70,7 +92,7 @@ export function AttemptGantt({ pipeline, now }: { readonly pipeline: PipelineVie
     const endpoint = settledAt != null ? formatDayTime(settledAt) : terminalAt != null ? formatDayTime(terminalAt) : live ? t('now') : t('No end time recorded');
     const elapsed = settledAt != null || terminalAt != null || live ? formatDuration(endOf(a) - a.dispatchedAt) : t('Observed through {at}', { at: formatDayTime(endOf(a)) });
     const sequence = Number.isFinite(a.dispatchSeq) ? t('dispatch {n}', { n: a.dispatchSeq }) : t('Dispatch sequence not recorded');
-    const tip = `#${a.id} · ${t('try {n}', { n: a.try })} · ${sequence} · ${label}\n${a.model ?? a.agent ?? t('unknown model')}\n${a.unit ?? a.job}\n${formatDayTime(a.dispatchedAt)} → ${endpoint}\n${elapsed}${reportedAt != null ? `\n${t('Reported at {at}', { at: formatDayTime(reportedAt) })}` : ''}${terminalAt != null ? `\n${t('Terminal closed at {at}', { at: formatDayTime(terminalAt) })}` : ''}${settledAt != null ? `\n${t('Settled at {at}', { at: formatDayTime(settledAt) })}` : pending ? `\n${t('No settlement time recorded')}` : ''}`;
+    const tip = barTip({ a, label, endpoint, elapsed, sequence, reportedAt, terminalAt, settledAt, pending });
     return { live, pending, terminalAt, settledAt, reportedAt, tone, bx, bw, by, tip };
   };
   const plotBars = placed.flatMap(({ bars, y: top }) => bars.map(({ a, lane }) => ({ a, ...barView(a, top, lane) })));

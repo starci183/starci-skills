@@ -46,6 +46,90 @@ export function LegAbout({ leg }: { readonly leg: LegRow }) {
   </div>;
 }
 
+type Attempt = LegRow['attempts'][number];
+type Leg = LegRow;
+type Tokens = NonNullable<ReturnType<typeof legTokens>>;
+/** The three facts about the attempt-detail read that decide which placeholder text applies. */
+type ReadState = { readonly loading: boolean; readonly hasData: boolean };
+
+function reportFileCount(attempt: AttemptDetailV2 | null | undefined): number | null {
+  const json = attempt?.report?.json;
+  const files = json && typeof json === 'object' ? (json as { files?: unknown }).files : undefined;
+  return Array.isArray(files) ? files.length : null;
+}
+
+function OpChips({ ops, byOp }: Readonly<{ ops: readonly string[]; byOp: ReadonlyMap<string, Leg> }>) {
+  return <ul className="space-y-1">{ops.map(op => <li key={op} className="flex flex-wrap items-center gap-2 text-sm"><StatusChip status={byOp.get(op)?.status ?? 'unknown'} /><span className="min-w-0 break-all font-mono text-xs">{op}</span></li>)}</ul>;
+}
+
+function dispatchedTitle(latest: Attempt | null, input: AttemptDetailV2['input']): string {
+  if (!latest) return t('No dispatched input yet');
+  return input?.source === 'contract' ? t('Contract context · attempt #{id}', { id: latest.id }) : t('Current job reference · attempt #{id}', { id: latest.id });
+}
+
+function noInputMessage(latest: Attempt | null, read: ReadState): string {
+  if (!latest) return t('No attempts yet, nothing dispatched.');
+  return read.loading ? t('Loading…') : t('Could not read the dispatched data yet.');
+}
+
+function DispatchedInput({ latest, input, read }: Readonly<{ latest: Attempt | null; input: AttemptDetailV2['input']; read: ReadState }>) {
+  return <div className="mt-2 bg-default p-3 text-xs">
+    <p className="mb-1 font-medium">{dispatchedTitle(latest, input)}</p>
+    {input ? <ul className="space-y-1 text-muted-foreground">
+      {input.what ? <li className="break-words">{input.what}</li> : null}
+      {input.goal ? <li>{t('Workflow goal, revision {n}', { n: input.goal.revision ?? '—' })}</li> : null}
+      <li>{input.ownedPaths.length ? t('{n} paths may be written:', { n: input.ownedPaths.length }) : t('{n} paths may be written', { n: input.ownedPaths.length })}</li>
+      {input.ownedPaths.length ? <li><ul className="ml-2 space-y-1">{input.ownedPaths.slice(0, 6).map(p => <li key={p} className="break-all font-mono text-[13px]">{p}</li>)}{input.ownedPaths.length > 6 ? <li>{t('… and {n} more paths', { n: input.ownedPaths.length - 6 })}</li> : null}</ul></li> : null}
+      {input.records.length ? <li>{t('{n} attached records', { n: input.records.length })}</li> : null}
+    </ul> : <p className="text-muted-foreground">{noInputMessage(latest, read)}</p>}
+  </div>;
+}
+
+function InputsBlock({ leg, info, latest, input, upstream, byOp, read }: Readonly<{
+  leg: Leg; info: ReturnType<typeof legInfo>; latest: Attempt | null; input: AttemptDetailV2['input']; upstream: readonly string[]; byOp: ReadonlyMap<string, Leg>; read: ReadState;
+}>) {
+  const reads = info?.reads ?? [];
+  return <Block title={t('Inputs')}>
+    {reads.length ? <ul className="space-y-2">{reads.map(r => <li key={r.id} className="text-xs"><span className="font-mono font-semibold">{r.id}</span>{r.purpose ? <span className="block text-muted-foreground">{r.purpose}</span> : null}</li>)}</ul> : muted(info?.declarations?.reads ? t('The op declares no read data.') : t('Input declaration unknown.'))}
+    {upstream.length ? <div className="mt-2"><p className="mb-1 text-[13px] text-muted-foreground">{t('Waiting on ops')}</p><OpChips ops={upstream} byOp={byOp} /></div> : null}
+    {leg.needs.length ? <ul className="mt-2 space-y-1">{leg.needs.map(n => <li key={n} className="break-all font-mono text-[13px] text-muted-foreground">{n}</li>)}</ul> : null}
+    <DispatchedInput latest={latest} input={input} read={read} />
+  </Block>;
+}
+
+function fileCountMessage(fileCount: number | null, read: ReadState): string {
+  if (fileCount != null) return t('{n} files declared in the Op report', { n: fileCount });
+  if (read.loading) return t('Counting files…');
+  return read.hasData ? t('No file report yet.') : t('Could not read the dispatched data yet.');
+}
+
+function LatestAttempt({ latest, fileCount, read }: Readonly<{ latest: Attempt; fileCount: number | null; read: ReadState }>) {
+  return <div className="mt-2 bg-default p-3 text-xs">
+    <p className="mb-1 flex flex-wrap items-center gap-2 font-medium">{t('Latest attempt #{id}', { id: latest.id })}
+      <StatusChip status={statusFromOutcome(latest.reportOutcome)} label={latest.reportOutcome ? outcomeLabel[latest.reportOutcome] : t('Op has not reported')} /></p>
+    {latest.summary ? <p className="line-clamp-4 whitespace-pre-wrap break-words">{latest.summary}</p> : null}
+    <p className="mt-1 text-muted-foreground">{fileCountMessage(fileCount, read)}</p>
+    <Link href={`${latest.href}?step=report`} className="mt-2 inline-flex items-center gap-1 font-medium">{t('View Products')} <ArrowRight className="size-3" aria-hidden="true" /></Link>
+  </div>;
+}
+
+function OutputsBlock({ leg, info, latest, fileCount, downstream, byOp, read }: Readonly<{
+  leg: Leg; info: ReturnType<typeof legInfo>; latest: Attempt | null; fileCount: number | null; downstream: readonly string[]; byOp: ReadonlyMap<string, Leg>; read: ReadState;
+}>) {
+  return <Block title={t('Outputs')}>
+    {leg.produces.length ? <ul className="space-y-1">{leg.produces.map(n => <li key={n} className="break-all font-mono text-xs">{n}</li>)}</ul> : muted(t('Not declared.'))}
+    {info?.writes.length ? <ul className="mt-1 space-y-1">{info.writes.map(w => <li key={w} className="break-all font-mono text-[13px] text-muted-foreground">{w}</li>)}</ul> : null}
+    {latest ? <LatestAttempt latest={latest} fileCount={fileCount} read={read} /> : null}
+    {downstream.length ? <div className="mt-2"><p className="mb-1 text-[13px] text-muted-foreground">{t('Unblocks')}</p><OpChips ops={downstream} byOp={byOp} /></div> : null}
+  </Block>;
+}
+
+function TokensBlock({ tokens, attempts }: Readonly<{ tokens: Tokens | null; attempts: number }>) {
+  return <Block title="Token">
+    {tokens ? <p className="font-mono text-sm">{t('{input} in · {output} out', { input: tokens.input == null ? '—' : fmt(tokens.input), output: tokens.output == null ? '—' : fmt(tokens.output) })} <span className="font-sans text-xs text-muted-foreground">{t('Recorded part · input {input}/{total}, output {output}/{total}', { input: tokens.inputKnown, output: tokens.outputKnown, total: attempts })}</span></p> : muted(t('not recorded'))}
+  </Block>;
+}
+
 /** Advanced part of the op story: input, output, tokens. Reads the latest attempt for the real hand-over. */
 export function LegStory({ project, wf, leg, pipeline }: { readonly project: string; readonly wf: string; readonly leg: LegRow; readonly pipeline: PipelineView }) {
   const info = legInfo(leg);
@@ -53,49 +137,18 @@ export function LegStory({ project, wf, leg, pipeline }: { readonly project: str
   const url = latest ? `/api/attempts/${encodeURIComponent(project)}/${latest.id}` : '';
   const detail = useApiQuery<AttemptDetailV2>(url, { enabled: Boolean(latest), topics: [`wf:${project}:${wf}`, 'system'], intervalMs: 60_000 });
   const attempt = latest ? detail.data : null;
-  const files = attempt?.report?.json && typeof attempt.report.json === 'object' ? (attempt.report.json as { files?: unknown }).files : undefined;
-  const fileCount = Array.isArray(files) ? files.length : null;
+  const fileCount = reportFileCount(attempt);
   const byOp = new Map(pipeline.legs.map(l => [l.op, l]));
   const upstream = pipeline.edges.filter(e => e.to === leg.op).map(e => e.from);
   const downstream = pipeline.edges.filter(e => e.from === leg.op).map(e => e.to);
-  const chip = (op: string) => <li key={op} className="flex flex-wrap items-center gap-2 text-sm"><StatusChip status={byOp.get(op)?.status ?? 'unknown'} /><span className="min-w-0 break-all font-mono text-xs">{op}</span></li>;
-  const tokens = legTokens(leg);
-  const input = attempt?.input ?? null;
-  const reads = info?.reads ?? [];
+  const read: ReadState = { loading: !detail.meta && !detail.error, hasData: Boolean(detail.data) };
   return <div>
     {latest && detail.error && <FeedbackState error onRetry={() => refreshQuery(url)}>{detail.meta ? t('The source is failing; showing the last read. {error}', { error: detail.error }) : detail.error}</FeedbackState>}
     {latest && detail.meta?.stale?.length ? <SourceWarning className="text-xs">{t('Source out of sync: {list}', { list: detail.meta.stale.join(', ') })}</SourceWarning> : null}
     {latest && detail.meta && <p className="mb-3 text-xs text-muted-foreground">{t('Read observed {at}', { at: formatAbsolute(detail.observedAt) })}</p>}
-    <Block title={t('Inputs')}>
-      {reads.length ? <ul className="space-y-2">{reads.map(r => <li key={r.id} className="text-xs"><span className="font-mono font-semibold">{r.id}</span>{r.purpose ? <span className="block text-muted-foreground">{r.purpose}</span> : null}</li>)}</ul> : muted(info?.declarations?.reads ? t('The op declares no read data.') : t('Input declaration unknown.'))}
-      {upstream.length ? <div className="mt-2"><p className="mb-1 text-[13px] text-muted-foreground">{t('Waiting on ops')}</p><ul className="space-y-1">{upstream.map(chip)}</ul></div> : null}
-      {leg.needs.length ? <ul className="mt-2 space-y-1">{leg.needs.map(n => <li key={n} className="break-all font-mono text-[13px] text-muted-foreground">{n}</li>)}</ul> : null}
-      <div className="mt-2 bg-default p-3 text-xs">
-        <p className="mb-1 font-medium">{latest ? input?.source === 'contract' ? t('Contract context · attempt #{id}', { id: latest.id }) : t('Current job reference · attempt #{id}', { id: latest.id }) : t('No dispatched input yet')}</p>
-        {input ? <ul className="space-y-1 text-muted-foreground">
-          {input.what ? <li className="break-words">{input.what}</li> : null}
-          {input.goal ? <li>{t('Workflow goal, revision {n}', { n: input.goal.revision ?? '—' })}</li> : null}
-          <li>{input.ownedPaths.length ? t('{n} paths may be written:', { n: input.ownedPaths.length }) : t('{n} paths may be written', { n: input.ownedPaths.length })}</li>
-          {input.ownedPaths.length ? <li><ul className="ml-2 space-y-1">{input.ownedPaths.slice(0, 6).map(p => <li key={p} className="break-all font-mono text-[13px]">{p}</li>)}{input.ownedPaths.length > 6 ? <li>{t('… and {n} more paths', { n: input.ownedPaths.length - 6 })}</li> : null}</ul></li> : null}
-          {input.records.length ? <li>{t('{n} attached records', { n: input.records.length })}</li> : null}
-        </ul> : <p className="text-muted-foreground">{latest ? (!detail.meta && !detail.error ? t('Loading…') : t('Could not read the dispatched data yet.')) : t('No attempts yet, nothing dispatched.')}</p>}
-      </div>
-    </Block>
-    <Block title={t('Outputs')}>
-      {leg.produces.length ? <ul className="space-y-1">{leg.produces.map(n => <li key={n} className="break-all font-mono text-xs">{n}</li>)}</ul> : muted(t('Not declared.'))}
-      {info?.writes.length ? <ul className="mt-1 space-y-1">{info.writes.map(w => <li key={w} className="break-all font-mono text-[13px] text-muted-foreground">{w}</li>)}</ul> : null}
-      {latest ? <div className="mt-2 bg-default p-3 text-xs">
-        <p className="mb-1 flex flex-wrap items-center gap-2 font-medium">{t('Latest attempt #{id}', { id: latest.id })}
-          <StatusChip status={statusFromOutcome(latest.reportOutcome)} label={latest.reportOutcome ? outcomeLabel[latest.reportOutcome] : t('Op has not reported')} /></p>
-        {latest.summary ? <p className="line-clamp-4 whitespace-pre-wrap break-words">{latest.summary}</p> : null}
-        <p className="mt-1 text-muted-foreground">{fileCount == null ? (!detail.meta && !detail.error ? t('Counting files…') : detail.data ? t('No file report yet.') : t('Could not read the dispatched data yet.')) : t('{n} files declared in the Op report', { n: fileCount })}</p>
-        <Link href={`${latest.href}?step=report`} className="mt-2 inline-flex items-center gap-1 font-medium">{t('View Products')} <ArrowRight className="size-3" aria-hidden="true" /></Link>
-      </div> : null}
-      {downstream.length ? <div className="mt-2"><p className="mb-1 text-[13px] text-muted-foreground">{t('Unblocks')}</p><ul className="space-y-1">{downstream.map(chip)}</ul></div> : null}
-    </Block>
-    <Block title="Token">
-      {tokens ? <p className="font-mono text-sm">{t('{input} in · {output} out', { input: tokens.input == null ? '—' : fmt(tokens.input), output: tokens.output == null ? '—' : fmt(tokens.output) })} <span className="font-sans text-xs text-muted-foreground">{t('Recorded part · input {input}/{total}, output {output}/{total}', { input: tokens.inputKnown, output: tokens.outputKnown, total: leg.attempts.length })}</span></p> : muted(t('not recorded'))}
-    </Block>
+    <InputsBlock leg={leg} info={info} latest={latest} input={attempt?.input ?? null} upstream={upstream} byOp={byOp} read={read} />
+    <OutputsBlock leg={leg} info={info} latest={latest} fileCount={fileCount} downstream={downstream} byOp={byOp} read={read} />
+    <TokensBlock tokens={legTokens(leg)} attempts={leg.attempts.length} />
     {leg.conditions.length ? <Advanced keepMounted className="mt-6" title={t('Conditions · {n}', { n: leg.conditions.length })}>
       <ul className="space-y-1">{leg.conditions.map(n => <li key={n} className="break-words text-sm">{n}</li>)}</ul></Advanced> : null}
     {info?.manifest ? <p className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">{t('Op manifest')} <PathLink path={info.manifest} kind="file" /></p> : null}
