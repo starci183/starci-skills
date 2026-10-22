@@ -12,6 +12,7 @@ import { validateAgainstSchema } from './json-schema.mjs';
 import { insidePath, samePath, slash } from './path-key.mjs';
 import { byCodeUnit } from './list.mjs';
 import { isLiteWorkRoot, workPathAllowed } from './work-edition.mjs';
+import { WORK_DIR_NAME } from './roots.mjs';
 
 /** The runtime's example tree root. */
 export const EXAMPLES_ROOT = 'examples';
@@ -166,7 +167,7 @@ export function exampleCheckoutOf(workRoot) {
   if (typeof workRoot !== 'string') return null;
   const work = path.resolve(workRoot);
   const appDir = path.dirname(work), examplesDir = path.dirname(appDir), checkout = path.dirname(examplesDir);
-  if (path.basename(work) !== '.starciwork' || path.basename(examplesDir) !== EXAMPLES_ROOT) return null;
+  if (path.basename(work) !== WORK_DIR_NAME || path.basename(examplesDir) !== EXAMPLES_ROOT) return null;
   return fs.existsSync(path.join(examplesDir, '.runtimes')) && fs.existsSync(path.join(appDir, 'hfs.json')) ? checkout : null;
 }
 
@@ -180,10 +181,10 @@ export function exampleArtifactReadOptions(runtimeRoot, workRoot, { resolveRoot 
   if (parts[0]?.toLowerCase() !== EXAMPLES_ROOT) return Object.freeze({});
   const app = parts[1];
   if (parts[0] !== EXAMPLES_ROOT || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(app ?? '')
-    || !discoverExampleApps(base).includes(app) || parts[2] !== '.starciwork')
+    || !discoverExampleApps(base).includes(app) || parts[2] !== WORK_DIR_NAME)
     throw new Error(`invalid example Work artifact context: ${relative}`);
   referenceFile(base, `${EXAMPLES_ROOT}/${app}/hfs.json`, { exact: true });
-  const ownWork = path.join(base, EXAMPLES_ROOT, app, '.starciwork');
+  const ownWork = path.join(base, EXAMPLES_ROOT, app, WORK_DIR_NAME);
   if (!isLiteWorkRoot(ownWork)) referenceFile(base, `${EXAMPLES_ROOT}/${app}/.starciwork/index.yaml`, { exact: true });
   if (!workPathAllowed(ownWork, target, { dir: true })) throw new Error('lite .starciwork holds only workspace.yaml and brand/ (plus .gitignore)');
   referenceFile(base, relative, { directory: true, exact: true });
