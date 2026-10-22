@@ -1,11 +1,8 @@
 "use client"
 
+import { Button } from "@starci/grammar/core"
 import type { ThemeChoice } from "../../theme-context"
-import {
-    THEME_TOGGLE_GROUP_CLASS_NAME,
-    THEME_TOGGLE_OPTION_CLASS_NAME,
-    THEME_TOGGLE_PLAIN_CLASS_NAME,
-} from "./classNames"
+import { THEME_TOGGLE_GROUP_CLASS_NAME, THEME_TOGGLE_PLAIN_CLASS_NAME } from "./classNames"
 
 const THEME_CHOICES: ReadonlyArray<ThemeChoice> = ["light", "dark", "system"]
 
@@ -27,7 +24,7 @@ export type ThemeToggleBaseProps = {
      * `pill` draws the bordered floating group the shell uses; `plain` keeps the same control
      * unframed for a surface that draws its own boundary.
      */
-    readonly appearance?: "pill" | "plain";
+    readonly appearance?: "pill" | "plain" | undefined;
     /** The currently chosen theme; drives each option's `aria-pressed`. */
     readonly theme: ThemeChoice;
     /** The resolved copy for the group label and each choice. */
@@ -47,15 +44,15 @@ export const ThemeToggleBase = (props: ThemeToggleBaseProps) => (
         className={props.appearance === "plain" ? THEME_TOGGLE_PLAIN_CLASS_NAME : THEME_TOGGLE_GROUP_CLASS_NAME}
     >
         {THEME_CHOICES.map((choice: ThemeChoice) => (
-            <button
+            <Button
                 key={choice}
-                type="button"
+                variant="tertiary"
+                size="sm"
                 aria-pressed={props.theme === choice}
-                className={THEME_TOGGLE_OPTION_CLASS_NAME}
-                onClick={() => props.onSelect(choice)}
+                onPress={() => props.onSelect(choice)}
             >
                 {props.labels[choice]}
-            </button>
+            </Button>
         ))}
     </div>
 )

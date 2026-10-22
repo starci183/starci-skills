@@ -12,6 +12,9 @@ import { CHECK_READINESS_DATABASE, CHECK_READINESS_JOBS } from "./persistence/re
 import type { ReadinessCheckName, ReadinessReport } from "./readiness.contracts"
 import { LivenessLogEvent } from "./readiness.log-events"
 
+/** The cancel of a deadline that was never scheduled. */
+const noCancel = (): void => undefined
+
 /** How long one dependency probe may take before the check answers not-ready. */
 const PROBE_TIMEOUT_MS = 3000
 
@@ -30,7 +33,7 @@ export class ReadinessService {
     /** The report of one probe; it throws LIVENESS_UNAVAILABLE when a required dependency did not answer. */
     async check(): Promise<ReadinessReport> {
         const probe = async (check: ReadinessCheckName, statement: SqlText): Promise<"ok"> => {
-            let cancel: () => void = () => undefined
+            let cancel: () => void = noCancel
             try {
                 const rows = await Promise.race([
                     this.entityManager.query<Array<DatabaseReadyRow | JobStatsRow>>(statement),

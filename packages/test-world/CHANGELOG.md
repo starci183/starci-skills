@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.3 - 2026-10-22
+
+- Changed: the package compiles with `exactOptionalPropertyTypes` on (owner ruling 2026-10-22, no loosening; it was off): optional options that callers pass an `undefined` through say `| undefined`, and a `fetch` body or header that may be absent is spread in only when present.
+
 ## 1.2.0 - 2026-10-02
 
 - Breaking: remove the `starci-test-stack` bin; the stack CLI is exported at `@starci/test-world/cli` for `starci app stack`.

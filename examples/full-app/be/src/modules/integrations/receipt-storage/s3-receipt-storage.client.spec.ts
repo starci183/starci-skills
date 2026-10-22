@@ -13,6 +13,10 @@ import { ReceiptStorageLogEvent } from "./receipt-storage.log-events"
 import type { ReceiptStorageOptions } from "./receipt-storage.options"
 import { S3ReceiptStorageClient } from "./s3-receipt-storage.client"
 
+/** Asymmetric matchers read as `unknown`: jest types them `any`, which may not flow into a property or a typed argument. */
+const objectLike = (shape: Record<string, unknown>): unknown => expect.objectContaining(shape)
+const textMatching = (pattern: RegExp): unknown => expect.stringMatching(pattern)
+
 const AT = "2026-10-01T12:00:00.000Z"
 const RUN_KEY_TEXT = "job-1:store-receipt:7"
 if (!isRunKey(RUN_KEY_TEXT)) throw new ReceiptStorageError({ code: ReceiptStorageErrorCode.Unavailable })
@@ -58,8 +62,8 @@ describe("store", () => {
             url: "https://s3.example.test/private-receipts/receipts/order-1.json",
             headers: {
                 "x-amz-date": "20261001T120000Z",
-                "x-amz-content-sha256": expect.stringMatching(/^[0-9a-f]{64}$/),
-                authorization: expect.stringMatching(/^AWS4-HMAC-SHA256 /),
+                "x-amz-content-sha256": textMatching(/^[0-9a-f]{64}$/),
+                authorization: textMatching(/^AWS4-HMAC-SHA256 /),
                 "content-type": "application/json",
             },
             bytes: receipt.content,
@@ -86,15 +90,15 @@ describe("store", () => {
             url: "https://s3.example.test/private-receipts",
             headers: {
                 "x-amz-date": "20261001T120000Z",
-                "x-amz-content-sha256": expect.stringMatching(/^[0-9a-f]{64}$/),
-                authorization: expect.stringMatching(/^AWS4-HMAC-SHA256 /),
+                "x-amz-content-sha256": textMatching(/^[0-9a-f]{64}$/),
+                authorization: textMatching(/^AWS4-HMAC-SHA256 /),
             },
             read: "bytes",
             timeoutMs: 3000,
         })
         expect(http.request).toHaveBeenNthCalledWith(
             3,
-            expect.objectContaining({ url: "https://s3.example.test/private-receipts/receipts/order-1.json" }),
+            objectLike({ url: "https://s3.example.test/private-receipts/receipts/order-1.json" }),
         )
     })
 

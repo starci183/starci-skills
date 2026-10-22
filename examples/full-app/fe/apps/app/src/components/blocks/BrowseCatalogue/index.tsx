@@ -39,10 +39,10 @@ export const BrowseCatalogue = () => {
                         ? t("descriptionCount", { count: catalog.length })
                         : t("description"),
                 productsSlot: read.status === "loading" ? { status: "loading" } : collectionSlot(products),
-                stockLabel: t.raw("stockLabel"),
+                stockLabel: t("stockLabel", { count: "{count}" }),
                 addToCart: t("addToCart"),
                 addingToCart: t("addingToCart"),
-                inCartLabel: t.raw("inCartLabel"),
+                inCartLabel: t("inCartLabel", { count: "{count}" }),
                 addRefused: t("addRefused"),
                 signedOutTitle: t("signedOut.title"),
                 signedOutDescription: t("signedOut.description"),

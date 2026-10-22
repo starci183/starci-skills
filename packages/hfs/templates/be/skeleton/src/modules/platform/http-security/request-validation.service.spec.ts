@@ -17,7 +17,7 @@ describe("RequestValidationService", () => {
     const metadata = { type: "body" as const, metatype: SignUpBody }
 
     it("returns the body as an instance of its declared class", async () => {
-        const body = await (await build()).transform({ name: "An Nguyen" }, metadata)
+        const body: unknown = await (await build()).transform({ name: "An Nguyen" }, metadata)
 
         expect(body).toBeInstanceOf(SignUpBody)
         expect(body).toEqual({ name: "An Nguyen" })

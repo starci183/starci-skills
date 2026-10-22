@@ -6,6 +6,9 @@ import type { Timer } from "@modules/platform/retry"
 import { HttpSecurityError, HttpSecurityErrorCode } from "./errors/http-security.error"
 import type { ReadinessReport } from "./readiness.contracts"
 
+/** The cancel of a deadline that was never scheduled. */
+const noCancel = (): void => undefined
+
 const READINESS_TIMEOUT_MS = 1000
 
 @Injectable()
@@ -18,7 +21,7 @@ export class ReadinessService {
 
     /** Returns ready only when the required primary database answers within one second. */
     async probeRequired(): Promise<ReadinessReport> {
-        let cancel: () => void = () => undefined
+        let cancel: () => void = noCancel
         try {
             await Promise.race([
                 this.database.probe(),

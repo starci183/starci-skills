@@ -7,6 +7,9 @@ import type { QueueOptions } from "./queue.options"
 import { ATTEMPTS, BACKOFF_MS, KEEP_COMPLETED_SECONDS } from "./queue.policy"
 import type { BullmqJob, BullmqQueue, BullmqWorker, QueueFactory } from "./queue-transport.port"
 
+/** Asymmetric matchers read as `unknown`: jest types them `any`, which may not flow into a property or a typed argument. */
+const anyOf = (type: unknown): unknown => expect.any(type)
+
 const options: QueueOptions = {
     redisHost: "redis.test",
     redisPort: 6380,
@@ -83,7 +86,7 @@ describe("BullmqQueueTransportClient", () => {
 
         await client.work(handler, 3)
 
-        expect(factory.worker).toHaveBeenCalledWith("orders", expect.any(Function), {
+        expect(factory.worker).toHaveBeenCalledWith("orders", anyOf(Function), {
             prefix: "spec.",
             connection: { host: "redis.test", port: 6380, db: 7, maxRetriesPerRequest: null },
             concurrency: 3,

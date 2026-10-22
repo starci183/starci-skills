@@ -26,7 +26,7 @@ export interface WorldLockOptions {
     /** The pid recorded for this holder (default: this process). */
     readonly pid?: number
     /** The pause between two attempts in milliseconds (default 100). */
-    readonly intervalMs?: number
+    readonly intervalMs?: number | undefined
     readonly pause?: (ms: number) => Promise<void>
 }
 

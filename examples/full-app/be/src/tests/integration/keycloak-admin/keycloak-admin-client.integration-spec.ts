@@ -5,8 +5,13 @@ import { refused } from "@modules/platform/primitives"
 import { KEYCLOAK_ADMIN_CAPABILITY_MODULES } from "../../world/test-capabilities.options"
 import { useTestWorld } from "../../world/use-test-world"
 
+/** Asymmetric matchers read as `unknown`: jest types them `any`, which may not flow into a property or a typed argument. */
+const anyOf = (type: unknown): unknown => expect.any(type)
+
 /** The ids of the rows and keys this spec arranges: deterministic, so a failing run reproduces. */
 const ids = fakeIds()
+
+const shopper = () => ({ email: `shopper-${ids.next()}@example.test`, password: `pw-${ids.next()}` })
 
 /**
  * keycloak-admin: the real admin client against the run's realm of the stack's Keycloak, no HTTP door of ours. It writes as
@@ -19,14 +24,13 @@ describe("keycloak-admin: shopper directory client (integration)", () => {
     const world = useTestWorld({ modules: KEYCLOAK_ADMIN_CAPABILITY_MODULES })
 
     const admin = (): KeycloakAdmin => world.resolve<KeycloakAdmin>(KEYCLOAK_ADMIN)
-    const shopper = () => ({ email: `shopper-${ids.next()}@example.test`, password: `pw-${ids.next()}` })
 
     it("creates a shopper that signs in to the realm with its password", async () => {
         const params = shopper()
 
         const created = await admin().createMember(params)
 
-        expect(created).toEqual({ kind: "ok", value: { id: expect.any(String) } })
+        expect(created).toEqual({ kind: "ok", value: { id: anyOf(String) } })
         const memberId = created.kind === "ok" ? created.value.id : ""
 
         // The realm vouches for the password, and the LOGIN it records belongs to the subject the client answered.

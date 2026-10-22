@@ -7,6 +7,9 @@ import { @@Step@@Compensation } from "./compensations/@@step@@.compensation"
 import { @@Saga@@SagaService } from "./@@saga@@.saga.service"
 import { @@Step@@Step } from "./steps/@@step@@.saga-step"
 
+/** Asymmetric matchers read as `unknown`: jest types them `any`, which may not flow into a property or a typed argument. */
+const anyOf = (type: unknown): unknown => expect.any(type)
+
 const build = async () => {
     const sagas = mock<SagaService>()
     const compensation = mock<@@Step@@Compensation>()
@@ -33,7 +36,7 @@ describe("@@Saga@@SagaService", () => {
                 saga: @@sagaUpper@@_SAGA,
                 correlationId: "x-1",
                 eventId: "e-1",
-                step: expect.any(@@Step@@Step),
+                step: anyOf(@@Step@@Step),
                 compensation,
             })
         })

@@ -2,6 +2,16 @@ import { Test } from "@nestjs/testing"
 import { DomainError } from "@modules/platform/errors"
 import { ok, refused, unwrapOutcome } from "./outcome.mapper"
 
+/** What `run` throws, read as `unknown`; the matcher then judges its fields. */
+const thrownBy = (run: () => unknown): unknown => {
+    try {
+        run()
+    } catch (error) {
+        return error
+    }
+    return undefined
+}
+
 type CapabilityErrorCode = "CAPABILITY_REFUSED"
 
 class CapabilityError extends DomainError<CapabilityErrorCode> {}
@@ -54,13 +64,11 @@ describe("outcome mappers", () => {
             const subject = await build()
             const outcome = subject.refused<CapabilityErrorCode>("CAPABILITY_REFUSED", { resource: "value-1" })
 
-            expect(() => subject.unwrapOutcome(outcome, CapabilityError)).toThrow(
-                expect.objectContaining({
-                    name: "CapabilityError",
-                    code: "CAPABILITY_REFUSED",
-                    params: { resource: "value-1" },
-                }),
-            )
+            expect(thrownBy(() => subject.unwrapOutcome(outcome, CapabilityError))).toMatchObject({
+                name: "CapabilityError",
+                code: "CAPABILITY_REFUSED",
+                params: { resource: "value-1" },
+            })
         })
     })
 })

@@ -47,6 +47,11 @@ export const BORROWED = Object.freeze({
     "@typescript-eslint/no-deprecated": "error",
     "@typescript-eslint/no-base-to-string": "error",
     "@typescript-eslint/require-await": "error",
+    "@typescript-eslint/no-unsafe-assignment": "error",
+    "@typescript-eslint/no-unsafe-member-access": "error",
+    "@typescript-eslint/no-unsafe-call": "error",
+    "@typescript-eslint/no-unsafe-return": "error",
+    "@typescript-eslint/no-unsafe-argument": "error",
     "no-console": "error",
 })
 
@@ -90,6 +95,6 @@ export const buildBeConfig = async ({ hfs, plugin, recommended }) => {
             rules: { ...rules, ...BORROWED },
         },
         // Sonar way: what the scan raises is refused while the code is written; a spec is outside the scan, so outside this block.
-        { files: [...SOURCE_FILES], ignores: [...OUTSIDE_THE_SCAN_FILES], plugins: { sonarjs, unicorn }, rules: sonarWayRules(sonarjs).rules },
+        { files: [...SOURCE_FILES], ignores: [...OUTSIDE_THE_SCAN_FILES], plugins: { sonarjs, unicorn }, rules: sonarWayRules(sonarjs, "be").rules },
     ]
 }

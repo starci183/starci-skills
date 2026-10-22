@@ -18,3 +18,6 @@ export abstract class DomainError<C extends string> extends Error {
         this.params = init.params ?? {}
     }
 }
+
+/** True for a DomainError of any capability. A generic class narrows `unknown` to `DomainError<any>`; this guard narrows to `DomainError<string>`, so its code is a string. */
+export const isDomainError = (value: unknown): value is DomainError<string> => value instanceof DomainError

@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.7.22 - 2026-10-22
+- Changed: the bundled R280 detector (`HFS_UNUSED_SYMBOL`) resolves more catalog keys so a product needs fewer `i18n-dynamic-keys.yaml` entries: the type checker reads the standard library (a key typed as a union of literals is read through `filter`/`map` callbacks), a `??` or `||` default holds both operands, a nullish branch of a property owner is skipped, and a table of constants is read through the `readonly` fields of the interface or alias that types it. Spec: `src/unused-symbol-flow.spec.mjs`.
+- Changed: the bundled `knowledge/sonar-gate.yaml` holds every issue severity on changed lines and a change of any size to duplication (`ignoreBelowChangedLines: 0`).
+
 ## 4.7.21 - 2026-10-22
 - Changed: the bundled `scripts/lib/gate-loosening.mjs` has no approval route (owner ruling loosening-always-red, 2026-10-22): `approved` and `approvalIdOf` are gone, `looseningStep` is the land gate's always-red step whose only way out is restoring the gate, and the pure released-state judgement `loosensReleased` moved here from the runtime's check library. Spec: `src/gate-loosening.spec.mjs`.
 - Added: the bundled runtime copy of `scripts/lib/gate-loosening.mjs`, which judges whether one change loosens a gate. It is rename-aware: an allowlist or rule entry that only moves with a git rename of the paths it names (the removed line, with every renamed prefix rewritten, equals an added line) is no loosening, while an entry that also widens, or one added beside the move, still is. Spec: `src/gate-loosening.spec.mjs`.

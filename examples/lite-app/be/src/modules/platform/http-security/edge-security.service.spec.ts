@@ -52,18 +52,14 @@ describe("HTTP edge origin validation", () => {
         "ftp://web.example",
     ])("rejects wildcard, malformed and non-origin allowlist entry %s at boot", async (origin) => {
         const edge = await buildEdge()
-        expect(() => edge.validateAllowedOrigins([origin], true)).toThrow(
-            expect.objectContaining({ code: "HTTP_SECURITY_REQUEST_INVALID" }),
-        )
+        expect(() => edge.validateAllowedOrigins([origin], true)).toThrow("HTTP_SECURITY_REQUEST_INVALID")
     })
 
     it("rejects an empty allowlist and HTTP origins without development permission", async () => {
         const edge = await buildEdge()
-        expect(() => edge.validateAllowedOrigins([], false)).toThrow(
-            expect.objectContaining({ code: "HTTP_SECURITY_REQUEST_INVALID" }),
-        )
+        expect(() => edge.validateAllowedOrigins([], false)).toThrow("HTTP_SECURITY_REQUEST_INVALID")
         expect(() => edge.validateAllowedOrigins(["http://web.example"], false)).toThrow(
-            expect.objectContaining({ code: "HTTP_SECURITY_REQUEST_INVALID" }),
+            "HTTP_SECURITY_REQUEST_INVALID",
         )
     })
 })
@@ -121,9 +117,7 @@ describe("HTTP edge installation", () => {
         async (trustProxy) => {
             const edge = await buildEdge()
             const { app } = appWithServer()
-            expect(() => edge.applyHttpSecurity(app, options, { trustProxy })).toThrow(
-                expect.objectContaining({ code: "HTTP_SECURITY_REQUEST_INVALID" }),
-            )
+            expect(() => edge.applyHttpSecurity(app, options, { trustProxy })).toThrow("HTTP_SECURITY_REQUEST_INVALID")
             expect(app.enableCors).not.toHaveBeenCalled()
         },
     )

@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.0.6 - 2026-10-22
+
+- Changed: every strictness flag lives in `base.json`, so no preset is looser than another (owner ruling 2026-10-22, no loosening): `noImplicitReturns`, `noUncheckedIndexedAccess`, `noUnusedLocals` and `noUnusedParameters` move down from `be.json` (and `next.json`) and the front end now compiles under them; new in the base: `allowUnusedLabels: false`. `skipLibCheck` stays on, stated once in `base.json` (checking `node_modules` declarations reports errors in third-party typings no repository can fix); no repository config restates it.
+
 ## 2.0.5 - 2026-10-22
 
 - Fixed: next.json sets `noUnusedLocals` and `noUnusedParameters`, as be.json does: the lint canons leave Sonar S1481 (unused local) to the compiler, which no front end ran (owner ruling 2026-10-22, no loosening). The three example front ends compile with 0 unused-declaration errors.

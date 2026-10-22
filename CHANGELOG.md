@@ -6,6 +6,9 @@ until every S* row in `docs/goal.md` holds with fresh evidence, then `1.0.0` fre
 
 ## [Unreleased]
 
+### Changed
+- No loosening in the lint and type canon (owner ruling 2026-10-22): the front-end canon borrows `no-floating-promises`, `no-misused-promises`, `switch-exhaustiveness-check` and the `no-unsafe-*` family like the back end (both canons carry the family); the Sonar way mapping leaves no rule to the server; `knowledge/sonar-gate.yaml` fails a slice on any severity and ignores no small change; `@starci/tsconfig` hoists every strictness flag into `base.json` (`noUncheckedIndexedAccess`, `noImplicitReturns`, `noUnused*`); fe-kit and the harness UI lint all of `src/` through `starciPlainSourceConfig`; the R280 detector resolves keys from typed constants and unions. Package versions: tsconfig 2.0.6, back-end canon 3.4.30, front-end canon 8.4.29, hfs 4.7.22 (pins move at the release cut).
+
 ## [1.0.0-alpha.26] — 2026-10-22
 
 ### Changed

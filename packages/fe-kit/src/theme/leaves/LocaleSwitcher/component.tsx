@@ -26,7 +26,7 @@ export type LocaleSwitcherBaseProps<L extends string = string> = {
      * `pill` draws the bordered floating group the shell uses; `plain` keeps the same control
      * unframed for a surface that draws its own boundary.
      */
-    readonly appearance?: "pill" | "plain";
+    readonly appearance?: "pill" | "plain" | undefined;
     /** The group's accessible name. */
     readonly label: string;
     /** One resolved option per shipped locale. */

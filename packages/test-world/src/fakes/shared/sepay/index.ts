@@ -171,8 +171,8 @@ const findIntent = (context: Context, key: string): StoredIntent | undefined =>
 interface SettleRequest {
     readonly key: string
     readonly status: "paid" | "failed"
-    readonly periodEnd?: string
-    readonly amount?: number
+    readonly periodEnd?: string | undefined
+    readonly amount?: number | undefined
     readonly deliverTo: string
 }
 

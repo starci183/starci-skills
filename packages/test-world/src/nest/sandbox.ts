@@ -100,7 +100,7 @@ export const createSandbox = <T>(spec: SandboxSpec<T>, base: () => ReadonlyArray
             const response = await fetch(request.url, {
                 method: request.method,
                 headers: { ...(request.body === undefined ? {} : { "content-type": "application/json" }), ...request.headers },
-                body: request.body === undefined ? undefined : JSON.stringify(request.body),
+                ...(request.body === undefined ? {} : { body: JSON.stringify(request.body) }),
                 signal: AbortSignal.timeout(30_000),
             })
             return { status: response.status, body: readJson(await response.text()) }

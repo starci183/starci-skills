@@ -1,6 +1,6 @@
 import "reflect-metadata"
 import { NestFactory } from "@nestjs/core"
-import type { Application } from "express"
+import type { NestExpressApplication } from "@nestjs/platform-express"
 import { SystemClock } from "@modules/platform/clock"
 import { EnvSource } from "@modules/platform/config"
 import { securityHeaders } from "@modules/platform/http-security"
@@ -12,9 +12,9 @@ import { readIdentityEnv } from "./identity.env"
 async function bootstrap(): Promise<void> {
     const env = EnvSource.fromProcess()
     const options = readIdentityEnv(env)
-    const app = await NestFactory.create(AppModule.register(options))
+    const app = await NestFactory.create<NestExpressApplication>(AppModule.register(options))
     app.enableShutdownHooks()
-    const server: Application = app.getHttpAdapter().getInstance()
+    const server = app.getHttpAdapter().getInstance()
     server.disable("x-powered-by")
     app.use(securityHeaders)
     server.set("trust proxy", 0)

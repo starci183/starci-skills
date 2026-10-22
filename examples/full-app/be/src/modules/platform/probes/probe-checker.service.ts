@@ -12,6 +12,9 @@ import { ProbesLogEvent } from "./probes.log-events"
 import type { ProbesOptions } from "./probes.options"
 import type { Probe } from "./probes.port"
 
+/** The cancel of a deadline that was never scheduled. */
+const noCancel = (): void => undefined
+
 /** A hung dependency must not hold the readiness HTTP request open indefinitely. */
 const PROBE_TIMEOUT_MS = 2_000
 
@@ -48,7 +51,7 @@ export class ProbeCheckerService {
     }
 
     private async state(probe: Probe): Promise<ProbeState> {
-        let cancel: () => void = () => undefined
+        let cancel: () => void = noCancel
         let state: ProbeState = "ok"
         try {
             await Promise.race([

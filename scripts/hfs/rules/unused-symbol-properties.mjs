@@ -35,7 +35,7 @@ function entryProperty(state, entry, name, seen, resolve) {
 }
 
 /** Fold writes in source order, with branch-local cycle detection and explicit absence. */
-function ownerProperty(state, owner, name, visited, resolve) {
+export function ownerProperty(state, owner, name, visited, resolve) {
   if ((!state.ts.isObjectLiteralExpression(owner) && !state.ts.isJsxAttributes(owner)) || visited.has(owner)) return null;
   const seen = new Set([...visited, owner]);
   return owner.properties.reduce((before, entry) => mergeProperty(before, entryProperty(state, entry, name, seen, resolve)), ABSENT_PROPERTY);

@@ -19,6 +19,9 @@ import { OrderEntity } from "./persistence/entities/order.entity"
 import { OrderLineEntity } from "./persistence/entities/order-line.entity"
 import { CANCEL_ORDER_IF_PENDING, COUNT_PERSON_ORDERS, INSERT_ORDER_IF_NEW } from "./persistence/order.sql"
 
+/** Asymmetric matchers read as `unknown`: jest types them `any`, which may not flow into a property or a typed argument. */
+const anything = (): unknown => expect.anything()
+
 const shirt = productView()
 const mug = productView({ id: "sku-2", name: "Mug", priceMinorUnits: 250, stock: 10 })
 
@@ -117,12 +120,12 @@ const registerCommittedPlacementTests = (): void => {
 
         expect(tx.em.query).toHaveBeenCalledWith(INSERT_ORDER_IF_NEW, ["p-1", 1250, "USD", "key-7"])
         expect(catalog.reserveStock).toHaveBeenNthCalledWith(1, {
-            manager: expect.anything(),
+            manager: anything(),
             productId: "sku-1",
             quantity: 2,
         })
         expect(catalog.reserveStock).toHaveBeenNthCalledWith(2, {
-            manager: expect.anything(),
+            manager: anything(),
             productId: "sku-2",
             quantity: 1,
         })
@@ -130,10 +133,10 @@ const registerCommittedPlacementTests = (): void => {
             { orderId: "o-7", productId: "sku-1", quantity: 2, unitPriceMinorUnits: 500 },
             { orderId: "o-7", productId: "sku-2", quantity: 1, unitPriceMinorUnits: 250 },
         ])
-        expect(cart.clear).toHaveBeenCalledWith({ manager: expect.anything(), personId: "p-1" })
+        expect(cart.clear).toHaveBeenCalledWith({ manager: anything(), personId: "p-1" })
         expect(tx.commits).toBe(1)
         expect(sagas.begin).toHaveBeenCalledWith({
-            manager: expect.anything(),
+            manager: anything(),
             saga: PLACE_ORDER_SAGA,
             correlationId: "o-7",
         })
@@ -306,12 +309,12 @@ const registerCancelOrderTests = (): void => {
 
             expect(tx.em.query).toHaveBeenCalledWith(CANCEL_ORDER_IF_PENDING, ["o-1"])
             expect(catalog.releaseStock).toHaveBeenNthCalledWith(1, {
-                manager: expect.anything(),
+                manager: anything(),
                 productId: "sku-1",
                 quantity: 2,
             })
             expect(catalog.releaseStock).toHaveBeenNthCalledWith(2, {
-                manager: expect.anything(),
+                manager: anything(),
                 productId: "sku-2",
                 quantity: 1,
             })

@@ -32,7 +32,7 @@ export type FeKitLinkProps<L extends string = string> = {
     /** Styling hook for the consuming leaf. */
     readonly className?: string;
     /** Current-locale marker the leaf sets on the reader's own language. */
-    readonly "aria-current"?: "page" | "true" | "false" | boolean;
+    readonly "aria-current"?: "page" | "true" | "false" | boolean | undefined;
     /** The link's visible copy. */
     readonly children?: ReactNode;
 };

@@ -208,7 +208,7 @@ const returnParams = (context: Context, txn: Txn, secret: string): Record<string
     )
 
 /** Moves the payment to its final state (the gateway reports it from now on) and builds the return URL. */
-const finish = (context: Context, txn: Txn, responseCode: string, extra: { readonly transactionNo?: string; readonly bankCode?: string }): void => {
+const finish = (context: Context, txn: Txn, responseCode: string, extra: { readonly transactionNo?: string | undefined; readonly bankCode?: string | undefined }): void => {
     context.state.transactionSequence += 1
     const success = responseCode === "00"
     txn.status = success ? "paid" : "failed"
@@ -275,7 +275,7 @@ const webApi = (request: FakeHttpRequest, context: Context): FakeHttpReply => {
     }
 }
 
-const settleBody = (body: unknown, action: string): { readonly txnRef: string; readonly deliverTo: string; readonly bankCode?: string; readonly transactionNo?: string; readonly code?: string } => {
+const settleBody = (body: unknown, action: string): { readonly txnRef: string; readonly deliverTo: string; readonly bankCode?: string | undefined; readonly transactionNo?: string | undefined; readonly code?: string | undefined } => {
     const record = controlRecord(body, action)
     return {
         txnRef: controlString(record, "reference", action),

@@ -3,6 +3,19 @@ import type { Express, RequestHandler } from "express"
 import { HttpSecurityError, HttpSecurityErrorCode } from "./errors/http-security.error"
 import type { HttpSecurityOptions } from "./http-security.options"
 
+/** The express application behind the Nest adapter. Nest types the instance `any`; it is read as `unknown` and checked before use. */
+const isExpressApplication = (value: unknown): value is Express =>
+    (typeof value === "function" || (typeof value === "object" && value !== null)) &&
+    typeof Reflect.get(value, "disable") === "function" &&
+    typeof Reflect.get(value, "set") === "function"
+
+const expressOf = (app: INestApplication): Express => {
+    const instance: unknown = app.getHttpAdapter().getInstance()
+    if (!isExpressApplication(instance))
+        throw new HttpSecurityError({ code: HttpSecurityErrorCode.RequestInvalid, params: { fields: "HTTP_ADAPTER" } })
+    return instance
+}
+
 /** The declared ingress hop count of the app's edge. */
 export interface HttpEdgeOptions {
     /** Exact trusted proxy hops; the declared stack has one ingress in front of the api. */
@@ -50,7 +63,7 @@ export const applyHttpSecurity = (app: INestApplication, options: HttpSecurityOp
             code: HttpSecurityErrorCode.RequestInvalid,
             params: { fields: "HTTP_SECURITY_TRUST_PROXY" },
         })
-    const server: Express = app.getHttpAdapter().getInstance()
+    const server = expressOf(app)
     server.disable("x-powered-by")
     server.set("trust proxy", edge.trustProxy)
     app.use(securityHeaders)

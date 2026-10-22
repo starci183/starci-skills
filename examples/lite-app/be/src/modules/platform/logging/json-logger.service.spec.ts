@@ -10,8 +10,9 @@ type WrittenLine = { stream: "out" | "err"; line: string }
 
 const readJsonLine = (line: string | undefined): Record<string, unknown> => {
     try {
-        const entry: Record<string, unknown> = JSON.parse(line ?? "")
-        return entry
+        const entry: unknown = JSON.parse(line ?? "")
+        if (typeof entry !== "object" || entry === null) return {}
+        return { ...entry }
     } catch (error) {
         throw error
     }

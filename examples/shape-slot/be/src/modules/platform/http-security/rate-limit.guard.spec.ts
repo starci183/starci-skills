@@ -40,8 +40,6 @@ const contextOf = (ip: string | undefined, handler = () => undefined, door: Type
     return { context, setIp: (value: string | undefined) => (address = value) }
 }
 
-const RATE_LIMITED = expect.objectContaining({ code: HttpSecurityErrorCode.RateLimited })
-
 describe("RateLimit", () => {
     it("marks a door with the tier it declares, and the guard counts it under that tier's limit", async () => {
         class Door {}
@@ -50,7 +48,7 @@ describe("RateLimit", () => {
         const { context } = contextOf("127.0.0.1", () => undefined, Door)
 
         expect(guard.canActivate(context)).toBe(true)
-        expect(() => guard.canActivate(context)).toThrow(RATE_LIMITED)
+        expect(() => guard.canActivate(context)).toThrow(HttpSecurityErrorCode.RateLimited)
     })
 })
 
@@ -61,7 +59,7 @@ describe("RateLimitGuard", () => {
 
         expect(guard.canActivate(context)).toBe(true)
         expect(guard.canActivate(context)).toBe(true)
-        expect(() => guard.canActivate(context)).toThrow(RATE_LIMITED)
+        expect(() => guard.canActivate(context)).toThrow(HttpSecurityErrorCode.RateLimited)
     })
 
     it("opens a fresh window for a caller whose bucket expired", async () => {
@@ -71,7 +69,7 @@ describe("RateLimitGuard", () => {
 
         guard.canActivate(context)
         guard.canActivate(context)
-        expect(() => guard.canActivate(context)).toThrow(RATE_LIMITED)
+        expect(() => guard.canActivate(context)).toThrow(HttpSecurityErrorCode.RateLimited)
 
         clock.advance(60_001)
 
@@ -84,7 +82,7 @@ describe("RateLimitGuard", () => {
 
         guard.canActivate(context)
         guard.canActivate(context)
-        expect(() => guard.canActivate(context)).toThrow(RATE_LIMITED)
+        expect(() => guard.canActivate(context)).toThrow(HttpSecurityErrorCode.RateLimited)
     })
 
     it("prunes the expired buckets when the map outgrows the bucket cap", async () => {
@@ -102,6 +100,6 @@ describe("RateLimitGuard", () => {
 
         expect(guard.canActivate(context)).toBe(true)
         expect(guard.canActivate(context)).toBe(true)
-        expect(() => guard.canActivate(context)).toThrow(RATE_LIMITED)
+        expect(() => guard.canActivate(context)).toThrow(HttpSecurityErrorCode.RateLimited)
     })
 })

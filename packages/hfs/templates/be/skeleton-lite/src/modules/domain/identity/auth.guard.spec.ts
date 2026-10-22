@@ -53,8 +53,6 @@ const contextOf = (
     return { context, request }
 }
 
-const unauthenticated = expect.objectContaining({ code: IdentityErrorCode.Unauthenticated })
-
 describe("AuthGuard", () => {
     it("lets a public door through without reading a token", async () => {
         const { guard, verify } = await build({ reason: PublicReason.Health })
@@ -100,7 +98,7 @@ describe("AuthGuard credential doors", () => {
             verify.mockResolvedValue(ok(principal))
             const { context } = contextOf("Bearer signed-token", credentialPrincipal, principal)
 
-            await expect(guard.canActivate(context)).rejects.toThrow(unauthenticated)
+            await expect(guard.canActivate(context)).rejects.toThrow(IdentityErrorCode.Unauthenticated)
 
             expect(verify).not.toHaveBeenCalled()
         },
@@ -115,7 +113,7 @@ describe("AuthGuard credential doors", () => {
             const { guard, verify } = await build({ reason: PublicReason.Health }, { kind: "api-key" })
             const { context } = contextOf("Bearer signed-token", credentialPrincipal, principal)
 
-            await expect(guard.canActivate(context)).rejects.toThrow(unauthenticated)
+            await expect(guard.canActivate(context)).rejects.toThrow(IdentityErrorCode.Unauthenticated)
 
             expect(verify).not.toHaveBeenCalled()
         },
@@ -126,7 +124,7 @@ describe("AuthGuard credential doors", () => {
         verify.mockResolvedValue(refused(SupabaseErrorCode.AccessTokenInvalid))
         const { context, request } = contextOf("bearer forged-token")
 
-        await expect(guard.canActivate(context)).rejects.toThrow(unauthenticated)
+        await expect(guard.canActivate(context)).rejects.toThrow(IdentityErrorCode.Unauthenticated)
 
         expect(request.principal).toBeUndefined()
     })
@@ -140,7 +138,7 @@ describe("AuthGuard credential doors", () => {
         const { guard, verify } = await build(undefined)
         const { context } = contextOf(authorization)
 
-        await expect(guard.canActivate(context)).rejects.toThrow(unauthenticated)
+        await expect(guard.canActivate(context)).rejects.toThrow(IdentityErrorCode.Unauthenticated)
 
         expect(verify).not.toHaveBeenCalled()
     })

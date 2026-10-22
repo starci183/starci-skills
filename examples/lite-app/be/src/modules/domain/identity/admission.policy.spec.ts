@@ -10,10 +10,14 @@ const principal: Principal = { id: "person-1", email: "person-1@example.test", r
 const credentialPrincipal: CredentialPrincipal = { kind: "api-key", subject: "key-1", workspaceId: "ws-1" }
 
 const SUBJECT = Symbol("admission policy")
+/** A record is read as metadata whatever its fields: the admission under test is what judges the reason. */
+const isMetadata = (value: unknown): value is PublicMetadata => typeof value === "object" && value !== null
+
 const parseMetadata = (text: string): PublicMetadata => {
     try {
-        const metadata: PublicMetadata = JSON.parse(text)
-        return metadata
+        const parsed: unknown = JSON.parse(text)
+        if (!isMetadata(parsed)) throw new IdentityError({ code: IdentityErrorCode.Unauthenticated })
+        return parsed
     } catch (cause) {
         throw new IdentityError({ code: IdentityErrorCode.Unauthenticated, cause })
     }

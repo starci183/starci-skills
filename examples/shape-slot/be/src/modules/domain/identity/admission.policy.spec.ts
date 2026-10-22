@@ -6,10 +6,14 @@ import { PublicReason } from "./identity.contracts"
 
 const ADMISSION: unique symbol = Symbol("identity.admission")
 
+/** A record is read as metadata whatever its fields: the admission under test is what judges the reason. */
+const isMetadata = (value: unknown): value is PublicMetadata => typeof value === "object" && value !== null
+
 const runtimeMetadata = (source: string): PublicMetadata => {
     try {
-        const metadata: PublicMetadata = JSON.parse(source)
-        return metadata
+        const parsed: unknown = JSON.parse(source)
+        if (!isMetadata(parsed)) throw new IdentityError({ code: IdentityErrorCode.Unauthenticated })
+        return parsed
     } catch (cause) {
         throw new IdentityError({ code: IdentityErrorCode.Unauthenticated, cause })
     }

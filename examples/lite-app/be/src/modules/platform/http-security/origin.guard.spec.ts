@@ -56,16 +56,12 @@ describe("OriginGuard", () => {
     it("refuses a state-changing request from an origin outside the allowlist", async () => {
         const { guard, context } = await build("DELETE", { origin: "https://foreign.test" })
 
-        expect(() => guard.canActivate(context)).toThrow(
-            expect.objectContaining({ code: HttpSecurityErrorCode.OriginRejected }),
-        )
+        expect(() => guard.canActivate(context)).toThrow(HttpSecurityErrorCode.OriginRejected)
     })
 
     it("refuses a state-changing request whose Referer names an origin outside the allowlist", async () => {
         const { guard, context } = await build("PUT", { referer: "https://foreign.test/page" })
 
-        expect(() => guard.canActivate(context)).toThrow(
-            expect.objectContaining({ code: HttpSecurityErrorCode.OriginRejected }),
-        )
+        expect(() => guard.canActivate(context)).toThrow(HttpSecurityErrorCode.OriginRejected)
     })
 })

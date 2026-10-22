@@ -8,7 +8,8 @@
  */
 import assert from "node:assert/strict"
 import test from "node:test"
-import { ESLint } from "eslint"
+import { ESLint, Linter } from "eslint"
+import tsParser from "@typescript-eslint/parser"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 import plugin, {
@@ -18,14 +19,19 @@ import plugin, {
   ruleOwners,
   rules,
   starciFeConfig,
+  starciPlainSourceConfig,
+  starciTypedSourceConfig,
   why,
 } from "./index.mjs"
+import { BORROWED, PLAIN_SOURCE_FILES, SLOT_FREE_RULES } from "./lib/config.mjs"
 import { hfsFromDeclaration } from "./lib/hfs.mjs"
 import { declaredHfsView } from "./runtime/scripts/hfs/view.mjs"
 import { hasSecondLanguage } from "./runtime/scripts/lib/language.mjs"
 import { appDeclaration } from "../be/fixtures/app.mjs"
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "fixtures", "typed")
+/** The files the typed fixture lints without listing them in its tsconfig; one list for every test, the project service is shared by root. */
+const ALLOW_DEFAULT_PROJECT = ["apps/*/src/components/*/*/*.tsx", "src/*.ts", "src/*.tsx"]
 const FE = appDeclaration("fe", { apps: [{ name: "web", kind: "next" }], optionalSlots: ["repo.packages", "fe.package.ui"] })
 const hfs = hfsFromDeclaration(FE, ROOT)
 const config = starciFeConfig({ hfs })
@@ -106,7 +112,7 @@ test("the factory's config lints a real file: a hardcoded copy string is an erro
   const RULE = "starci-fe/no-hardcoded-copy"
   const parserOptions = {
     ...block.languageOptions.parserOptions,
-    projectService: { allowDefaultProject: ["apps/*/src/components/*/*/*.tsx"], defaultProject: "tsconfig.json" },
+    projectService: { allowDefaultProject: ALLOW_DEFAULT_PROJECT, defaultProject: "tsconfig.json" },
   }
   const eslint = new ESLint({
     cwd: ROOT,
@@ -120,6 +126,104 @@ test("the factory's config lints a real file: a hardcoded copy string is an erro
   const rule = result.messages.find((message) => message.ruleId === RULE)
   assert.ok(rule, `no-hardcoded-copy did not report: ${JSON.stringify(result.messages.map((m) => m.ruleId))}`)
   assert.equal(rule.severity, 2)
+})
+
+const TYPE_AWARE = [
+  "@typescript-eslint/no-floating-promises",
+  "@typescript-eslint/no-misused-promises",
+  "@typescript-eslint/switch-exhaustiveness-check",
+  "@typescript-eslint/no-unsafe-assignment",
+  "@typescript-eslint/no-unsafe-member-access",
+  "@typescript-eslint/no-unsafe-call",
+  "@typescript-eslint/no-unsafe-return",
+  "@typescript-eslint/no-unsafe-argument",
+]
+
+test("the front end borrows the same type-aware promise, exhaustiveness and no-unsafe rules the back end does, all at error", () => {
+  for (const name of TYPE_AWARE) {
+    assert.equal(BORROWED[name], "error", `${name} is not borrowed at error`)
+    assert.equal(single[0].rules[name], "error", `${name} is not in the source block`)
+  }
+})
+
+test("a floating promise, an async handler passed where a void is expected and an unsound any are refused in front-end source", async () => {
+  const [block] = single
+  const parserOptions = {
+    ...block.languageOptions.parserOptions,
+    projectService: { allowDefaultProject: ALLOW_DEFAULT_PROJECT, defaultProject: "tsconfig.json" },
+  }
+  const eslint = new ESLint({
+    cwd: ROOT,
+    overrideConfigFile: true,
+    overrideConfig: [{ ...block, rules: Object.fromEntries(TYPE_AWARE.map((name) => [name, "error"])), languageOptions: { ...block.languageOptions, parserOptions } }],
+  })
+  const source = [
+    "declare const load: () => Promise<string>",
+    "declare const raw: any",
+    "export const run = (): void => { load() }",
+    "export const handlers = [1].map(async () => 1).every(Boolean)",
+    "export const name: string = raw.name",
+    "",
+  ].join("\n")
+  const [result] = await eslint.lintText(source, { filePath: join(ROOT, "apps", "web", "src", "components", "blocks", "Feed", "index.tsx") })
+  assert.deepEqual(result.messages.filter((message) => message.fatal), [], "the file parses with types")
+  const ids = new Set(result.messages.map((message) => message.ruleId))
+  for (const name of ["@typescript-eslint/no-floating-promises", "@typescript-eslint/no-unsafe-member-access", "@typescript-eslint/no-unsafe-assignment"]) assert.ok(ids.has(name), `${name} did not report: ${[...ids].join(", ")}`)
+})
+
+// -- a front-end tree that is no HFS app (a runtime package, the harness UI) ---------------------------------
+
+const plain = starciPlainSourceConfig({ root: ROOT })
+
+test("the plain-source config is typed, fenced and at error: no rule is off, warn or overridable", () => {
+  assert.equal(plain.length, 3)
+  assert.deepEqual(plain[1].files, [...PLAIN_SOURCE_FILES])
+  assert.equal(plain[1].languageOptions.parserOptions.tsconfigRootDir, ROOT)
+  assert.equal(plain[1].languageOptions.parserOptions.projectService, true)
+  assert.deepEqual(plain[1].linterOptions, { noInlineConfig: true, reportUnusedDisableDirectives: "error" })
+  for (const block of plain.slice(1)) for (const [name, setting] of Object.entries(block.rules)) assert.equal(Array.isArray(setting) ? setting[0] : setting, "error", name)
+  for (const name of TYPE_AWARE) assert.equal(plain[1].rules[name], "error", name)
+  for (const name of SLOT_FREE_RULES) assert.equal(plain[1].rules[`starci-fe/${name}`], "error", name)
+  assert.equal(plain[1].rules["react-hooks/rules-of-hooks"], "error")
+  assert.equal(plain[2].rules["unicorn/prefer-top-level-await"]?.[0], "error")
+  assert.throws(() => starciPlainSourceConfig(), /needs { root }/)
+})
+
+test("the typed-source config is the plain one without the canon's own rules: types, hooks and Sonar way, all at error", () => {
+  const typed = starciTypedSourceConfig({ root: ROOT })
+  assert.equal(typed.length, 3)
+  assert.deepEqual(Object.keys(typed[1].rules).filter((name) => name.startsWith("starci-fe/")), [])
+  for (const name of TYPE_AWARE) assert.equal(typed[1].rules[name], "error", name)
+  assert.equal(typed[1].rules["react-hooks/exhaustive-deps"], "error")
+  assert.deepEqual(typed[2].rules, plain[2].rules)
+  assert.deepEqual(typed[1].linterOptions, { noInlineConfig: true, reportUnusedDisableDirectives: "error" })
+})
+
+test("the slot-free list is closed: every other canon rule refuses to run without an HFS view, and every listed rule runs without one", () => {
+  const linter = new Linter({ configType: "flat" })
+  const parserOptions = { ...plain[1].languageOptions.parserOptions, projectService: { allowDefaultProject: ALLOW_DEFAULT_PROJECT, defaultProject: "tsconfig.json" } }
+  const verify = (name) => linter.verify("export const x = 1\n", [{ files: ["**/*.ts"], languageOptions: { parser: tsParser, parserOptions }, plugins: { "starci-fe": plugin }, rules: { [`starci-fe/${name}`]: "error" } }], { filename: join(ROOT, "src", "a.ts") })
+  const free = new Set(SLOT_FREE_RULES)
+  for (const name of free) assert.ok(name in rules, `${name} is a published rule`)
+  for (const name of Object.keys(rules)) {
+    if (free.has(name)) {
+      assert.deepEqual(verify(name).filter((message) => message.fatal), [], `${name} runs without a slot view`)
+    } else {
+      assert.throws(() => verify(name), /settings.starci.hfs/, `${name} needs a slot view, or is missing from SLOT_FREE_RULES`)
+    }
+  }
+})
+
+test("the plain-source config refuses a floating promise and a bare button in a tree with no slots", async () => {
+  const [, block] = plain
+  const parserOptions = { ...block.languageOptions.parserOptions, projectService: { allowDefaultProject: ALLOW_DEFAULT_PROJECT, defaultProject: "tsconfig.json" } }
+  const eslint = new ESLint({ cwd: ROOT, overrideConfigFile: true, overrideConfig: [{ ...block, languageOptions: { ...block.languageOptions, parserOptions } }] })
+  const source = ["declare const load: () => Promise<string>", "export const run = (): void => { load() }", "export const View = () => <button type=\"button\">x</button>", ""].join("\n")
+  const [result] = await eslint.lintText(source, { filePath: join(ROOT, "src", "plain.tsx") })
+  assert.deepEqual(result.messages.filter((message) => message.fatal), [])
+  const ids = new Set(result.messages.map((message) => message.ruleId))
+  assert.ok(ids.has("@typescript-eslint/no-floating-promises"), [...ids].join(", "))
+  assert.ok(ids.has("starci-fe/no-native-form-control"), [...ids].join(", "))
 })
 
 // -- the why map -----------------------------------------------------------------------------------
@@ -225,7 +329,10 @@ test("the Sonar way block lints the source outside the specs with the pinned son
   assert.ok(sonar.plugins.sonarjs?.rules && sonar.plugins.unicorn?.rules)
   assert.deepEqual(sonar.rules["sonarjs/cognitive-complexity"], ["error", 15])
   for (const name of ["sonarjs/no-nested-template-literals", "no-duplicate-imports", "unicorn/prefer-set-has"]) assert.ok(name in sonar.rules, `${name} is mapped`)
-  for (const name of ["sonarjs/different-types-comparison", "sonarjs/function-return-type", "sonarjs/argument-type", "@typescript-eslint/prefer-optional-chain"]) assert.ok(!(name in sonar.rules), `${name} is left to the server`)
+  for (const name of ["sonarjs/different-types-comparison", "sonarjs/function-return-type", "sonarjs/argument-type", "@typescript-eslint/prefer-optional-chain", "unicorn/prefer-top-level-await"]) {
+    assert.equal(sonar.rules[name]?.[0], "error", `${name} is not left to the server`)
+  }
+  assert.deepEqual(sonar.rules["unicorn/consistent-function-scoping"], ["error"], "arrow functions are judged too")
   assert.equal(single[0].rules["starci-fe/max-params"], "error")
   assert.equal(single[0].rules["starci-fe/media-has-caption"], "error")
 })

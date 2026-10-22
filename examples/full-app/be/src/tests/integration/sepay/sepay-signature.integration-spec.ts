@@ -39,7 +39,7 @@ describe("sepay: notifier signature (integration)", () => {
         expect(delivery.status).toBe(204)
         expect(() => verify(delivery)).not.toThrow()
         expect(() => verify({ ...delivery, body: `${delivery.body} ` })).toThrow(
-            expect.objectContaining({ code: HttpSecurityErrorCode.WebhookSignatureInvalid }),
+            HttpSecurityErrorCode.WebhookSignatureInvalid,
         )
     })
 
@@ -49,13 +49,11 @@ describe("sepay: notifier signature (integration)", () => {
         const bad = present(await world.fake.sepay.settle({ reference, amount: 1500 }), "bad signature delivery")
 
         expect(bad.status).toBe(401)
-        expect(() => verify(bad)).toThrow(
-            expect.objectContaining({ code: HttpSecurityErrorCode.WebhookSignatureInvalid }),
-        )
+        expect(() => verify(bad)).toThrow(HttpSecurityErrorCode.WebhookSignatureInvalid)
 
         const stale = await world.fake.sepay.replayWebhook(reference, { ageMs: 600_000 })
         expect(stale.status).toBe(401)
-        expect(() => verify(stale)).toThrow(expect.objectContaining({ code: HttpSecurityErrorCode.WebhookReplayed }))
+        expect(() => verify(stale)).toThrow(HttpSecurityErrorCode.WebhookReplayed)
 
         const retried = await world.fake.sepay.replayWebhook(reference, { ageMs: 1 })
         expect(retried.status).toBe(204)

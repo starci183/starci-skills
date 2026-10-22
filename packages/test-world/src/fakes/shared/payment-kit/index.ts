@@ -31,7 +31,7 @@ export const sendOutgoing = async (outgoing: OutgoingDelivery, timeoutMs = 10_00
         const response = await fetch(outgoing.url, {
             method: outgoing.method,
             headers: outgoing.headers,
-            body: outgoing.method === "GET" ? undefined : outgoing.body,
+            ...(outgoing.method === "GET" ? {} : { body: outgoing.body }),
             signal: AbortSignal.timeout(timeoutMs),
         })
         return { ...base, status: response.status, response: await response.text() }

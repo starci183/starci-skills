@@ -49,7 +49,7 @@ import { recommended as typographyRecommended, rules as typographyRules } from "
 import { recommended as vendorRecommended, rules as vendorRules } from "./vendor-boundary.mjs"
 import { recommended as projectGraphRecommended, rules as projectGraphRules } from "./project-graph.mjs"
 import { recommended as sonarParityRecommended, rules as sonarParityRules } from "./sonar-parity.mjs"
-import { buildFeConfig } from "./lib/config.mjs"
+import { buildFeConfig, buildPlainSourceConfig } from "./lib/config.mjs"
 import { why } from "./lib/why.mjs"
 
 /** Each law's contribution, kept separate so a duplicate name is detectable rather than silent. */
@@ -244,6 +244,33 @@ export const starciFeConfig = ({ hfs } = {}) => {
     sonar: loadSonarPlugins(),
     source: { ...recommended, ...reactHooksRules(reactHooks) },
   })
+}
+
+/**
+ * The flat config of a TypeScript front-end tree that is no HFS app (a runtime package, the harness UI):
+ * `export default starciPlainSourceConfig({ root: import.meta.dirname })`. It lints the tree's `src/` with types, with the inline-directive fence, the
+ * React Hooks rules, the type-aware rules and the Sonar way rules, and with every canon rule that needs no slot view, all at `error`.
+ *
+ * @param {{ root: string }} input - The absolute directory holding the tree's `tsconfig.json` and `src/`.
+ * @returns {object[]} The flat config: ignores, the typed source block and the Sonar way block.
+ */
+export const starciPlainSourceConfig = ({ root } = {}) => {
+  const reactHooks = loadReactHooks()
+  return buildPlainSourceConfig({ root, plugin, hooks: reactHooksRules(reactHooks), reactHooks, tsPlugin: loadTsPlugin(), sonar: loadSonarPlugins() })
+}
+
+/**
+ * The flat config of a TypeScript front-end tree that adopts the typed half of the canon first: the inline-directive fence, typed linting, the
+ * React Hooks rules, the type-aware typescript-eslint rules and the Sonar way rules over the tree's `src/`, all at `error`. It is
+ * `starciPlainSourceConfig` without the canon's own product-structure rules (`SLOT_FREE_RULES`: jsdoc on exports, arrow exports, English-only
+ * source, grammar controls, ...), for a tree that has not been brought to them yet; a tree that has uses `starciPlainSourceConfig`.
+ *
+ * @param {{ root: string }} input - The absolute directory holding the tree's `tsconfig.json` and `src/`.
+ * @returns {object[]} The flat config: ignores, the typed source block and the Sonar way block.
+ */
+export const starciTypedSourceConfig = ({ root } = {}) => {
+  const reactHooks = loadReactHooks()
+  return buildPlainSourceConfig({ root, plugin, hooks: reactHooksRules(reactHooks), reactHooks, tsPlugin: loadTsPlugin(), sonar: loadSonarPlugins(), canon: false })
 }
 
 // A21 append-only registration: keep the already exported plugin and recommendation live.

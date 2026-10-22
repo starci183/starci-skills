@@ -1,4 +1,5 @@
 import { NestFactory } from "@nestjs/core"
+import type { NestExpressApplication } from "@nestjs/platform-express"
 import { SystemClockService } from "@modules/platform/clock"
 import { EnvSource } from "@modules/platform/config"
 import { securityHeaders } from "@modules/platform/http-security"
@@ -10,7 +11,7 @@ import { readCoreEnv } from "./core.env"
 const bootstrap = async (): Promise<void> => {
     const env = EnvSource.fromProcess()
     const options = readCoreEnv(env)
-    const app = await NestFactory.create(AppModule.register(options))
+    const app = await NestFactory.create<NestExpressApplication>(AppModule.register(options))
     const server = app.getHttpAdapter().getInstance()
     server.disable("x-powered-by")
     // Configuration validates the supported hop counts before the listener starts.

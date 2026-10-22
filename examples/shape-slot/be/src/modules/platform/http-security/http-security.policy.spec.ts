@@ -2,6 +2,16 @@ import { Test } from "@nestjs/testing"
 import { ConfigErrorCode } from "@modules/platform/config"
 import { allowedOriginsOf, trustProxyOf } from "./http-security.policy"
 
+/** What `run` throws, read as `unknown`; the matcher then judges its fields. */
+const thrownBy = (run: () => unknown): unknown => {
+    try {
+        run()
+    } catch (error) {
+        return error
+    }
+    return undefined
+}
+
 const SUBJECT = Symbol("subject")
 const build = async () => {
     const moduleRef = await Test.createTestingModule({
@@ -29,12 +39,10 @@ describe("HTTP security policy", () => {
         "https://user:pass@app.test",
     ])("refuses an unsafe browser origin %s", async (origin) => {
         const subject = await build()
-        expect(() => subject.allowedOriginsOf(origin)).toThrow(
-            expect.objectContaining({
-                code: ConfigErrorCode.KeyInvalid,
-                params: { key: "HTTP_SECURITY_ALLOWED_ORIGINS" },
-            }),
-        )
+        expect(thrownBy(() => subject.allowedOriginsOf(origin))).toMatchObject({
+            code: ConfigErrorCode.KeyInvalid,
+            params: { key: "HTTP_SECURITY_ALLOWED_ORIGINS" },
+        })
     })
 
     it("accepts a direct host and an explicitly declared proxy hop count", async () => {
@@ -45,11 +53,9 @@ describe("HTTP security policy", () => {
 
     it.each([-1, 11, Number.NaN, 1.5])("refuses invalid proxy hop count %s", async (hops) => {
         const subject = await build()
-        expect(() => subject.trustProxyOf(hops)).toThrow(
-            expect.objectContaining({
-                code: ConfigErrorCode.KeyInvalid,
-                params: { key: "HTTP_SECURITY_TRUST_PROXY" },
-            }),
-        )
+        expect(thrownBy(() => subject.trustProxyOf(hops))).toMatchObject({
+            code: ConfigErrorCode.KeyInvalid,
+            params: { key: "HTTP_SECURITY_TRUST_PROXY" },
+        })
     })
 })

@@ -543,4 +543,65 @@ for (const edition of ['full', 'lite']) {
     }
   });
 
+  test(`${edition} reads keys typed as a union of literals through the standard library's array callbacks`, t => {
+    assert.deepEqual(findings(t, edition, {
+      'fe/src/nav.ts': [
+        'type Label = "navHome" | "navLeads";',
+        'interface Destination { readonly key: string; readonly label: Label }',
+        'declare const DESTINATIONS: ReadonlyArray<Destination>;',
+        'export const useNav = (admin: boolean) => {',
+        '  const t = useTranslations("shell");',
+        '  return DESTINATIONS.filter(row => admin || row.key !== "admin").map(row => t(row.label));',
+        '};',
+      ].join('\n'),
+    }, { shell: { navHome: 'Home', navLeads: 'Leads', navTeam: 'Team' } }), ['shell.navTeam']);
+  });
+
+  test(`${edition} reads the strings of a typed table of constants through the readonly field that holds them`, t => {
+    assert.deepEqual(findings(t, edition, {
+      'fe/src/presets.ts': [
+        'interface Step { readonly text: string; readonly link?: { readonly label: string; readonly url: string } }',
+        'interface Mode { readonly id: string; readonly title: string; readonly steps: ReadonlyArray<Step> }',
+        'interface Preset { readonly id: string; readonly modes: ReadonlyArray<Mode> }',
+        'export const PRESETS: ReadonlyArray<Preset> = [',
+        '  { id: "a", modes: [{ id: "m", title: "a_title", steps: [{ text: "a_step1", link: { label: "a_link", url: "https://a" } }, { text: "a_step2" }] }] },',
+        '  { id: "b", modes: [{ id: "n", title: "b_title", steps: [{ text: "b_step1" }] }] },',
+        '];',
+        'export const find = (id: string): Preset => PRESETS.find(item => item.id === id) ?? PRESETS[0];',
+      ].join('\n'),
+      'fe/src/view.ts': [
+        'import { find } from "./presets";',
+        'export const useView = (id: string) => {',
+        '  const say = useTranslations("presets");',
+        '  const preset = find(id);',
+        '  return preset.modes.map(mode => ({ title: say(mode.title), steps: mode.steps.map(step => ({ text: say(step.text), link: step.link === undefined ? null : say(step.link.label) })) }));',
+        '};',
+      ].join('\n'),
+    }, { presets: { a_title: 'A', a_step1: 'One', a_step2: 'Two', a_link: 'Link', b_title: 'B', b_step1: 'One', unused: 'Unused' } }), ['presets.unused']);
+  });
+
+  test(`${edition} does not read a typed table through a field that can be reassigned or that no literal of the type sets`, t => {
+    assert.deepEqual(findings(t, edition, {
+      'fe/src/rows.ts': [
+        'interface Row { label: string; readonly other: string }',
+        'const ROWS: ReadonlyArray<Row> = [{ label: "mutable_key", other: "other_key" }];',
+        'export const keep = ROWS;',
+        'export const use = (row: Row) => { const t = useTranslations("rows"); return [t(row.label), t(row.other)]; };',
+      ].join('\n'),
+    }, { rows: { mutable_key: 'Mutable', other_key: 'Other', unused: 'Unused' } }), ['rows.mutable_key', 'rows.unused']);
+  });
+
+  test(`${edition} reads both sides of a nullish default and skips a null owner`, t => {
+    assert.deepEqual(findings(t, edition, {
+      'fe/src/kinds.ts': [
+        'const KEYS: Readonly<Record<string, string>> = { ad: "refAd", form: "refForm" };',
+        'export const refKey = (kind: string): string => KEYS[kind] ?? "refPost";',
+        'const effectOf = (open: boolean) => ({ submitKey: open ? "adjustAsk" : "adjustApply" });',
+        'export const useEffectKey = (open: boolean) => { const effect = open === undefined ? null : effectOf(open); return effect === null ? null : effect.submitKey; };',
+        'export const label = (t: (key: string) => string, kind: string, open: boolean) => [t(refKey(kind)), t(useEffectKey(open) ?? "none")];',
+      ].join('\n'),
+      'fe/src/view.ts': 'import { label } from "./kinds"; const t = useTranslations("lead"); label(t, "ad", true);',
+    }, { lead: { refAd: 'Ad', refForm: 'Form', refPost: 'Post', adjustAsk: 'Ask', adjustApply: 'Apply', none: 'None', unused: 'Unused' } }), ['lead.unused']);
+  });
+
 }

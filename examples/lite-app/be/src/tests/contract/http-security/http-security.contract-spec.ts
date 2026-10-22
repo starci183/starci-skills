@@ -30,12 +30,12 @@ describe("HTTP security configuration", () => {
             parseHttpSecurityConfig(
                 new EnvSource({ NODE_ENV: mode, HTTP_SECURITY_ALLOWED_ORIGINS: "http://web.example" }),
             ),
-        ).toThrow(expect.objectContaining({ code: "HTTP_SECURITY_REQUEST_INVALID" }))
+        ).toThrow("HTTP_SECURITY_REQUEST_INVALID")
     })
 
     it("rejects an empty entry after a trailing comma", () => {
         expect(() =>
             parseHttpSecurityConfig(new EnvSource({ HTTP_SECURITY_ALLOWED_ORIGINS: "https://web.example," })),
-        ).toThrow(expect.objectContaining({ code: "HTTP_SECURITY_REQUEST_INVALID" }))
+        ).toThrow("HTTP_SECURITY_REQUEST_INVALID")
     })
 })
