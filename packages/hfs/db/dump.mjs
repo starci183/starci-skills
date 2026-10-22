@@ -17,6 +17,19 @@ export function rowcounts(session) {
   });
 }
 
+/** The archive name inside the plaintext scratch directory. */
+export const ARCHIVE_NAME = 'backup.tar';
+
+/**
+ * Archive `parts` of `scratch` into scratch/backup.tar. tar runs inside scratch with relative names only: no -C and no
+ * absolute path, because GNU tar (Git Bash puts it first on Windows) reads `C:\...` as a remote `host:path`, while bsdtar
+ * does not; relative arguments mean the same to both. Returns the archive's absolute path.
+ */
+export function archiveParts(ctx, scratch, parts) {
+  backupTool(ctx, 'tar', ['-cf', ARCHIVE_NAME, ...parts], { cwd: scratch });
+  return path.join(scratch, ARCHIVE_NAME);
+}
+
 /** Writes only ciphertext and its receipt permanently; a receipt is published only after header, size and hash checks. */
 function dumpDatabase(ctx, options = {}) {
   if (!options.out) throw refusal('DB_USAGE', '--out is required');
@@ -41,8 +54,7 @@ function dumpDatabase(ctx, options = {}) {
     const counts = rowcounts(session);
     fs.writeFileSync(path.join(scratch, 'rowcounts.json'), `${JSON.stringify(counts, null, 2)}\n`, { mode: 0o600 });
     const parts = [...jobs.map(([file]) => file), 'rowcounts.json'];
-    const tar = path.join(scratch, 'backup.tar');
-    backupTool(ctx, 'tar', ['-cf', tar, '-C', scratch, ...parts]);
+    const tar = archiveParts(ctx, scratch, parts);
     const bytes = encryptFile(ctx, tar, archive, recipients);
     const receipt = { schema: RECEIPT_SCHEMA, project: session.project, target: session.target.kind, ref: session.target.ref ?? null,
       at, file: path.basename(archive), bytes, sha256: sha256(archive), parts,

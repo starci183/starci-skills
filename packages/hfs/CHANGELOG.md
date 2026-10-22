@@ -1,6 +1,7 @@
 # Changelog
 
 ## 4.7.21 - 2026-10-22
+- Fixed: `starci app db dump` archives its parts with tar run inside the scratch directory and relative names only (no `-C`, no absolute path): GNU tar, first on PATH under Git Bash on Windows, read the absolute `C:\...` archive path as a remote host and every backup failed with `DB_BACKUP_TOOL_FAILED`. Spec: `src/db-dump-archive.spec.mjs`.
 - Fixed: the bundled stacks gate validates a declaration's `operations` block with the composed provision-operation schema instead of crashing on its cross-file `$ref`; the bundled schema lets a SonarCloud admin credential name a runtime secret.env variable (`hostConnection: sonar-runtime-secret-env`).
 
 ## 4.7.20 - 2026-10-22
