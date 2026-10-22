@@ -1,5 +1,8 @@
 # Changelog
 
+## 8.4.29 - 2026-10-22
+- Changed: the bundled canon pins select @starci/hfs 4.7.23 and @starci/cli 1.7.23.
+
 ## 8.4.28 - 2026-10-22
 - Changed: the bundled canon pins select @starci/hfs 4.7.21 and @starci/cli 1.7.21.
 

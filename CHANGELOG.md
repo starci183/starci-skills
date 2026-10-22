@@ -7,7 +7,7 @@ until every S* row in `docs/goal.md` holds with fresh evidence, then `1.0.0` fre
 ## [Unreleased]
 
 ### Changed
-- Rendered `sonar-project.properties` leaves the message catalogs (`**/messages/*.messages.ts`, `**/messages/*.json`) out of Sonar copy-paste detection only (`sonar.cpd.exclusions`, owner ruling 2026-10-22): a catalog repeats its keys once per language. HFS 4.7.23, CLI 1.7.23; the three examples carry the line.
+- Rendered `sonar-project.properties` leaves the message catalogs (`**/messages/*.messages.ts`, `**/messages/*.json`) out of Sonar copy-paste detection only (`sonar.cpd.exclusions`, owner ruling 2026-10-22): a catalog repeats its keys once per language. HFS 4.7.23, CLI 1.7.23, back-end canon 3.4.30 and front-end canon 8.4.29; the three examples carry the line.
 
 ## [1.0.0-alpha.26] — 2026-10-22
 
