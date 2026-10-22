@@ -4,6 +4,7 @@ import type { ExecutionContext } from "@nestjs/common"
 import type { Reflector } from "@nestjs/core"
 import { ThrottlerGuard } from "@nestjs/throttler"
 import type { ThrottlerModuleOptions, ThrottlerStorage } from "@nestjs/throttler"
+import { isRecord } from "@modules/platform/primitives"
 import { HttpSecurityError, HttpSecurityErrorCode } from "./errors/http-security.error"
 import { requestOf } from "./execution-request.mapper"
 import { InjectHttpSecurityOptions, InjectRateLimitStorage, InjectRateLimitReflector } from "./http-security.decorators"
@@ -39,8 +40,8 @@ const tierOf = (context: ExecutionContext): RateTier => {
  * credential itself is never a storage key. An absent credential shares one anonymous window.
  */
 export const serviceTrackerOf = (request: Record<string, unknown>): string => {
-    const headers = request.headers as Readonly<Record<string, unknown>> | undefined
-    const authorization = typeof headers?.authorization === "string" ? headers.authorization : ""
+    const headers = request.headers
+    const authorization = isRecord(headers) && typeof headers.authorization === "string" ? headers.authorization : ""
     return `service:${createHash("sha256").update(authorization).digest("hex")}`
 }
 

@@ -1,4 +1,4 @@
-import type { Secret } from "@modules/platform/config"
+import type { IdentityOptions } from "@modules/domain/identity"
 import type { CacheOptions } from "@modules/integrations/cache"
 import type { KeycloakOptions } from "@modules/integrations/keycloak"
 import type { KeycloakAdminOptions } from "@modules/integrations/keycloak-admin"
@@ -23,5 +23,5 @@ export interface IdentityAppOptions {
     /** The origin allowlist and rate limits. */
     readonly httpSecurity: HttpSecurityOptions
     /** The keys the calling services present to the service doors, by service name. */
-    readonly identity: { readonly serviceKeys?: Readonly<Record<string, Secret>> }
+    readonly identity: Pick<IdentityOptions, "serviceKeys">
 }

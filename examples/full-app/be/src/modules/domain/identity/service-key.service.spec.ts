@@ -10,11 +10,9 @@ const BILLING_KEY = "billing-key-of-the-spec"
 
 const SERVICE_KEYS = { order: new Secret(ORDER_KEY), billing: new Secret(BILLING_KEY) }
 
-const WITH_KEYS: IdentityOptions = { verifier: "verifier", serviceKeys: SERVICE_KEYS }
-
-const build = async (options: IdentityOptions = WITH_KEYS) => {
+const build = async (serviceKeys: IdentityOptions["serviceKeys"]) => {
     const moduleRef = await Test.createTestingModule({
-        providers: [ServiceKeyService, { provide: IDENTITY_OPTIONS, useValue: options }],
+        providers: [ServiceKeyService, { provide: IDENTITY_OPTIONS, useValue: { verifier: "verifier", serviceKeys } }],
     }).compile()
     return moduleRef.get(ServiceKeyService)
 }
@@ -26,7 +24,7 @@ describe("ServiceKeyService", () => {
         { caller: "the order service", key: ORDER_KEY, service: "order" },
         { caller: "the billing service", key: BILLING_KEY, service: "billing" },
     ])("names $caller as the api-key principal of the services workspace", async ({ key, service }) => {
-        const authenticator = await build()
+        const authenticator = await build(SERVICE_KEYS)
 
         await expect(authenticator.authenticate({ kind: "api-key" }, `Bearer ${key}`)).resolves.toEqual({
             kind: "api-key",
@@ -42,7 +40,7 @@ describe("ServiceKeyService", () => {
         { presented: "a wrong key", authorization: "Bearer not-the-order-key" },
         { presented: "a key that only starts like a real one", authorization: `Bearer ${ORDER_KEY}x` },
     ])("refuses $presented as unauthenticated", async ({ authorization }) => {
-        const authenticator = await build()
+        const authenticator = await build(SERVICE_KEYS)
 
         await expect(authenticator.authenticate({ kind: "api-key" }, authorization)).rejects.toMatchObject(
             unauthenticated,
@@ -50,7 +48,7 @@ describe("ServiceKeyService", () => {
     })
 
     it("refuses a right key on a door of another credential kind", async () => {
-        const authenticator = await build()
+        const authenticator = await build(SERVICE_KEYS)
 
         await expect(authenticator.authenticate({ kind: "tool-token" }, `Bearer ${ORDER_KEY}`)).rejects.toMatchObject(
             unauthenticated,
@@ -58,7 +56,7 @@ describe("ServiceKeyService", () => {
     })
 
     it("fails closed when the app holds no service keys", async () => {
-        const authenticator = await build({ verifier: "verifier" })
+        const authenticator = await build(undefined)
 
         await expect(authenticator.authenticate({ kind: "api-key" }, `Bearer ${ORDER_KEY}`)).rejects.toMatchObject(
             unauthenticated,
@@ -66,10 +64,7 @@ describe("ServiceKeyService", () => {
     })
 
     it("refuses a key two services share, since it names no single service", async () => {
-        const authenticator = await build({
-            verifier: "verifier",
-            serviceKeys: { order: new Secret(ORDER_KEY), billing: new Secret(ORDER_KEY) },
-        })
+        const authenticator = await build({ order: new Secret(ORDER_KEY), billing: new Secret(ORDER_KEY) })
 
         await expect(authenticator.authenticate({ kind: "api-key" }, `Bearer ${ORDER_KEY}`)).rejects.toMatchObject(
             unauthenticated,

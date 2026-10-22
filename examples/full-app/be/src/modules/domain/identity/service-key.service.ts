@@ -22,19 +22,19 @@ export class ServiceKeyService implements CredentialAuthenticator {
     constructor(@InjectIdentityOptions() private readonly options: IdentityOptions) {}
 
     /** The service the presented key belongs to, as an `api-key` principal of the services workspace. */
-    async authenticate(metadata: CredentialMetadata, authorization: string): Promise<CredentialPrincipal> {
-        const presented = bearerTokenOf(authorization)
-        if (metadata.kind !== "api-key" || presented === null) {
-            throw new IdentityError({ code: IdentityErrorCode.Unauthenticated })
-        }
+    authenticate(metadata: CredentialMetadata, authorization: string): Promise<CredentialPrincipal> {
+        const service = metadata.kind === "api-key" ? this.serviceOf(bearerTokenOf(authorization)) : undefined
+        if (service === undefined) return Promise.reject(new IdentityError({ code: IdentityErrorCode.Unauthenticated }))
+        return Promise.resolve({ kind: "api-key", subject: service, workspaceId: SERVICE_WORKSPACE })
+    }
+
+    /** The one service whose key equals the presented one, or undefined when none or several do. */
+    private serviceOf(presented: string | null): string | undefined {
+        if (presented === null) return undefined
         const presentedDigest = digestOf(presented)
         const services = Object.entries(this.options.serviceKeys ?? {})
             .filter(([, key]) => timingSafeEqual(digestOf(key.reveal()), presentedDigest))
             .map(([service]) => service)
-        const [service] = services
-        if (services.length !== 1 || service === undefined) {
-            throw new IdentityError({ code: IdentityErrorCode.Unauthenticated })
-        }
-        return { kind: "api-key", subject: service, workspaceId: SERVICE_WORKSPACE }
+        return services.length === 1 ? services[0] : undefined
     }
 }
