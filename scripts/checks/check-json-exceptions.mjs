@@ -19,6 +19,8 @@ import { fileURLToPath } from 'node:url';
 import { RUNTIME_STATE_DIR } from '../../engine/runtime-root.mjs';
 import { ALLOWLIST_FILE, readAllowlistFile } from '../lib/allowlist.mjs';
 import { isMain } from '../lib/is-main.mjs';
+import { declaredTemplateNames, isManagedRender, managedTemplatesOf } from '../lib/managed-json.mjs';
+import { loadSlotManifest } from '../hfs/slots.mjs';
 
 export const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const ignoreLockfiles = process.argv.includes('--ignore-lockfiles');
@@ -185,11 +187,41 @@ function walkJsonFiles(dir, relativePosix, out) {
   }
 }
 
+/** Where @starci/hfs keeps the templates `starci app sync` renders managed files from. */
+const HFS_TEMPLATES = path.join('packages', 'hfs', 'templates');
+
+/**
+ * A reader of whether a JSON file is managed canon: a template a managed slot of the slot manifest names, or an example app's render of one (scripts/lib/managed-json.mjs): canon output that
+ * `starci app sync` writes and HFS_MANAGED_FILE_DRIFT keeps equal to its template, not authored JSON. Only a file of an app (a folder
+ * of examples/ with its hfs.json) is judged; any byte of difference from the template keeps it in the inventory.
+ */
+function managedRenderReader(skillRoot) {
+  let manifest;
+  let templateNames;
+  const templatesPrefix = `${HFS_TEMPLATES.split(path.sep).join('/')}/`;
+  return (rel) => {
+    // A template a managed slot of the slot manifest names is that slot's canon source, declared there and nowhere else.
+    if (rel.startsWith(templatesPrefix)) {
+      manifest ??= loadSlotManifest({ root: skillRoot });
+      templateNames ??= declaredTemplateNames(manifest);
+      return templateNames.has(rel.slice(templatesPrefix.length));
+    }
+    const [top, app, ...rest] = rel.split('/');
+    if (top !== 'examples' || !app || !rest.length || !fs.existsSync(path.join(skillRoot, top, app, 'hfs.json'))) return false;
+    manifest ??= loadSlotManifest({ root: skillRoot });
+    const templates = managedTemplatesOf(manifest, rest.join('/'))
+      .map((name) => path.join(skillRoot, HFS_TEMPLATES, ...name.split('/')))
+      .filter((file) => fs.existsSync(file))
+      .map((file) => ({ text: fs.readFileSync(file, 'utf8') }));
+    return templates.length > 0 && isManagedRender(fs.readFileSync(path.join(skillRoot, rel), 'utf8'), templates);
+  };
+}
+
 /** The parent directory of a relative path ('' for a root file). */
 const dirOf = rel => (rel.includes('/') ? rel.slice(0, rel.lastIndexOf('/')) : '');
 
 /** Splits the walked .json files into offenders (unregistered) and generatedPresent. */
-function partitionFound(found, ignoreLocks, allow, allowDirs) {
+function partitionFound(found, ignoreLocks, allow, allowDirs, isManaged = () => false) {
   const offenders = [];
   const generatedPresent = [];
   for (const rel of found) {
@@ -200,7 +232,7 @@ function partitionFound(found, ignoreLocks, allow, allowDirs) {
       generatedPresent.push(rel);
       continue;
     }
-    if (!allow.has(rel) && !allowDirs.has(dirOf(rel))) offenders.push(rel);
+    if (!allow.has(rel) && !allowDirs.has(dirOf(rel)) && !isManaged(rel)) offenders.push(rel);
   }
   return { offenders, generatedPresent };
 }
@@ -232,7 +264,7 @@ function checkJsonExceptions({
   walkJsonFiles(skillRoot, '', found);
   found.sort((a, b) => a.localeCompare(b));
 
-  const { offenders, generatedPresent } = partitionFound(found, ignoreLocks, new Set(allowlist), new Set(directories));
+  const { offenders, generatedPresent } = partitionFound(found, ignoreLocks, new Set(allowlist), new Set(directories), managedRenderReader(skillRoot));
   const missingAllowlist = missingEntries(skillRoot, allowlist, directories, ignoreLocks);
 
   return {

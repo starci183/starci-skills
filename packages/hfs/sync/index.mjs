@@ -24,6 +24,7 @@ import { braceVariants } from '../runtime/scripts/lib/glob.mjs';
 import { codecovPaths, coverageComponents, jestCoverage, sonarCoverageExclusions } from '../runtime/scripts/hfs/coverage-scope.mjs';
 import { APP_SCOPE, SIDES, litePresenceOf, loadSlotManifest, resolveRepoDeclaration, slotInEdition } from '../runtime/scripts/hfs/slots.mjs';
 import { managedGroupOf } from '../runtime/scripts/hfs/edition-slots.mjs';
+import { declaredSlotEnabled } from '../runtime/scripts/hfs/declaration-slots.mjs';
 import { feAppPackageName } from '../runtime/scripts/hfs/rules/monorepo.mjs';
 import { DEFAULT_PORT, NODE_IMAGE, dockerfilePath } from '../runtime/scripts/hfs/rules/docker.mjs';
 import { isFile } from '../runtime/scripts/lib/fs-kind.mjs';
@@ -74,8 +75,10 @@ function managedTemplate(scope, group, file, hasTemplate) {
   return directories.map(dir => `${dir}/${group}/${file}`).find(name => hasTemplate(name));
 }
 
-function slotTargets(slot, scope, edition, manifest, hasTemplate) {
+function slotTargets(slot, scope, edition, manifest, hasTemplate, enabled) {
   if (!slot.profiles.includes(scope) || !slotInEdition(manifest, slot, edition)) return [];
+  // An opt-in slot is rendered only for a repository that enables it (app.browser-config with `browser: true`).
+  if (slot.presence === 'opt-in' && !enabled(slot)) return [];
   if (edition === 'lite' && litePresenceOf(slot, scope) === 'forbidden') return [];
   const group = managedGroupOf(slot, edition);
   if (group === undefined) return [];
@@ -100,10 +103,11 @@ function unlistedTargets(scope, edition) {
 /**
  * Every target of `scope` (app, be or fe), its path relative to that scope's folder: the files the manifest's managedBy slots
  * list, then (app root) the unlisted ones. A slot that names managedBy lists literal files only, and each has a template under
- * its scope or under common.
+ * its scope or under common. `enabled(slot)` decides an opt-in slot (renderTargets passes the declaration's); without it every slot
+ * counts, which is what an inventory of the templates needs.
  */
-export function targetsOf(scope, { edition = 'full', manifest = loadSlotManifest(), hasTemplate = name => fs.existsSync(path.join(TEMPLATES_DIR, name)) } = {}) {
-  const listed = manifest.slots.flatMap(slot => slotTargets(slot, scope, edition, manifest, hasTemplate));
+export function targetsOf(scope, { edition = 'full', manifest = loadSlotManifest(), hasTemplate = name => fs.existsSync(path.join(TEMPLATES_DIR, name)), enabled = () => true } = {}) {
+  const listed = manifest.slots.flatMap(slot => slotTargets(slot, scope, edition, manifest, hasTemplate, enabled));
   return [...listed, ...unlistedTargets(scope, edition)];
 }
 
@@ -383,7 +387,8 @@ export function renderTargets(hfs, presets, { sonarKey, readTemplate = readBundl
   const hasTemplate = name => { try { return readTemplate(name) !== undefined; } catch { return false; } };
   return SCOPES.flatMap(scope => {
     const vars = variables(app, scope, presets, sonarKey, manifest, source);
-    const declaredTargets = targetsOf(scope, { edition: app.edition, manifest, hasTemplate });
+    const repo = scope === APP_SCOPE ? app : app.sides[scope];
+    const declaredTargets = targetsOf(scope, { edition: app.edition, manifest, hasTemplate, enabled: slot => declaredSlotEnabled(slot, repo) });
     if (scope === APP_SCOPE && source?.badges) declaredTargets.push({ path: 'README.md', mode: 'block', markdown: true, template: 'app/readme-badges/README.md' });
     const targets = declaredTargets
       .filter(target => !(app.edition === 'lite' && source?.workPresent === false && target.path === '.starciwork/.gitignore'));

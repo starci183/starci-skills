@@ -857,6 +857,7 @@ surfaces:
       slots:
         - app.ci-e2e
         - app.browser
+        - app.browser-config
         - be.root-e2e
         - be.contract.graphql
         - be.contract.openapi
@@ -892,6 +893,7 @@ surfaces:
       slots:
         - app.ci-e2e
         - app.browser
+        - app.browser-config
         - be.root-e2e
         - be.contract.graphql
         - be.contract.openapi

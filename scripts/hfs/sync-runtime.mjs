@@ -47,6 +47,8 @@ const CHECK_ENTRIES = [
   'scripts/lib/uat-run-folder.mjs',
   // What loosens a gate over one change's diff, rename-aware, proven by the package spec src/gate-loosening.spec.mjs over this copy.
   'scripts/lib/gate-loosening.mjs',
+  // Which JSON files are managed canon (a slot-declared template or its render), proven by src/managed-json.spec.mjs over this copy.
+  'scripts/lib/managed-json.mjs',
 ];
 /** Static imports and `new URL(<relative>.yaml, import.meta.url)` reads (the framework-pinned knowledge file) are followed. */
 const IMPORT_SPEC = /(?:\bfrom\s+|\bimport\s*\(\s*|\bimport\s+)['"](\.[^'"]+)['"]/g;

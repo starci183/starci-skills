@@ -153,9 +153,10 @@ export function resolveRepoDeclaration(manifest, declaration, { file = HFS_DECLA
     edition,
     side: null,
     profile: APP_SCOPE,
-    // The root declares no app or connection of its own (each side does); its one opt-in slot is the browser journey (`browser: true`).
+    // The root declares no app or connection of its own (each side does); its opt-in slots are the browser journey and the managed
+    // tsconfig.json that type-checks it, both switched on by `browser: true`.
     apps: Object.freeze([]),
-    optionalSlots: Object.freeze(declaration.browser === true ? ['app.browser'] : []),
+    optionalSlots: Object.freeze(declaration.browser === true ? ['app.browser', 'app.browser-config'] : []),
     connections: Object.freeze([]),
     providers,
     reads: Object.freeze([]),

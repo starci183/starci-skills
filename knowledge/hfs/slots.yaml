@@ -7,7 +7,7 @@
 # catalog READ this file through scripts/hfs/slots.mjs; none of them hardcodes a path.
 # Shape: modules/schemas/hfs-slots.schema.yaml. The repository side is hfs.json: modules/schemas/hfs-repo.schema.yaml.
 schema: starci/hfs-slots@3
-version: 3.4.0
+version: 3.5.0
 
 versioning:
   # MAJOR.MINOR.PATCH of this manifest. A repository pins only the MAJOR in hfs.json ("hfs": 3).
@@ -39,6 +39,8 @@ versioning:
 # when the file key is absent; .starcistacks owns custody. Capability <capability>.config.ts roles stay unchanged.
 # 3.3.0 is a minor (alpha.16): it ADDS the optional app.ci-stack-deploy slot, the managed workflow of the starci app stack verbs.
 # 3.4.0 is a minor (alpha.25): it ADDS the opt-in be.contract.mcp-tools slot, the committed MCP tool-catalog snapshot of an app.
+# 3.5.0 is a minor (alpha.27): it ADDS the opt-in app.browser-config slot, the managed browser/tsconfig.json that type-checks the browser
+# journey (enabled with app.browser by `browser: true`).
 
 # Field meaning, per slot.
 #   id          stable name, never changes meaning inside a major.
@@ -617,6 +619,23 @@ slots:
     tests: none
     requires: [playwright.config.ts, journeys/]
     allows: [playwright.config.ts, stack.mjs, "journeys/*.ts"]
+  - id: app.browser-config
+    since: 3.5.0
+    profiles: [app]
+    editionWhy: "ruling:R212/case-2 (with the Work boundary amended by ruling:R212/case-4): browser journeys belong to full; lite proves app boot through R272 wiring."
+    # The program that type-checks the browser journey: Playwright only transpiles the config and the journeys, so without it nothing
+    # type-checks them and the op gate finds no tsconfig.json owning a changed journey (GATE_TSC_CONFIG_MISSING). It is managed (rendered
+    # by starci app sync from templates/app/browser-config, extending @starci/tsconfig/e2e.json), never authored, and enabled with
+    # app.browser by `browser: true` in hfs.json.
+    path: browser/tsconfig.json
+    presence: opt-in
+    litePresence: forbidden
+    goesTo: "the full edition: a lite app has no browser journey to type-check"
+    tracked: tracked
+    tier: none
+    tests: none
+    managedBy: browser-config
+    rules: [HFS_MANAGED_FILE_DRIFT]
   - id: app.github-meta
     since: 3.1.0
     profiles: [app]
