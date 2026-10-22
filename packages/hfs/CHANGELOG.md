@@ -1,5 +1,8 @@
 # Changelog
 
+## 4.7.23 - 2026-10-22
+- Changed: the rendered `sonar-project.properties` leaves the message catalogs (`**/messages/*.messages.ts`, `**/messages/*.json`) out of Sonar's copy-paste detection (`sonar.cpd.exclusions`, owner ruling 2026-10-22). A catalog repeats its keys once per language, which CPD read as duplicated code (35% new duplicated lines on NIVO v0.3.1 once prettier formatted the catalogs); they stay sources, so lint, analysis and every other rule still hold them. Spec: `src/sonar-cpd-messages.spec.mjs`.
+
 ## 4.7.22 - 2026-10-22
 - Fixed: the bundled runtime carries `modules/schemas/provision-operation.schema.yaml`; 4.7.21 left it out, so `starci app check` and `starci app lint` failed with ENOENT in every app whose stack declaration has an `operations` block. The composition reads both schemas through `new URL(..., import.meta.url)`, the form the runtime copy follows. Spec: `src/provision-operation-schema-bundle.spec.mjs`.
 
