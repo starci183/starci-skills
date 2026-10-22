@@ -6,27 +6,16 @@ until every S* row in `docs/goal.md` holds with fresh evidence, then `1.0.0` fre
 
 ## [Unreleased]
 
-### Changed
-- Candidate package pins select HFS 4.7.21, CLI 1.7.21, back-end canon 3.4.29 and front-end canon 8.4.28.
-
-### Added
-- `starci sonar project rekey` moves a declared project to its new key in place (`api/projects/update_key`, the target's `previousKey` to its `projectKey`): its analyses, issues and quality gate stay with it. Idempotent; verified when the new key reads back and the old key returns 404; `sonar-project-rekey-*` codes name a conflict (both keys hold a project), a missing source or an undeclared previous key.
-- A SonarCloud operations target may take its admin credential from the runtime's untracked secret.env by name (`hostConnection: sonar-runtime-secret-env`, `env: SONAR_TOKEN`), read through the same `runtimeSecretEnv` reader as `starci gate sonar up`; the value is never printed or written, and an absent or empty variable refuses with `sonar-host-credential-unavailable`. No sealed secret enters the public runtime repository.
-- The three examples declare the operations target `sonarcloud` (organization `starcidapride`, project `starcidapride_starci-example-<app>`, the organization and key the examples workflow scans with), so `starci sonar project ensure --target sonarcloud` puts ecommerce-app and shape-slot on `starci-quality` and lite-app on `starci-quality-lite` with the conditions of `knowledge/sonar-gate.yaml`.
-
-### Fixed
-- `sonar project ensure` with a declared quality gate reported `provision-proof-invalid` after a correct readback: its proof keys `conditions` and `project` were outside the provision owner's closed proof vocabulary. Both are now part of it with their own shape rules, and a refused proof names the key in its `detail`.
-- Every provider operation plan failed with a bare `provider-operation-failed` (for example `starci sonar project ensure` on a fresh ledger): the journal stored its public plan blob with the redaction claim `public-provision-record`, which `blobs.redaction` does not admit (`v1`, `binary` or NULL), so `INSERT OR IGNORE` dropped the row and the plan's foreign key failed. Public provision records now carry the NULL claim; a blob row the ledger does not keep refuses with `provision-journal-blob-refused`; an unclassified failure adds a `detail` naming its error code or class (never its message), and a refused Sonar action names its refusal code.
-- The examples declared the SonarCloud organization as `starci183` (the GitHub owner): their `SONAR_ORGANIZATION` CI variable value and README quality-gate badges now name `starcidapride`, the organization the repository variable holds and the examples workflow scans under.
-- The stacks gate no longer crashes on a declaration with an `operations` block: its schema walker resolved only local `#/` references, so the block's `$ref` to `provision-operation.schema.yaml` failed with a TypeError. The block is validated with the composed schema the provision target owner uses (`scripts/lib/provision-operation-schema.mjs`, one home for both readers), and any other cross-file reference is a finding instead of a crash.
-
 ## [1.0.0-alpha.26] — 2026-10-22
 
 ### Changed
-- Candidate package pins select HFS 4.7.20, CLI 1.7.20, jest preset 2.3.4, back-end canon 3.4.28 and front-end canon 8.4.27; the CLI's runtime installer selects 1.0.0-alpha.26.
+- Candidate package pins select HFS 4.7.21, CLI 1.7.21, jest preset 2.3.4, back-end canon 3.4.29 and front-end canon 8.4.28; the CLI's runtime installer selects 1.0.0-alpha.26.
 
 ### Added
 - `starci runtime check --only export-used` also reports `RT_IMPORT_UNBOUND`: a runtime module that imports or re-exports a name a relative module of the tree does not export, which Node refuses at link time. Dropping an export can no longer leave an importer behind.
+- `starci sonar project rekey` moves a declared project to its new key in place (`api/projects/update_key`, the target's `previousKey` to its `projectKey`): its analyses, issues and quality gate stay with it. Idempotent; verified when the new key reads back and the old key returns 404; `sonar-project-rekey-*` codes name a conflict (both keys hold a project), a missing source or an undeclared previous key.
+- A SonarCloud operations target may take its admin credential from the runtime's untracked secret.env by name (`hostConnection: sonar-runtime-secret-env`, `env: SONAR_TOKEN`), read through the same `runtimeSecretEnv` reader as `starci gate sonar up`; the value is never printed or written, and an absent or empty variable refuses with `sonar-host-credential-unavailable`. No sealed secret enters the public runtime repository.
+- The three examples declare the operations target `sonarcloud` (organization `starcidapride`, project `starcidapride_starci-example-<app>`, the organization and key the examples workflow scans with), so `starci sonar project ensure --target sonarcloud` puts ecommerce-app and shape-slot on `starci-quality` and lite-app on `starci-quality-lite` with the conditions of `knowledge/sonar-gate.yaml`.
 
 ### Fixed
 - `starci workflow start` (and every command that loads `scripts/agent/trust-launch.mjs`) died at module link time: the alpha.25 export cleanup (4f2e99a0b) had dropped the `export` of `TOOL_GUARD_MATCHER` from `scripts/agent/trust.mjs` while `trust-launch.mjs` still imported it. The name is exported again.
@@ -35,6 +24,10 @@ until every S* row in `docs/goal.md` holds with fresh evidence, then `1.0.0` fre
 - The package clean proof reads a packed `.gitignore` at the `.npmignore` name npm installs it under (with the same bytes), so the runtime archive's example Work allowlists (`examples/*/.starciwork/.gitignore`) no longer fail the install stage.
 - `starci sonar project ensure` ensures a project's declared quality gate on SonarQube Server and Cloud: the gate named by the target's `qualityGate` exists (organization-scoped on Cloud), carries exactly the conditions of `knowledge/sonar-gate.yaml` and is selected for the project, verified by readback. The SonarCloud example projects were left on the implicit default gate because the gate was only ensured on a local SonarQube.
 - SonarCloud code smells: `normPath` and `citedIncidents` declare string inputs (S6551), and the failure classifier reads its codes with `matchAll` (S6594).
+- `sonar project ensure` with a declared quality gate reported `provision-proof-invalid` after a correct readback: its proof keys `conditions` and `project` were outside the provision owner's closed proof vocabulary. Both are now part of it with their own shape rules, and a refused proof names the key in its `detail`.
+- Every provider operation plan failed with a bare `provider-operation-failed` (for example `starci sonar project ensure` on a fresh ledger): the journal stored its public plan blob with the redaction claim `public-provision-record`, which `blobs.redaction` does not admit (`v1`, `binary` or NULL), so `INSERT OR IGNORE` dropped the row and the plan's foreign key failed. Public provision records now carry the NULL claim; a blob row the ledger does not keep refuses with `provision-journal-blob-refused`; an unclassified failure adds a `detail` naming its error code or class (never its message), and a refused Sonar action names its refusal code.
+- The examples declared the SonarCloud organization as `starci183` (the GitHub owner): their `SONAR_ORGANIZATION` CI variable value and README quality-gate badges now name `starcidapride`, the organization the repository variable holds and the examples workflow scans under.
+- The stacks gate no longer crashes on a declaration with an `operations` block: its schema walker resolved only local `#/` references, so the block's `$ref` to `provision-operation.schema.yaml` failed with a TypeError. The block is validated with the composed schema the provision target owner uses (`scripts/lib/provision-operation-schema.mjs`, one home for both readers), and any other cross-file reference is a finding instead of a crash.
 
 ## [1.0.0-alpha.25] — 2026-10-21
 
