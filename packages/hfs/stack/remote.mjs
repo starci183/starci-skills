@@ -30,6 +30,15 @@ export function shellQuote(value) {
   return ["'", text.replaceAll("'", String.raw`'\''`), "'"].join('');
 }
 
+/**
+ * The shell that prints the release the symlink `name` under `quotedBase` (an already-quoted directory) points at, one line; an absent link prints an
+ * empty line and succeeds. Only the absent link is expected: a `readlink` or `basename` that fails fails the script, and the caller reports it.
+ */
+export const releasePointerScript = (quotedBase, name) => `if [ -L ${quotedBase}/${name} ]; then basename "$(readlink ${quotedBase}/${name})"; else printf '\\n'; fi`;
+
+/** The shell that lists the stored releases under `quotedBase`/releases, newest first; no releases directory prints nothing and succeeds, a failing `ls` fails the script. */
+export const releaseListScript = (quotedBase) => `if [ -d ${quotedBase}/releases ]; then ls -1t ${quotedBase}/releases; fi`;
+
 /** Runs `docker <args>` on the manager through `run` (every argument quoted). */
 export const remoteDocker = (run, args) => run(['docker', ...args.map(shellQuote)].join(' '));
 

@@ -6,6 +6,9 @@ until every S* row in `docs/goal.md` holds with fresh evidence, then `1.0.0` fre
 
 ## [Unreleased]
 
+### Changed
+- No loosening in the runtime packages: `@starci/test-world`, the `@starci/jest-preset` probe fixtures and the e2e carry no inline suppression and no skip. Lazy loads go through one `lazyRequire`; type tests assert the compiler's diagnostics (code and line) instead of `@ts-expect-error`; the generated metadata anchor has no `c8 ignore`; test-world is linted with lint directives refused (`npm run lint` is part of its `npm test`); the jest preset sets no `testTimeout` (the jest default applies, a world spec sets its own); `sandbox.describe` registers a failing test naming the missing keys instead of `describe.skip`; the prettier spec and the stylelint brand-value spec always run; the scaffold e2e fails on a missing Docker or app install instead of skipping (`STARCI_REQUIRE_APP_INSTALLS` is removed), and the gate verdict for a skipped test stays red, now specified; the stack release pointer shell has no `|| true`: an absent link is an empty answer, a failing command fails.
+
 ## [1.0.0-alpha.26] — 2026-10-22
 
 ### Changed

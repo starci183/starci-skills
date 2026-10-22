@@ -2,8 +2,8 @@
 // release-app-installs.mjs: the release verification of a scaffolded app against FRESH registry installs.
 // It runs the published `starci app scaffold release-app` (npx, canon-pins versions) into a temp dir, installs that app from the npm registry (`npm ci` on the
 // scaffold's own lockfile, or `npm install` when it has none), and runs e2e/hfs-scaffold-app.spec.mjs with
-// STARCI_APP_INSTALLS = that install and STARCI_REQUIRE_APP_INSTALLS=1. A missing install then fails the spec
-// instead of skipping it, so the lint, typecheck and api boot proofs can never pass silently.
+// STARCI_APP_INSTALLS = that install. The spec skips nothing: a missing install fails it, so the lint, typecheck and
+// api boot proofs can never pass silently.
 //
 //   starci release app-installs          scaffold, install, run the spec; exit = the spec's exit
 //   starci release app-installs --keep   keep the temp app and print where it is
@@ -107,7 +107,7 @@ try {
   if (!init(app).ok) { console.error('release-app-installs: FAILED at git init of the app'); throw new StepFailed(1); }
   step('git add (the coverage proof reads tracked files)', (args, opts) => add(args, opts), ['-A'], { cwd: app });
   step('starci app ci local --jobs test,coverage (the rendered shards, merge and coverage proof, installed cli)', runNpx, ['--no-install', 'starci', 'app', 'ci', 'local', '--jobs', 'test,coverage', '--parallel', '3', '--logs', path.join(into, 'ci-local-logs')], { cwd: app });
-  const env = { ...nextBuildEnv(), STARCI_APP_INSTALLS: path.join(app, 'node_modules'), STARCI_REQUIRE_APP_INSTALLS: '1' };
+  const env = { ...nextBuildEnv(), STARCI_APP_INSTALLS: path.join(app, 'node_modules') };
   const r = runNode(['--test', path.join(root, 'e2e/hfs-scaffold-app.spec.mjs')], { cwd: root, env, stdio: 'inherit' });
   exit = r.status ?? 1;
   const against = source ? 'fresh installs of the packed @starci tarballs' : 'fresh registry installs';

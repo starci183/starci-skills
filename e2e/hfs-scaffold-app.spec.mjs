@@ -45,18 +45,10 @@ const BOOT_DEPENDENCIES = Object.freeze(['tsc-alias', '@nestjs/platform-express'
 const UNIT_DEPENDENCIES = Object.freeze(['jest', 'ts-jest', 'tslib', ...VALIDATION_DEPENDENCIES]);
 const installs = runtimeInstalls({ required: [...LINT_DEPENDENCIES, ...BOOT_DEPENDENCIES, ...UNIT_DEPENDENCIES] });
 const missing = missingFrom(installs);
-const skipReason = missing.length ? `no install holds ${missing.join(', ')}; set STARCI_APP_INSTALLS to an app's node_modules` : false;
-// A skip must never pass silently. Locally it prints one SKIPPED line. The release verification and CI set
-// STARCI_REQUIRE_APP_INSTALLS=1 (scripts/gates/release-app-installs.mjs provides fresh registry installs), and then a
-// missing install fails the test instead of skipping it.
-export const REQUIRE_APP_INSTALLS = process.env.STARCI_REQUIRE_APP_INSTALLS === '1';
-function gate(name, reason) {
-  if (!reason) return { skip: false, required: null };
-  if (REQUIRE_APP_INSTALLS) return { skip: false, required: `REQUIRED (STARCI_REQUIRE_APP_INSTALLS=1) but ${reason}` };
-  console.log(`SKIPPED: no installs - ${name}: ${reason}`);
-  return { skip: reason, required: null };
-}
-const lintGate = gate('scaffold lint', skipReason);
+const missingInstalls = missing.length ? `no install holds ${missing.join(', ')}; set STARCI_APP_INSTALLS to an app's node_modules` : false;
+// An install the proof needs is a prerequisite, never an option: a test whose install is missing FAILS naming it, on a developer
+// machine as in CI (scripts/gates/release-app-installs.mjs provides fresh registry installs). Nothing here skips.
+const requireInstalls = (name, reason) => assert.equal(reason, false, `${name} needs an app install, and ${reason}`);
 
 test('fixture installs prefer physical resolution of required framework peers over package count', (t) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-install-coherence-'));
@@ -189,7 +181,7 @@ function buildPackages(app) {
   }
 }
 
-const bootGate = gate('scaffold api boot', skipReason || (missingFrom(installs, BOOT_DEPENDENCIES).length ? `no install holds ${missingFrom(installs, BOOT_DEPENDENCIES).join(', ')}; set STARCI_APP_INSTALLS to an app's node_modules` : false));
+const bootMissing = missingInstalls || (missingFrom(installs, BOOT_DEPENDENCIES).length ? `no install holds ${missingFrom(installs, BOOT_DEPENDENCIES).join(', ')}; set STARCI_APP_INSTALLS to an app's node_modules` : false);
 
 function assertValidationPeers(app) {
   const common = fs.realpathSync(path.join(app, 'node_modules', '@nestjs', 'common', 'package.json'));
@@ -395,8 +387,8 @@ test('a scaffolded app has one Dockerfile per app, the managed .dockerignore and
   for (const secret of ['.starcistacks', '**/.env', '.secrets', 'node_modules']) assert.ok(ignore.includes(secret), `.dockerignore excludes ${secret}`);
 });
 
-test('starci app scaffold writes the app shape and starci app lint finds nothing, each side judged by its own canon', { skip: lintGate.skip, timeout: 600_000 }, async (t) => {
-  if (lintGate.required) assert.fail(lintGate.required);
+test('starci app scaffold writes the app shape and starci app lint finds nothing, each side judged by its own canon', { timeout: 600_000 }, async (t) => {
+  requireInstalls('scaffold lint', missingInstalls);
   const into = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-scaffold-app-'));
   const app = path.join(into, 'demo');
   let links = [];
@@ -572,8 +564,8 @@ function fakePostgres() {
   });
 }
 
-test('the scaffolded be core api builds with build:be and boots with start:core from the linked installs, then stops', { skip: bootGate.skip, timeout: 600_000 }, async (t) => {
-  if (bootGate.required) assert.fail(bootGate.required);
+test('the scaffolded be core api builds with build:be and boots with start:core from the linked installs, then stops', { timeout: 600_000 }, async (t) => {
+  requireInstalls('scaffold api boot', bootMissing);
   const into = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-scaffold-boot-'));
   const app = path.join(into, 'demo');
   let links = [];
@@ -610,10 +602,10 @@ test('the scaffolded be core api builds with build:be and boots with start:core 
   await boot.exited;
 });
 
-const unitGate = gate('scaffold be unit run', missingFrom(installs, [...LINT_DEPENDENCIES, ...UNIT_DEPENDENCIES]).length ? `no install holds ${missingFrom(installs, [...LINT_DEPENDENCIES, ...UNIT_DEPENDENCIES]).join(', ')}; set STARCI_APP_INSTALLS to an app's node_modules` : false);
+const unitMissing = missingFrom(installs, [...LINT_DEPENDENCIES, ...UNIT_DEPENDENCIES]).length ? `no install holds ${missingFrom(installs, [...LINT_DEPENDENCIES, ...UNIT_DEPENDENCIES]).join(', ')}; set STARCI_APP_INSTALLS to an app's node_modules` : false;
 
-test('the scaffolded be unit run (the test script) writes the lcov Sonar and Codecov import, naming the logic files of be/src/modules only', { skip: unitGate.skip, timeout: 600_000 }, async (t) => {
-  if (unitGate.required) assert.fail(unitGate.required);
+test('the scaffolded be unit run (the test script) writes the lcov Sonar and Codecov import, naming the logic files of be/src/modules only', { timeout: 600_000 }, async (t) => {
+  requireInstalls('scaffold be unit run', unitMissing);
   const into = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-scaffold-unit-'));
   const app = path.join(into, 'demo');
   let links = [];
@@ -640,13 +632,13 @@ test('the scaffolded be unit run (the test script) writes the lcov Sonar and Cod
 
 /** What the fe build loads besides the lint set: the server-only marker the i18n package's server modules import. */
 const FE_BUILD_DEPENDENCIES = Object.freeze(['server-only']);
-const feBuildGate = gate('scaffold fe build', missingFrom(installs, [...LINT_DEPENDENCIES, ...FE_BUILD_DEPENDENCIES]).length ? `no install holds ${missingFrom(installs, [...LINT_DEPENDENCIES, ...FE_BUILD_DEPENDENCIES]).join(', ')}; set STARCI_APP_INSTALLS to an app's node_modules` : false);
+const feBuildMissing = missingFrom(installs, [...LINT_DEPENDENCIES, ...FE_BUILD_DEPENDENCIES]).length ? `no install holds ${missingFrom(installs, [...LINT_DEPENDENCIES, ...FE_BUILD_DEPENDENCIES]).join(', ')}; set STARCI_APP_INSTALLS to an app's node_modules` : false;
 
 /** The environment `next build` runs in: the one managed build env (scripts/gates/build-env.mjs). */
 const buildEnv = () => nextBuildEnv();
 
-test('the scaffolded fe builds with the root build:fe script: next-intl finds its request config from the directory the build runs in', { skip: feBuildGate.skip, timeout: 900_000 }, async (t) => {
-  if (feBuildGate.required) assert.fail(feBuildGate.required);
+test('the scaffolded fe builds with the root build:fe script: next-intl finds its request config from the directory the build runs in', { timeout: 900_000 }, async (t) => {
+  requireInstalls('scaffold fe build', feBuildMissing);
   // The app sits inside the runtime checkout: the borrowed install links packages from the runtime and its examples, and Turbopack
   // compiles only what lies under its workspace root, so the spec widens that root (below) to the checkout that holds every link target.
   const into = fs.mkdtempSync(path.join(RUNTIME, '.tmp-hfs-fe-build-'));

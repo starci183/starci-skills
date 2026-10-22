@@ -12,7 +12,7 @@
 //                       the jest world setup itself calls) provisions the run's own database and the `primary`
 //                       connection's schema-per-context login over the shared warm stack; stack.detach drops them again.
 // The Postgres image is the one the example app's stack declaration pins (examples/full-app/.starcistacks). The whole
-// proof needs Docker; unavailable docker is the one and only reason it may skip.
+// proof needs Docker: an unavailable docker FAILS the test (no skip); the release gate counts a skipped test red as well.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
@@ -82,12 +82,13 @@ test('a test-world package without its own install fails at once with the comman
 /** The last lines of a run's output, for failure messages. */
 const tail = (run, lines = 30) => `${run.stdout ?? ''}\n${run.stderr ?? ''}`.trim().split(/\r?\n/).slice(-lines).join('\n');
 
-/** Docker answering: the warm stack `stack.attach` uses. The only thing the proof may skip on. */
+/** Docker answering: the warm stack `stack.attach` uses. A prerequisite of the proof: an unanswered `docker info` fails the test. */
 const dockerProbe = spawnSync('docker', ['info'], { encoding: 'utf8', windowsHide: true, timeout: 60_000 });
-const skipReason = dockerProbe.status === 0 ? false
+const dockerUnavailable = dockerProbe.status === 0 ? false
   : `docker is unavailable: ${dockerProbe.error?.message ?? `${dockerProbe.stderr ?? dockerProbe.stdout ?? ''}`.trim().split(/\r?\n/)[0] ?? 'docker info failed'}`;
 
-test('starci app scaffold end to end: npm ci, codegen + typecheck, starci app lint clean, the be unit run and cli migrate run over a real Postgres', { skip: skipReason, timeout: 1_800_000 }, async (t) => {
+test('starci app scaffold end to end: npm ci, codegen + typecheck, starci app lint clean, the be unit run and cli migrate run over a real Postgres', { timeout: 1_800_000 }, async (t) => {
+  assert.equal(dockerUnavailable, false, String(dockerUnavailable));
   assertTestWorldInstalled();
   const into = mkdtemp(t, 'hfs-scaffold-e2e-');
   const app = path.join(into, 'demo');

@@ -1,6 +1,6 @@
 // hfs-scaffold-app-installs.e2e.spec.mjs - the registry-install proof of a scaffolded app, BEFORE the publish: `starci release app-installs --source`
 // scaffolds the app with this checkout's hfs, installs it fresh with the @starci scope from the checkout's PACKED tarballs (every other package from
-// the public registry) and runs e2e/hfs-scaffold-app.spec.mjs over that install with STARCI_REQUIRE_APP_INSTALLS=1, so no proof of it may skip.
+// the public registry) and runs e2e/hfs-scaffold-app.spec.mjs over that install; that spec skips nothing, a missing install fails it.
 // CI runs the same spec over the PUBLISHED packages (`starci release app-installs`); this file puts it inside `starci release scaffold-e2e`, the
 // proof the runtime verify and the release cut run, so a defect of the spec or of the packages it installs is red before the cut and never first
 // on CI after it (alpha.21: the spec still read the CI job `ci` the rendered workflow had split into fast, test, build and sonar).
