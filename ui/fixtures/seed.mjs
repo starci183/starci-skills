@@ -138,7 +138,7 @@ function productsRepository(repoRoot) {
 
 try {
   const a = makeRuntime('shop', 1);
-  const b = makeRuntime('ecommerce-app', 2);
+  const b = makeRuntime('full-app', 2);
   workflow(a, 'wf-stuck', 'Blocked delivery', 'running', 1);
   workflow(a, 'wf-under-dispatched', 'Ready work', 'running', 2);
   workflow(a, 'wf-paused', 'Paused delivery', 'paused', 3);

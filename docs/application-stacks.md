@@ -307,7 +307,7 @@ environments:
 
 ## Reference pattern
 
-The `examples/ecommerce-app/.starcistacks` kit demonstrates the full manifest, distinct dev and VPS runtimes, secret custody, and static checker input. `examples/lite-app` demonstrates a lite production Swarm environment with Supabase as managed backing. Application-specific readiness and audit evidence belongs in that application's reports.
+The `examples/full-app/.starcistacks` kit demonstrates the full manifest, distinct dev and VPS runtimes, secret custody, and static checker input. `examples/lite-app` demonstrates a lite production Swarm environment with Supabase as managed backing. Application-specific readiness and audit evidence belongs in that application's reports.
 
 ## Primary references
 

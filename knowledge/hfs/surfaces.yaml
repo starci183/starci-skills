@@ -137,9 +137,9 @@ surfaces:
         - be.integrations.model
         - be.integrations.supabase
       examples:
-        - examples/ecommerce-app/be/apps/order/src/main.ts
-        - examples/ecommerce-app/be/src/features/api/checkout
-        - examples/ecommerce-app/be/src/modules/domain
+        - examples/full-app/be/apps/order/src/main.ts
+        - examples/full-app/be/src/features/api/checkout
+        - examples/full-app/be/src/modules/domain
       gap:
         A07/A12/A16/A17/A21 owe new structure/composition/door/budget/proof rules and edition-specific
         proofs. Current paths map existing rules only.
@@ -273,9 +273,9 @@ surfaces:
         - fe.package.api.outcome
         - fe.package.i18n
       examples:
-        - examples/ecommerce-app/fe/apps/app/src
-        - examples/ecommerce-app/fe/apps/landing/src
-        - examples/ecommerce-app/fe/apps/app/package.json
+        - examples/full-app/fe/apps/app/src
+        - examples/full-app/fe/apps/landing/src
+        - examples/full-app/fe/apps/app/package.json
       gap:
         A14/A15/A21 and C08/C10 owe SWR family, copy/glyph, callback, stack and function-budget
         coverage; existing paths do not prove these new branches.
@@ -326,8 +326,8 @@ surfaces:
       slots:
         - repo.app-image
       examples:
-        - examples/ecommerce-app/be/apps/order/Dockerfile
-        - examples/ecommerce-app/.starcistacks/dev/environment.json
+        - examples/full-app/be/apps/order/Dockerfile
+        - examples/full-app/.starcistacks/dev/environment.json
       gap:
         A08/C03 owe production Swarm or Kubernetes evidence. Current ecommerce development Compose does
         not demonstrate a production release or restore.
@@ -390,9 +390,9 @@ surfaces:
         - app.scripts
         - app.scripts.delivery
       examples:
-        - examples/ecommerce-app/.github/workflows/ci.yml
-        - examples/ecommerce-app/.github/workflows/images.yml
-        - examples/ecommerce-app/scripts
+        - examples/full-app/.github/workflows/ci.yml
+        - examples/full-app/.github/workflows/images.yml
+        - examples/full-app/scripts
       gap:
         A02/A11 owe product workflow/script content checks, protected deployment jobs and no-host-cron
         proofs.
@@ -452,10 +452,10 @@ surfaces:
         - app.plaintext-env
         - repo.plaintext-env
       examples:
-        - examples/ecommerce-app/.starcistacks/application-stacks.yaml
-        - examples/ecommerce-app/.sops.yaml
-        - examples/ecommerce-app/be/apps/order/src/order.env.ts
-        - examples/ecommerce-app/be/src/modules/platform/config/env-source.config.ts
+        - examples/full-app/.starcistacks/application-stacks.yaml
+        - examples/full-app/.sops.yaml
+        - examples/full-app/be/apps/order/src/order.env.ts
+        - examples/full-app/be/src/modules/platform/config/env-source.config.ts
       gap:
         A01/A03 owe key/value parity, sole .enc custody and the .claude/secret.env age-key contract. No
         secret value is evidence in this ledger.
@@ -511,8 +511,8 @@ surfaces:
         - be.feature.webhooks.http
         - be.transport.http
       examples:
-        - examples/ecommerce-app/be/src/features/webhooks
-        - examples/ecommerce-app/be/src/modules/platform
+        - examples/full-app/be/src/features/webhooks
+        - examples/full-app/be/src/modules/platform
       gap:
         A06/A07 owe pinned JWT algorithms, CORS/header/proxy hardening, real readiness and
         path-independent webhook scope.
@@ -549,8 +549,8 @@ surfaces:
       slots:
         - app.starcistacks
       examples:
-        - examples/ecommerce-app/.starcistacks/application-stacks.yaml
-        - examples/ecommerce-app/.starcistacks/dev/README.md
+        - examples/full-app/.starcistacks/application-stacks.yaml
+        - examples/full-app/.starcistacks/dev/README.md
       gap:
         A08/C02/C03 owe rendered production-model judgment, schedules, owner actions and production
         fixtures.
@@ -585,8 +585,8 @@ surfaces:
       slots:
         - app.starciwork
       examples:
-        - examples/ecommerce-app/.starciwork/index.yaml
-        - examples/ecommerce-app/.starciwork/brand/index.yaml
+        - examples/full-app/.starciwork/index.yaml
+        - examples/full-app/.starciwork/brand/index.yaml
       gap:
         WDD/W4 records missing acceptance-criterion and graph families; WDD/W5 records the _derived
         layout conflict for C08. An index is not proof of every family.
@@ -688,8 +688,8 @@ surfaces:
         - be.app.api
         - repo.app-image
       examples:
-        - examples/ecommerce-app/be/src/modules/platform/logging/json-logger.service.ts
-        - examples/ecommerce-app/be/src/features/api/health/transport/http/health.controller.ts
+        - examples/full-app/be/src/modules/platform/logging/json-logger.service.ts
+        - examples/full-app/be/src/features/api/health/transport/http/health.controller.ts
       gap:
         A06/C02/C03 owe backing-service readiness and matching Docker HEALTHCHECK routes.
         Correlation/metrics/tracing remain P2; FE reporting is documented-optional.
@@ -736,8 +736,8 @@ surfaces:
         - repo.docs
         - repo.docs-media
       examples:
-        - examples/ecommerce-app/README.md
-        - examples/ecommerce-app/.starcistacks/dev/README.md
+        - examples/full-app/README.md
+        - examples/full-app/.starcistacks/dev/README.md
       gap: A11/C01 owe product path/command/env/rule freshness and correction of stale deployment claims.
   - id: managed-supply-chain
     title: Managed configuration, dependency pins and supply chain
@@ -822,9 +822,9 @@ surfaces:
         - fe.tool-config-local
         - repo.packages
       examples:
-        - examples/ecommerce-app/package.json
-        - examples/ecommerce-app/.husky/pre-commit
-        - examples/ecommerce-app/.nvmrc
+        - examples/full-app/package.json
+        - examples/full-app/.husky/pre-commit
+        - examples/full-app/.nvmrc
       gap:
         C04/A02/C08 owe managed .editorconfig/.nvmrc/.gitattributes/.sops.yaml plus Dependabot, audit
         and SBOM.
@@ -908,10 +908,10 @@ surfaces:
         - be.tests.contract
         - be.tests.e2e-world-dir
       examples:
-        - examples/ecommerce-app/be/src/tests/world
-        - examples/ecommerce-app/be/src/tests/integration
-        - examples/ecommerce-app/be/src/tests/e2e
-        - examples/ecommerce-app/browser
+        - examples/full-app/be/src/tests/world
+        - examples/full-app/be/src/tests/integration
+        - examples/full-app/be/src/tests/e2e
+        - examples/full-app/browser
       gap:
         A13/A17 owe boot/coverage and pattern-proof metadata. Existing lanes are not a measured
         coverage result.
@@ -954,8 +954,8 @@ surfaces:
         - app.ci-images
         - app.ci-db
       examples:
-        - examples/ecommerce-app/.github/workflows/images.yml
-        - examples/ecommerce-app/.husky/pre-push
+        - examples/full-app/.github/workflows/images.yml
+        - examples/full-app/.husky/pre-push
       gap:
         A11 owes product tag/version/image provenance and guarded database deploy; workflows alone do
         not prove production digests, backups or migration receipts.
@@ -995,7 +995,7 @@ surfaces:
         - app.sides
         - repo.side-root-forbidden
       examples:
-        - examples/ecommerce-app/hfs.json
+        - examples/full-app/hfs.json
       gap:
         A09/A10/C05-C08/Z01 owe the complete derived enforcer/doc/template/example/spec/witness chain
         and stale-ruling judgment.
@@ -1029,7 +1029,7 @@ surfaces:
       slots:
         - be.persistence
       examples:
-        - examples/ecommerce-app/be/src/modules/domain
+        - examples/full-app/be/src/modules/domain
       gap:
         Full persistence sources exist; a domain directory alone does not establish
         reversible-migration proof.
@@ -1088,7 +1088,7 @@ surfaces:
         - be.assets
         - repo.i18n-dynamic-keys
       examples:
-        - examples/ecommerce-app/.gitignore
+        - examples/full-app/.gitignore
       gap:
         Generated-output freshness and asset/lexicon budgets require their own proofs.
         Ignored/forbidden absence is enforced by slot boundaries, not positive content evidence.
@@ -1128,8 +1128,8 @@ surfaces:
         - app.starcistacks
         - repo.app-image
       examples:
-        - examples/ecommerce-app/.starcistacks/dev/README.md
-        - examples/ecommerce-app/.starcistacks/dev/environment.json
+        - examples/full-app/.starcistacks/dev/README.md
+        - examples/full-app/.starcistacks/dev/environment.json
       gap:
         A08/C03 owe production model judgment. Full development runbook is present; Kubernetes has no
         current example and production convergence is not proven.
@@ -1305,8 +1305,8 @@ surfaces:
         - be.cli
         - app.deploy
       examples:
-        - examples/ecommerce-app/be/src/features/jobs
-        - examples/ecommerce-app/be/apps/cli/src
+        - examples/full-app/be/src/features/jobs
+        - examples/full-app/be/apps/cli/src
       gap:
         A02/A05/A08/C02 owe no-host-cron judgment, migration/code cron parity and replicated-job
         fixtures. C08 owes the stale host-scheduler text correction.
@@ -1351,7 +1351,7 @@ surfaces:
         - app.ci-authorize-deploy-key
         - app.ci-db
       examples:
-        - examples/ecommerce-app/.github/workflows/ci.yml
+        - examples/full-app/.github/workflows/ci.yml
       gap: A02/A11 owe product trigger/permissions/concurrency/protected
         environment/credential/action/tool checks. Reviewers are owner-run configuration; a declared
         environment cannot prove provider settings.
@@ -1433,8 +1433,8 @@ surfaces:
         - be.app.cli
         - app.starcistacks
       examples:
-        - examples/ecommerce-app/be/apps/order/src/order.env.ts
-        - examples/ecommerce-app/be/src/modules/platform/config/env-source.config.ts
+        - examples/full-app/be/apps/order/src/order.env.ts
+        - examples/full-app/be/src/modules/platform/config/env-source.config.ts
       gap:
         A01/A03/A07 owe code/sealed/stack/example parity, in-memory value validation and required app
         env readers. The old R245 inline-parsing allowance is amended by R289; this row does not use
@@ -1513,8 +1513,8 @@ surfaces:
         - repo.app-image
         - be.integrations.supabase
       examples:
-        - examples/ecommerce-app/scripts
-        - examples/ecommerce-app/be/apps/order/Dockerfile
+        - examples/full-app/scripts
+        - examples/full-app/be/apps/order/Dockerfile
       gap:
         A02/A03 owe plaintext-load/xtrace/deploy-logic/service-role-scope content cases. Existing
         helpers, clients and images cover older rules only.
@@ -1556,7 +1556,7 @@ surfaces:
         - be.integrations.supabase
         - fe.modules.auth
       examples:
-        - examples/ecommerce-app/be/src/modules/platform
+        - examples/full-app/be/src/modules/platform
       gap:
         A06 owes an algorithm-pinned verification proof in each edition; existing principal/auth
         sources do not prove pinned algorithms.
@@ -1602,8 +1602,8 @@ surfaces:
         - be.platform.queue
         - be.events
       examples:
-        - examples/ecommerce-app/be/src/features/webhooks
-        - examples/ecommerce-app/be/src/modules/platform/queue
+        - examples/full-app/be/src/features/webhooks
+        - examples/full-app/be/src/modules/platform/queue
       gap:
         A07/A20 owe path-independent scope and lite receipt plus typed-outbox-event hand-off after
         commit, replay/inbox-key/sealed-provider-secret cases. Current intake paths are partial
@@ -1639,7 +1639,7 @@ surfaces:
         - be.transport.http
         - be.platform
       examples:
-        - examples/ecommerce-app/be/apps/order/src/main.ts
+        - examples/full-app/be/apps/order/src/main.ts
       gap:
         A06/C02/C03 owe explicit CORS/security-header/proxy cases. A bootstrap path alone does not
         prove edge policy.
@@ -1705,8 +1705,8 @@ surfaces:
         - be.app.api
         - be.transport.http
       examples:
-        - examples/ecommerce-app/be/apps/order/Dockerfile
-        - examples/ecommerce-app/be/src/features/api/health/transport/http/health.controller.ts
+        - examples/full-app/be/apps/order/Dockerfile
+        - examples/full-app/be/src/features/api/health/transport/http/health.controller.ts
       gap:
         A06/C03 owe readiness and migration-gating proofs. Current full health and Dockerfile paths
         establish presence, not behavior.
@@ -1767,10 +1767,10 @@ surfaces:
         - app.ci-images
         - repo.app-image
       examples:
-        - examples/ecommerce-app/package.json
-        - examples/ecommerce-app/.github/dependabot.yml
-        - examples/ecommerce-app/.github/workflows/images.yml
-        - examples/ecommerce-app/be/apps/order/Dockerfile
+        - examples/full-app/package.json
+        - examples/full-app/.github/dependabot.yml
+        - examples/full-app/.github/workflows/images.yml
+        - examples/full-app/be/apps/order/Dockerfile
       gap:
         A02/C04/A11 owe audit/Dependabot/SBOM/provenance and product release digest evidence. Existing
         install/pin examples do not prove the new links.
@@ -1836,7 +1836,7 @@ surfaces:
       slots:
         - app.starciwork
       examples:
-        - examples/ecommerce-app/.starciwork/brand/index.yaml
+        - examples/full-app/.starciwork/brand/index.yaml
       gap:
         Full brand exists; stale lite-brand-only citations need R274 judgment rather than inferring
         correctness from a grep.
@@ -1872,8 +1872,8 @@ surfaces:
       slots:
         - app.starciwork
       examples:
-        - examples/ecommerce-app/.starciwork/index.yaml
-        - examples/ecommerce-app/.starciwork/features
+        - examples/full-app/.starciwork/index.yaml
+        - examples/full-app/.starciwork/features
       gap:
         WDD records missing acceptance-criterion and graph examples and conflicting _derived
         allowances. C08/C09 and final coverage backfill owe these schema/layout branches.
@@ -2119,7 +2119,7 @@ surfaces:
         - app.starcistacks
         - be.persistence
       examples:
-        - examples/ecommerce-app/be/src/modules/domain
+        - examples/full-app/be/src/modules/domain
       gap:
         A05/A08/A11 owe destructive-DDL judgment, backup/fingerprint/lock declarations and rollback
         compatibility. A migration path is not a production receipt.
@@ -2148,8 +2148,8 @@ surfaces:
         - be.platform
         - be.domain
       examples:
-        - examples/ecommerce-app/be/src/modules/platform/logging/logging.port.ts
-        - examples/ecommerce-app/be/src/modules/platform/logging/json-logger.service.spec.ts
+        - examples/full-app/be/src/modules/platform/logging/logging.port.ts
+        - examples/full-app/be/src/modules/platform/logging/json-logger.service.spec.ts
   - id: observe-optional-p2
     title: Optional FE reporting and deferred correlation/metrics/tracing
     editions:
@@ -2227,8 +2227,8 @@ surfaces:
         - app.starcistacks
         - app.hooks
       examples:
-        - examples/ecommerce-app/README.md
-        - examples/ecommerce-app/.starcistacks/dev/README.md
+        - examples/full-app/README.md
+        - examples/full-app/.starcistacks/dev/README.md
       gap:
         A11/A10/C01/C08 owe product freshness, stale-ruling correction and gate truth. Runtime docs
         checks do not prove product freshness or that every claimed gate runs.
@@ -2286,10 +2286,10 @@ surfaces:
         - be.tool-config
         - fe.tool-config
       examples:
-        - examples/ecommerce-app/.gitattributes
-        - examples/ecommerce-app/.husky/pre-commit
-        - examples/ecommerce-app/.husky/pre-push
-        - examples/ecommerce-app/sonar-project.properties
+        - examples/full-app/.gitattributes
+        - examples/full-app/.husky/pre-commit
+        - examples/full-app/.husky/pre-push
+        - examples/full-app/sonar-project.properties
       gap:
         C04/C08/A09 owe unmanaged-file registration and gate truth. Hook chunking is unscheduled P2;
         current hook paths are not measured per-rule coverage.
@@ -2329,8 +2329,8 @@ surfaces:
         - app.ci-images
         - app.ci-db
       examples:
-        - examples/ecommerce-app/.husky/pre-push
-        - examples/ecommerce-app/package.json
+        - examples/full-app/.husky/pre-push
+        - examples/full-app/package.json
       gap:
         A11 owes product tag/version/image/migration provenance. Current hooks are not proof of
         published images, release notes or a completed production gate.
@@ -2374,7 +2374,7 @@ surfaces:
         - app.starcistacks
         - be.tests.integration
       examples:
-        - examples/ecommerce-app/hfs.json
+        - examples/full-app/hfs.json
       gap:
         A09/A10/C02/C03/C05/C06/Z01 owe non-vacuous per-edition example/spec/witness chains and
         truthful example claims. WDD/E1-E11 gaps remain on concrete rows; E12 script examples are

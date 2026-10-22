@@ -465,7 +465,7 @@ pins:
     version: 13.4.5
     group: framework
     side: be
-    why: 'the GraphQL transport of every back end (be.transport.graphql) that the front end calls; the ecommerce-app resolution on 2026-10-13. Stays on 13.x for alpha.18: the npm-audit advisory fixed by 14.0.3 (semver major) is a documented accepted exception, upgrade deferred to alpha.19 (owner ruling graphql-13-advisory-accepted-until-a19, 2026-10-16).'
+    why: 'the GraphQL transport of every back end (be.transport.graphql) that the front end calls; the full-app resolution on 2026-10-13. Stays on 13.x for alpha.18: the npm-audit advisory fixed by 14.0.3 (semver major) is a documented accepted exception, upgrade deferred to alpha.19 (owner ruling graphql-13-advisory-accepted-until-a19, 2026-10-16).'
   '@graphql-tools/utils':
     version: 12.1.0
     group: framework
@@ -475,12 +475,12 @@ pins:
     version: 13.4.5
     group: framework
     side: be
-    why: 'the Apollo driver of @nestjs/graphql; the ecommerce-app resolution on 2026-10-13. Stays on 13.x with @nestjs/graphql (accepted advisory, major deferred to alpha.19).'
+    why: 'the Apollo driver of @nestjs/graphql; the full-app resolution on 2026-10-13. Stays on 13.x with @nestjs/graphql (accepted advisory, major deferred to alpha.19).'
   '@apollo/server':
     version: 5.5.1
     group: framework
     side: be
-    why: 'the Apollo server behind @nestjs/apollo; the ecommerce-app resolution on 2026-10-13.'
+    why: 'the Apollo server behind @nestjs/apollo; the full-app resolution on 2026-10-13.'
   '@nestjs/websockets':
     version: 11.2.5
     group: framework

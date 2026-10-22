@@ -1,0 +1,12 @@
+schema: work/workspace@1
+id: full-app
+project: full-app
+description: >-
+  The example product: a small real shop, one StarCi app whose back end in be/ is deployed as two
+  services (identity, order) and whose front end in fe/ serves two Next apps (landing, shop). One canonical
+  Work tree at the app root serves both sides.
+repositories:
+  - role: be
+    name: be
+  - role: fe
+    name: fe

@@ -1,0 +1,15 @@
+services:
+  identity:
+    # The api image is built from this repository (the context is the app root, the Dockerfile the app's own). The canonical dev run
+    # keeps only the infra here and drives the API on the host with `npm run start:identity`; the app profile runs the image.
+    image: full-app/identity:1.0.0
+    build:
+      context: ../../../..
+      dockerfile: be/apps/identity/Dockerfile
+    profiles: [app]
+    depends_on:
+      - postgres
+      - redis
+      - keycloak
+    ports:
+      - "5070:5070"

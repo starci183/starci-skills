@@ -56,7 +56,7 @@ rules:
       - {path: packages/eslint/fe/slot-ownership.spec.mjs, editions: [lite, full], codes: [HFS_SLOT_UNDECLARED, HFS_SLOT_AMBIGUOUS, HFS_SLOT_NOT_ENABLED]}
     exemplifiedBy:
       - {path: examples/lite-app/be/src/features/webhooks/calendar/transport/http/calendar.webhook.ts, edition: lite}
-      - {path: examples/ecommerce-app/be/src/features/webhooks/sepay/transport/http/sepay.webhook.ts, edition: full}
+      - {path: examples/full-app/be/src/features/webhooks/sepay/transport/http/sepay.webhook.ts, edition: full}
     witness: {status: unreachable, reason: "owner:no-runtime-specs (2026-10-17): the mutation witness was a deleted runtime spec or fixture", date: "2026-10-17"}
     specNa: "owner:no-runtime-specs (2026-10-17): the runtime has no specs of its own; the package specs named in proves keep proving the lint enforcers, the runtime-code enforcers lost their deleted runtime spec"
   - id: R02
@@ -4254,7 +4254,7 @@ rules:
       - {"path":"packages/hfs/templates/be/inbox/webhook-door.ts.tpl","editions":["lite","full"]}
       - {"path":"packages/hfs/templates/be/inbox/service.ts.tpl","editions":["lite","full"]}
       - {"path":"examples/lite-app/be/src/features/webhooks/calendar/transport/http/calendar.webhook.ts","edition":"lite"}
-      - {"path":"examples/ecommerce-app/be/src/features/webhooks/sepay/transport/http/sepay.webhook.ts","edition":"full"}
+      - {"path":"examples/full-app/be/src/features/webhooks/sepay/transport/http/sepay.webhook.ts","edition":"full"}
       - {"path":"packages/eslint/be/webhook-handoff-inbox.spec.mjs","editions":["lite","full"],"codes":["BE_WEBHOOK_INBOX_KEY"]}
     proves:
       - {"path":"packages/eslint/be/webhook-handoff-scope.spec.mjs","editions":["lite","full"],"codes":["BE_WEBHOOK_SCOPE"]}
@@ -4279,7 +4279,7 @@ rules:
     exemplifiedBy:
       - {"path":"packages/hfs/templates/be/skeleton/src/features/api/system-health/application/check-liveness.contracts.ts","editions":["lite","full"]}
       - {"path":"examples/lite-app/be/src/features/api/bookings/application/create-booking.contracts.ts","edition":"lite"}
-      - {"path":"examples/ecommerce-app/be/src/features/api/health/application/check-health.contracts.ts","edition":"full"}
+      - {"path":"examples/full-app/be/src/features/api/health/application/check-health.contracts.ts","edition":"full"}
     proves:
       - {"path":"packages/eslint/be/feature-thin.spec.mjs","editions":["lite","full"],"codes":["HFS_FEATURE_LOGIC_ROLE"]}
     witness:
@@ -4301,7 +4301,7 @@ rules:
       - {"path":"packages/hfs/templates/be/skeleton-lite/apps/api/src/compose/platform.ts","edition":"lite"}
       - {"path":"packages/hfs/templates/be/skeleton/apps/__app__/src/compose/platform.ts","edition":"full"}
       - {"path":"examples/lite-app/be/apps/api/src/compose/platform.ts","edition":"lite"}
-      - {"path":"examples/ecommerce-app/be/apps/order/src/compose/platform.ts","edition":"full"}
+      - {"path":"examples/full-app/be/apps/order/src/compose/platform.ts","edition":"full"}
     proves:
       - {"path":"packages/eslint/be/app-composition.spec.mjs","editions":["lite","full"],"codes":["BE_COMPOSITION_UNTYPED"]}
     witness:
@@ -4453,7 +4453,7 @@ rules:
     exemplifiedBy:
       - {"path":"packages/hfs/templates/be/tool-config/jest.config.js","editions":["lite","full"]}
       - {"path":"examples/lite-app/be/jest.config.js","edition":"lite"}
-      - {"path":"examples/ecommerce-app/be/jest.config.js","edition":"full"}
+      - {"path":"examples/full-app/be/jest.config.js","edition":"full"}
     specNa: "owner:no-runtime-specs (2026-10-17): the runtime has no specs of its own; this code is enforced by runtime code and its spec proof was a deleted runtime spec"
 
     witness: {status: unreachable, reason: "owner:no-runtime-specs (2026-10-17): the mutation witness was a deleted runtime spec or fixture", date: "2026-10-17"}
@@ -4794,7 +4794,7 @@ rules:
       - {path: packages/eslint/fe/function-budget.spec.mjs, editions: [lite, full], codes: [HFS_FUNCTION_BUDGET]}
       - {path: packages/hfs/templates/be/patterns/api/graphql.resolver.ts.tpl, editions: [lite, full]}
       - {path: examples/lite-app/be/src/features/api/bookings/application/create-booking.handler.ts, editions: [lite]}
-      - {path: examples/ecommerce-app/be/src/features/api/checkout/application/add-cart-item.handler.ts, editions: [full]}
+      - {path: examples/full-app/be/src/features/api/checkout/application/add-cart-item.handler.ts, editions: [full]}
     proves:
       - {path: packages/eslint/be/function-budget.spec.mjs, editions: [lite, full], codes: [HFS_FUNCTION_BUDGET]}
       - {path: packages/eslint/fe/function-budget.spec.mjs, editions: [lite, full], codes: [HFS_FUNCTION_BUDGET]}
@@ -4815,7 +4815,7 @@ rules:
     exemplifiedBy:
       - {path: packages/hfs/templates/be/patterns/api, editions: [lite, full]}
       - {path: examples/lite-app/be/src/features/api/bookings, editions: [lite]}
-      - {path: examples/ecommerce-app/be/src/features/api/checkout, editions: [full]}
+      - {path: examples/full-app/be/src/features/api/checkout, editions: [full]}
     specNa: "owner:no-runtime-specs (2026-10-17): the runtime has no specs of its own; this code is enforced by runtime code and its spec proof was a deleted runtime spec"
 
     witness: {status: unreachable, reason: "owner:no-runtime-specs (2026-10-17): the mutation witness was a deleted runtime spec or fixture", date: "2026-10-17"}
@@ -4876,7 +4876,7 @@ rules:
       - {path: packages/hfs/templates/be/patterns/api/feature.module-definition.ts.tpl, edition: lite}
       - {path: packages/hfs/templates/be/patterns/api/graphql.module-definition.ts.tpl, edition: lite}
       - {path: examples/lite-app/be/src/features/api/bookings/transport/graphql/bookings-graphql.module-definition.ts, edition: lite}
-      - {path: examples/ecommerce-app/be/src/features/api/checkout/checkout.module-definition.ts, edition: full}
+      - {path: examples/full-app/be/src/features/api/checkout/checkout.module-definition.ts, edition: full}
       - {path: packages/eslint/be/module-shape.spec.mjs, editions: [lite, full]}
     proves:
       - {path: packages/eslint/be/module-shape.spec.mjs, editions: [lite, full], codes: [BE_MODULE_DEFINITION_MISSING]}
@@ -4895,7 +4895,7 @@ rules:
       - {path: docs/application-stacks.md#r296, editions: [lite, full]}
     exemplifiedBy:
       - {path: examples/lite-app/.starcistacks/application-stacks.yaml, edition: lite}
-      - {path: examples/ecommerce-app/.starcistacks/application-stacks.yaml, edition: full}
+      - {path: examples/full-app/.starcistacks/application-stacks.yaml, edition: full}
       - {path: examples/shape-slot/.starcistacks/application-stacks.yaml, edition: full}
       - {path: packages/hfs/templates/app/skeleton-lite/.starcistacks/application-stacks.yaml, edition: lite}
       - {path: packages/hfs/templates/app/skeleton/.starcistacks/application-stacks.yaml, edition: full}
@@ -4914,7 +4914,7 @@ rules:
       - {path: docs/application-stacks.md#r297, editions: [lite, full]}
     exemplifiedBy:
       - {path: examples/lite-app/.starcistacks/application-stacks.yaml, edition: lite}
-      - {path: examples/ecommerce-app/.starcistacks/application-stacks.yaml, edition: full}
+      - {path: examples/full-app/.starcistacks/application-stacks.yaml, edition: full}
       - {path: examples/shape-slot/.starcistacks/application-stacks.yaml, edition: full}
       - {path: packages/hfs/templates/app/skeleton-lite/.starcistacks/application-stacks.yaml, edition: lite}
       - {path: packages/hfs/templates/app/skeleton/.starcistacks/application-stacks.yaml, edition: full}
@@ -4933,7 +4933,7 @@ rules:
       - {path: docs/application-stacks.md#r298, editions: [lite, full]}
     exemplifiedBy:
       - {path: examples/lite-app/.starcistacks/application-stacks.yaml, edition: lite}
-      - {path: examples/ecommerce-app/.starcistacks/application-stacks.yaml, edition: full}
+      - {path: examples/full-app/.starcistacks/application-stacks.yaml, edition: full}
       - {path: examples/shape-slot/.starcistacks/application-stacks.yaml, edition: full}
       - {path: packages/hfs/templates/app/skeleton-lite/.starcistacks/application-stacks.yaml, edition: lite}
       - {path: packages/hfs/templates/app/skeleton/.starcistacks/application-stacks.yaml, edition: full}

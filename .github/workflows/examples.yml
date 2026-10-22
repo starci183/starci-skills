@@ -257,15 +257,21 @@ jobs:
         id: policy
         working-directory: .
         run: |
-          if [ -f "examples/${{ matrix.app }}/codecov.yml" ]; then
-            echo "tests=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "tests=false" >> "$GITHUB_OUTPUT"
+          # Every example app measures its tests (codecov.yml is its generated test policy): a missing policy fails, never skips the journey.
+          if [ ! -f "examples/${{ matrix.app }}/codecov.yml" ]; then
+            echo "::error title=Test policy missing::examples/${{ matrix.app }} has no codecov.yml; run npx starci app sync --write in it"
+            exit 1
           fi
+          echo "tests=true" >> "$GITHUB_OUTPUT"
       - name: Back-end build (tsc, tsc-alias)
         run: npm run build:be
       - name: Front-end build
         run: npm run build:fe
+      - name: Shop build for the local stack (the projection's public api URLs inlined)
+        if: ${{ steps.policy.outputs.tests == 'true' }}
+        # The app's serve helper resolves the app root from its own place.
+        working-directory: examples/${{ matrix.app }}/scripts
+        run: node serve.mjs app build
       - name: Browser stack up (ephemeral env, infra, migrate, seed, apis)
         if: ${{ steps.policy.outputs.tests == 'true' }}
         run: node browser/stack.mjs up

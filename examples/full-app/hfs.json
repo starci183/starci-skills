@@ -1,0 +1,43 @@
+{
+  "hfs": 3,
+  "kind": "app",
+  "project": "full-app",
+  "browser": true,
+  "sides": {
+    "be": {
+      "kinds": ["api", "cli", "jobs", "reactors", "realtime", "saga", "webhooks"],
+      "apps": [
+        { "name": "identity", "kind": "api" },
+        { "name": "order", "kind": "api" },
+        { "name": "billing", "kind": "api" },
+        { "name": "cli", "kind": "cli" }
+      ],
+      "connections": [
+        { "name": "identity", "envPrefix": "IDENTITY_DB", "owner": "identity", "isolation": "database" },
+        { "name": "order", "envPrefix": "ORDER_DB", "owner": "order", "isolation": "database" },
+        { "name": "billing", "envPrefix": "BILLING_DB", "owner": "billing", "isolation": "database" }
+      ],
+      "optionalSlots": [
+        "repo.docs",
+        "be.contract.graphql",
+        "be.contract.events",
+        "be.contract.events.pin",
+        "be.transport.message"
+      ],
+      "patterns": ["saga", "event-bus", "webhooks", "realtime", "projection", "queue", "fenced-job"]
+    },
+    "fe": {
+      "apps": [
+        { "name": "landing", "kind": "next" },
+        { "name": "app", "kind": "next" }
+      ],
+      "optionalSlots": ["fe.package.api", "fe.package.i18n", "fe.package.ui"],
+      "extraPackages": [
+        {
+          "name": "@fontsource-variable/inter",
+          "reason": "Self-host the variable Inter font required by both apps' brand records."
+        }
+      ]
+    }
+  }
+}

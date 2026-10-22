@@ -574,7 +574,7 @@ consumer undoes that step. Every consumed event is named by an e2e spec that boo
 spec of a saga step also names the compensated event, so it drives the whole flow (R167). A saga is a declared pattern
 (`patterns: ["saga"]` in hfs.json): its folder `be/src/features/saga/<saga>/` (the saga kind) holds an orchestrator, a versioned state, steps and a
 compensation for every step (R169 to R173; `knowledge/patterns/be/saga.yaml`). See `docs/microservices.md` and the
-`ecommerce-app` example (`identity`, `order`, `billing`).
+`full-app` example (`identity`, `order`, `billing`).
 
 ### 5.12 Provider webhooks (R182, R183, R203)
 

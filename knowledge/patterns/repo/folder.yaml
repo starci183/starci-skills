@@ -297,7 +297,7 @@ rules:
         - Confirm every badge's target currently reports a live external service.
         - Review GitHub description and topics against the app's current purpose.
     relatedExamples:
-      - examples/ecommerce-app/README.md
+      - examples/full-app/README.md
       - packages/hfs/templates/app/skeleton/README.md
   - id: REPO-FOLDER-7
     title: Source and documentation use the current product vocabulary

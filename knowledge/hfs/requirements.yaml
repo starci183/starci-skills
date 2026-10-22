@@ -1276,7 +1276,7 @@ requirements:
     editions:
       - lite
       - full
-    statement: "| the two demo secrets of the ecommerce example | none (retired) | the example carries demo-only
+    statement: "| the two demo secrets of the full-app example | none (retired) | the example carries demo-only
       defaults in its compose files |"
     status: owed
     gap: Host setup, presence-only preflight or native qualification is an operational contract without a matching

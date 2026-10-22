@@ -1,0 +1,4 @@
+schema: work/disposable-accounts@1
+disposable: true
+accounts:
+  - {role: person, identity: identity.full-app.demo}

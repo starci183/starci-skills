@@ -1,0 +1,92 @@
+# Testing the full-app back end
+
+Unit specs sit beside their subjects. Every `*.service.ts` owes its colocated `<name>.service.spec.ts` and each cli command
+its `<name>.cli.spec.ts` (the spec-required roles of `ruleParams.be.unitRoles`); any other logic file of `src/modules/**` —
+a policy, a guard, a mapper, a client, a projection — may carry `<name>.<role>.spec.ts` beside it, and this app writes them.
+Each of those files owes 100 percent coverage per file. Feature files (handlers, resolvers, controllers, consumers,
+processors) are thin (R203 `BE_FEATURE_THIN`): they map their input and make one delegating call, so nothing is left in them
+to unit-test, and they are never measured. The apps only compose; the e2e world proves they boot.
+
+Run these commands from the full-app root, the directory that contains its [package manifest](../../../package.json):
+
+| Check      | Command             |
+| ---------- | ------------------- |
+| Types      | `npm run typecheck` |
+| Lint       | `npm run lint`      |
+| Build      | `npm run build:be`  |
+| Unit suite | `npm test`          |
+| E2E suite  | `npm run test:e2e`  |
+
+## Unit suite
+
+`npm test` is `jest --selectProjects unit --coverage`. Coverage is measured per file on the logic of `src/modules/**`: every
+file of a `ruleParams.be.logicRoles` role inside a `coverage: required` slot must reach 100 percent lines, branches,
+functions and statements (`jest.config.js`, relative to the back-end root, is the render `starci app sync` writes from the runtime's
+coverage-scope derivation; R204); jest exits non-zero below that. The derivation belongs to the StarCi runtime rather than this app repository. The run writes `be/coverage/lcov.info` relative to the app root; Sonar and
+Codecov import it with the same measured scope and hold each file at 100.
+
+A service spec builds its subject from a testing module that provides exactly the constructor dependencies and nothing else:
+
+```ts
+const moduleRef = await Test.createTestingModule({
+    providers: [OrderService, { provide: ORDER_ENTITY_MANAGER, useValue: em }, { provide: CART_SERVICE, useValue: cart }, ...],
+}).compile()
+const orders = moduleRef.get(OrderService)
+```
+
+No `new` of the service, no `imports`, no `overrideProvider`, no `jest.mock`, no casts, no ambient clock or `process.env`.
+Doubles come from the root of `@starci/jest-preset`:
+
+| Dependency                                                                   | Double                                                                                                                                                      |
+| ---------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Named EntityManager (`ORDER_ENTITY_MANAGER`, `IDENTITY_ENTITY_MANAGER`)      | `mockEntityManager({ method: [Entity, result] })`: any method the spec did not stub throws, so a missing stub proves the service made no such database call |
+| Transaction                                                                  | `fakeTransaction(em)`: commit, rollback and the writes that were committed or discarded                                                                     |
+| Clock (`CLOCK`)                                                              | `FakeClock`                                                                                                                                                 |
+| Cache (`CACHE`)                                                              | `fakeCache(clock)`: JSON round trip, TTL from the clock                                                                                                     |
+| Options tokens (`*_OPTIONS`)                                                 | real values from a `builder`                                                                                                                                |
+| Other capability services (`CART_SERVICE`, `SESSION_SERVICE`, ...) and ports | `mock<T>()`                                                                                                                                                 |
+| Logger, streams, probes                                                      | `mock<T>()`                                                                                                                                                 |
+
+Assertions check results (`toBeRefused`, `toSucceedWith`, returned values, thrown domain error codes) and state (what was
+written: `expect(em.save).toHaveBeenCalledWith(...)`, commits and rollbacks). Test names are English and start with a verb.
+A measured file without a spec of its own — a free helper with no role, covered through the specs of the files that call it —
+still owes the same 100 percent per file; this app chooses a colocated spec for each of its policies, guards, mappers and
+clients.
+
+The canonical example in this tree is `OrderService.placeOrder` (`src/modules/domain/order/order.service.spec.ts`): a refusal
+that never touches the database, a replayed key that returns the first order and writes nothing, and the place path with the
+exact fields written inside one committed transaction; `PaymentService.capture` stamps the capture time from the clock.
+
+### Test data builders
+
+Builders live in `src/tests/fixtures/builders/<area>.builder.ts`. Pure builders (`productEntity`, `orderEntity`,
+`placedOrder`, ...) return typed objects with valid, deterministic defaults; a spec overrides only what matters, and uses
+them as inputs and as `mockEntityManager` results. Persisting builders (`productBuilder(world.db.order).build(overrides)`)
+insert real rows for the integration and e2e specs, with the database constraints on. Builders never assert.
+
+## Integration and e2e
+
+Everything else lives under `src/tests/`:
+
+- `src/tests/world/` is the only test infrastructure, declared once for `@starci/test-world` in `src/tests/world/test-world.config.ts`
+  (`export const { useTestWorld, useSandbox } = defineTestWorld({...})`); `src/tests/world/global-setup.ts` and `src/tests/world/global-teardown.ts`
+  re-export the library's hooks. The library runs the services the [dev stack](../../../.starcistacks/dev/README.md) declares, real and behind toxiproxy:
+  Postgres with one database per connection (identity, order), the Redis of the cache, Keycloak with the stack's
+  [ecommerce realm](../../../.starcistacks/dev/infra/compose/realm-ecommerce.json) and MinIO with the receipts bucket. It runs the real `cli migrate run`
+  bootstrap once and applies the dev seeds; `src/tests/world/use-test-world.ts` re-exports `useTestWorld({ apps } | { modules })`, which
+  boots the real identity and order apps in the spec process, wired to each other over real GraphQL, and returns
+  `world.apps.<name>.api`, `world.db.<connection>` (the shared EntityManager), `world.infra.redis` (the real Redis:
+  `size()`, `cut()`, `restore()`), `world.infra.postgresql.connection(name)` (one database down while the other serves)
+  and `world.waitFor`. Nothing is overridden in the DI container and nothing of the stack is faked; this app calls no
+  external provider, so it has no network fakes and no contract specs.
+- `src/tests/fixtures/` holds the builders, the response shapes and the SQL constants of out-of-band reads.
+- `src/tests/integration/<capability>/*.integration-spec.ts` run real capability modules through `useTestWorld({ modules })`:
+  every integration of `src/modules/integrations/<provider>/` has one (R112), against the real Redis, realm, MinIO or the
+  real peer app the world boots beside the modules (`apps`).
+- `src/tests/e2e/<area>/*.e2e-spec.ts` are flow specs: they call the public GraphQL doors and assert persisted state
+  through `world.db`. Narrow a run with jest arguments, for example `npm run test:e2e -- checkout/checkout-journey`.
+
+E2E needs a container runtime and runs by hand or in the manual e2e workflow; husky, `typecheck`, `lint` and the
+automatic CI never run it.
+
+The [dev runbook](../../../.starcistacks/dev/README.md) contains the stack and process instructions.

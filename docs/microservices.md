@@ -2,7 +2,7 @@ Owner: knowledge/hfs/rules.yaml
 # Services of one product
 
 A product that runs more than one back-end service stays one repository, one `package.json` and one lockfile. This page is the
-policy the `starci app check` rules R163 to R168 enforce and the way the reference example, `examples/ecommerce-app`, follows it.
+policy the `starci app check` rules R163 to R168 enforce and the way the reference example, `examples/full-app`, follows it.
 
 The code requirements apply equally to lite and full. The database requirements below apply when the product declares Supabase.
 
@@ -226,7 +226,7 @@ Supabase CLI stack; it has no e2e world.
 
 ## The reference example
 
-`examples/ecommerce-app` runs four back-end apps: `identity` and `order` (GraphQL, calling each other), `billing` (consumes
+`examples/full-app` runs four back-end apps: `identity` and `order` (GraphQL, calling each other), `billing` (consumes
 `order.placed`, records an invoice, announces a rejection) and `migrate`; the order service also consumes `billing.invoice-rejected`, the compensating
 step of its saga. Its e2e specs `billing/order-placed` and `order/invoice-rejected` prove the asynchronous path, the redelivery and
 the compensation on the real stack; `integration/messaging` proves the queue adapter against Redis.

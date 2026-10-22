@@ -1,0 +1,14 @@
+services:
+  billing:
+    # The billing api, built from this repository: the context is the app root, the Dockerfile is the app's own. The tag is the
+    # exact version of the image (never a moving tag); it publishes 7070, the webhook door and the readiness probe.
+    image: full-app/billing:1.0.0
+    build:
+      context: ../../../..
+      dockerfile: be/apps/billing/Dockerfile
+    profiles: [app]
+    depends_on:
+      - postgres
+      - redis
+    ports:
+      - "7070:7070"

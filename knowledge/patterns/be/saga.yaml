@@ -20,7 +20,7 @@ provenance:
     - knowledge/hfs/slots.yaml
     - knowledge/hfs/rules.yaml
     - knowledge/patterns/be/services.yaml
-    - examples/ecommerce-app
+    - examples/full-app
   limitations: |-
     The checks read the folder tree, the step and compensation event names, the contracts, the consumers' use of the delivery id
     and the e2e specs. They cannot see that a compensation really undoes its step, that a step is idempotent, or that the

@@ -36,7 +36,7 @@ history (without `--rev`, from the parent of the commit that deleted it), decryp
 | `ext/sonar/secrets/sonarqube-admin-token.key.enc` | `SONARQUBE_ADMIN_TOKEN` | `scripts/gates/sonar-local.mjs` |
 | `ext/sonar/secrets/cloudflare-starci-local-services-tunnel-token.key.enc` | `CLOUDFLARE_TUNNEL_TOKEN` | `ext/sonar/cloudflared.yaml`, through `starci gate sonar up --public` |
 | `ext/sonar/secrets/sonarqube-analysis-token.txt.enc` | none (retired) | nothing reads a server-wide analysis token of the extension; a product reads its own custody |
-| the two demo secrets of the ecommerce example | none (retired) | current application secrets follow the sealed application custody contract below |
+| the two demo secrets of the full-app example | none (retired) | current application secrets follow the sealed application custody contract below |
 
 A ciphertext deleted from the tree stays in the public history, encrypted to the owner's age key: rotate the stack's admin password,
 admin token and tunnel token after the move.

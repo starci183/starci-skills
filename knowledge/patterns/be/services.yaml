@@ -20,7 +20,7 @@ provenance:
     - knowledge/hfs/slots.yaml
     - knowledge/hfs/rules.yaml
     - owner decision 2026-10-02 (be is a Nest monorepo of be/apps/<service>, each app with its own Dockerfile)
-    - examples/ecommerce-app
+    - examples/full-app
   limitations: |-
     The checks read the stack declaration, the event tables and their snapshots, the consumes tables, the compensating events of the contracts, the queues the code defines and the e2e
     spec files. They cannot see whether a spec asserts the right behaviour beyond naming the event and booting the world, nor
@@ -71,7 +71,7 @@ rules:
     cases:
       - id: case-1
         when: A third-party database and an own service
-        write: 'components: { postgres: { image: "postgres:16.4@sha256:<digest>" }, billing: { image: "ecommerce-app/billing:1.0.0", role: service } }'
+        write: 'components: { postgres: { image: "postgres:16.4@sha256:<digest>" }, billing: { image: "full-app/billing:1.0.0", role: service } }'
     verification:
       automated:
         - HFS_IMAGE_UNPINNED

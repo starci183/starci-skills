@@ -11,7 +11,7 @@
 //   npm run migrate     `cli migrate run` against a REAL Postgres: @starci/test-world's stack.attach (the world/attach API
 //                       the jest world setup itself calls) provisions the run's own database and the `primary`
 //                       connection's schema-per-context login over the shared warm stack; stack.detach drops them again.
-// The Postgres image is the one the example app's stack declaration pins (examples/ecommerce-app/.starcistacks). The whole
+// The Postgres image is the one the example app's stack declaration pins (examples/full-app/.starcistacks). The whole
 // proof needs Docker; unavailable docker is the one and only reason it may skip.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -63,7 +63,7 @@ function testWorldRequire() {
 }
 
 /** The Postgres image the canon stack pins (the example app's stack declaration: what a world attaches to). */
-const POSTGRES_IMAGE = parseYaml(fs.readFileSync(path.join(RUNTIME, 'examples', 'ecommerce-app', '.starcistacks', 'application-stacks.yaml'), 'utf8')).components?.postgres?.image;
+const POSTGRES_IMAGE = parseYaml(fs.readFileSync(path.join(RUNTIME, 'examples', 'full-app', '.starcistacks', 'application-stacks.yaml'), 'utf8')).components?.postgres?.image;
 
 
 test('a test-world package without its own install fails at once with the command that installs it', (t) => {

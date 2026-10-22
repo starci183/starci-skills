@@ -1,0 +1,13 @@
+services:
+  order:
+    # See identity.yaml: the same built image and the same host-run split.
+    image: full-app/order:1.0.0
+    build:
+      context: ../../../..
+      dockerfile: be/apps/order/Dockerfile
+    profiles: [app]
+    depends_on:
+      - postgres
+      - minio
+    ports:
+      - "6070:6070"

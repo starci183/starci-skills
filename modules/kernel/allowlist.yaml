@@ -257,21 +257,21 @@ json-exceptions:
         Append-only model-pool snapshots written by scripts/agent/benchmark-snapshot.mjs, one
         <YYYY-MM-DD>-<N>h.json per date and window in the raw model-scorecard --json shape
         (benchmark/README.md). JSON by the scorecard contract; a new snapshot needs no new line here.
-    - path: examples/ecommerce-app/be/contracts/billing
+    - path: examples/full-app/be/contracts/billing
       reason: >
         The vendored async contract of the billing service (`starci/event-contract@1`), emitted by `starci app emit` from `apps/billing/src/events.ts`, never written by hand; JSON by the contract format (R151).
-    - path: examples/ecommerce-app/be/contracts/order
+    - path: examples/full-app/be/contracts/order
       reason: >
         The vendored async contract of the order service (`starci/event-contract@1`), emitted by `starci app emit` from `apps/order/src/events.ts`, never written by hand; JSON by the contract format (R151).
-    - path: examples/ecommerce-app/fe/packages/ecommerce-api
+    - path: examples/full-app/fe/packages/ecommerce-api
       reason: >
-        npm workspace package of the ecommerce-app front end: its package.json, tsconfig.json and tsconfig.build.json are toolchain config npm and tsc read as JSON.
-    - path: examples/ecommerce-app/fe/packages/ecommerce-i18n
+        npm workspace package of the full-app front end: its package.json, tsconfig.json and tsconfig.build.json are toolchain config npm and tsc read as JSON.
+    - path: examples/full-app/fe/packages/ecommerce-i18n
       reason: >
-        npm workspace package of the ecommerce-app front end: its package.json, tsconfig.json and tsconfig.build.json are toolchain config npm and tsc read as JSON.
-    - path: examples/ecommerce-app/fe/packages/ecommerce-ui
+        npm workspace package of the full-app front end: its package.json, tsconfig.json and tsconfig.build.json are toolchain config npm and tsc read as JSON.
+    - path: examples/full-app/fe/packages/ecommerce-ui
       reason: >
-        npm workspace package of the ecommerce-app front end: its package.json, tsconfig.json and tsconfig.build.json are toolchain config npm and tsc read as JSON.
+        npm workspace package of the full-app front end: its package.json, tsconfig.json and tsconfig.build.json are toolchain config npm and tsc read as JSON.
     - path: packages/test-world
       reason: >
         The @starci/test-world package: its package.json, package-lock.json and tsconfig.json are toolchain config npm and tsc read as JSON.
@@ -286,65 +286,65 @@ json-exceptions:
       reason: >
         License metadata for the bundled yaml runtime in engine/yaml.mjs;
         authored JSON kept source-side by upstream license form.
-    - path: examples/ecommerce-app/.starcistacks/dev/environment.json
+    - path: examples/full-app/.starcistacks/dev/environment.json
       reason: >
-        starci/rendered-environment output for the ecommerce-app application stack (be side); JSON by the rendering contract.
-    - path: examples/ecommerce-app/.starcistacks/dev/infra/compose/realm-ecommerce.json
+        starci/rendered-environment output for the full-app application stack (be side); JSON by the rendering contract.
+    - path: examples/full-app/.starcistacks/dev/infra/compose/realm-ecommerce.json
       reason: >
-        Keycloak realm import for the dev Compose stack of the ecommerce-app back end; the
+        Keycloak realm import for the dev Compose stack of the full-app back end; the
         Keycloak container's realm-import feature requires a JSON realm file.
-    - path: examples/ecommerce-app/.starcistacks/dev/infra/metadata.json
+    - path: examples/full-app/.starcistacks/dev/infra/metadata.json
       reason: >
         Resolved runtime projection (port map) for the ecommerce product; JSON by the example tooling contract.
-    - path: examples/ecommerce-app/be/nest-cli.json
+    - path: examples/full-app/be/nest-cli.json
       reason: >
-        Nest CLI monorepo map inside the ecommerce-app back end; the nest toolchain reads JSON.
-    - path: examples/ecommerce-app/be/src/tests/tsconfig.json
+        Nest CLI monorepo map inside the full-app back end; the nest toolchain reads JSON.
+    - path: examples/full-app/be/src/tests/tsconfig.json
       reason: >
-        TypeScript config for the ecommerce-app back-end test tree (src/tests); tsc reads JSON (with comments).
-    - path: examples/ecommerce-app/be/tsconfig.build.json
+        TypeScript config for the full-app back-end test tree (src/tests); tsc reads JSON (with comments).
+    - path: examples/full-app/be/tsconfig.build.json
       reason: >
-        TypeScript toolchain config inside the ecommerce-app back end; tsc reads JSON (with comments).
-    - path: examples/ecommerce-app/be/tsconfig.json
+        TypeScript toolchain config inside the full-app back end; tsc reads JSON (with comments).
+    - path: examples/full-app/be/tsconfig.json
       reason: >
-        TypeScript toolchain config inside the ecommerce-app back end; tsc reads JSON (with comments).
-    - path: examples/ecommerce-app/fe/apps/app/package.json
+        TypeScript toolchain config inside the full-app back end; tsc reads JSON (with comments).
+    - path: examples/full-app/fe/apps/app/package.json
       reason: >
-        npm workspace manifest of the ecommerce-app monorepo; npm requires a JSON package.json.
-    - path: examples/ecommerce-app/fe/apps/app/src/modules/i18n/messages/en.json
+        npm workspace manifest of the full-app monorepo; npm requires a JSON package.json.
+    - path: examples/full-app/fe/apps/app/src/modules/i18n/messages/en.json
       reason: >
-        i18n message catalog inside the ecommerce-app front-end source; the app i18n loader consumes JSON.
-    - path: examples/ecommerce-app/fe/apps/app/src/modules/i18n/messages/vi.json
+        i18n message catalog inside the full-app front-end source; the app i18n loader consumes JSON.
+    - path: examples/full-app/fe/apps/app/src/modules/i18n/messages/vi.json
       reason: >
-        i18n message catalog inside the ecommerce-app front-end source; the app i18n loader consumes JSON.
-    - path: examples/ecommerce-app/fe/apps/app/tsconfig.json
+        i18n message catalog inside the full-app front-end source; the app i18n loader consumes JSON.
+    - path: examples/full-app/fe/apps/app/tsconfig.json
       reason: >
-        TypeScript toolchain config inside the ecommerce-app front end; tsc reads JSON (with comments).
-    - path: examples/ecommerce-app/fe/apps/landing/package.json
+        TypeScript toolchain config inside the full-app front end; tsc reads JSON (with comments).
+    - path: examples/full-app/fe/apps/landing/package.json
       reason: >
-        npm workspace manifest of the ecommerce-app monorepo; npm requires a JSON package.json.
-    - path: examples/ecommerce-app/fe/apps/landing/src/modules/i18n/messages/en.json
+        npm workspace manifest of the full-app monorepo; npm requires a JSON package.json.
+    - path: examples/full-app/fe/apps/landing/src/modules/i18n/messages/en.json
       reason: >
-        i18n message catalog inside the ecommerce-app front-end source; the app i18n loader consumes JSON.
-    - path: examples/ecommerce-app/fe/apps/landing/src/modules/i18n/messages/vi.json
+        i18n message catalog inside the full-app front-end source; the app i18n loader consumes JSON.
+    - path: examples/full-app/fe/apps/landing/src/modules/i18n/messages/vi.json
       reason: >
-        i18n message catalog inside the ecommerce-app front-end source; the app i18n loader consumes JSON.
-    - path: examples/ecommerce-app/fe/apps/landing/tsconfig.json
+        i18n message catalog inside the full-app front-end source; the app i18n loader consumes JSON.
+    - path: examples/full-app/fe/apps/landing/tsconfig.json
       reason: >
-        TypeScript toolchain config inside the ecommerce-app front end; tsc reads JSON (with comments).
-    - path: examples/ecommerce-app/fe/tsconfig.json
+        TypeScript toolchain config inside the full-app front end; tsc reads JSON (with comments).
+    - path: examples/full-app/fe/tsconfig.json
       reason: >
-        TypeScript toolchain config inside the ecommerce-app front end; tsc reads JSON (with comments).
-    - path: examples/ecommerce-app/hfs.json
+        TypeScript toolchain config inside the full-app front end; tsc reads JSON (with comments).
+    - path: examples/full-app/hfs.json
       reason: >
-        HFS repository declaration (modules/schemas/hfs-repo.schema.yaml) for the ecommerce-app example; the architecture machine reads hfs.json as JSON.
-    - path: examples/ecommerce-app/package-lock.json
+        HFS repository declaration (modules/schemas/hfs-repo.schema.yaml) for the full-app example; the architecture machine reads hfs.json as JSON.
+    - path: examples/full-app/package-lock.json
       reason: >
-        npm lockfile of the ecommerce-app root; npm writes JSON by contract.
-    - path: examples/ecommerce-app/package.json
+        npm lockfile of the full-app root; npm writes JSON by contract.
+    - path: examples/full-app/package.json
       reason: >
-        npm package manifest of the ecommerce-app root; the npm toolchain requires JSON.
-    - path: examples/ecommerce-app/turbo.json
+        npm package manifest of the full-app root; the npm toolchain requires JSON.
+    - path: examples/full-app/turbo.json
       reason: >
         The managed turbo task graph rendered by starci app sync; turbo reads only JSON.
     - path: examples/lite-app/.starcistacks/dev/environment.json
