@@ -25,7 +25,7 @@ export interface DefinedTestWorld<
     useTestWorld(spec: WorldSpec<keyof TApps & string>): TestWorld<TApps, TFakes, TSiblings, TStacks>
     /**
      * The contract layer: the REAL integration client against a provider sandbox, in a `contract-spec`. The library reads the
-     * sandbox keys from the environment and skips the described body when one is absent; the spec never touches the environment.
+     * sandbox keys from the environment and fails the described body when one is absent; the spec never touches the environment.
      */
     useSandbox<T>(spec: SandboxSpec<T>): SandboxHandle<T>
 }

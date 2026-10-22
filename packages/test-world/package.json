@@ -72,15 +72,18 @@
     "@types/jest": "^29.5.0",
     "@types/node": "^22.13.0",
     "@types/pg": "^8.15.0",
+    "eslint": "10.11.0",
     "pg": "^8.16.0",
     "reflect-metadata": "^0.2.2",
     "tsconfig-paths": "^4.2.0",
     "typeorm": "^0.3.27",
-    "typescript": "^5.9.0"
+    "typescript": "^5.9.0",
+    "typescript-eslint": "8.71.0"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "test": "npm run build && node --test \"dist/**/*.spec.js\"",
-    "prepack": "npm run build"
+    "test": "npm run lint && npm run build && node --test \"dist/**/*.spec.js\"",
+    "prepack": "npm run build",
+    "lint": "eslint . --max-warnings 0"
   }
 }

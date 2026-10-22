@@ -1,6 +1,6 @@
 import { tmpdir } from "node:os"
 import assert from "node:assert/strict"
-import { mkdirSync, mkdtempSync } from "node:fs"
+import { mkdtempSync } from "node:fs"
 import { join } from "node:path"
 import { describe, it } from "node:test"
 import { TestWorldErrorCode } from "../errors"
@@ -10,6 +10,7 @@ import type { ExecResult } from "./exec"
 import type { PgClient } from "./pg"
 import { createStack } from "./index"
 import { KAFKA_IMAGE, containerName, kafkaProxyName, serviceContainerName } from "./naming"
+import { Registry } from "./registry"
 
 const scratch = mkdtempSync(join(tmpdir(), "starci-tw-stack-"))
 let counter = 0
@@ -238,7 +239,6 @@ describe("stack attach", () => {
         const docker = fakeDocker()
         const dead = new Set<number>([3333])
         const live = harness([], { home, pid: 4444, isAlive: (pid) => !dead.has(pid), docker })
-        const { Registry } = require("./registry") as typeof import("./registry")
         await new Registry({ dir: home }).update((data) => void data.leases.push({ namespace: "ghost_w1", runId: "ghost", pid: 3333, since: "2026-01-01T00:00:00.000Z", containers: [] }))
         await live.stack.attach(request(namespace("shop_aaaaaa_w1"), "live-w1"))
         assert.equal(live.queries.some((query) => query.includes("ghost")), false)

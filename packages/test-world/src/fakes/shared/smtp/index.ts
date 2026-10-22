@@ -1,5 +1,5 @@
 /** The mail host at the network edge: `smtpFake()` declares a real SMTP server; the app's SMTP client only points its host and port here. */
-import type { FakeBridge, FakeClient, FakeDefinition, FakeInstance, FakeStartContext } from "../../framework/contracts"
+import type { FakeBridge, FakeClient, FakeDefinition, FakeInstance } from "../../framework/contracts"
 import { createBaseClient } from "../../framework/http-fake"
 import { FailureQueue, FakeControlRejected, RequestLog, runBaseControl } from "../../framework/failures"
 import { SmtpServer } from "../../framework/smtp-server"
@@ -24,7 +24,7 @@ export const smtpFake = (): FakeDefinition<SmtpFakeClient> => ({
         ...createBaseClient(bridge),
         mails: () => bridge.call<ReadonlyArray<SentMail>>("mails"),
     }),
-    start: async (_context: FakeStartContext): Promise<FakeInstance> => {
+    start: async (): Promise<FakeInstance> => {
         const log = new RequestLog()
         const failures = new FailureQueue()
         const server = new SmtpServer({ log, failures })

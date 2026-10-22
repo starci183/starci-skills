@@ -6,7 +6,7 @@ import type { AddressInfo } from "node:net"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import test from "node:test"
-import { Controller, Get, Module, Post, Req } from "@nestjs/common"
+import { Controller, Get, Inject, Injectable, Module, Post, Req, Scope } from "@nestjs/common"
 import type { DynamicModule } from "@nestjs/common"
 import type { AnyTestWorldConfig } from "../config/types"
 import { FakesHost } from "../fakes/framework/host"
@@ -15,6 +15,8 @@ import { SLOT_ENV, STATE_FILE_ENV, writeRunState, removeRunState } from "../jest
 import type { RunContext } from "../jest/context"
 import { World } from "./world"
 import type { WorldSpec } from "./world-types"
+import { REQUEST } from "@nestjs/core"
+import { CommandBus, CommandHandler, CqrsModule, QueryBus, QueryHandler } from "@nestjs/cqrs"
 import { DataSource } from "typeorm"
 import { namespaceOf } from "../stack/namespace"
 import { databaseName } from "../stack/services/postgresql"
@@ -270,14 +272,14 @@ test("applicationOrigin answers scheme://host:port of the named or first listeni
     const world = new World(declaration(order), { apps: ["api", "worker"] } as WorldSpec, { resetRun: async () => undefined })
     await world.start()
     try {
-        const handle = world.apps["api" as keyof typeof world.apps] as { api: { baseUrl: string; get<T>(p: string): Promise<{ status: number }> }; restart(): Promise<void> }
+        const handle = world.apps["api" as keyof typeof world.apps] as { api: { baseUrl: string; get(p: string): Promise<{ status: number }> }; restart(): Promise<void> }
         const before = handle.api.baseUrl
         assert.equal(world.applicationOrigin(), before)
         assert.equal(world.applicationOrigin("api"), before)
         assert.throws(() => world.applicationOrigin("worker"), /worker/)
         await handle.restart()
         assert.deepEqual(order, ["api", "worker", "api"])
-        const after = world.apps["api" as keyof typeof world.apps] as { api: { baseUrl: string; get<T>(p: string): Promise<{ status: number }> } }
+        const after = world.apps["api" as keyof typeof world.apps] as { api: { baseUrl: string; get(p: string): Promise<{ status: number }> } }
         assert.equal(after.api.baseUrl, before)
         assert.equal((await after.api.get("/hello")).status, 200)
         await assert.rejects(world.restartApp("nope"), /apps.nope/)
@@ -288,10 +290,6 @@ test("applicationOrigin answers scheme://host:port of the named or first listeni
 
 test("withRequest runs commands, queries and providers in a real request scope that carries the request values", async () => {
     await publish()
-    const { CommandBus, CommandHandler, CqrsModule, QueryBus, QueryHandler } = require("@nestjs/cqrs") as typeof import("@nestjs/cqrs")
-    const { Inject, Injectable, Scope } = require("@nestjs/common") as typeof import("@nestjs/common")
-    const { REQUEST } = require("@nestjs/core") as typeof import("@nestjs/core")
-
     class WhoAmI {}
     class WhichPlan {}
     @Injectable({ scope: Scope.REQUEST })
@@ -339,7 +337,6 @@ test("withRequest runs commands, queries and providers in a real request scope t
 
 test("resolve answers a provider of a modules world by its class, its symbol or its string token", async () => {
     await publish()
-    const { Injectable } = require("@nestjs/common") as typeof import("@nestjs/common")
     const SYMBOL_TOKEN = Symbol("gateway")
     @Injectable()
     class Gateway {
@@ -660,7 +657,7 @@ test("write faults own the outage lock, stop attempts every cleanup, and unknown
                 if (sql.startsWith("SELECT current_database()")) return { rows: [{ database, oid: sql.includes("c.relname = 'inbox_claims'") ? "18" : "17", relkind: "r", relispartition: false, inherited: false, constraints: [], triggers: [] }] }
                 if (sql.startsWith("SELECT\n            COALESCE")) {
                     const name = sql.match(/p\.proname = '([^']+)'/)?.[1] ?? ""
-                    return { rows: [{ functions: functions.has(name) ? [functions.get(name)!] : [], triggers: triggers.has(name) ? [triggers.get(name)!] : [] }] }
+                    return { rows: [{ functions: [...functions.entries()].filter(([key]) => key === name).map(([, value]) => value), triggers: [...triggers.entries()].filter(([key]) => key === name).map(([, value]) => value) }] }
                 }
                 const name = sql.match(/"(starci_fault_[a-f0-9]+)"/)?.[1] ?? ""
                 if (sql.startsWith("CREATE FUNCTION")) functions.set(name, { oid: "42", source: sql.split("$fault$")[1], returns: "trigger", arguments: 0, security: false, language: "plpgsql" })
