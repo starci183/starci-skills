@@ -2,9 +2,9 @@
  * The rule that keeps every back-end spec running (catalog R48 `BE_SPEC_QUALITY`, owner test policy 2026-09-30).
  *
  * A unit, integration, e2e or contract spec never skips, focuses, marks as todo or picks its own runner: a test that does
- * not run is a claim nobody checks. A contract spec whose provider sandbox is not configured does not skip either: the
- * test-world library's `useSandbox(...)` of `@starci/test-world` hands the spec `sandbox.describe(...)`, which registers a
- * failing test naming the missing keys. No file of the repository writes a skip: the rule judges every spec AND every file
+ * not run is a claim nobody checks. The ONE legitimate skip is the contract layer's own, and it lives in the test-world
+ * library: `useSandbox(...)` of `@starci/test-world` skips itself when the provider sandbox is not configured and hands
+ * the spec `sandbox.describe(...)`. No file of the repository writes a skip: the rule judges every spec AND every file
  * of the test tree (`be.tests.*` slots: world, fixtures, kit), so a repo-local helper cannot become a second skip path.
  *
  * Refused in a spec: `it|test|describe` followed by `.skip`, `.skipIf`, `.runIf`, `.todo` or `.only`; `xit`, `xtest`,
@@ -34,11 +34,11 @@ const resolve = (scope, name) => {
 export const specNoSkip = {
     meta: {
         type: "problem",
-        docs: { description: "No spec or test-tree file skips, focuses, marks todo or selects its runner conditionally; nothing skips, a contract spec without its sandbox keys fails through the test-world library's `useSandbox`." },
+        docs: { description: "No spec or test-tree file skips, focuses, marks todo or selects its runner conditionally; only the test-world library's `useSandbox` skips." },
         schema: [],
         messages: {
-            skip: "`{{what}}` keeps a test from running. A spec runs every test it declares: delete it or write it. A contract spec calls `useSandbox(...)` of `@starci/test-world` and writes `sandbox.describe(...)`, which fails, naming the keys, when the sandbox is not configured.",
-            select: "A test runner (`{{what}}`) is used as a value here, so the spec picks or hides what runs. Call `describe`/`it`/`test` directly; a contract spec writes `sandbox.describe(...)` from `useSandbox(...)` of `@starci/test-world`.",
+            skip: "`{{what}}` keeps a test from running. A spec runs every test it declares: delete it or write it. The only skip is the test-world library's own: a contract spec calls `useSandbox(...)` of `@starci/test-world` and writes `sandbox.describe(...)`.",
+            select: "A test runner (`{{what}}`) is used as a value here, so the spec picks or hides what runs. Call `describe`/`it`/`test` directly; a contract spec writes `sandbox.describe(...)` from `useSandbox(...)` of `@starci/test-world`, which decides the skip.",
         },
     },
     create(context) {
