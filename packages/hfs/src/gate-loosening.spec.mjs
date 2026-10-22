@@ -1,9 +1,12 @@
 // What "loosens a gate" means is judged over the diff of one change (scripts/lib/gate-loosening.mjs, the runtime's land gate and its
 // gate-loosening self-check). A change that renames a directory may move the allowlist and rule entries that name it: an entry moved with
-// the rename, and nothing else, is no loosening; an entry that also widens, or an entry added beside the move, still is.
+// the rename, and nothing else, is no loosening; an entry that also widens, or an entry added beside the move, still is. A loosening is
+// always red (owner ruling loosening-always-red): the library has no approval and the land gate step names none.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { looseningsOf, movedLinesOf, renamedPrefixesOf } from '../runtime/scripts/lib/gate-loosening.mjs';
+import * as gateLoosening from '../runtime/scripts/lib/gate-loosening.mjs';
+
+const { looseningStep, looseningsOf, loosensReleased, movedLinesOf, renamedPrefixesOf } = gateLoosening;
 
 const RULES = Object.freeze({
   gateFiles: ['knowledge/hfs/rules.yaml'],
@@ -90,4 +93,67 @@ test('a rule removed during a rename, with no moved counterpart, is still a remo
 test('a prefix is rewritten only as a whole path, never inside a longer name', () => {
   const entry = { file: 'modules/kernel/allowlist.yaml', removed: ['- path: examples/old-app-v2/x'], added: ['- path: examples/new-app-v2/x'] };
   assert.deepEqual(movedLinesOf(entry, [{ from: 'examples/old-app', to: 'examples/new-app' }]), entry);
+});
+
+/** An allowlist line a removed owner approval once let through (2026-10-13): the lite example test tsconfig. */
+const ONCE_APPROVED = { removed: [], added: ['    - path: examples/lite-app/be/src/tests/tsconfig.json'] };
+
+test('a loosening an approval entry once let through is still a loosening: the library offers no approval', () => {
+  const found = looseningsOf(diffOf({ allowlist: ONCE_APPROVED }), RULES);
+  assert.deepEqual(found.map(({ kind }) => kind), ['allowlist-added']);
+  assert.equal(gateLoosening.approved, undefined);
+  assert.equal(gateLoosening.approvalIdOf, undefined);
+});
+
+test('the land gate step of a loosening is red and names no approval route, only restoring the gate', () => {
+  const step = looseningStep(looseningsOf(diffOf({ allowlist: ONCE_APPROVED }), RULES));
+  assert.equal(step.ok, false);
+  assert.equal(step.name, 'gate-loosening');
+  assert.equal(step.output, 'allowlist-added modules/kernel/allowlist.yaml: - path: examples/lite-app/be/src/tests/tsconfig.json');
+  assert.match(step.hint, /restore every gate/);
+  assert.doesNotMatch(`${step.hint} ${step.output}`, /approv|owner-rulings|fingerprint/i);
+  assert.equal('approved' in step || 'advisory' in step || 'id' in step, false);
+});
+
+/** A reader of files at a revision, over a fixed history: the release tag and HEAD. */
+const historyReader = (files) => (rev, file) => files[rev]?.[file] ?? null;
+const RELEASE = 'v1.0.0-alpha.26';
+
+test('released state: a check that the release shipped and the change removed is a loosening', () => {
+  const read = historyReader({ [RELEASE]: { 'knowledge/hfs/rules.yaml': '    - {kind: hfs, id: shipped-check}\n' } });
+  const finding = { kind: 'check-removed', file: 'knowledge/hfs/rules.yaml', detail: '- {kind: hfs, id: shipped-check}' };
+  assert.equal(loosensReleased(finding, { base: RELEASE, read, rules: RULES }), true);
+});
+
+test('released state: a check added after the release and folded away before the next one never was a gate of a release', () => {
+  const read = historyReader({ [RELEASE]: { 'knowledge/hfs/rules.yaml': '    - {kind: hfs, id: shipped-check}\n' } });
+  const finding = { kind: 'check-removed', file: 'knowledge/hfs/rules.yaml', detail: '- {kind: hfs, id: added-after-release}' };
+  assert.equal(loosensReleased(finding, { base: RELEASE, read, rules: RULES }), false);
+});
+
+test('released state: a clipped detail still matches the start of the released line', () => {
+  const read = historyReader({ [RELEASE]: { 'knowledge/hfs/rules.yaml': '    - {kind: hfs, id: a-check-with-a-very-long-row}\n' } });
+  const finding = { kind: 'check-removed', file: 'knowledge/hfs/rules.yaml', detail: '- {kind: hfs, id: a-check…' };
+  assert.equal(loosensReleased(finding, { base: RELEASE, read, rules: RULES }), true);
+});
+
+test('released state: a file the release did not hold carries no released gate', () => {
+  const finding = { kind: 'spec-deleted', file: 'examples/app/be/src/new.service.spec.ts', detail: 'deleted' };
+  assert.equal(loosensReleased(finding, { base: RELEASE, read: historyReader({}), rules: RULES }), false);
+});
+
+test('released state: an added exception loosens whenever its file was released', () => {
+  const read = historyReader({ [RELEASE]: { 'modules/kernel/allowlist.yaml': 'json-exceptions:\n' } });
+  const finding = { kind: 'allowlist-added', file: 'modules/kernel/allowlist.yaml', detail: '- path: x.json' };
+  assert.equal(loosensReleased(finding, { base: RELEASE, read, rules: RULES }), true);
+});
+
+test('released state: a spec weakened below what the release held loosens; one still above it does not', () => {
+  const file = 'examples/app/be/src/a.service.spec.ts';
+  const finding = { kind: 'assertion-weakened', file, detail: '1 assertion(s) fewer' };
+  const released = { [file]: 'expect(1)\nexpect(2)\n' };
+  const below = historyReader({ [RELEASE]: released, HEAD: { [file]: 'expect(1)\n' } });
+  const above = historyReader({ [RELEASE]: released, HEAD: { [file]: 'expect(1)\nexpect(2)\nexpect(3)\n' } });
+  assert.equal(loosensReleased(finding, { base: RELEASE, read: below, rules: RULES }), true);
+  assert.equal(loosensReleased(finding, { base: RELEASE, read: above, rules: RULES }), false);
 });

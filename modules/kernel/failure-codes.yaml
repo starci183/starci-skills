@@ -16087,13 +16087,13 @@ RT_EDGE_CASE_REGISTRY:
   owner: supervisor
   kind: check-finding
 RT_GATE_LOOSENING:
-  title: "A change loosens a gate without the owner's approval"
-  title_vi: "Một thay đổi nới lỏng cổng kiểm mà chưa có chủ phê duyệt"
-  meaning_vi: "Bỏ một kiểm tra khỏi danh sách của cổng, hạ ngưỡng, thêm một mục vào allowlist, xoá hoặc làm yếu một spec cùng lúc với mã sản phẩm là việc của chủ dự án; commit hoặc lần land đó chỉ qua khi cây gốc đã có mục owner-rulings gate-loosening-<dấu vân> của đúng thay đổi này."
+  title: "A change loosens a gate"
+  title_vi: "Một thay đổi nới lỏng cổng kiểm"
+  meaning_vi: "Bỏ một kiểm tra khỏi danh sách của cổng, hạ ngưỡng, thêm một mục vào allowlist, xoá hoặc làm yếu một spec cùng lúc với mã sản phẩm luôn bị chặn; không có phê duyệt nào cho nới lỏng đi qua, kể cả của chủ (owner ruling loosening-always-red, 2026-10-22)."
   causes_vi:
     - "Một lane gỡ kiểm tra hoặc hạ ngưỡng để cho workflow chạy qua"
     - "Một spec bị xoá hoặc bớt khẳng định trong cùng thay đổi với mã sản phẩm"
-  nextStep_vi: "Khôi phục cổng; nếu chủ thật sự duyệt, chủ thêm mục owner-rulings gate-loosening-<dấu vân> trước, rồi mới land thay đổi."
+  nextStep_vi: "Khôi phục mọi cổng được liệt kê rồi land lại; không có đường duyệt cho nới lỏng."
   owner: owner
   kind: check-finding
 OP_REPORTS_TO_KERNEL:

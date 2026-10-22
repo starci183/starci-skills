@@ -358,19 +358,8 @@ rulings:
       The heroicons family is the application icon set. @heroicons/react supplies the base glyphs and
       @starci/heroicons supplies missing brand or domain glyphs in the same style, through the Icon leaf.
       Only a leaf declared as a brand mark in hfs.json may hold inline path artwork.
-    supersedes: [gate-loosening-6a6b539ea67d]
-    enforcedBy: [R93, R286]
-
-  - id: gate-loosening-6a6b539ea67d
-    date: '2026-10-13'
-    topic: code.fe-glyph-source
-    status: amended
-    source: modules/kernel/owner-rulings.yaml gate-loosening-6a6b539ea67d
-    statement: The earlier icon-vendor choice is replaced by the owner's heroicons-family decision of the same day.
     supersedes: []
-    amendedBy: [heroicons-family-icon-set]
-    amendmentScope: The icon-vendor clause only; the front-end Supabase data-door removals remain.
-    enforcedBy: [R93, R217]
+    enforcedBy: [R93, R286]
 
   - id: ambient-id-test-world-exemption
     date: '2026-10-16'

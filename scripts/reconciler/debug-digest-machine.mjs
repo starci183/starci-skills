@@ -136,7 +136,7 @@ export function machineFacts({ env = process.env, read = readMachine, numbers = 
     engine: engineOf(m), supervisor: supervisorOf(m, revSinceOf(m, ask(m, 'SELECT rev FROM engine_leader')[0]?.rev ?? null)), reservations: reservationsOf(m),
     seats: ask(m, 'SELECT seat_id FROM seats').map((r) => r.seat_id), silent: silentFacts((sql, args) => ask(m, sql, args), numbers),
     supJobs: ask(m, 'SELECT job_id, status FROM sup_jobs').map((r) => ({ jobId: r.job_id, status: r.status })),
-    lands: ask(m, "SELECT run_id, lane, result, started_at, json_extract(specs_json,'$.loosening.id') AS id, json_extract(specs_json,'$.loosening.approved') AS approved FROM land_runs WHERE json_extract(specs_json,'$.loosening') IS NOT NULL ORDER BY run_id DESC LIMIT 50")
-      .map((r) => ({ runId: r.run_id, lane: r.lane, result: r.result, at: r.started_at, id: r.id, approved: r.approved === 1 })),
+    lands: ask(m, "SELECT run_id, lane, result, started_at FROM land_runs WHERE json_extract(specs_json,'$.loosening') IS NOT NULL ORDER BY run_id DESC LIMIT 50")
+      .map((r) => ({ runId: r.run_id, lane: r.lane, result: r.result, at: r.started_at })),
   }), null, { env });
 }

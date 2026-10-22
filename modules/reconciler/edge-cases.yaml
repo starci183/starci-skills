@@ -227,9 +227,9 @@ cases:
     met: {date: "2026-10-08", where: "draw gate of alpha.7 (autopilot-state gatePart)", evidence: "scripts/kernel/autopilot-state.mjs"}
     rule: {file: scripts/work/critic-verdict.mjs, anchor: "staleRefusal"}
     status: covered
-  - id: gate-loosening-lands-without-owner-approval
+  - id: gate-loosening-lands
     family: authority-safety
-    met: {date: "2026-10-08", where: "owner ruling 6: loosening a gate is owner-class", evidence: "modules/kernel/roles.yaml rulings.loosening-is-owner-class"}
+    met: {date: "2026-10-08", where: "owner ruling 6: loosening a gate is owner-class; since 2026-10-22 a loosening is always red with no approval route", evidence: "modules/kernel/roles.yaml rulings.loosening-always-red"}
     rule: {file: scripts/supervisor/land-gate-loosening.mjs, anchor: "gateLooseningCheck"}
     status: covered
   - id: supervisor-gates-left-unanswered-for-fixes

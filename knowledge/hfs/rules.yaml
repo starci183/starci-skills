@@ -2540,7 +2540,7 @@ rules:
     enforcers:
       - {kind: hfs, id: pattern-spec-missing, at: scripts/hfs/rules/event-bus.mjs, editions: [full]}
       - {kind: hfs, id: lite-proof-lane, at: scripts/hfs/rules/lite-proof-lane.mjs, editions: [lite]}
-    editionWhy: "owner:gate-loosening-e77ca91cded7 approves the per-edition enforcer split; ruling:R212/case-2 (with the Work boundary amended by ruling:R212/case-4) gives lite its integration proof lane while full retains e2e or integration proofs."
+    editionWhy: "each enforcer judges the edition it emits for (pattern-spec-missing returns no findings for lite, lite-proof-lane is lite's emitter), so the split adds lite's emitter and drops no finding; ruling:R212/case-2 (with the Work boundary amended by ruling:R212/case-4) gives lite its integration proof lane while full retains e2e or integration proofs."
     docs: [docs/quality-bar.md#r155]
     templateNa: "Pattern scenarios depend on application behavior and providers; no universal runnable scenario proof is scaffolded."
     specNa: "owner:no-runtime-specs (2026-10-17): the runtime has no specs of its own; this code is enforced by runtime code and its spec proof was a deleted runtime spec"
@@ -3781,10 +3781,10 @@ rules:
     code: "RT_GATE_LOOSENING"
     editions: [lite, full]
     docs: [docs/debugging.md#r236]
-    templateNa: "Runtime release-history approval is checked against committed gates and owner rulings; product scaffolding has no runtime release history to generate."
+    templateNa: "Runtime release history is judged against the committed gates of the last release; product scaffolding has no runtime release history to generate."
     specNa: "owner:no-runtime-specs (2026-10-17): the runtime has no specs of its own; this code is enforced by runtime code and its spec proof was a deleted runtime spec"
     witness: {status: unreachable, reason: "owner:no-runtime-specs (2026-10-17): the mutation witness was a deleted runtime spec or fixture", date: "2026-10-17"}
-    law: "A change that loosens a gate or check is owner-class: a check removed from a gate file's list, a floor lowered or a ceiling raised there, an allowlist entry added, a spec deleted or weakened or skipped together with product code (modules/kernel/gate-loosening.yaml). It lands, and passes the check, only when the tree it is judged against already holds the owner's approval of exactly that loosening, an owner-rulings entry gate-loosening-<fingerprint>."
+    law: "A change that loosens a gate or check is always red: a check removed from a gate file's list, a floor lowered or a ceiling raised there, an allowlist entry added, a spec deleted or weakened or skipped together with product code (modules/kernel/gate-loosening.yaml). It never lands and never passes the check; there is no approval route, the owner's included (owner:loosening-always-red), and the fix is to restore the gate. An entry that only moves with a git rename of the paths it names is no loosening."
     scope: runtime
     kinds: [check]
     gates: [runtime]

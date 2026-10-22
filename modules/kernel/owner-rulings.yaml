@@ -126,34 +126,6 @@ rulings:
     date: '2026-09-30'
     ruling: "One pattern, no exceptions, no legacy, no backward compatibility: a mechanism that is superseded or unusable is deleted with all its references, never kept as an alias, fallback or second path."
     confirmed: '2026-09-30 owner decision on the starci link removal, task pub1'
-  - id: gate-loosening-d145858bfcc1
-    date: '2026-10-08'
-    ruling: The example apps are analysed on SonarCloud with the runtime's one token and the local self-hosted Sonar solution for the examples is deleted ("xoa giai phap cua local di"); the specs of that removed stack supplier go with it.
-    enforcedBy: [scripts/gates/starcistacks-form.mjs, scripts/hfs/runtime-rules/secret-tracked.mjs]
-  - id: gate-loosening-4c2ebeed9581
-    date: '2026-10-08'
-    ruling: The public runtime repository tracks no secret material, not even ciphertext ("khong muon commit enc cua .claude len"); the seven held .enc members, their allowance and the specs of sealing into ext/sonar are removed.
-    enforcedBy: [scripts/hfs/runtime-rules/secret-tracked.mjs]
-  - id: gate-loosening-d7dedf2f9c47
-    date: '2026-10-13'
-    ruling: The lite example's back-end test tsconfig (examples/lite-app/be/src/tests/tsconfig.json, the be.tool-config file the lite standard requires) is allowlisted as authored JSON like the other examples' test tsconfigs; the owner approved the pending items in chat ("allow every flag", said in Vietnamese and relayed by the alpha.13 coordinator).
-    enforcedBy: [scripts/checks/check-json-exceptions.mjs]
-  - id: gate-loosening-9b68d921f23e
-    date: '2026-10-13'
-    ruling: "Commit a631629 removes the lite-only no-api route-handler spec case of tests/hfs/architecture-supabase.spec.mjs, superseded by the owner ruling of 2026-10-13 (one fe standard for lite and full); the owner approved this loosening in chat (\"Duyet\", Vietnamese for \"approved\", typed in reply to the alpha.13 coordinator listing exactly these four loosenings)."
-    enforcedBy: [scripts/hfs/architecture/supabase.mjs]
-  - id: gate-loosening-a52e4e7c327c
-    date: '2026-10-13'
-    ruling: "Commit 2f53dbe removes the assertions of the front-end Supabase readers and writers (modules/db), Server Actions and the db owner entries (architecture-supabase, lite-canon-adversarial, hfs-slot-entries, architecture-hfs-dead-exports, architecture-owner-export-entries), which the owner ruling of 2026-10-13 removed with the slots; the owner approved this loosening in chat (\"Duyet\", Vietnamese for \"approved\", typed in reply to the alpha.13 coordinator listing exactly these four loosenings)."
-    enforcedBy: [scripts/hfs/architecture/server-action.mjs, scripts/hfs/architecture/supabase.mjs]
-  - id: gate-loosening-6a6b539ea67d
-    date: '2026-10-13'
-    ruling: "Commit 5dd7904 removes the rule of typed and error-handled Supabase results on the front end with its two codes, the supabase-result machine enforcer and the eslint enforcer that named Heroicons the glyph vendor: the front end reads no data through Supabase and @phosphor-icons/react is the one icon set (owner ruling 2026-10-13); the owner approved this loosening in chat (\"Duyet\", Vietnamese for \"approved\", typed in reply to the alpha.13 coordinator listing exactly these four loosenings)."
-    enforcedBy: [knowledge/hfs/rules.yaml]
-  - id: gate-loosening-fa80eadaa449
-    date: '2026-10-13'
-    ruling: "Commit cfa2fad removes the lite fe modules/db and Server Action security cases of tests/packages-hfs/hfs-lite-fe-security.spec.mjs, gone with the one fe standard (owner ruling 2026-10-13); the owner approved this loosening in chat (\"Duyet\", Vietnamese for \"approved\", typed in reply to the alpha.13 coordinator listing exactly these four loosenings)."
-    enforcedBy: [scripts/hfs/architecture/server-action.mjs]
   - id: release-suite-ci
     date: '2026-10-09'
     ruling: "The owner's words: add to config.yaml a setting 'full test: none' so the full test is never applied locally and it is pushed to git, letting Codecov handle it, to save time; locally it still runs PARTIAL tests, the tests related to the commit. Recorded as release.suite (local or ci, shipped default local; the value is ci because the suite moves to CI, it does not vanish). Under ci the release cut plans no root suite and no Linux parity row, the pre-push gate accepts a release record without a local npm test row only when the record says suite ci and the checked-out config says ci, and a red CI is fixed forward with the next pre-release. The trade the owner accepts, that a release can reach GitHub and its tag before the suite has run, is stated in docs/releasing.md."
@@ -167,27 +139,6 @@ rulings:
     date: '2026-10-09'
     ruling: "Same delegation (the owner's words, said in Vietnamese in chat: go with your own judgment, asking is not needed; 2026-10-09 ~23:10). business.decide is the first deciding leg after scope and everything downstream builds on it, and its answers are provisional answers to owner-class questions, so it gets the runtime-run independent Critic (single pass, another provider, the same mechanics as scope.define and architecture.decide). This ADDS a gate. test.author declares code.refactor as its next leg where the canonical-workspace chain places it; scope.finish has no owner gate in the policy and stays open; content.generate and perf.verify stay open (outside the two running workflows)."
     enforcedBy: [modules/kernel/critic.yaml, modules/kernel/critic-rubrics.yaml, scripts/kernel/critic-settle.mjs]
-  - id: gate-loosening-bccaf83fbdc7
-    date: '2026-10-10'
-    ruling: >-
-      The owner's words are "truoc luc tat may thi xoa sach nhung test khong co y nghia nhu fake orca, chap nhan coverage thap hon; giu nhung specs dang giu, va phai giai thich vi sao";
-      the delegation is "theo y tro di, thay cho phep khoi hoi". Under that delegation the lead's completed independent body and replacement review approves exactly the v4 narrowed prune on integration 8da72049bd3c0269c3c17d20aeea448ca2424b9a:
-      71 original-hash-qualified tests (D1 call/stand-in relay, D2 proved replay duplicate, D3 source-text duplicate, D4 empty literal/cardinality proof), recorded in ../../starci-tmp/codex/alpha9-prune-final-v4-candidates.json relative to the lane root.
-      This raw fingerprint binds 55 native findings and the exact candidate diff, before deletion. All twelve reviewed KEEP statements remain whole, including Run selection, parser refusal, Critic cleanup and successful launch recovery;
-      the three export-consequence removals remain Deferred. All changed, new and unreviewed specs, all replay/walk/judge/receipt/cache/owning assertions and the sixteen role-prompt pins remain.
-      Consequences are only unused imports and pure declarations inside the same edited specs and one registry reproducer field pointing to the retained read-attestation replay; production exports, classifier, runtime coverage policy and example coverage are unchanged.
-      There is no approval of unrelated or historical findings and no waiver of a red check. The former shutdown deadline is cancelled.
-    enforcedBy: [scripts/lib/gate-loosening.mjs, scripts/checks/check-gate-loosening.mjs, scripts/supervisor/land-gate-loosening.mjs]
-  - id: gate-loosening-e77ca91cded7
-    date: '2026-10-16'
-    ruling: >-
-      The owner's words are "Theo y tro (chot alpha.18)", relayed by main for the single alpha.18 release (the a17 PROPOSALS approved as recommended, PROPOSALS.md section D, R155).
-      R155 (BE_PATTERN_SPEC_MISSING) applies to both editions (tests/hfs/hfs-lite-proof-lane.spec.mjs). Its catalog row names the full-edition enforcer hfs:pattern-spec-missing
-      (patternSpecFindings, which returns no findings for lite); the lite emitter is hfs:lite-proof-lane (liteProofLaneFindings), previously absent from the rule.
-      The change that follows this entry declares each enforcer for the edition it judges: pattern-spec-missing editions [full], lite-proof-lane editions [lite].
-      No finding is removed, no edition of the rule is dropped and no lite check is weakened: the rule gains an enforcer and lite's actual emitter becomes part of its chain.
-      The mechanical detector reports this as check-narrowed because the old row gains an editions restriction; this entry approves exactly that one finding and nothing else.
-    enforcedBy: [knowledge/hfs/rules.yaml, scripts/hfs/rules/lite-proof-lane.mjs, scripts/hfs/rules/event-bus.mjs]
   - id: purge-deleted-terminal-idempotent
     date: '2026-10-11'
     ruling: >-
@@ -201,7 +152,7 @@ rulings:
     enforcedBy: [scripts/api/orca/terminal-list.mjs, scripts/machine/workflow-purge-orca.mjs, scripts/machine/workflow-purge-plan.mjs, scripts/machine/workflow-purge-apply.mjs]
   - id: heroicons-family-icon-set
     date: '2026-10-13'
-    supersedes: [gate-loosening-6a6b539ea67d]
+    supersedes: []
     ruling: "The one application icon set is the heroicons family, not Phosphor: @heroicons/react is the base set and is used first, @starci/heroicons holds only the glyphs heroicons lacks (brand or domain glyphs drawn in heroicons style), never duplicates a heroicons glyph, and a missing glyph is added to @starci/heroicons; both are imported on the 24/outline and 16/solid cuts through the icon leaf."
     enforcedBy: [knowledge/hfs/fe-stack.yaml, packages/eslint/fe/icon.mjs, scripts/work/draw/draw-source.mjs, packages/heroicons/src/package-boundary.spec.mjs]
 
@@ -474,12 +425,6 @@ rulings:
     ruling: Every drawing set covers desktop and mobile in the light theme for each drawn state; dark-theme drawings are optional.
     supersedes: []
     enforcedBy: [scripts/work/ui/shell-conformance.mjs]
-  - id: gate-loosening-05bab95ace66
-    date: '2026-10-15'
-    ruling: "Declared by main under the owner's delegation of 2026-10-14; owner to ratify. Nine authored JSON files are declared in modules/kernel/allowlist.yaml json-exceptions, each by its exact path with a reason: four English i18n message catalogs (examples/lite-app and three FE skeleton templates), the npm scripts fragment packages/hfs/templates/app/package-scripts/supabase.json that renders into package.json (a tool-mandated format), and four environment.json files (the lite example production descriptor and the skeleton and skeleton-lite templates), the canon-named value-free rendered descriptor of knowledge/hfs/slots.yaml:707. The six lite swarm recovery and release records were converted to YAML instead."
-    supersedes: []
-    enforcedBy: [scripts/checks/check-json-exceptions.mjs]
-
   - id: ambient-id-test-world-exemption
     date: '2026-10-16'
     source: knowledge/hfs/rulings.yaml ambient-id-test-world-exemption; packages/eslint/be/ambient-id.mjs
@@ -541,15 +486,6 @@ rulings:
     ruling: "The owner's words: \"Tests in packages/ and examples/ stay; the .claude runtime's own specs are removed entirely; delete codecov. Real tests (package clean-test + scaffold e2e) decide.\" Amended the same day: codecov stays for packages/ and examples/ (the example flags, the hfs template codecov.yml, the example uploads); only the runtime coverage goes (the runtime flag and the runtime lcov chain). Added the same day: no runtime tests in .claude contributions - a spec that exercises the runtime's own code (scripts/, modules/, the kernel, supervisor and work graph, checks, gates, CLI internals) outside packages/ and examples/ is refused; the scaffold e2e (e2e/) is the one exception. Recorded as: tests/ deleted; starci runtime verify, git land, runtime deploy, the release cut and release check prove a commit by the runtime check, the package clean-test and the scaffold e2e; a rule whose spec proof was a runtime spec carries specNa citing this ruling; RT_SPEC_PLACEMENT refuses a runtime test."
     supersedes: []
     enforcedBy: [scripts/hfs/runtime-rules/test-layout.mjs, scripts/reconciler/runtime-verify.mjs, scripts/gates/runtime-tests.mjs, scripts/gates/scaffold-e2e.mjs, scripts/checks/lib/coverage-rules.mjs, scripts/guards/release-definition.mjs]
-  - id: gate-loosening-e0b604204f6a
-    date: '2026-10-17'
-    ruling: "The a19 gates commit removes from the protected zone test-policy the paths of the deleted runtime specs and their selection (the spec dependency resolver, the guard and host-lock specs and the spec preloads) and protects the real tests instead (scripts/gates/runtime-tests.mjs, scripts/gates/scaffold-e2e.mjs, e2e/**), under the owner ruling no-runtime-specs; the owner approved it in chat to the main coordinator (\"tests in packages and examples stay; runtime specs removed; delete codecov; no runtime tests in contribution\"), relayed to the a19 lead with the instruction to record these approvals."
-    enforcedBy: [modules/kernel/protected-zone.yaml]
-  - id: gate-loosening-64f16c52431a
-    date: '2026-10-17'
-    ruling: "The a19 checks commit removes the spec-over-budget rule (RT_SPEC_OVER_BUDGET) and its spec-budget enforcer, the runtime.tests, runtime.tests-proof-settle and runtime.brand-sources-replay slots, the spec-budget and spec-cache-key self-checks, and every runtime-spec entry of the rule catalog's proves, exemplifiedBy and witness lists (the rows they proved carry specNa, exampleNa or an unreachable witness citing owner:no-runtime-specs), under the owner ruling no-runtime-specs; the owner approved it in chat to the main coordinator (\"tests in packages and examples stay; runtime specs removed; delete codecov; no runtime tests in contribution\"), relayed to the a19 lead with the instruction to record these approvals."
-    enforcedBy: [knowledge/hfs/rules.yaml, knowledge/hfs/runtime-slots.yaml]
-
   - id: alpha20-secrets-by-consumer
     date: '2026-10-17'
     source: "the owner (thay) in chat to the main coordinator, relayed to the a20 lead"
@@ -661,6 +597,11 @@ rulings:
     ruling: "The runtime may create a plain Orca shell: `terminal create` is an official host verb (modules/host/orca/calls.yaml terminal-create) and leaves api.yaml forbiddenForStarciOrchestration; check-host-boundary no longer bans it. The shell launches no agent: an agent is still launched only by orchestration worker-start, and a task is never dispatched into a terminal the runtime made. This is a feature ruling, not a loosening: the gate-loosening table (modules/kernel/gate-loosening.yaml) does not watch check scripts or the Orca forbidden list, so this entry, not a gate-loosening fingerprint, is the owner's record of the removed ban."
     supersedes: []
     enforcedBy: [scripts/checks/check-host-boundary.mjs, modules/host/orca/api.yaml, modules/host/orca/calls.yaml, scripts/kernel/orca-relay.mjs]
+  - id: loosening-always-red
+    date: '2026-10-22'
+    ruling: "The owner's words are \"Go han cua duyet loosening va 12 entry cu trong alpha.27; loosening la luon do\" (remove the loosening approval route and the 12 old entries in alpha.27; a loosening is always red), relayed by the alpha.27 lead. A change that loosens a gate or check is always refused by the land gate and flagged by the gate-loosening self-check; no approval lets one through, the owner's included, and the fix is to restore the gate. The 12 gate-loosening-<fingerprint> approval entries are removed with the route. An entry that only moves with a git rename of the paths it names is no loosening."
+    supersedes: []
+    enforcedBy: [scripts/lib/gate-loosening.mjs, scripts/supervisor/land-gate-loosening.mjs, scripts/checks/check-gate-loosening.mjs, modules/kernel/roles.yaml]
 
 supersedes:
   'ruling:R212/case-2': ['ruling:R212/case-1']

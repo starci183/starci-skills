@@ -13,14 +13,14 @@
 // same file that are equal once every renamed prefix of the removed line is rewritten to its new name are one entry moved, not a check
 // removed and an exception added (renamedPrefixesOf, movedLinesOf). A moved entry that also changes in any other way (a widened glob, an
 // extra path) is still judged as a removal and an addition.
-// The finding id is `<kind>:<file>:<detail>`; the fingerprint of a change is the digest of its sorted ids, the name under which the owner
-// approves exactly that loosening (an owner-rulings entry `gate-loosening-<fingerprint>`).
-import { shortHash } from './hash.mjs';
+// The finding id is `<kind>:<file>:<detail>`. A loosening is always red (owner ruling loosening-always-red, 2026-10-22): there is no
+// approval that lets one through, so a change that loosens a gate is fixed by restoring the gate (looseningStep).
+// Only what a release shipped can be loosened (loosensReleased): a check, a spec or an assertion added after the release and folded
+// away before the next one never was a gate of a release.
 import { byCodeUnit } from './list.mjs';
 
 const LIST_ITEM = /^\s*-\s+\S/;
 const NUMBER_LINE = /^\s*(?:-\s+)?([A-Za-z][\w.-]*):\s*(-?\d+(?:\.\d+)?)\s*(?:#.*)?$/;
-const FINGERPRINT_LENGTH = 12;
 
 /** The files of a unified diff: [{file, deleted, added[], removed[]}] (changed lines without their marker). */
 export function parseDiff(text) {
@@ -213,11 +213,36 @@ export function looseningsOf(diffText, rules, { renamed = [] } = {}) {
   return found.map((finding) => ({ ...finding, id: `${finding.kind}:${finding.file}:${finding.detail}` })).sort((a, b) => byCodeUnit(a.id, b.id));
 }
 
-/** The name under which the owner approves exactly these loosenings. */
-const looseningFingerprint = (findings) => shortHash(findings.map((finding) => finding.id).join('\n'), { n: FINGERPRINT_LENGTH });
+/** One finding as the land gate and the self-check print it. */
+export const looseningLine = (finding) => `${finding.kind} ${finding.file}: ${finding.detail}`;
 
-/** The id of the owner-rulings entry that approves these loosenings. */
-export const approvalIdOf = (findings) => `gate-loosening-${looseningFingerprint(findings)}`;
+/**
+ * The land gate's step for a change that loosens a gate: always red, with the way out that exists, restoring the gate. There is no
+ * approval: a loosening never lands (owner ruling loosening-always-red).
+ */
+export const looseningStep = (findings) => ({
+  name: 'gate-loosening', ok: false, findings, output: findings.map(looseningLine).join('\n'),
+  hint: 'a change that loosens a gate never lands (owner ruling loosening-always-red): restore every gate listed above',
+});
 
-/** Whether the parsed owner-rulings document holds the approval of these loosenings. */
-export const approved = (findings, rulings) => (rulings?.rulings ?? []).some((entry) => entry?.id === approvalIdOf(findings));
+const assertionsIn = (text, markers) => String(text ?? '').split('\n').filter((line) => markers.some((marker) => line.includes(marker))).length;
+
+/** The detail of a check-removed finding without its clipping mark: the start of the removed line. */
+const shownDetail = (detail) => (detail.endsWith('…') ? detail.slice(0, -1) : detail);
+
+/**
+ * Whether `finding` loosens the state released at `base`, read through `read(rev, file)` (text, or null when the revision holds no such
+ * file); `rules` gives the assertion markers. A finding stays only when
+ *   check-removed       the removed list item is an item of that gate file at the release commit
+ *   spec-deleted        the spec exists at the release commit
+ *   spec-skipped        the spec exists at the release commit
+ *   assertion-weakened  the spec exists at the release commit and holds fewer assertion lines now than it held there
+ * (every other kind loosens whenever its file existed at the release).
+ */
+export function loosensReleased(finding, { base, read, rules }) {
+  const before = read(base, finding.file);
+  if (before === null) return false;
+  if (finding.kind === 'check-removed') return before.split('\n').some((line) => line.trim().startsWith(shownDetail(finding.detail)));
+  if (finding.kind !== 'assertion-weakened') return true;
+  return assertionsIn(read('HEAD', finding.file), rules.assertionMarkers) < assertionsIn(before, rules.assertionMarkers);
+}

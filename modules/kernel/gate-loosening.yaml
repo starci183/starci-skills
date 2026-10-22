@@ -1,11 +1,10 @@
 schema: starci/module-kernel-gate-loosening@1
 id: kernel.gate-loosening
 
-# What "loosens a gate" means, mechanically (modules/kernel/roles.yaml rulings.loosening-is-owner-class). scripts/lib/gate-loosening.mjs reads
+# What "loosens a gate" means, mechanically (modules/kernel/roles.yaml rulings.loosening-always-red). scripts/lib/gate-loosening.mjs reads
 # this table over the diff of one change (a land: base..head; the self-check: each commit since the last release against its parent).
-# A change that loosens is refused by the land gate and flagged by the `gate-loosening` self-check unless the owner approved exactly
-# that loosening: an entry of modules/kernel/owner-rulings.yaml, present in the tree the change is judged against (so a change cannot
-# approve itself), whose id is `gate-loosening-<fingerprint>`. The fingerprint is printed with the refusal.
+# A change that loosens is always refused by the land gate and flagged by the `gate-loosening` self-check: there is no approval route
+# (owner ruling loosening-always-red, 2026-10-22). An entry that only moves with a git rename of the paths it names is no loosening.
 
 # Files whose lists and numbers are gates: a check, a rule, a protected path, a guard denial, a verdict condition.
 gateFiles:

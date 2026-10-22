@@ -56,7 +56,7 @@ groups:
       - {id: as-op-reports-to-kernel, ask: "Did an op address anyone but its Kernel?", answerable: today, check: op-refusals, source: "events op-caller-refused"}
       - {id: as-interventions, ask: "Did a person write the ledger by hand during the run?", answerable: today, check: interventions, signalAdded: "ledger-written-outside-seat event: one per call of an unbound owner with no runtime marker", source: "events ledger-written-outside-seat"}
       - {id: as-runtime-change-refused, ask: "Did the Supervisor try to change the runtime, and was it refused?", answerable: today, check: runtime-change-refused, signalAdded: "refusals.jsonl rows carry the role of the seat, and the CLI dispatcher logs its RUNTIME_CHANGE_OWNED_BY_DEBUG refusals there", source: "<guards root>/refusals.jsonl"}
-      - {id: as-gate-loosening, ask: "Did a land loosen a gate or a check without the owner's approval?", answerable: today, check: gate-loosening-lands, signalAdded: "land_runs.specs_json.loosening: the approval id, whether the owner approved it and the number of findings", source: "land_runs"}
+      - {id: as-gate-loosening, ask: "Did a land pass while loosening a gate or a check (a loosening is always red)?", answerable: today, check: gate-loosening-lands, signalAdded: "land_runs.specs_json.loosening: the number of findings of the refused loosening", source: "land_runs"}
   - id: concurrency
     title: "Concurrency"
     questions:

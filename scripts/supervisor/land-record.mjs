@@ -9,10 +9,10 @@ import { describe } from './land-format.mjs';
 const landResultOf = (r) => { if (r.ok) { return 'passed'; } if (r.reason === 'conflict') { return 'conflict'; } if (['dirty', 'not-on-main', 'live-not-on-main', 'main-moved', 'gate-busy', 'git-unusable', 'host-lock-held'].includes(r.reason)) { return 'refused'; } return 'failed'; };
 const landLogKind = (result) => (result.ok && 'land.passed') || (!result.ok && result.reason === 'gate-busy' && 'land.gate-busy') || 'land.failed';
 
-/** The gate-loosening step of a land as {loosening: {id, approved, findings}} for the land record, or nothing when the change loosened no gate. */
+/** The gate-loosening step of a land as {loosening: {findings}} for the land record (always a refusal), or nothing when the change loosened no gate. */
 const looseningOf = (result) => {
   const step = (result.checks ?? []).find((c) => c.name === 'gate-loosening');
-  return step ? { loosening: { id: step.id ?? null, approved: step.approved === true, findings: (step.findings ?? []).length } } : {};
+  return step ? { loosening: { findings: (step.findings ?? []).length } } : {};
 };
 
 /**

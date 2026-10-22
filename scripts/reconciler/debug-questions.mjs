@@ -101,9 +101,10 @@ function runtimeChangeRefused(d, snapshot) {
 
 function gateLooseningLands(d, snapshot) {
   const lands = snapshot.lands ?? [];
-  const unapprovedLanded = lands.filter((l) => l.result === 'passed' && !l.approved);
-  const text = `${lands.length} land(s) loosened a gate: ${lands.filter((l) => l.approved).length} approved by the owner, ${lands.filter((l) => !l.approved && l.result !== 'passed').length} refused`;
-  return verdictOf(unapprovedLanded.length > 0, `${unapprovedLanded.length} land(s) loosened a gate without the owner's approval (${unapprovedLanded.map((l) => l.runId).join(', ')})`, text);
+  // A loosening is always red (owner ruling loosening-always-red): any land that passed with one is the finding, whatever it once carried.
+  const landed = lands.filter((l) => l.result === 'passed');
+  const text = `${lands.length} land(s) loosened a gate, all ${lands.length - landed.length} refused`;
+  return verdictOf(landed.length > 0, `${landed.length} land(s) passed while loosening a gate (${landed.map((l) => l.runId).join(', ')})`, text);
 }
 
 /** One line per runtime Critic run: who judged, the model, the time, the tokens (unmeasured when the run recorded none) and the verdict or the hold. */
