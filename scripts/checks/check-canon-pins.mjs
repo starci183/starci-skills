@@ -31,7 +31,7 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import { validateAgainstSchema } from '../lib/json-schema.mjs';
 import { canonContentDigest, packedFiles } from '../gates/canon-digest.mjs';
 import { PINS_FILE, PROFILES_FILE, SCHEMA_FILE, loadPins } from '../gates/canon-pins.mjs';
-import { runScript } from '../api/node/run-script.mjs';
+import { nodeSpawn } from '../api/node/lib.mjs';
 
 const BINDING = Object.freeze({ version: 'CANON_BINDING_VERSION', digest: 'CANON_BINDING_DIGEST', invalid: 'CANON_BINDING_INVALID' });
 const DEP_KEYS = ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies'];
@@ -71,18 +71,22 @@ function checkCanonPins({ root = skillRoot } = {}) {
   return { ok: errors.length === 0, errors, pins: Object.keys(doc?.pins ?? {}).length };
 }
 
+/** Regenerates the git-ignored runtime copies before the pack list is read; the refusal lines when the generator fails. */
+function regenerateRuntimeCopies(root) {
+  const syncScript = path.join(root, 'scripts', 'hfs', 'sync-runtime.mjs');
+  if (!fs.existsSync(syncScript)) return [];
+  // The generator's progress line is captured, not inherited: under --json this process's stdout is one JSON document.
+  const run = nodeSpawn([syncScript], { cwd: root, stdio: ['ignore', 'pipe', 'inherit'] });
+  const status = run.error ? 1 : (run.status ?? 1);
+  return status === 0 ? [] : [`${BINDING.invalid} the generated runtime copies could not be regenerated (the runtime copy generator exited ${status})`];
+}
+
 /** Every code-pattern profile's canon binding against the canon source this runtime publishes; `pack` lists a package's published files. */
 function checkCanonBindings({ root = skillRoot, pack = packedFiles } = {}) {
   const errors = [];
   // The published file set includes the generated runtime copies (runtime/**): git-ignored, so they are regenerated
   // before the pack list is read - an absent copy would leave it out of the digest.
-  if (pack === packedFiles) {
-    const syncScript = path.join(root, 'scripts', 'hfs', 'sync-runtime.mjs');
-    if (fs.existsSync(syncScript)) {
-      const status = runScript(syncScript, [], { cwd: root });
-      if (status !== 0) errors.push(`${BINDING.invalid} the generated runtime copies could not be regenerated (the runtime copy generator exited ${status})`);
-    }
-  }
+  if (pack === packedFiles) errors.push(...regenerateRuntimeCopies(root));
   const pins = loadPins(root).pins ?? {};
   const profiles = parseYaml(fs.readFileSync(path.join(root, PROFILES_FILE), 'utf8'))?.profiles ?? {};
   for (const [profile, value] of Object.entries(profiles)) {
