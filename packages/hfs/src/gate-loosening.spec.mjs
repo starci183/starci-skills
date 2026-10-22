@@ -15,11 +15,14 @@ const RULES = Object.freeze({
   assertionMarkers: ['expect('],
 });
 
+/** One rename line of `git diff --name-status -M`: R<similarity>, the old path and the new one, tab separated. */
+const renameLine = (similarity, from, to) => [`R${similarity}`, from, to].join('\t');
+
 /** The `git diff --name-status -M` lines of a change that renamed the example directory old-app to new-app. */
 const EXAMPLE_RENAME = [
-  'R100\texamples/old-app/be/contracts/billing/schema.graphql\texamples/new-app/be/contracts/billing/schema.graphql',
-  'R100\texamples/old-app/be/tsconfig.json\texamples/new-app/be/tsconfig.json',
-  'R087\texamples/old-app/package.json\texamples/new-app/package.json',
+  renameLine(100, 'examples/old-app/be/contracts/billing/schema.graphql', 'examples/new-app/be/contracts/billing/schema.graphql'),
+  renameLine(100, 'examples/old-app/be/tsconfig.json', 'examples/new-app/be/tsconfig.json'),
+  renameLine(87, 'examples/old-app/package.json', 'examples/new-app/package.json'),
 ].join('\n');
 
 /** A unified diff (`--no-renames -U0`) of the two gate files, from the removed and added lines of each. */
@@ -45,7 +48,7 @@ test('the renamed prefix of a directory rename is its old and new directory', ()
 });
 
 test('an old prefix whose files moved two ways names no single move and is dropped', () => {
-  const split = [EXAMPLE_RENAME, 'R100\texamples/old-app/hfs.json\tarchive/elsewhere/hfs.json'].join('\n');
+  const split = [EXAMPLE_RENAME, renameLine(100, 'examples/old-app/hfs.json', 'archive/elsewhere/hfs.json')].join('\n');
   assert.deepEqual(renamedPrefixesOf(split), []);
 });
 

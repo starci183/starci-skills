@@ -64,11 +64,11 @@ export function renamedPrefixesOf(nameStatus) {
     .sort((a, b) => b.from.length - a.from.length || byCodeUnit(a.from, b.from));
 }
 
-const escapeRegExp = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const escapeRegExp = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
 
 /** `line` with every renamed prefix rewritten to its new name; a prefix matches only as a whole path (not inside a longer name). */
 function renamedLine(line, prefixes) {
-  return prefixes.reduce((text, { from, to }) => text.replace(new RegExp(`(?<![\\w./-])${escapeRegExp(from)}(?![\\w.-])`, 'g'), to), line);
+  return prefixes.reduce((text, { from, to }) => text.replace(new RegExp(String.raw`(?<![\w./-])${escapeRegExp(from)}(?![\w.-])`, 'g'), to), line);
 }
 
 /**
