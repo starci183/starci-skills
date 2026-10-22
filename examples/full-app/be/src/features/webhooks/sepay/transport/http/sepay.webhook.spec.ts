@@ -41,7 +41,7 @@ const STALE_SIGNATURE = "sha256=49740cf400df7a317a63f0cf6afe83a1ee5e0376b9731b70
 
 const OPTIONS: HttpSecurityOptions = {
     allowedOrigins: [],
-    rateLimit: { windowMs: 60_000, defaultLimit: 600, strictLimit: 30 },
+    rateLimit: { windowMs: 60_000, defaultLimit: 600, strictLimit: 30, serviceLimit: 6000 },
     webhooks: { sepay: { secret: new Secret("sepay-unit-fixture-secret"), toleranceMs: REPLAY_WINDOW_MS } },
 }
 

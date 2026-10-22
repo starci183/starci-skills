@@ -176,6 +176,12 @@ export interface VerifySessionData {
     verifySession: VerifiedView
 }
 
+/** The data of the `verifyServiceSession` query, the service door the order and billing services call with their own key. */
+export interface VerifyServiceSessionData {
+    /** The `verifyServiceSession` field. */
+    verifyServiceSession: VerifiedView
+}
+
 /** The outcome of revokeSession. */
 export interface RevokedView {
     /** True when the session ended. */

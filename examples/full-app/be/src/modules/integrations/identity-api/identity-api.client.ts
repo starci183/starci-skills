@@ -13,7 +13,10 @@ import type { IdentitySessionLookup } from "./identity-api.contracts"
 const SESSION_INVALID_CODE = "SESSION_INVALID"
 
 @Injectable()
-/** The order service view of the identity service: it verifies bearer tokens over the identity GraphQL door and probes its health. */
+/**
+ * The calling service's view of the identity service: it verifies shoppers' bearer tokens over the identity service door,
+ * authenticated by this service's own key (the public verifySession handshake stays on its strict tier), and probes its health.
+ */
 export class IdentityApiClient implements Probe {
     /** The name the health report lists this dependency under. */
     readonly name = "identity"
@@ -34,7 +37,7 @@ export class IdentityApiClient implements Probe {
                 params: { reason: answer.errorCodes.join(",") },
             })
         }
-        const verified = answer.data?.verifySession
+        const verified = answer.data?.verifyServiceSession
         if (!isRecord(verified) || typeof verified.personId !== "string") {
             throw new IdentityApiError({ code: IdentityApiErrorCode.ContractMismatch })
         }
@@ -66,8 +69,9 @@ export class IdentityApiClient implements Probe {
         try {
             return await callGraphql(this.http, {
                 url: `${this.options.url}/graphql`,
-                query: IDENTITY_API_DOCUMENTS.verifySession,
+                query: IDENTITY_API_DOCUMENTS.verifyServiceSession,
                 variables: { input: { sessionToken } },
+                headers: { authorization: `Bearer ${this.options.serviceKey.reveal()}` },
                 timeoutMs: this.options.timeoutMs,
             })
         } catch (cause) {

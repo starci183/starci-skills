@@ -13,9 +13,9 @@ surface:
       The verifySession GraphQL query of the identity service (POST /graphql on identityApi, the port
       .starcistacks/dev/infra/metadata.json resolves; served by
       features/api/identity/transport/graphql/verify-session.resolver.ts). The token to verify travels as the input's
-      sessionToken; an internal hop carries no user session of its own. The order service's session guard calls it
-      through modules/integrations/identity-api/identity-api.client.ts on every person-scoped GraphQL door, and the
-      shop frontend's session door calls it while rendering an account page.
+      sessionToken. It is the public handshake: anonymous by design and counted on the strict rate tier, one small
+      window per caller address. The shop frontend's session door calls it while rendering an account page; a service
+      that verifies every request it serves calls verifyServiceSession instead.
     guarantee: >-
       A live session answers {personId}; a token that is absent, malformed or dead answers a GraphQL error whose
       extensions.code is SESSION_INVALID. An answer whose data does not carry a personId string is a contract breach,
@@ -23,6 +23,25 @@ surface:
     stability: >-
       Changing the operation name, the input key or the refusal code is breaking for both consumers; adding response
       fields is not.
+  - name: verifyServiceSession
+    shape: "query verifyServiceSession(input: {sessionToken}) -> {personId}, with Authorization: Bearer <service key>"
+    transport: >-
+      The verifyServiceSession GraphQL query on the same identity door
+      (features/api/identity/transport/graphql/verify-service-session.resolver.ts). The calling service authenticates
+      with its own key in the Authorization header (an api-key credential the identity service checks against the key
+      it holds for that service, modules/domain/identity/service-key.service.ts); the shopper's token to verify travels
+      as the input's sessionToken. Both sides read their key only from a mounted <KEY>_FILE, never a plaintext value.
+      The order and billing services' session guards call it through
+      modules/integrations/identity-api/identity-api.client.ts on every person-scoped door.
+    guarantee: >-
+      The same answers as verifySession for the session itself, read live on every call with no cache, so a revoked
+      session is refused on the next request. A call without a key, with a key the identity service does not hold, or
+      bearing a shopper's own token is refused as IDENTITY_UNAUTHENTICATED before the session is looked at. The door is
+      counted on the service rate tier, one window per calling service's key, so the shoppers behind one service never
+      share the strict per-address window of the public handshake.
+    stability: >-
+      Changing the operation name, the input key, the credential scheme or the refusal codes is breaking for the order
+      and billing services; adding response fields is not.
   - name: revokeSession
     shape: "mutation revokeSession(input: {sessionToken}) -> {revoked: true}"
     transport: >-
@@ -38,9 +57,12 @@ surface:
       {revoked: true}.
 guarantees:
   - "verify never invents a person: a token that names no live session is refused, not resolved."
+  - the service door answers only a calling service that presents its own key, and that service's traffic is limited by
+    its own service-tier window, never by the strict window of the public handshake.
   - revoke never reports failure for an already-dead token; forgetting is unconditional.
 consumerObligations:
-  - checkout verifies the bearer on every person-scoped door and answers the provider's SESSION_INVALID as an
+  - checkout verifies the bearer on every person-scoped door through verifyServiceSession, presenting its own key read
+    from a mounted file, and answers the provider's SESSION_INVALID as an
     unauthenticated caller; an unreachable identity, or any other refusal, is a typed IDENTITY_API_UNAVAILABLE, and an
     answer missing personId is IDENTITY_API_CONTRACT_MISMATCH - never a guessed person.
   - the shop treats revoke as best-effort on sign-out and clears its cookies either way.
@@ -55,11 +77,12 @@ requiresProof:
     note: The consumer proves it propagates refusals and never invents an actor.
 
 change:
-  rev: 2
-  kind: clarifying
-  at: 2026-10-01T12:00:00.000Z
+  rev: 3
+  kind: breaking
+  at: 2026-10-22T12:00:00.000Z
   reason: >-
-    Corrected the declared wire to the doors the code serves since the services moved to GraphQL: verifySession is a
-    query and revokeSession a mutation on the identity service's /graphql (the /internal/sessions REST doors are gone).
-    The consumer's refusal taxonomy states the codes the identity-api client raises (IDENTITY_API_UNAVAILABLE,
-    IDENTITY_API_CONTRACT_MISMATCH) - code is truth here; the contract was wrong about its own wire.
+    The order service verified every shopper request through the public verifySession handshake, whose strict tier
+    allows 30 calls a minute per caller address, so in a deployment all shoppers behind one order service shared that
+    window and the cart answered "not accessible" (the place-order UAT failed at its sixth and seventh steps). Checkout
+    now calls the new service door verifyServiceSession with its own key, counted per calling service; verifySession
+    keeps its strict tier and remains the shop frontend's handshake.

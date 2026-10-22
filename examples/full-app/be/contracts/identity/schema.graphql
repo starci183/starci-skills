@@ -12,6 +12,7 @@ type Mutation {
 
 type Query {
   account: AccountType!
+  verifyServiceSession(input: VerifySessionInput!): VerifySessionType!
   verifySession(input: VerifySessionInput!): VerifySessionType!
 }
 

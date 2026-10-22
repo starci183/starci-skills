@@ -1,5 +1,6 @@
 import crypto from "node:crypto"
 import fs from "node:fs"
+import os from "node:os"
 import path from "node:path"
 import { spawn, spawnSync } from "node:child_process"
 import { fileURLToPath } from "node:url"
@@ -136,6 +137,8 @@ const generateSecrets = () => {
         keycloakAdminPassword: crypto.randomBytes(24).toString("hex"),
         keycloakAdminClientSecret: crypto.randomBytes(24).toString("hex"),
         minioRootPassword: crypto.randomBytes(24).toString("hex"),
+        orderServiceKey: crypto.randomBytes(32).toString("hex"),
+        billingServiceKey: crypto.randomBytes(32).toString("hex"),
     }
     composeEnv = {
         ...process.env,
@@ -146,8 +149,27 @@ const generateSecrets = () => {
     return values
 }
 
+/**
+ * The service keys of this run, mounted the way sealed custody mounts them in a deployment: one file per key in a private
+ * folder outside the repository (owner-only, removed by `down`), handed to the apis as `<KEY>_FILE`. The apis refuse these
+ * keys as plaintext environment values, so the folder is the only place they exist besides the processes that read them.
+ */
+const mountServiceKeys = (secrets) => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "full-app-service-keys-"))
+    const mount = (name, value) => {
+        const file = path.join(dir, name)
+        fs.writeFileSync(file, value, { mode: 0o600 })
+        return file
+    }
+    return {
+        dir,
+        orderServiceKey: mount("order-service-key", secrets.orderServiceKey),
+        billingServiceKey: mount("billing-service-key", secrets.billingServiceKey),
+    }
+}
+
 /** The environment one api boots with, per runtime/env/KEYS.md, every URL read from the projection. */
-const serviceEnv = (secrets) => ({
+const serviceEnv = (secrets, mounts) => ({
     identity: {
         IDENTITY_API_PORT: String(ports.identityApi),
         IDENTITY_DB_URL,
@@ -159,12 +181,15 @@ const serviceEnv = (secrets) => ({
         KEYCLOAK_ADMIN_CLIENT_ID: "identity-admin",
         KEYCLOAK_ADMIN_CLIENT_SECRET: secrets.keycloakAdminClientSecret,
         ORDER_API_URL: `http://localhost:${ports.orderApi}`,
+        ORDER_SERVICE_KEY_FILE: mounts.orderServiceKey,
+        BILLING_SERVICE_KEY_FILE: mounts.billingServiceKey,
         HTTP_SECURITY_ALLOWED_ORIGINS: ORIGIN_APP,
     },
     order: {
         ORDER_API_PORT: String(ports.orderApi),
         ORDER_DB_URL,
         IDENTITY_API_URL: `http://localhost:${ports.identityApi}`,
+        IDENTITY_API_SERVICE_KEY_FILE: mounts.orderServiceKey,
         RECEIPTS_S3_ENDPOINT: `http://localhost:${ports.minio}`,
         RECEIPTS_S3_BUCKET: "receipts",
         RECEIPTS_S3_ACCESS_KEY_ID: "ecommerce",
@@ -251,11 +276,13 @@ const up = async () => {
     }
     log("seeds applied")
 
-    const env = serviceEnv(secrets)
+    const mounts = mountServiceKeys(secrets)
+    const env = serviceEnv(secrets, mounts)
     const services = ["identity", "order"].map((name) => startService(name, env[name]))
     const state = {
         startedAt: new Date().toISOString(),
         services: services.map(({ name, pid }) => ({ name, pid })),
+        serviceKeys: mounts.dir,
         logs: path.relative(APP_ROOT, LOG_DIR),
     }
     fs.mkdirSync(path.dirname(STATE_FILE), { recursive: true })
@@ -293,6 +320,10 @@ const down = () => {
             } catch {
                 log(`${name} (pid ${pid}) was already gone`)
             }
+        }
+        if (typeof state.serviceKeys === "string") {
+            fs.rmSync(state.serviceKeys, { recursive: true, force: true })
+            log("service keys removed")
         }
         fs.unlinkSync(STATE_FILE)
     }

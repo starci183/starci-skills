@@ -5,6 +5,7 @@ import type {
     RegisterData,
     SignInData,
     VerifySessionData,
+    VerifyServiceSessionData,
     RevokeSessionData,
 } from "../../fixtures/e2e-views.contracts"
 import { readRows } from "../../fixtures/persistence/e2e-verification.rows"
@@ -67,12 +68,14 @@ async function completesIdentityJourney(
     )
     expect(login.userId).toBe(personId)
 
-    // verifySession is the handshake the order service uses; it is anonymous by design (AuthHandshake).
+    // verifySession is the public handshake; it is anonymous by design (AuthHandshake) and stays on the strict tier.
     const verified = await anonymous.read<VerifySessionData>("verifySession", {
         variables: { input: { sessionToken: session.sessionToken } },
     })
     expect(verified.errorCode).toBeNull()
     expect(verified.data?.verifySession.personId).toBe(personId)
+
+    await verifyServiceDoorRefusals(world, session.sessionToken)
 
     // The account view is the cross-service proof: identity reads hasOrders live from order, forwarding the caller token.
     const caller = world.apps.identity.api.bearing(session.sessionToken)
@@ -126,6 +129,19 @@ async function verifyCredentialRefusals(
     expect(wrongPassword.errorCode).toBe("ACCOUNT_INVALID_CREDENTIALS")
     expect(unknownEmail.errorCode).toBe(wrongPassword.errorCode)
     expect(unknownEmail.errorMessage).toBe(wrongPassword.errorMessage)
+}
+
+async function verifyServiceDoorRefusals(world: ReturnType<typeof useTestWorld>, sessionToken: string): Promise<void> {
+    // verifyServiceSession admits only a calling service's own key: an anonymous caller and a shopper bearing a live session
+    // token are both refused before the session is looked at, so the service tier's budget is never a shopper's.
+    const input = { variables: { input: { sessionToken } } }
+    const anonymousCall = await world.apps.identity.api.read<VerifyServiceSessionData>("verifyServiceSession", input)
+    expect(anonymousCall.errorCode).toBe("IDENTITY_UNAUTHENTICATED")
+    expect(anonymousCall.data?.verifyServiceSession).toBeUndefined()
+    const shopperCall = await world.apps.identity.api
+        .bearing(sessionToken)
+        .read<VerifyServiceSessionData>("verifyServiceSession", input)
+    expect(shopperCall.errorCode).toBe("IDENTITY_UNAUTHENTICATED")
 }
 
 async function verifyIdentityPersistence(

@@ -4,6 +4,7 @@
  * the Redis of the cache and Keycloak with the stack's realm are the real ones the library runs; each app is wired to the
  * other through the URL the library reserved for it before either booted.
  */
+import { randomBytes } from "node:crypto"
 import type { DynamicModule } from "@nestjs/common"
 import type { WorldWiring } from "@starci/test-world"
 import { accountEntities } from "@modules/domain/account"
@@ -127,10 +128,23 @@ export const orderApiOptionsOf = (w: EcommerceWiring): OrderApiOptions => ({
     timeoutMs: CALL_DEADLINE_MS,
 })
 
-/** The identity app of the run, as the order app calls it. */
-export const identityApiOptionsOf = (w: EcommerceWiring): IdentityApiOptions => ({
+/**
+ * The key each calling service of the run presents to the identity service doors: fresh random values per run, held only in
+ * memory and handed to the identity app and to its caller, like the dev stack's generated secrets.
+ */
+const SERVICE_KEYS: Readonly<Record<"order" | "billing", string>> = {
+    order: randomBytes(24).toString("hex"),
+    billing: randomBytes(24).toString("hex"),
+}
+
+/** The identity app of the run, as `service` calls it with its own key (the order app unless named). */
+export const identityApiOptionsOf = (
+    w: EcommerceWiring,
+    service: "order" | "billing" = "order",
+): IdentityApiOptions => ({
     url: w.apps.identity.url,
     timeoutMs: CALL_DEADLINE_MS,
+    serviceKey: new Secret(SERVICE_KEYS[service]),
 })
 
 /** The logical topics of the run: the events, retry and dead-letter topic of each service that publishes (`order`, `billing`) and of the probe the bus integration spec runs. */
@@ -166,7 +180,12 @@ export const receiptStorageOptionsOf = (w: EcommerceWiring): ReceiptStorageOptio
 
 const httpSecurity: HttpSecurityOptions = {
     allowedOrigins: ALLOWED_ORIGINS,
-    rateLimit: { windowMs: 60_000, defaultLimit: RATE_LIMIT_HIGH, strictLimit: RATE_LIMIT_HIGH },
+    rateLimit: {
+        windowMs: 60_000,
+        defaultLimit: RATE_LIMIT_HIGH,
+        strictLimit: RATE_LIMIT_HIGH,
+        serviceLimit: RATE_LIMIT_HIGH,
+    },
     webhooks: {},
 }
 
@@ -191,6 +210,7 @@ export const identityOptions = (w: EcommerceWiring): IdentityAppOptions => ({
     keycloak: keycloakOptionsOf(w),
     keycloakAdmin: keycloakAdminOptionsOf(w),
     httpSecurity,
+    identity: { serviceKeys: { order: new Secret(SERVICE_KEYS.order), billing: new Secret(SERVICE_KEYS.billing) } },
 })
 
 /** The options of the order app. */
@@ -216,7 +236,7 @@ const WEBHOOK_TOLERANCE_MS = 300_000
 export const billingOptions = (w: EcommerceWiring): BillingAppOptions => ({
     port: w.apps.billing.port,
     database: billingDatabase(w),
-    identityApi: identityApiOptionsOf(w),
+    identityApi: identityApiOptionsOf(w, "billing"),
     httpSecurity,
     sepay: {
         secret: new Secret(fakeValue(w.fake.sepay.values, "webhookSecret")),

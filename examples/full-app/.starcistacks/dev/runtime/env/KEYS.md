@@ -22,13 +22,19 @@ only. Every key without a default is required: a missing or malformed key stops 
 | `KEYCLOAK_ADMIN_TIMEOUT` | Deadline of a call to Keycloak (`250`, `3s`) | `3s` |
 | `ORDER_API_URL` | Base URL of the order service | none |
 | `ORDER_API_TIMEOUT` | Deadline of a call to the order service (`250`, `3s`) | `3s` |
+| `ORDER_SERVICE_KEY_FILE` | File holding the key the order service presents to `verifyServiceSession` (mounted only: without it the boot stops, and a plaintext `ORDER_SERVICE_KEY` is never read) | none |
+| `BILLING_SERVICE_KEY_FILE` | File holding the key the billing service presents to `verifyServiceSession` (mounted only) | none |
 | `HTTP_SECURITY_ALLOWED_ORIGINS` | Comma-separated origins allowed to send browser state-changing requests | none |
 | `HTTP_SECURITY_RATE_WINDOW` | Rate limit window | `1m` |
 | `HTTP_SECURITY_RATE_DEFAULT_LIMIT` | Requests per window per caller, default tier | `600` |
-| `HTTP_SECURITY_RATE_STRICT_LIMIT` | Requests per window per caller, strict tier (register, signIn, verifySession) | `30` |
+| `HTTP_SECURITY_RATE_STRICT_LIMIT` | Requests per window per caller address, strict tier (register, signIn, the public verifySession) | `30` |
+| `HTTP_SECURITY_RATE_SERVICE_LIMIT` | Requests per window per calling service, service tier (verifyServiceSession) | `6000` |
 
-The order service verifies every bearer token through identity `verifySession`, which is on the strict tier: raise
-`HTTP_SECURITY_RATE_STRICT_LIMIT` on the identity api to the request rate you expect from the order service.
+The order and billing services verify every shopper's bearer token through identity `verifyServiceSession`, the
+service door: it admits only a calling service's own key and counts on the service tier, one window per key, so the
+shoppers behind one service never share the strict per-address limit of the public `verifySession` handshake. Size
+`HTTP_SECURITY_RATE_SERVICE_LIMIT` to the request rate of the busiest calling service. Each service key is a pair: the
+identity api holds it as `<SERVICE>_SERVICE_KEY_FILE` and the calling service as `IDENTITY_API_SERVICE_KEY_FILE`.
 
 ## order api (`apps/order`)
 
@@ -38,6 +44,7 @@ The order service verifies every bearer token through identity `verifySession`, 
 | `ORDER_DB_URL` | Postgres URL of the `order` connection (secret) | none |
 | `IDENTITY_API_URL` | Base URL of the identity service | none |
 | `IDENTITY_API_TIMEOUT` | Deadline of a call to the identity service | `3s` |
+| `IDENTITY_API_SERVICE_KEY_FILE` | File holding this service's own key for the identity service door, the same value as the identity api's `ORDER_SERVICE_KEY_FILE` (mounted only: without it the boot stops, and a plaintext `IDENTITY_API_SERVICE_KEY` is never read) | none |
 | `RECEIPTS_S3_ENDPOINT` | MinIO (S3) endpoint the receipts are archived in; buyers' download links point at it | none |
 | `RECEIPTS_S3_BUCKET` | Private bucket of the receipts | none |
 | `RECEIPTS_S3_ACCESS_KEY_ID` | Access key id (the MinIO root user `ecommerce` in dev) | none |
@@ -45,7 +52,7 @@ The order service verifies every bearer token through identity `verifySession`, 
 | `RECEIPTS_S3_REGION` | Region the requests are signed for | `us-east-1` |
 | `RECEIPTS_LINK_TTL` | Lifetime of a receipt download link (`5m`) | `5m` |
 | `RECEIPTS_S3_TIMEOUT` | Deadline of a call to MinIO | `15s` |
-| `HTTP_SECURITY_ALLOWED_ORIGINS`, `HTTP_SECURITY_RATE_WINDOW`, `HTTP_SECURITY_RATE_DEFAULT_LIMIT`, `HTTP_SECURITY_RATE_STRICT_LIMIT` | As above | as above |
+| `HTTP_SECURITY_ALLOWED_ORIGINS`, `HTTP_SECURITY_RATE_WINDOW`, `HTTP_SECURITY_RATE_DEFAULT_LIMIT`, `HTTP_SECURITY_RATE_STRICT_LIMIT`, `HTTP_SECURITY_RATE_SERVICE_LIMIT` | As above | as above |
 | `EVENT_BUS_BROKERS` | Kafka bootstrap addresses, comma separated (`host:port`) | none |
 | `EVENT_BUS_GROUP_ID` | Consumer group of the app (the order api consumes `billing.invoice-issued` and `billing.invoice-rejected`) | none |
 | `EVENT_BUS_TOPIC_PREFIX` | What every topic name starts with (empty in a deployment) | empty |
@@ -73,9 +80,10 @@ It listens for the signed webhook of the bank transfer notifier (`POST /webhooks
 | `BILLING_API_PORT` | Port the api listens on | none |
 | `BILLING_DB_URL` | Postgres URL of the `billing` connection (secret) | none |
 | `IDENTITY_API_URL`, `IDENTITY_API_TIMEOUT` | As on the order api | as above |
+| `IDENTITY_API_SERVICE_KEY_FILE` | File holding the billing service's own key, the same value as the identity api's `BILLING_SERVICE_KEY_FILE` (mounted only) | none |
 | `SEPAY_WEBHOOK_SECRET` | Secret the bank transfer notifier signs its deliveries with: HMAC-SHA256 over `<timestamp>.<raw body>` in `x-sepay-signature`, the timestamp in `x-sepay-timestamp` (secret) | none |
 | `SEPAY_WEBHOOK_TOLERANCE` | How far a delivery's signed timestamp may be from now before it is refused as a replay | `5m` |
-| `HTTP_SECURITY_ALLOWED_ORIGINS`, `HTTP_SECURITY_RATE_WINDOW`, `HTTP_SECURITY_RATE_DEFAULT_LIMIT`, `HTTP_SECURITY_RATE_STRICT_LIMIT` | As above | as above |
+| `HTTP_SECURITY_ALLOWED_ORIGINS`, `HTTP_SECURITY_RATE_WINDOW`, `HTTP_SECURITY_RATE_DEFAULT_LIMIT`, `HTTP_SECURITY_RATE_STRICT_LIMIT`, `HTTP_SECURITY_RATE_SERVICE_LIMIT` | As above | as above |
 
 | `EVENT_BUS_BROKERS`, `EVENT_BUS_GROUP_ID`, `EVENT_BUS_TOPIC_PREFIX`, `EVENT_BUS_RELAY_INTERVAL`, `EVENT_BUS_RELAY_BATCH`, `EVENT_BUS_TIMEOUT` | As on the order api | as above |
 | `INVOICE_MAX_TOTAL_MINOR_UNITS` | The largest total one invoice may bill; a larger order is rejected and announced | `50000000` |
@@ -96,6 +104,8 @@ It listens for the signed webhook of the bank transfer notifier (`POST /webhooks
 
 Export `KC_BOOTSTRAP_ADMIN_PASSWORD`, `KEYCLOAK_ADMIN_CLIENT_SECRET` and `MINIO_ROOT_PASSWORD` before `up`; Compose refuses to start when they are missing.
 The browser stack helper generates fresh values per run and hands them to Compose and to the APIs through the environment; the services receive the same values.
+The service keys it generates are mounted instead: one owner-only file per key in a private temporary folder outside the
+repository, handed to the APIs as `<KEY>_FILE` and removed by `down`.
 
 ## cli (`apps/cli`)
 

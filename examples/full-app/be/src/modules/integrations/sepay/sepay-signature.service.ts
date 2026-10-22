@@ -12,7 +12,7 @@ export class SepaySignatureService extends WebhookSignatureService {
         super(
             {
                 allowedOrigins: [],
-                rateLimit: { windowMs: 60_000, defaultLimit: 100, strictLimit: 100 },
+                rateLimit: { windowMs: 60_000, defaultLimit: 100, strictLimit: 100, serviceLimit: 100 },
                 webhooks: { sepay: options },
             },
             clock,

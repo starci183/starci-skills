@@ -8,6 +8,7 @@ import { bearerTokenOf } from "./bearer-token.mapper"
 import type { CredentialAuthenticator, CredentialMetadata } from "./credential.contracts"
 import { IdentityError, IdentityErrorCode } from "./errors/identity.error"
 import type { PublicMetadata, SessionVerifier } from "./identity.contracts"
+import type { IdentityOptions } from "./identity.options"
 
 /** Metadata key of `@Public`. */
 export const PUBLIC_KEY = "domain.identity.public"
@@ -24,6 +25,13 @@ export const InjectSessionVerifier = (): TypedParameterDecorator<SessionVerifier
 
 /** Opens a door to anonymous callers, stating why; every other door needs a credential or a live session. */
 export const Public = (metadata: PublicMetadata): ReturnType<typeof SetMetadata> => SetMetadata(PUBLIC_KEY, metadata)
+
+/** Token of the options the identity capability was registered with. */
+export const IDENTITY_OPTIONS: unique symbol = Symbol("domain.identity.options")
+
+/** Injects the options of the identity capability. Parameter type: IdentityOptions. */
+export const InjectIdentityOptions = (): TypedParameterDecorator<IdentityOptions> =>
+    injector<IdentityOptions>(IDENTITY_OPTIONS)
 
 /** Metadata key of `@Credential`. */
 export const CREDENTIAL_KEY: unique symbol = Symbol("domain.identity.credential")

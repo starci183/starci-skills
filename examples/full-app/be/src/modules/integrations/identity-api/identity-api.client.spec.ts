@@ -2,13 +2,18 @@ import { Test } from "@nestjs/testing"
 import { mock } from "@starci/jest-preset"
 import { HTTP_CLIENT } from "@modules/platform/http"
 import type { HttpClient } from "@modules/platform/http"
+import { Secret } from "@modules/platform/config"
 import { IdentityApiErrorCode } from "./errors/identity-api.error"
 import { IdentityApiClient } from "./identity-api.client"
 import { IDENTITY_API_DOCUMENTS } from "./identity-api.contracts"
 import { IDENTITY_API_OPTIONS } from "./identity-api.decorators"
 import type { IdentityApiOptions } from "./identity-api.options"
 
-const options: IdentityApiOptions = { url: "http://identity.test", timeoutMs: 3000 }
+const options: IdentityApiOptions = {
+    url: "http://identity.test",
+    timeoutMs: 3000,
+    serviceKey: new Secret("order-service-key"),
+}
 
 const build = async () => {
     const http = mock<HttpClient>()
@@ -23,11 +28,11 @@ const build = async () => {
 }
 
 describe("verify", () => {
-    it("asks the identity GraphQL door and returns the verified session", async () => {
+    it("asks the identity service door with this service's own key and returns the verified session", async () => {
         const { client, http } = await build()
         http.request.mockResolvedValue({
             status: 200,
-            body: { data: { verifySession: { personId: "person-1" } } },
+            body: { data: { verifyServiceSession: { personId: "person-1" } } },
         })
 
         await expect(client.verify("session-token")).resolves.toEqual({ personId: "person-1" })
@@ -35,9 +40,9 @@ describe("verify", () => {
         expect(http.request).toHaveBeenCalledWith({
             method: "POST",
             url: "http://identity.test/graphql",
-            headers: undefined,
+            headers: { authorization: "Bearer order-service-key" },
             body: {
-                query: IDENTITY_API_DOCUMENTS.verifySession,
+                query: IDENTITY_API_DOCUMENTS.verifyServiceSession,
                 variables: { input: { sessionToken: "session-token" } },
             },
             timeoutMs: 3000,
@@ -75,8 +80,8 @@ describe("verify refusals and failures", () => {
         ["a non-GraphQL body", "not-json-object"],
         ["missing data", {}],
         ["a missing session", { data: {} }],
-        ["a non-object session", { data: { verifySession: "person-1" } }],
-        ["a non-string person id", { data: { verifySession: { personId: 1 } } }],
+        ["a non-object session", { data: { verifyServiceSession: "person-1" } }],
+        ["a non-string person id", { data: { verifyServiceSession: { personId: 1 } } }],
     ])("reports contract mismatch for %s", async (_case, body) => {
         const { client, http } = await build()
         http.request.mockResolvedValue({ status: 200, body })

@@ -6,7 +6,11 @@ import { ECOMMERCE_OPERATIONS } from "../../world/ecommerce-operations.contracts
 const schema = buildSchema(readFileSync(join(__dirname, "../../../../contracts/identity/schema.graphql"), "utf8"))
 
 describe("identity GraphQL contract", () => {
-    it("accepts the verifySession document the order service sends", () => {
+    it("accepts the verifyServiceSession document the order and billing services send with their own key", () => {
+        expect(validate(schema, parse(ECOMMERCE_OPERATIONS.verifyServiceSession))).toEqual([])
+    })
+
+    it("accepts the public verifySession handshake document", () => {
         expect(validate(schema, parse(ECOMMERCE_OPERATIONS.verifySession))).toEqual([])
     })
 

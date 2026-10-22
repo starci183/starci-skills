@@ -1,6 +1,6 @@
 import type { DynamicModule } from "@nestjs/common"
 import { AccountModule } from "@modules/domain/account"
-import { IdentityModule } from "@modules/domain/identity"
+import { IdentityModule, ServiceKeyService } from "@modules/domain/identity"
 import { SessionModule, SessionService } from "@modules/domain/session"
 import { KeycloakModule } from "@modules/integrations/keycloak"
 import { KeycloakAdminModule } from "@modules/integrations/keycloak-admin"
@@ -15,6 +15,11 @@ export function identityModules(options: IdentityAppOptions): Array<DynamicModul
         OrderApiModule.register({ isGlobal: true, ...options.orderApi }),
         AccountModule.register({ isGlobal: true }),
         SessionModule.register({ isGlobal: true }),
-        IdentityModule.register({ isGlobal: true, verifier: SessionService }),
+        IdentityModule.register({
+            isGlobal: true,
+            verifier: SessionService,
+            credentialAuthenticator: ServiceKeyService,
+            serviceKeys: options.identity.serviceKeys,
+        }),
     ]
 }

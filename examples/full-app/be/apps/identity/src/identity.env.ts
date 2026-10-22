@@ -1,3 +1,4 @@
+import { parseIdentityConfig } from "@modules/domain/identity"
 import { parseCacheConfig } from "@modules/integrations/cache"
 import { parseKeycloakConfig } from "@modules/integrations/keycloak"
 import { parseKeycloakAdminConfig } from "@modules/integrations/keycloak-admin"
@@ -22,6 +23,8 @@ export interface IdentityEnv {
     readonly orderApi: ReturnType<typeof parseOrderApiConfig>
     /** The origin allowlist and rate limits. */
     readonly httpSecurity: ReturnType<typeof parseHttpSecurityConfig>
+    /** The keys the calling services present to the service doors. */
+    readonly identity: ReturnType<typeof parseIdentityConfig>
 }
 
 /** Reads the identity environment; missing or invalid values fail boot and secret readers prefer mounted files. */
@@ -33,4 +36,5 @@ export const readIdentityEnv = (env: EnvSource): IdentityEnv => ({
     keycloakAdmin: parseKeycloakAdminConfig(env),
     orderApi: parseOrderApiConfig(env),
     httpSecurity: parseHttpSecurityConfig(env),
+    identity: parseIdentityConfig(env),
 })

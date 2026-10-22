@@ -12,6 +12,7 @@ export const parseHttpSecurityConfig = (env: EnvSource): HttpSecurityOptions => 
         windowMs: env.duration("HTTP_SECURITY_RATE_WINDOW", 60_000),
         defaultLimit: env.int("HTTP_SECURITY_RATE_DEFAULT_LIMIT", 600),
         strictLimit: env.int("HTTP_SECURITY_RATE_STRICT_LIMIT", 30),
+        serviceLimit: env.int("HTTP_SECURITY_RATE_SERVICE_LIMIT", 6000),
     },
     webhooks: {},
 })

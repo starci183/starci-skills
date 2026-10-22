@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto"
 import { Injectable, SetMetadata } from "@nestjs/common"
 import type { ExecutionContext } from "@nestjs/common"
 import type { Reflector } from "@nestjs/core"
@@ -14,6 +15,11 @@ export enum RateTier {
     Default = "default",
     /** The tight tier every authentication handshake and signed webhook carries. */
     Strict = "strict",
+    /**
+     * The tier of a door another service calls with its own credential: counted per presented credential, not per address,
+     * so the services behind one address keep separate budgets and a shopper's traffic through them never meets the strict tier.
+     */
+    Service = "service",
 }
 
 const RATE_TIER_KEY = "platform.http-security.rate-tier"
@@ -26,6 +32,16 @@ const tierOf = (context: ExecutionContext): RateTier => {
         Reflect.getMetadata(RATE_TIER_KEY, context.getHandler()) ??
         Reflect.getMetadata(RATE_TIER_KEY, context.getClass())
     return declared ?? RateTier.Default
+}
+
+/**
+ * The service tier's counter key: a digest of the presented credential, so each calling service has its own window and the
+ * credential itself is never a storage key. An absent credential shares one anonymous window.
+ */
+export const serviceTrackerOf = (request: Record<string, unknown>): string => {
+    const headers = request.headers as Readonly<Record<string, unknown>> | undefined
+    const authorization = typeof headers?.authorization === "string" ? headers.authorization : ""
+    return `service:${createHash("sha256").update(authorization).digest("hex")}`
 }
 
 /** The throttler configuration of the app: one window per tier, each counting only the doors of its own tier. */
@@ -42,6 +58,13 @@ export const throttlerOptionsOf = (rateLimit: RateLimitOptions): ThrottlerModule
             ttl: rateLimit.windowMs,
             limit: rateLimit.strictLimit,
             skipIf: (context) => tierOf(context) !== RateTier.Strict,
+        },
+        {
+            name: RateTier.Service,
+            ttl: rateLimit.windowMs,
+            limit: rateLimit.serviceLimit,
+            skipIf: (context) => tierOf(context) !== RateTier.Service,
+            getTracker: serviceTrackerOf,
         },
     ],
     setHeaders: false,

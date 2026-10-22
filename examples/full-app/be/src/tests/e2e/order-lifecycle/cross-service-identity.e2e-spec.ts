@@ -6,8 +6,9 @@ import { useTestWorld } from "../../world/use-test-world"
 
 /**
  * The identity to order boundary for real: an order operation authenticates because the auth guard asks identity
- * verifySession over live GraphQL on EVERY request, so when a session dies mid-journey (revoked on the identity side)
- * the next order operation answers IDENTITY_UNAUTHENTICATED, not a cached principal. Re-auth then issues a new token for the
+ * verifyServiceSession (the service door, authenticated by the order service's own key and counted on its own service-tier
+ * budget) over live GraphQL on EVERY request, so when a session dies mid-journey (revoked on the identity side) the next
+ * order operation answers IDENTITY_UNAUTHENTICATED, not a cached principal. Re-auth then issues a new token for the
  * same person, and the person-keyed state (the cart) resumes the journey.
  *
  * Session lifetime is declared by the session cache key (one hour), so an expiry journey is not part of the suite: it

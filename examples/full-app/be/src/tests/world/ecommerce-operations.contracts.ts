@@ -5,7 +5,8 @@ import { ORDER_API_DOCUMENTS } from "@modules/integrations/order-api"
 export const ECOMMERCE_OPERATIONS = {
     register: "mutation Register($input: RegisterInput!) { register(input: $input) { personId } }",
     signIn: "mutation SignIn($input: SignInInput!) { signIn(input: $input) { sessionToken personId } }",
-    verifySession: IDENTITY_API_DOCUMENTS.verifySession,
+    verifySession: "query VerifySession($input: VerifySessionInput!) { verifySession(input: $input) { personId } }",
+    verifyServiceSession: IDENTITY_API_DOCUMENTS.verifyServiceSession,
     revokeSession: "mutation RevokeSession($input: RevokeSessionInput!) { revokeSession(input: $input) { revoked } }",
     account: "query { account { personId email hasOrders } }",
     cart: "query { cart { items { productId quantity } catalog { id name priceMinorUnits stock } } }",

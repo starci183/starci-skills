@@ -14,7 +14,7 @@ const BODY = Buffer.from(JSON.stringify({ eventId: "evt-1", status: "confirmed" 
 
 const OPTIONS: HttpSecurityOptions = {
     allowedOrigins: [],
-    rateLimit: { windowMs: 60_000, defaultLimit: 600, strictLimit: 30 },
+    rateLimit: { windowMs: 60_000, defaultLimit: 600, strictLimit: 30, serviceLimit: 6000 },
     webhooks: { "payment-gateway": { secret: new Secret(SECRET), toleranceMs: 300_000 } },
 }
 

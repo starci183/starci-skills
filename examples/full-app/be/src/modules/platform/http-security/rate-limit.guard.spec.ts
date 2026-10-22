@@ -7,18 +7,24 @@ import { HttpSecurityError, HttpSecurityErrorCode } from "./errors/http-security
 import type { OperationRequest } from "./http-security.contracts"
 import { HTTP_SECURITY_OPTIONS } from "./http-security.decorators"
 import type { RateLimitOptions } from "./http-security.options"
-import { RateLimit, RateLimitGuard, RateTier, throttlerOptionsOf } from "./rate-limit.guard"
+import { RateLimit, RateLimitGuard, RateTier, serviceTrackerOf, throttlerOptionsOf } from "./rate-limit.guard"
 
-const rateLimit: RateLimitOptions = { windowMs: 60_000, defaultLimit: 100, strictLimit: 10 }
+const rateLimit: RateLimitOptions = { windowMs: 60_000, defaultLimit: 100, strictLimit: 10, serviceLimit: 1000 }
 
 class Door {}
 
 const defaultHandler = (): void => undefined
 const strictHandler = (): void => undefined
 RateLimit(RateTier.Strict)(strictHandler)
+const serviceHandler = (): void => undefined
+RateLimit(RateTier.Service)(serviceHandler)
 
-const contextOf = (handler = defaultHandler) => {
-    const request: OperationRequest = { headers: { "user-agent": "spec" }, method: "GET", ip: "127.0.0.1" }
+const contextOf = (handler = defaultHandler, authorization?: string) => {
+    const request: OperationRequest = {
+        headers: { "user-agent": "spec", ...(authorization === undefined ? {} : { authorization }) },
+        method: "GET",
+        ip: "127.0.0.1",
+    }
     const http = mock<ReturnType<ExecutionContext["switchToHttp"]>>()
     http.getRequest.mockReturnValue(request)
     const context = mock<ExecutionContext>()
@@ -50,20 +56,35 @@ const configuredTiers = () => {
     if (Array.isArray(options)) {
         throw new HttpSecurityError({ code: HttpSecurityErrorCode.RequestInvalid })
     }
-    const [defaultTier, strictTier] = options.throttlers
-    if (defaultTier === undefined || strictTier === undefined) {
+    const [defaultTier, strictTier, serviceTier] = options.throttlers
+    if (defaultTier === undefined || strictTier === undefined || serviceTier === undefined) {
         throw new HttpSecurityError({ code: HttpSecurityErrorCode.RequestInvalid })
     }
-    return { options, defaultTier, strictTier }
+    return { options, defaultTier, strictTier, serviceTier }
 }
+
+const notBlocked = { totalHits: 1, timeToExpire: 30_000, isBlocked: false, timeToBlockExpire: 0 }
 
 describe("rate limiting configuration", () => {
     it("builds one isolated window for each rate tier and disables response headers", () => {
-        const { options, defaultTier, strictTier } = configuredTiers()
+        const { options, defaultTier, strictTier, serviceTier } = configuredTiers()
 
         expect(options.setHeaders).toBe(false)
         expect(defaultTier).toMatchObject({ name: RateTier.Default, ttl: 60_000, limit: 100 })
         expect(strictTier).toMatchObject({ name: RateTier.Strict, ttl: 60_000, limit: 10 })
+        expect(serviceTier).toMatchObject({ name: RateTier.Service, ttl: 60_000, limit: 1000 })
+        expect(serviceTier.getTracker).toBe(serviceTrackerOf)
+    })
+
+    it("counts a service door only in the service tier, never in the strict or default window", () => {
+        const { defaultTier, strictTier, serviceTier } = configuredTiers()
+        const service = contextOf(serviceHandler)
+        const strict = contextOf(strictHandler)
+
+        expect(serviceTier.skipIf?.(service)).toBe(false)
+        expect(strictTier.skipIf?.(service)).toBe(true)
+        expect(defaultTier.skipIf?.(service)).toBe(true)
+        expect(serviceTier.skipIf?.(strict)).toBe(true)
     })
 
     it("selects the default tier when neither the handler nor its class declares one", () => {
@@ -96,6 +117,30 @@ describe("rate limiting configuration", () => {
 
         expect(defaultTier.skipIf?.(context)).toBe(false)
         expect(strictTier.skipIf?.(context)).toBe(true)
+    })
+})
+
+describe("serviceTrackerOf", () => {
+    it("keys one window per presented credential, whatever address the call comes from", () => {
+        const order = serviceTrackerOf({ ip: "10.0.0.1", headers: { authorization: "Bearer order-key" } })
+
+        expect(serviceTrackerOf({ ip: "10.0.0.2", headers: { authorization: "Bearer order-key" } })).toBe(order)
+        expect(serviceTrackerOf({ ip: "10.0.0.1", headers: { authorization: "Bearer billing-key" } })).not.toBe(order)
+    })
+
+    it("never uses the credential itself as the storage key", () => {
+        const tracker = serviceTrackerOf({ headers: { authorization: "Bearer order-key" } })
+
+        expect(tracker).toMatch(/^service:[0-9a-f]{64}$/)
+        expect(tracker).not.toContain("order-key")
+    })
+
+    it.each([
+        { request: "no headers", value: {} },
+        { request: "no authorization header", value: { headers: {} } },
+        { request: "a non-string authorization", value: { headers: { authorization: ["Bearer order-key"] } } },
+    ])("puts a call with $request into the one anonymous window", ({ value }) => {
+        expect(serviceTrackerOf(value)).toBe(serviceTrackerOf({ headers: { authorization: "" } }))
     })
 })
 
@@ -140,5 +185,33 @@ describe("RateLimitGuard", () => {
             60_000,
             RateTier.Strict,
         )
+    })
+
+    it("counts each calling service in its own service-tier window, at the service limit", async () => {
+        const { guard, storage } = await build()
+        storage.increment.mockResolvedValue(notBlocked)
+
+        await expect(guard.canActivate(contextOf(serviceHandler, "Bearer order-key"))).resolves.toBe(true)
+        await expect(guard.canActivate(contextOf(serviceHandler, "Bearer billing-key"))).resolves.toBe(true)
+
+        expect(storage.increment).toHaveBeenCalledTimes(2)
+        const [orderCall, billingCall] = storage.increment.mock.calls
+        expect(orderCall?.slice(1)).toEqual([60_000, 1000, 60_000, RateTier.Service])
+        expect(billingCall?.slice(1)).toEqual([60_000, 1000, 60_000, RateTier.Service])
+        expect(orderCall?.[0]).not.toBe(billingCall?.[0])
+    })
+
+    it("reports a calling service past its own budget as rate limited", async () => {
+        const { guard, storage } = await build()
+        storage.increment.mockResolvedValue({
+            ...notBlocked,
+            totalHits: 1001,
+            isBlocked: true,
+            timeToBlockExpire: 30_000,
+        })
+
+        await expect(guard.canActivate(contextOf(serviceHandler, "Bearer order-key"))).rejects.toMatchObject({
+            code: HttpSecurityErrorCode.RateLimited,
+        })
     })
 })

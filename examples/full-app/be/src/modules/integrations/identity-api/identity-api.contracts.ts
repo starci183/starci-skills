@@ -9,5 +9,6 @@ export type IdentitySessionLookup = IdentitySession | null
 
 /** The GraphQL documents the order service sends to the identity service, checked against its published schema by the contract layer. */
 export const IDENTITY_API_DOCUMENTS = {
-    verifySession: "query VerifySession($input: VerifySessionInput!) { verifySession(input: $input) { personId } }",
+    verifyServiceSession:
+        "query VerifyServiceSession($input: VerifySessionInput!) { verifyServiceSession(input: $input) { personId } }",
 } as const

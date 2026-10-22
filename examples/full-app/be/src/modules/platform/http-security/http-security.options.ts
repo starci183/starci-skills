@@ -8,6 +8,8 @@ export interface RateLimitOptions {
     readonly defaultLimit: number
     /** Requests per window for the strict tier (authentication handshakes and signed webhooks). */
     readonly strictLimit: number
+    /** Requests per window for the service tier: one budget per calling service's credential, sized for its whole traffic. */
+    readonly serviceLimit: number
 }
 
 /** What the signature proof of one webhook provider needs. */
