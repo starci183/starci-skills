@@ -18,20 +18,21 @@ import { JsonView } from '../../evidence/renderers';
 import { reportTestedHead } from '../checkpoint';
 import { Badge } from '../../ui/badge';
 
+/** The business concept id (C8) under which the products card is filed; it is stamped on data-concept so the rendered DOM traces back to its spec. */
 export const concept: Concept = 'C8';
 
 const short = (sha: string | null) => (sha ? sha.slice(0, 9) : '—');
 const TEXTY = new Set<EvidenceKind>(['json', 'yaml', 'markdown', 'text']);
 
 /** The report's explicit file declaration; absent data does not become an empty list. */
-function declaredFiles(attempt: AttemptDetailV3): string[] | null {
+const declaredFiles = (attempt: AttemptDetailV3): string[] | null => {
   const report = attempt.report?.json;
   if (!report || typeof report !== 'object' || Array.isArray(report) || !('files' in report) || !Array.isArray(report.files)) return null;
   return report.files.every((path): path is string => typeof path === 'string') ? report.files : null;
-}
+};
 
 /** Files the server marks `key`, without the manifest (shown as the checklist above) and without duplicates or empties. */
-function keyFiles(attempt: AttemptDetailV3): EvidenceFileV3[] {
+const keyFiles = (attempt: AttemptDetailV3): EvidenceFileV3[] => {
   const seen = new Set<string>();
   const out: EvidenceFileV3[] = [];
   for (const file of attempt.files) {
@@ -39,9 +40,9 @@ function keyFiles(attempt: AttemptDetailV3): EvidenceFileV3[] {
     seen.add(file.sha); out.push(file);
   }
   return out;
-}
+};
 
-function KeyEvidence({ file, authorOp, defaultOpen }: Readonly<{ file: EvidenceFileV3; authorOp: string; defaultOpen: boolean }>) {
+const KeyEvidence = ({ file, authorOp, defaultOpen }: Readonly<{ file: EvidenceFileV3; authorOp: string; defaultOpen: boolean }>) => {
   return <li className="min-w-0 py-2 first:pt-0 last:pb-0">
     <Advanced defaultOpen={defaultOpen} title={<span className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
       <span className="min-w-0 flex-1 break-all text-sm font-medium">{file.base}</span>
@@ -52,11 +53,11 @@ function KeyEvidence({ file, authorOp, defaultOpen }: Readonly<{ file: EvidenceF
       <div className="grid min-w-0 gap-4"><PathLink path={file.hostPath} kind="file" label={t('open path')} /><EvidenceSchemaView file={file} authorOp={authorOp} /></div>
     </Advanced>
   </li>;
-}
+};
 
 type Products = AttemptProducts | null;
 
-function sourceReadLabel(state: Readonly<{ loading: boolean; fallback: boolean; products: Products; read: ReadState; unavailableFiles: number }>): string {
+const sourceReadLabel = (state: Readonly<{ loading: boolean; fallback: boolean; products: Products; read: ReadState; unavailableFiles: number }>): string => {
   const { loading, fallback, products, read, unavailableFiles } = state;
   if (loading) return t('Reading the op files…');
   if (fallback) return t('Declared paths and recorded diff only');
@@ -65,24 +66,24 @@ function sourceReadLabel(state: Readonly<{ loading: boolean; fallback: boolean; 
   if (read.meta?.stale?.length) return t('Some sources unavailable');
   if (unavailableFiles) return t('{n} file reads unavailable', { n: unavailableFiles });
   return products ? t('Recorded commit read available') : t('No product response recorded');
-}
+};
 
-function contentSourceLabel(products: Products): string {
+const contentSourceLabel = (products: Products): string => {
   if (products?.headSource === 'runtime-checkpoint') return t('Content source: recorded runtime checkpoint');
   if (products?.headSource === 'report-tested') return t('Content source: commit tested by the Op; authored output is unproven');
   return products ? t('Content source not recorded') : t('Product read source not confirmed');
-}
+};
 
-function CommitRef({ head, parent }: Readonly<{ head: string; parent: string | null }>) {
+const CommitRef = ({ head, parent }: Readonly<{ head: string; parent: string | null }>) => {
   return <span className="text-xs text-muted-foreground">commit <code className="font-mono text-foreground" title={head}>{short(head)}</code>{parent ? <>{t(' · parent')} <code className="font-mono" title={parent}>{short(parent)}</code></> : null}</span>;
-}
+};
 
-function TestedHead({ tested, inCommit }: Readonly<{ tested: string | null; inCommit: boolean }>) {
+const TestedHead = ({ tested, inCommit }: Readonly<{ tested: string | null; inCommit: boolean }>) => {
   if (!tested) return <>{t('Not recorded')}</>;
   return inCommit ? <span className="font-mono" title={tested}>{short(tested)}</span> : <code className="font-mono" title={tested}>{short(tested)}</code>;
-}
+};
 
-function SourceNotices({ products, read, url, fallback, error }: Readonly<{ products: Products; read: ReadState; url: string; fallback: boolean; error: string | null }>) {
+const SourceNotices = ({ products, read, url, fallback, error }: Readonly<{ products: Products; read: ReadState; url: string; fallback: boolean; error: string | null }>) => {
   return <>
     {products?.scope && !products.error ? <p className="mb-3 mt-0 text-xs text-muted-foreground">{t('Read scope: {returned}/{listed} recorded file paths', { returned: products.scope.returned, listed: products.scope.listed })}</p> : null}
     <ReadWarning read={read} url={url} retained={Boolean(products)} />
@@ -91,21 +92,21 @@ function SourceNotices({ products, read, url, fallback, error }: Readonly<{ prod
     {read.error || products?.error || fallback ? <p className="mb-3 mt-2 text-xs text-muted-foreground">{t('Source availability is separate from the Op outcome, verdict and checkpoint receipt.')}</p> : null}
     {fallback ? <p className="mb-3 mt-0 text-xs text-muted-foreground">{t('The server has no products API yet: only the report file list and the patch.diff diff are shown, no content.')}</p> : null}
   </>;
-}
+};
 
-function FilesList({ loading, files, products }: Readonly<{ loading: boolean; files: ProductFile[]; products: Products }>) {
+const FilesList = ({ loading, files, products }: Readonly<{ loading: boolean; files: ProductFile[]; products: Products }>) => {
   if (loading) return <p className="m-0 text-sm text-muted-foreground">{t('Reading the op files…')}</p>;
   if (files.length) return <ul className="m-0 flex list-none flex-col divide-y p-0">{files.map(file => <ProductRow key={file.path} file={file} />)}</ul>;
   return products && !products.error ? <Empty>{t('No file paths are listed for the recorded source.')}</Empty> : null;
-}
+};
 
-function DeclaredPaths({ declared }: Readonly<{ declared: string[] | null }>) {
+const DeclaredPaths = ({ declared }: Readonly<{ declared: string[] | null }>) => {
   if (declared == null) return <>{t('Not recorded')}</>;
   if (!declared.length) return <>{t('Recorded empty list')}</>;
-  return <ul className="m-0 list-none p-0">{declared.map((path, index) => <li key={`${index}:${path}`} className="break-all font-mono">{path}</li>)}</ul>;
-}
+  return <ul className="m-0 list-none p-0">{declared.map(path => <li key={path} className="break-all font-mono">{path}</li>)}</ul>;
+};
 
-function FilesSection(props: Readonly<{ attempt: AttemptDetailV3; state: ReturnType<typeof useProducts>; declared: string[] | null }>) {
+const FilesSection = (props: Readonly<{ attempt: AttemptDetailV3; state: ReturnType<typeof useProducts>; declared: string[] | null }>) => {
   const { attempt, state, declared } = props;
   const { products, loading, fallback, error, url, read } = state;
   const tested = products?.reportHead ?? reportTestedHead(attempt);
@@ -133,17 +134,17 @@ function FilesSection(props: Readonly<{ attempt: AttemptDetailV3; state: ReturnT
     {other.length ? <Advanced className="mt-4" title={t('This commit also changed {n} other files', { n: other.length })} keepMounted>
       <ul className="m-0 grid list-none gap-2 p-0 text-xs">{other.map(f => <li key={f.path} className="break-all"><span className="mr-2 text-muted-foreground">{f.status}</span><code className="font-mono">{f.path}</code></li>)}</ul></Advanced> : null}
   </section>;
-}
+};
 
-function KeyEvidenceSection({ keyFiles: key, op }: Readonly<{ keyFiles: EvidenceFileV3[]; op: string }>) {
+const KeyEvidenceSection = ({ keyFiles: key, op }: Readonly<{ keyFiles: EvidenceFileV3[]; op: string }>) => {
   return <section className="min-w-0">
     <div className="mb-2 flex flex-wrap items-center gap-x-3"><h3 className="m-0 text-sm font-medium">{t('Key evidence')}</h3>{key.length ? <span className="text-xs text-muted-foreground">{t('{n} files', { n: key.length })}</span> : null}</div>
     {key.length ? <ul className="m-0 flex list-none flex-col divide-y p-0">{key.map((file, i) => <KeyEvidence key={file.artifactId} file={file} authorOp={op} defaultOpen={i === 0 || file.kind === 'markdown'} />)}</ul>
       : <Empty>{t('No key evidence files are listed for this Attempt.')}</Empty>}
   </section>;
-}
+};
 
-function ProvenanceBody(props: Readonly<{ attempt: AttemptDetailV3; state: ReturnType<typeof useProducts>; declared: string[] | null; keyFiles: EvidenceFileV3[] }>) {
+const ProvenanceBody = (props: Readonly<{ attempt: AttemptDetailV3; state: ReturnType<typeof useProducts>; declared: string[] | null; keyFiles: EvidenceFileV3[] }>) => {
   const { attempt, state, declared, keyFiles: key } = props;
   const { products, read } = state;
   const repo = products?.repo ?? attempt.where.repo;
@@ -158,10 +159,10 @@ function ProvenanceBody(props: Readonly<{ attempt: AttemptDetailV3; state: Retur
     {products?.claims.length ? <section className="min-w-0"><h3 className="m-0 mb-2 text-sm font-medium">{t('Op-declared product claims')}</h3><JsonView text={JSON.stringify(products.claims, null, 2)} /></section> : null}
     <KeyEvidenceSection keyFiles={key} op={attempt.op} />
   </div>;
-}
+};
 
 /** Recorded commit content and submitted evidence, with the commit's authority explicit. */
-export function ProductsCard({ project, attempt }: Readonly<{ project: string; attempt: AttemptDetailV3 }>) {
+export const ProductsCard = ({ project, attempt }: Readonly<{ project: string; attempt: AttemptDetailV3 }>) => {
   const state = useProducts(project, attempt);
   const key = keyFiles(attempt);
   const declared = declaredFiles(attempt);
@@ -175,4 +176,4 @@ export function ProductsCard({ project, attempt }: Readonly<{ project: string; a
       </Advanced>
     </div>
   </Card>;
-}
+};

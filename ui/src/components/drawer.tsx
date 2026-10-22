@@ -3,11 +3,13 @@ import { Sheet, SheetBody, SheetContent, SheetDescription, SheetHeader, SheetTit
 import type { Concept } from './concept';
 import { t } from '../i18n/t';
 
+/** The business concept id (frame) under which the shared side drawer is filed; it is stamped on data-concept so the rendered DOM traces back to its spec. */
 export const concept: Concept = 'frame';
 
-export function Drawer({ open, onOpenChange, title, description, children }: Readonly<{
+/** The right-hand sheet that shows read-only technical details, restoring focus to the page when its opener is gone. */
+export const Drawer = ({ open, onOpenChange, title, description, children }: Readonly<{
   open: boolean; onOpenChange: (open: boolean) => void; title: ReactNode; description?: ReactNode; children: ReactNode;
-}>) {
+}>) => {
   return <Sheet open={open} onOpenChange={onOpenChange}>
     <SheetContent side="right" className="drawer-panel"
       onCloseAutoFocus={event => {
@@ -21,4 +23,4 @@ export function Drawer({ open, onOpenChange, title, description, children }: Rea
       <SheetBody className="drawer-body">{children}</SheetBody>
     </SheetContent>
   </Sheet>;
-}
+};

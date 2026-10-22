@@ -8,6 +8,7 @@ import { AgentAvatar, agentOf } from '../../agent/agent-avatar';
 import { formatDayTime, formatDuration } from './time';
 import { t } from '../../../i18n/t';
 
+/** The business concept id (C7) under which the leg attempt card is filed; it is stamped on data-concept so the rendered DOM traces back to its spec. */
 export const concept: Concept = 'C7';
 
 const outcomeLabel: Record<string, string> = { done: t('Op reported done'), partial: t('Op reported partial'), failed: t('Op reported failed'), ask: t('Op asked back'), blocked: t('Op reported blocked') };
@@ -20,28 +21,28 @@ const runtimeLabel = (attempt: AttemptBrief) => {
 };
 
 /** Where the attempt stopped, as the second half of "dispatched -> ...". */
-function endLabel(attempt: AttemptBrief, end: number | null) {
+const endLabel = (attempt: AttemptBrief, end: number | null) => {
   if (end != null) return formatDayTime(end);
   if (attempt.reportedAt != null) return t('Reported {at}', { at: formatDayTime(attempt.reportedAt) });
   return attempt.endState ?? t('State unknown');
-}
+};
 
-function durationLabel(dispatchedAt: number, end: number | null, executing: boolean): string {
+const durationLabel = (dispatchedAt: number, end: number | null, executing: boolean): string => {
   if (end == null) return t('Duration not recorded');
   if (executing) return t('running for {n} min', { n: Math.max(0, Math.round((end - dispatchedAt) / 60000)) });
   return formatDuration(end - dispatchedAt);
-}
+};
 
-function DispatchLine({ attempt, executing, end }: Readonly<{ attempt: AttemptBrief; executing: boolean; end: number | null }>) {
+const DispatchLine = ({ attempt, executing, end }: Readonly<{ attempt: AttemptBrief; executing: boolean; end: number | null }>) => {
   return <p className="mt-2 text-xs">
     {attempt.dispatchedAt == null ? t('Not dispatched') : <>{formatDayTime(attempt.dispatchedAt)} → {executing ? <span className="text-[var(--status-running)]">{t('running')}</span> : endLabel(attempt, end)}</>}
     {attempt.dispatchedAt != null && <span className="text-muted-foreground"> · {durationLabel(attempt.dispatchedAt, end, executing)}</span>}
     {attempt.open && !executing && <span className="text-muted-foreground"> · {t('Awaiting settlement')}</span>}
   </p>;
-}
+};
 
 /** One dispatch, its Op report and the independently recorded runtime verdict. */
-export function AttemptCard({ attempt, now }: Readonly<{ attempt: AttemptBrief; now: number }>) {
+export const AttemptCard = ({ attempt, now }: Readonly<{ attempt: AttemptBrief; now: number }>) => {
   const executing = attempt.open && attempt.endedAt == null && attempt.reportedAt == null && !attempt.reportOutcome;
   const end = attempt.settledAt ?? attempt.endedAt ?? (executing ? now : null);
   const outcome = statusFromOutcome(attempt.reportOutcome);
@@ -66,4 +67,4 @@ export function AttemptCard({ attempt, now }: Readonly<{ attempt: AttemptBrief; 
     {attempt.summary && <p className="mt-2 whitespace-pre-wrap break-words text-xs">{attempt.summary}</p>}
     <Link href={attempt.href} className="mt-3 gap-1 text-xs font-medium">{t('Open attempt')} <ArrowRight className="size-3" aria-hidden="true" /></Link>
   </li>;
-}
+};

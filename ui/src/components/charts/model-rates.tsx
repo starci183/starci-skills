@@ -1,4 +1,5 @@
 import type { Concept } from '../concept';
+/** Names the C16 analytics concept this module belongs to, for the per-model first-try pass-rate chart. */
 export const concept: Concept = 'C16';
 import type { AttemptRow } from '../../contract';
 import { toneVar } from '../status';
@@ -11,13 +12,17 @@ import { t } from '../../i18n/t';
 
 const ROW = 76;
 
-function AgentGlyph({ model, pool, agent: agentId }: Readonly<{ model: string; pool: string | null; agent: string | null }>) {
+/** The agent family mark for a model, drawn inside the SVG so each row shows which vendor ran it. */
+const AgentGlyph = ({ model, pool, agent: agentId }: Readonly<{ model: string; pool: string | null; agent: string | null }>) => {
   const agent = agentOf({ model, pool, agent: agentId });
   const tint = familyTint[agent.family];
-  return <foreignObject x={0} y={-3} width={22} height={22}><span className="grid size-5 place-items-center rounded-full border p-[3px]" style={tintStyle(tint.tone)} title={[tint.name, pool, model].filter(Boolean).join(' · ')}><AgentMark family={agent.family} initial={model[0]?.toUpperCase()} /></span></foreignObject>;
-}
+  const initial = model[0]?.toUpperCase();
+  const initialProps = initial === undefined ? {} : { initial };
+  return <foreignObject x={0} y={-3} width={22} height={22}><span className="grid size-5 place-items-center rounded-full border p-[3px]" style={tintStyle(tint.tone)} title={[tint.name, pool, model].filter(Boolean).join(' · ')}><AgentMark family={agent.family} {...initialProps} /></span></foreignObject>;
+};
 
-export function ModelRates({ rows }: Readonly<{ rows: AttemptRow[] }>) {
+/** Compares models by their first-try pass rate and median time, to show which model settles work cleanly the first time. */
+export const ModelRates = ({ rows }: Readonly<{ rows: AttemptRow[] }>) => {
   const [ref, width] = useWidth();
   const models = [...groupBy(rows, row => row.model ?? t('model unknown')).entries()].map(([model, list]) => {
     const first = list.filter(r => r.attempt === 1 && isVerdictSettled(r));
@@ -40,4 +45,4 @@ export function ModelRates({ rows }: Readonly<{ rows: AttemptRow[] }>) {
       </g>)}
     </svg></div>
   </ChartCard>;
-}
+};

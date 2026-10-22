@@ -1,14 +1,15 @@
 import { ArrowRight } from 'lucide-react';
 import { Alert, Chip } from '@heroui/react';
-import type { Why } from '../../contract';
+import type { Why, WhyRef } from '../../contract';
 import type { Concept } from '../concept';
 import { Advanced } from '../motion';
 import { t } from '../../i18n/t';
 
+/** The business concept id (C10) under which the owner-facing "why" explanation is filed; it is stamped on data-concept so the rendered DOM traces back to its spec. */
 export const concept: Concept = 'C10';
 
 /** Display the supplied handling role or retry handoff; it does not identify an assigned person or prove active work. */
-export function whyOwner(owner: string | null | undefined): { label: string; tone: 'owner' | 'warning' | 'failed' | 'running' | 'queued' } {
+export const whyOwner = (owner: string | null | undefined): { label: string; tone: 'owner' | 'warning' | 'failed' | 'running' | 'queued' } => {
   if (!owner) return { label: t('Handling role not recorded'), tone: 'queued' };
   if (owner === 'owner') return { label: t('Workflow owner'), tone: 'owner' };
   if (owner === 'op-retry') return { label: t('Kernel · retry coordination'), tone: 'warning' };
@@ -18,17 +19,25 @@ export function whyOwner(owner: string | null | undefined): { label: string; ton
   if (owner === 'runtime-core') return { label: t('Runtime core'), tone: 'queued' };
   if (owner.startsWith('other-op:')) return { label: t('Op: {op}', { op: owner.slice('other-op:'.length) }), tone: 'warning' };
   return { label: t('Handling role: {role}', { role: owner }), tone: 'queued' };
-}
+};
 
 /** Render the source role label without implying a named person, launch, repair or completed outcome. */
-export function WhyOwnerBadge({ owner }: Readonly<{ owner: string | null | undefined }>) {
+export const WhyOwnerBadge = ({ owner }: Readonly<{ owner: string | null | undefined }>) => {
   const o = whyOwner(owner);
   return <Chip size="sm" variant="tertiary" data-tone={o.tone} className="max-w-full text-[var(--tone)]">
     <Chip.Label className="whitespace-normal break-words">{o.label}</Chip.Label>
   </Chip>;
-}
+};
 
-function CodeChips({ why }: Readonly<{ why: Why }>) {
+/** One line describing a supporting reference of an explanation, by what kind of record it points at. */
+const refLine = (ref: WhyRef): string => {
+  if (ref.kind === 'check') return `check ${ref.name} · ${ref.runner} · ${ref.status}`;
+  if (ref.kind === 'commit') return `commit ${String(ref.sha).slice(0, 12)}`;
+  if (ref.kind === 'report') return `report #${ref.reportId}`;
+  return JSON.stringify(ref);
+};
+
+const CodeChips = ({ why }: Readonly<{ why: Why }>) => {
   const items = why.codeInfo?.length ? why.codeInfo : why.codes.map(code => ({ code, known: false, title: code, meaning: null, next: null }));
   if (!items.length) return null;
   return <div className="flex flex-wrap gap-2">{items.map(item => <Chip key={item.code} size="sm" variant="tertiary"
@@ -38,13 +47,13 @@ function CodeChips({ why }: Readonly<{ why: Why }>) {
       <code className="break-all font-mono text-xs text-muted-foreground">{item.code}</code>
     </Chip.Label>
   </Chip>)}</div>;
-}
+};
 
 /**
  * The owner-facing reason (starci/why@1). `compact`: source headline and a separate handling role.
  * Full: headline, cause, op-vs-runtime disagreement, what happens next; codes and refs under "Advanced".
  */
-export function WhyBlock({ why, compact = false, className = '' }: Readonly<{ why: Why | null | undefined; compact?: boolean; className?: string }>) {
+export const WhyBlock = ({ why, compact = false, className = '' }: Readonly<{ why: Why | null | undefined; compact?: boolean; className?: string }>) => {
   if (!why?.headline) return null;
   if (compact) return <div className={`flex min-w-0 flex-col gap-1 ${className}`}>
     <p className="m-0 min-w-0 text-sm leading-6">{why.headline}</p>
@@ -65,10 +74,8 @@ export function WhyBlock({ why, compact = false, className = '' }: Readonly<{ wh
     {why.codes.length || why.refs?.length ? <Advanced summary={t('{codes} codes · {refs} references', { codes: why.codes.length, refs: why.refs?.length ?? 0 })}>
       <div className="flex flex-col gap-3">
         <CodeChips why={why} />
-        {why.refs?.length ? <ul className="m-0 flex list-none flex-col gap-1 p-0 font-mono text-xs text-muted-foreground">{why.refs.map((ref, i) => <li key={`${ref.kind}-${i}`} className="break-all">
-          {ref.kind === 'check' ? `check ${ref.name} · ${ref.runner} · ${ref.status}` : ref.kind === 'commit' ? `commit ${String(ref.sha).slice(0, 12)}` : ref.kind === 'report' ? `report #${ref.reportId}` : JSON.stringify(ref)}
-        </li>)}</ul> : null}
+        {why.refs?.length ? <ul className="m-0 flex list-none flex-col gap-1 p-0 font-mono text-xs text-muted-foreground">{why.refs.map(ref => <li key={refLine(ref)} className="break-all">{refLine(ref)}</li>)}</ul> : null}
       </div>
     </Advanced> : null}
   </div>;
-}
+};

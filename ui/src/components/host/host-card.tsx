@@ -10,37 +10,42 @@ import { QueryReadNotice } from '../system/panel';
 import { formatAbsolute } from '../../i18n/vi';
 import { t } from '../../i18n/t';
 
+/** The business concept id (C14) under which the host machine card is filed; it is stamped on data-concept so the rendered DOM traces back to its spec. */
 export const concept: Concept = 'C14';
 
 const nf = (value: number, digits = 0) => new Intl.NumberFormat('vi-VN', { maximumFractionDigits: digits }).format(value);
 const gb = (mb: number) => `${nf(mb / 1024, 1)} GB`;
 const readingTone = (value: number | null): Tone => value == null ? 'queued' : 'running';
-function uptime(sec: number): string {
+const uptime = (sec: number): string => {
   const d = Math.floor(sec / 86400), h = Math.floor(sec % 86400 / 3600), m = Math.floor(sec % 3600 / 60);
-  return d ? t('{d} days {h} h', { d, h }) : h ? t('{h} h {m} min', { h, m }) : t('{m} min', { m });
-}
+  if (d) return t('{d} days {h} h', { d, h });
+  if (h) return t('{h} h {m} min', { h, m });
+  return t('{m} min', { m });
+};
 
-function Bar({ pct, tone, label, valueText }: Readonly<{ pct: number | null; tone: Tone; label: string; valueText?: string }>) {
+const Bar = ({ pct, tone, label, valueText }: Readonly<{ pct: number | null; tone: Tone; label: string; valueText?: string }>) => {
   const value = pct == null || !Number.isFinite(pct) ? null : Math.max(0, Math.min(100, pct));
-  return <ProgressBar size="sm" aria-label={label} value={value ?? undefined} isIndeterminate={value == null}
-    aria-valuetext={value == null ? t('No reading yet') : valueText}>
+  const text = value == null ? t('No reading yet') : valueText;
+  return <ProgressBar size="sm" aria-label={label} isIndeterminate={value == null}
+    {...(value == null ? {} : { value })}
+    {...(text === undefined ? {} : { 'aria-valuetext': text })}>
     <ProgressBar.Track>{value != null ? <ProgressBar.Fill style={{ background: toneVar(tone) }} /> : null}</ProgressBar.Track>
   </ProgressBar>;
-}
+};
 
-function Row({ label, value, pct, tone, barLabel, barValueText }: Readonly<{ label: string; value: string; pct: number | null; tone: Tone; barLabel?: string; barValueText?: string }>) {
+const Row = ({ label, value, pct, tone, barLabel, barValueText }: Readonly<{ label: string; value: string; pct: number | null; tone: Tone; barLabel?: string; barValueText?: string }>) => {
   return <div className="flex flex-col gap-1">
     <div className="flex flex-wrap items-baseline justify-between gap-x-2 text-sm"><span className="min-w-0 text-muted-foreground">{label}</span><span className="font-medium tabular-nums">{value}</span></div>
-    <Bar pct={pct} tone={tone} label={barLabel ?? label} valueText={barValueText} />
+    <Bar pct={pct} tone={tone} label={barLabel ?? label} {...(barValueText === undefined ? {} : { valueText: barValueText })} />
   </div>;
-}
+};
 
-function Temp({ value }: Readonly<{ value: number | null }>) {
+const Temp = ({ value }: Readonly<{ value: number | null }>) => {
   if (value == null) return <span className="text-muted-foreground">{t('unreadable')}</span>;
   return <span className="font-medium tabular-nums">{nf(value)} °C</span>;
-}
+};
 
-function Spark({ history }: Readonly<{ history: HostView['history'] }>) {
+const Spark = ({ history }: Readonly<{ history: HostView['history'] }>) => {
   if (history.length < 2) return <p className="text-sm text-muted-foreground">{t('Not enough samples to draw a trend yet.')}</p>;
   const x = (i: number) => (i * 300 / (history.length - 1)).toFixed(1);
   const line = (pick: (row: HostView['history'][number]) => number | null) => {
@@ -66,56 +71,71 @@ function Spark({ history }: Readonly<{ history: HostView['history'] }>) {
       <span>{t('{n} latest samples', { n: history.length })}</span>
     </div>
   </div>;
-}
+};
 
-const modeToneOf = (mode: HostView['throttleMode']): Tone => mode === 'critical' ? 'failed' : mode === 'heavy' ? 'warning' : mode === 'normal' ? 'success' : 'queued';
-const availabilityLabel = (availability: string) => availability === 'pending' ? t('Reading') : availability === 'available' ? t('Available') : t('Unavailable');
+const modeToneOf = (mode: HostView['throttleMode']): Tone => {
+  if (mode === 'critical') return 'failed';
+  if (mode === 'heavy') return 'warning';
+  if (mode === 'normal') return 'success';
+  return 'queued';
+};
+const availabilityLabel = (availability: string) => {
+  if (availability === 'pending') return t('Reading');
+  if (availability === 'available') return t('Available');
+  return t('Unavailable');
+};
 
-function GpuSummary({ gpu }: Readonly<{ gpu: HostView['gpus'][number] | undefined }>) {
+const GpuSummary = ({ gpu }: Readonly<{ gpu: HostView['gpus'][number] | undefined }>) => {
   if (!gpu) return <p className="text-sm text-muted-foreground">{t('No GPU reading recorded.')}</p>;
   return <div className="flex flex-col gap-1">
     <div className="flex flex-wrap items-baseline justify-between gap-x-2 text-sm"><span className="min-w-0 truncate font-medium" title={gpu.name}>{gpu.name}</span><span className="tabular-nums"><Temp value={gpu.tempC} />{gpu.utilPct != null ? <span className="text-muted-foreground"> · {t('load {n} %', { n: nf(gpu.utilPct) })}</span> : null}</span></div>
     <Bar pct={gpu.utilPct} tone={readingTone(gpu.utilPct)} label={t('GPU load')} />
   </div>;
-}
+};
 
-function GpuList({ gpus }: Readonly<{ gpus: HostView['gpus'] }>) {
+const GpuList = ({ gpus }: Readonly<{ gpus: HostView['gpus'] }>) => {
   if (!gpus.length) return null;
+  const seen = new Map<string, number>();
+  const keyed = gpus.map(gpu => {
+    const nth = (seen.get(gpu.name) ?? 0) + 1;
+    seen.set(gpu.name, nth);
+    return { gpu, key: `${gpu.name}#${nth}` };
+  });
   return <div className="flex flex-col gap-3 border-t pt-3">
     <p className="text-xs font-medium text-muted-foreground">GPU</p>
-    {gpus.map((g, i) => <div key={`${g.name}-${i}`} className="flex flex-col gap-2">
+    {keyed.map(({ gpu: g, key }) => <div key={key} className="flex flex-col gap-2">
       {g.memUsedMb != null && g.memTotalMb ? <Row label={`VRAM · ${g.name}`} value={`${gb(g.memUsedMb)} / ${gb(g.memTotalMb)}`} pct={g.memUsedMb / g.memTotalMb * 100} tone="running" /> : null}
       <p className="text-xs text-muted-foreground">{t('Power:')} {g.powerW == null ? t('unknown') : `${nf(g.powerW, 1)} W`}</p>
     </div>)}
   </div>;
-}
+};
 
-function DiskRow({ disk }: Readonly<{ disk: HostView['disks'][number] }>) {
+const DiskRow = ({ disk }: Readonly<{ disk: HostView['disks'][number] }>) => {
   const freePct = Number.isFinite(disk.freeGb) && Number.isFinite(disk.totalGb) && disk.totalGb > 0 && disk.freeGb >= 0 && disk.freeGb <= disk.totalGb
     ? disk.freeGb / disk.totalGb * 100 : null;
   const value = t('{free} GB free / {total} GB', { free: nf(disk.freeGb, 1), total: nf(disk.totalGb, 1) });
-  const barValueText = freePct == null ? undefined : `${nf(freePct, 1)}% · ${value}`;
-  return <Row label={disk.mount} value={value} pct={freePct} tone={readingTone(freePct)} barLabel={`${t('Disks (free space)')} · ${disk.mount}`} barValueText={barValueText} />;
-}
+  const barValueText = freePct == null ? {} : { barValueText: `${nf(freePct, 1)}% · ${value}` };
+  return <Row label={disk.mount} value={value} pct={freePct} tone={readingTone(freePct)} barLabel={`${t('Disks (free space)')} · ${disk.mount}`} {...barValueText} />;
+};
 
-function DiskList({ disks }: Readonly<{ disks: HostView['disks'] }>) {
+const DiskList = ({ disks }: Readonly<{ disks: HostView['disks'] }>) => {
   if (!disks.length) return null;
   return <div className="flex flex-col gap-3 border-t pt-3">
     <p className="text-xs font-medium text-muted-foreground">{t('Disks (free space)')}</p>
     {disks.map(d => <DiskRow key={d.mount} disk={d} />)}
   </div>;
-}
+};
 
-function AgentRam({ host }: Readonly<{ host: HostView }>) {
+const AgentRam = ({ host }: Readonly<{ host: HostView }>) => {
   const agents = Object.entries(host.agentsRamMb).map(([key, mb]) => [key.replace(/^agent:/, ''), mb] as const).sort((a, b) => b[1] - a[1]);
   const agentMax = Math.max(1, ...agents.map(([, mb]) => mb));
   return <div className="flex flex-col gap-3 border-t pt-3">
     <p className="text-xs font-medium text-muted-foreground">{t('RAM per agent')}{host.running != null ? t(' · {n} ops running', { n: host.running }) : ''}</p>
     {agents.length ? agents.map(([name, mb]) => <Row key={name} label={name} value={gb(mb)} pct={mb / agentMax * 100} tone="running" />) : <p className="text-sm text-muted-foreground">{t('No per-agent RAM reading yet.')}</p>}
   </div>;
-}
+};
 
-function SourceObservations({ host }: Readonly<{ host: HostView }>) {
+const SourceObservations = ({ host }: Readonly<{ host: HostView }>) => {
   return <Advanced title={t('Source observations')} summary={t('Sensor observations retain their own timestamps and read failures.')}>
     <DataTable rows={Object.entries(host.sources ?? {}).map(([key, source]) => ({ key, ...source }))} getKey={row => row.key} caption={t('Host source observations')} columns={[
       { key: 'source', header: t('Source'), render: row => <span className="break-words">{row.source}</span> },
@@ -125,28 +145,28 @@ function SourceObservations({ host }: Readonly<{ host: HostView }>) {
       { key: 'error', header: t('Read failure'), mobileStack: true, render: row => row.error ?? '—' },
     ]} />
   </Advanced>;
-}
+};
 
-function ExpandedSections({ host }: Readonly<{ host: HostView }>) {
+const ExpandedSections = ({ host }: Readonly<{ host: HostView }>) => {
   return <>
     <GpuList gpus={host.gpus} />
     <DiskList disks={host.disks} />
     <AgentRam host={host} />
     <div className="border-t pt-3"><p className="mb-2 text-xs font-medium text-muted-foreground">{t('CPU and free RAM trend')}</p><Spark history={host.history} /></div>
   </>;
-}
+};
 
-function HostHeader({ host, bare }: Readonly<{ host: HostView; bare: boolean }>) {
+const HostHeader = ({ host, bare }: Readonly<{ host: HostView; bare: boolean }>) => {
   const modeTone = modeToneOf(host.throttleMode);
   const padding = bare ? '' : 'px-4 sm:px-6';
   return <Card.Header className={`flex-row items-start justify-between gap-3 border-b py-3 ${padding}`}>
     <div className="min-w-0"><Card.Title<"h2"> render={props => <h2 {...props} />} className="truncate">{host.name ?? t('Host')}</Card.Title><Card.Description className="truncate text-xs">{host.os} · {t('up {uptime}', { uptime: uptime(host.uptimeSec) })}</Card.Description></div>
     {host.throttleMode ? <Chip size="sm" variant="soft" data-tone={modeTone} className="shrink-0" style={{ color: 'var(--tone)', background: 'var(--tone-bg)' }}><Chip.Label>{t('throttled: {mode}', { mode: host.throttleMode })}</Chip.Label></Chip> : null}
   </Card.Header>;
-}
+};
 
 /** Host machine card (CPU, RAM, GPU, temperatures, disks, agents' RAM, sparkline) from /api/host. */
-export function HostCard({ compact = false, bare = false }: Readonly<{ compact?: boolean; bare?: boolean }>) {
+export const HostCard = ({ compact = false, bare = false }: Readonly<{ compact?: boolean; bare?: boolean }>) => {
   const query = useApiQuery<HostView>('/api/host', { topics: ['system'], intervalMs: 10_000 });
   const host = query.data;
   if (!host) return <Card<"section"> render={(props) => <section {...props} />} className="p-4 sm:p-6" data-concept="C14">
@@ -173,4 +193,4 @@ export function HostCard({ compact = false, bare = false }: Readonly<{ compact?:
       <SourceObservations host={host} />
     </Card.Content>
   </Card>;
-}
+};

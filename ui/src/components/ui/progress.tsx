@@ -9,22 +9,22 @@ type ProgressProps = Omit<ProgressBarProps, "value" | "maxValue" | "children" | 
   className?: string
 }
 
-function progressColor(tone: Tone | undefined): "success" | "danger" | "warning" | "default" | "accent" {
+const progressColor = (tone: Tone | undefined): "success" | "danger" | "warning" | "default" | "accent" => {
   if (tone === "success") return "success"
   if (tone === "failed") return "danger"
   if (tone === "warning") return "warning"
   if (tone === "skipped") return "default"
   return "accent"
-}
+};
 
-function Progress({ className, value = null, tone, max = 100, ...props }: ProgressProps) {
+const Progress = ({ className, value = null, tone, max = 100, ...props }: ProgressProps) => {
   const hasMaximum = Number.isFinite(max) && max > 0
   const maximum = hasMaximum ? max : 100
   const bounded = hasMaximum && typeof value === "number" && Number.isFinite(value)
     ? Math.min(Math.max(value, 0), maximum) : null
   return <ProgressBar
     {...props}
-    value={bounded ?? undefined}
+    {...(bounded === null ? {} : { value: bounded })}
     maxValue={maximum}
     isIndeterminate={bounded == null}
     color={progressColor(tone)}
@@ -32,6 +32,6 @@ function Progress({ className, value = null, tone, max = 100, ...props }: Progre
     data-tone={tone}
     className={cn("min-w-0 gap-0", tone && "[--progress-bar-fill:var(--tone)]", className)}
   ><ProgressBar.Track className="h-full min-h-1.5">{bounded != null ? <ProgressBar.Fill /> : null}</ProgressBar.Track></ProgressBar>
-}
+};
 
 export { Progress }

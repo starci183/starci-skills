@@ -6,12 +6,14 @@ export type Status = 'success' | 'running' | 'settling' | 'queued' | 'paused' | 
 /** Colour family. One tone = one token set in style.css ([data-tone=…]). */
 export type Tone = 'success' | 'running' | 'queued' | 'failed' | 'warning' | 'skipped' | 'owner';
 
+/** The colour family each status is drawn in, so one status always looks the same on every surface. */
 export const statusTone: Record<Status, Tone> = {
   success: 'success', running: 'running', settling: 'running', queued: 'queued', retry: 'warning',
   paused: 'warning', stopped: 'skipped',
   failed: 'failed', blocked: 'failed', 'awaiting-owner': 'owner', planned: 'queued', deferred: 'skipped', external: 'skipped', dropped: 'skipped', rejected: 'skipped', warning: 'warning', unknown: 'queued',
 };
 
+/** The translated word shown for each status. */
 export const statusLabels: Record<Status, string> = {
   success: t('Passed'), running: t('Running'), settling: t('settling'), queued: t('Queued'), retry: t('Waiting to retry'),
   paused: t('Paused'), stopped: t('Stopped'),
@@ -21,7 +23,8 @@ export const statusLabels: Record<Status, string> = {
 /** Statuses that are "live" (animated dot). */
 export const liveStatuses = new Set<Status>(['running', 'settling']);
 
-export function statusFromUi(ui: UiState | 'awaiting-owner' | 'rejected'): Status {
+/** Maps a row's display state (including the two attempt-only ones) to the status vocabulary the chips speak. */
+export const statusFromUi = (ui: UiState | 'awaiting-owner' | 'rejected'): Status => {
   switch (ui) {
     case 'awaiting-owner': return 'awaiting-owner';
     case 'rejected': return 'rejected';
@@ -33,10 +36,10 @@ export function statusFromUi(ui: UiState | 'awaiting-owner' | 'rejected'): Statu
     case 'unknown':
     default: return 'unknown';
   }
-}
+};
 
 /** The verdict chip. `ui` is v_op_history.ui (or a brief's status): 'awaiting-owner' / 'rejected' win over the raw verdict (docs/why.md). */
-export function statusFromVerdict(verdict: string | null | undefined, open = false, ui?: string | null): Status {
+export const statusFromVerdict = (verdict: string | null | undefined, open = false, ui?: string | null): Status => {
   if (ui === 'awaiting-owner') return 'awaiting-owner';
   if (ui === 'rejected') return 'rejected';
   if (verdict === 'pass') return 'success';
@@ -44,26 +47,28 @@ export function statusFromVerdict(verdict: string | null | undefined, open = fal
   if (verdict === 'fail' || verdict === 'partial') return 'failed';
   if (verdict === 'dropped' || verdict === 'cancelled') return 'dropped';
   return open ? 'running' : 'unknown';
-}
+};
 
 /** An Op's self-reported outcome (report) — shown separately from the verdict. */
-export function statusFromOutcome(outcome: string | null | undefined): Status {
+export const statusFromOutcome = (outcome: string | null | undefined): Status => {
   if (outcome === 'done') return 'success';
   if (outcome === 'blocked') return 'blocked';
   if (outcome === 'failed') return 'failed';
   if (outcome === 'partial' || outcome === 'ask') return 'retry';
   return 'unknown';
-}
+};
 
-export function statusFromCheck(status: string | null | undefined): Status {
+/** Maps a check's recorded status to a chip status; a skipped check reads as deferred and an unavailable one as waiting to retry. */
+export const statusFromCheck = (status: string | null | undefined): Status => {
   if (status === 'pass') return 'success';
   if (status === 'fail' || status === 'error') return 'failed';
   if (status === 'skipped') return 'deferred';
   if (status === 'unavailable') return 'retry';
   return 'unknown';
-}
+};
 
-export function statusFromUnit(state: string): Status {
+/** Maps a unit's lifecycle state to a chip status, treating reported units as still running and deciding ones as settling. */
+export const statusFromUnit = (state: string): Status => {
   switch (state) {
     case 'done': return 'success';
     case 'running': case 'reported': return 'running';
@@ -74,7 +79,7 @@ export function statusFromUnit(state: string): Status {
     case 'queued': return 'queued';
     default: return 'unknown';
   }
-}
+};
 
 /** CSS custom property for a tone's ink colour, for SVG fills/strokes. */
 export const toneVar = (tone: Tone, part: '' | '-bg' | '-line' = '') => `var(--status-${tone}${part})`;

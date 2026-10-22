@@ -1,5 +1,6 @@
 import type { Concept } from '../concept';
 
+/** Names the C8 evidence concept this module belongs to, for the renderer registry that picks a view per evidence file kind. */
 export const concept: Concept = 'C8';
 
 /** S7 renderers. Text comes already decoded (server converts UTF-16/BOM to UTF-8). Implementations live in ./renderers/. */

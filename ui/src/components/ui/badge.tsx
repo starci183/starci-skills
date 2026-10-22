@@ -1,8 +1,7 @@
 import * as React from "react"
-import { Chip, Link as HeroLink } from "@heroui/react"
+import { Chip } from "@heroui/react"
 import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
-import { nativeLinkProps } from "./button"
 
 const badgeVariants = cva("group/badge whitespace-nowrap [&>svg]:size-3 [&>svg]:shrink-0", {
   variants: {
@@ -11,15 +10,28 @@ const badgeVariants = cva("group/badge whitespace-nowrap [&>svg]:size-3 [&>svg]:
   defaultVariants: { variant: "default" },
 })
 
-function Badge({ className, variant = "default", asChild = false, children, ...props }: React.ComponentProps<"span"> & VariantProps<typeof badgeVariants> & { asChild?: boolean }) {
-  const chipVariant = variant === "default" ? "primary" : variant === "secondary" || variant === "destructive" ? "soft" : variant === "outline" ? "secondary" : "tertiary"
-  const color = variant === "default" || variant === "link" ? "accent" : variant === "destructive" ? "danger" : "default"
-  const classes = cn(badgeVariants({ variant }), className)
-  if (asChild && React.isValidElement<React.ComponentProps<"a">>(children) && children.type === "a") {
-    const { children: linkChildren, ...linkProps } = children.props
-    return <Chip<"a"> color={color} variant={chipVariant} size="sm" className={classes} render={chipProps => <HeroLink {...nativeLinkProps({ ...chipProps, ...linkProps })} className={cn(chipProps.className, linkProps.className)} />}><Chip.Label className="inline-flex items-center gap-1.5">{linkChildren}</Chip.Label></Chip>
-  }
-  return <Chip {...props} color={color} variant={chipVariant} size="sm" data-variant={variant} className={classes}><Chip.Label className="inline-flex items-center gap-1.5">{children}</Chip.Label></Chip>
+type BadgeProps = React.ComponentProps<"span"> & VariantProps<typeof badgeVariants>
+
+/** The HeroUI chip variant each badge variant is drawn with. */
+const chipVariantOf = (variant: BadgeProps["variant"]): "primary" | "soft" | "secondary" | "tertiary" => {
+  if (variant === "default") return "primary"
+  if (variant === "secondary" || variant === "destructive") return "soft"
+  if (variant === "outline") return "secondary"
+  return "tertiary"
 }
+
+/** The HeroUI chip colour each badge variant is drawn with. */
+const chipColorOf = (variant: BadgeProps["variant"]): "accent" | "danger" | "default" => {
+  if (variant === "default" || variant === "link") return "accent"
+  if (variant === "destructive") return "danger"
+  return "default"
+}
+
+const Badge = ({ className, variant = "default", children, ...props }: BadgeProps) => {
+  const chipVariant = chipVariantOf(variant)
+  const color = chipColorOf(variant)
+  const classes = cn(badgeVariants({ variant }), className)
+  return <Chip {...props} color={color} variant={chipVariant} size="sm" data-variant={variant} className={classes}><Chip.Label className="inline-flex items-center gap-1.5">{children}</Chip.Label></Chip>
+};
 
 export { Badge, badgeVariants }

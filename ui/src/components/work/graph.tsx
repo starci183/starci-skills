@@ -10,23 +10,27 @@ import { Advanced } from '../motion';
 import { formatOpLabel } from '../../i18n/vi';
 import { useNodeHeights } from './use-node-heights';
 
+/** The business concept id (C4) under which the unit dependency graph is filed; it is stamped on data-concept so the rendered DOM traces back to its spec. */
 export const concept: Concept = 'C4';
+/** The unit dependency graph as the API returns it: nodes, recorded edges and per-operation state tallies. */
 export type WorkGraph = { nodes: GraphNode[]; edges: GraphEdge[]; groups: { op: string; total: number; byUi: Record<UiState, number> }[] };
 type Predecessor = { unit: string; kind: string };
+/** Units of one operation sharing exactly the same predecessors, drawn as a single box with its incoming edges and aggregate state. */
 export type GraphGroup = { id: string; op: string; nodes: GraphNode[]; incoming: GraphEdge[]; recordedEdges: GraphEdge[]; predecessors: Predecessor[]; ui: UiState; orderUnresolved: boolean };
 type GroupEdge = GraphEdge & { records: GraphEdge[] };
 type Dependency = { from: string; to: string };
 const severity: UiState[] = ['bad', 'warn', 'running', 'waiting', 'unknown', 'ok', 'done'];
 const nodeWidth = 256, nodeHeight = 160, colGap = 48, rowGap = 16;
-const edgeDash = (kind: string) => kind === 'seam' ? '6 3' : kind === 'dependsOn' ? '3 3' : kind === 'peer-wait' ? '1 3' : undefined;
+const dashByKind: Partial<Record<string, string>> = { seam: '6 3', dependsOn: '3 3', 'peer-wait': '1 3' };
+const edgeDash = (kind: string) => dashByKind[kind];
 
-function addTo(map: Map<string, string[]>, key: string, value: string) {
+const addTo = (map: Map<string, string[]>, key: string, value: string) => {
   const list = map.get(key);
   if (list) list.push(value);
-}
+};
 
 /** Iterative depth-first finishing order, without a recursion limit. */
-function finishOrderOf(nodeIds: readonly string[], outgoing: ReadonlyMap<string, string[]>): string[] {
+const finishOrderOf = (nodeIds: readonly string[], outgoing: ReadonlyMap<string, string[]>): string[] => {
   const seen = new Set<string>();
   const order: string[] = [];
   for (const root of nodeIds) {
@@ -46,9 +50,9 @@ function finishOrderOf(nodeIds: readonly string[], outgoing: ReadonlyMap<string,
     }
   }
   return order;
-}
+};
 
-function collectComponent(root: string, componentId: number, reverse: ReadonlyMap<string, string[]>, component: Map<string, number>): string[] {
+const collectComponent = (root: string, componentId: number, reverse: ReadonlyMap<string, string[]>, component: Map<string, number>): string[] => {
   const members: string[] = [];
   const stack = [root];
   component.set(root, componentId);
@@ -61,10 +65,10 @@ function collectComponent(root: string, componentId: number, reverse: ReadonlyMa
     }
   }
   return members;
-}
+};
 
 /** Strongly connected components (Kosaraju) that retain exact cycle membership. */
-function cycleMembersOf(order: readonly string[], reverse: ReadonlyMap<string, string[]>) {
+const cycleMembersOf = (order: readonly string[], reverse: ReadonlyMap<string, string[]>) => {
   const component = new Map<string, number>();
   const cycleNodes = new Set<string>();
   let componentId = 0;
@@ -75,10 +79,10 @@ function cycleMembersOf(order: readonly string[], reverse: ReadonlyMap<string, s
     componentId++;
   }
   return { component, cycleNodes };
-}
+};
 
 /** Structural evidence over recorded IDs, independent of runtime readiness or color. */
-export function graphEvidenceOf<T extends Dependency>(nodeIds: string[], recordedEdges: T[]) {
+export const graphEvidenceOf = <T extends Dependency>(nodeIds: string[], recordedEdges: T[]) => {
   const ids = new Set(nodeIds);
   const dangling = recordedEdges.filter(edge => !ids.has(edge.from) || !ids.has(edge.to));
   const self = recordedEdges.filter(edge => edge.from === edge.to);
@@ -101,9 +105,9 @@ export function graphEvidenceOf<T extends Dependency>(nodeIds: string[], recorde
     }
   }
   return { drawable, dangling, self, cyclic, unresolved };
-}
+};
 
-function predecessorsByUnit(edges: readonly GraphEdge[]): Map<string, Map<string, Predecessor>> {
+const predecessorsByUnit = (edges: readonly GraphEdge[]): Map<string, Map<string, Predecessor>> => {
   const incomingByUnit = new Map<string, Map<string, Predecessor>>();
   for (const edge of edges) {
     const incoming = incomingByUnit.get(edge.to) ?? new Map<string, Predecessor>();
@@ -111,9 +115,9 @@ function predecessorsByUnit(edges: readonly GraphEdge[]): Map<string, Map<string
     incomingByUnit.set(edge.to, incoming);
   }
   return incomingByUnit;
-}
+};
 
-function groupUnits(graph: WorkGraph) {
+const groupUnits = (graph: WorkGraph) => {
   const incomingByUnit = predecessorsByUnit(graph.edges);
   const grouped = new Map<string, GraphGroup>();
   const unitGroup = new Map<string, string>();
@@ -132,9 +136,9 @@ function groupUnits(graph: WorkGraph) {
   }
   const groups = [...grouped.values()].map(group => ({ ...group, ui: severity.find(state => group.nodes.some(node => node.ui === state)) ?? 'unknown' }));
   return { groups, unitGroup };
-}
+};
 
-function groupEdgesOf(drawable: readonly GraphEdge[], unitGroup: ReadonlyMap<string, string>): GroupEdge[] {
+const groupEdgesOf = (drawable: readonly GraphEdge[], unitGroup: ReadonlyMap<string, string>): GroupEdge[] => {
   const dedupe = new Map<string, GroupEdge>();
   for (const edge of drawable) {
     const from = unitGroup.get(edge.from), to = unitGroup.get(edge.to);
@@ -143,10 +147,10 @@ function groupEdgesOf(drawable: readonly GraphEdge[], unitGroup: ReadonlyMap<str
     dedupe.set(id, { ...edge, from, to, records: [...(dedupe.get(id)?.records ?? []), edge] });
   }
   return [...dedupe.values()];
-}
+};
 
 /** Longest-path layering applies only where the recorded dependency order is resolved. */
-function layerGroups(groups: readonly GraphGroup[], edges: readonly GraphEdge[], unresolvedUnits: ReadonlySet<string>) {
+const layerGroups = (groups: readonly GraphGroup[], edges: readonly GraphEdge[], unresolvedUnits: ReadonlySet<string>) => {
   const depth = new Map(groups.map(group => [group.id, 0]));
   const outgoing = new Map<string, GraphEdge[]>();
   const remaining = new Map(groups.map(group => [group.id, 0]));
@@ -169,9 +173,9 @@ function layerGroups(groups: readonly GraphGroup[], edges: readonly GraphEdge[],
   const levels = [...new Set(ordered.map(group => depth.get(group.id) ?? 0))].sort((a, b) => a - b);
   const layers = levels.map(level => ordered.filter(group => depth.get(group.id) === level));
   return { layers, orderUnknown };
-}
+};
 
-function positionLayers(layers: readonly (readonly GraphGroup[])[], measuredHeights: ReadonlyMap<string, number>, top: number) {
+const positionLayers = (layers: readonly (readonly GraphGroup[])[], measuredHeights: ReadonlyMap<string, number>, top: number) => {
   const positions = new Map<string, { x: number; y: number; height: number }>();
   let bottom = top + nodeHeight;
   for (const [x, layer] of layers.entries()) {
@@ -184,9 +188,9 @@ function positionLayers(layers: readonly (readonly GraphGroup[])[], measuredHeig
     bottom = Math.max(bottom, y - rowGap);
   }
   return { positions, bottom };
-}
+};
 
-function buildLayout(graph: WorkGraph, measuredHeights: ReadonlyMap<string, number>) {
+const buildLayout = (graph: WorkGraph, measuredHeights: ReadonlyMap<string, number>) => {
   const evidence = graphEvidenceOf(graph.nodes.map(node => node.unit), graph.edges);
   const { groups, unitGroup } = groupUnits(graph);
   const edges = groupEdgesOf(evidence.drawable, unitGroup);
@@ -200,9 +204,27 @@ function buildLayout(graph: WorkGraph, measuredHeights: ReadonlyMap<string, numb
   if (orderUnknown.size) layers.push(groups.filter(group => orderUnknown.has(group.id)));
   const { positions, bottom } = positionLayers(layers, measuredHeights, orderUnknown.size ? 48 : 24);
   return { groups: layers.flat(), edges, positions, evidence, orderUnknown, unresolvedColumn, width: Math.max(1, layers.length) * (nodeWidth + colGap) - colGap + 48, height: bottom + 24 };
-}
+};
 
-export function GraphView({ graph, onUnit, onGroupSelect, selectionInInspector = false, opLabels }: { readonly graph: WorkGraph; readonly onUnit: (unit: string) => void; readonly onGroupSelect?: (group: GraphGroup | null) => void; readonly selectionInInspector?: boolean; readonly opLabels?: NonNullable<ContractInfo['opLabels']> }) {
+type GroupBoxProps = { readonly group: GraphGroup; readonly position: { x: number; y: number }; readonly selected: boolean; readonly title: string; readonly counts: string; readonly opLabels: ContractInfo['opLabels']; readonly onSelect: (group: GraphGroup) => void };
+
+/** One absolutely positioned operation-group box of the desktop graph; selecting it expands the group's units below the graph. */
+const GroupBox = ({ group, position, selected, title, counts, opLabels, onSelect }: GroupBoxProps) => {
+  const unknown = group.nodes.filter(node => node.ui === 'unknown').length;
+  return <Card data-graph-group={group.id} title={title} style={{ left: position.x, top: position.y, width: nodeWidth, minHeight: nodeHeight }} className={`absolute min-w-0 p-0 ${selected ? 'ring-1 ring-foreground' : ''}`}><Button variant="ghost" onPress={() => onSelect(group)} aria-expanded={selected}
+              aria-label={`${formatOpLabel(group.op, opLabels)} (${group.op}) · ${counts}`}
+              style={{ minHeight: nodeHeight }} className="h-auto w-full min-w-0 flex-col items-stretch justify-start gap-2 whitespace-normal rounded-[inherit] p-3 text-left">
+              <span className="break-words text-base font-semibold leading-6">{formatOpLabel(group.op, opLabels)} ×{group.nodes.length}</span>
+              <span className="truncate font-mono text-xs text-muted-foreground" title={group.op}>{group.op}</span>
+              <span className="flex flex-wrap items-center gap-2"><StateChip state={group.ui} compact />{unknown > 0 && <span className="text-xs text-muted-foreground">{t('{n} unknown', { n: unknown })}</span>}</span>
+              <span className="text-xs font-normal text-muted-foreground">{t('{done}/{total} units done', { done: group.nodes.filter(node => node.state === 'done').length, total: group.nodes.length })}</span>
+            </Button></Card>;
+};
+
+type GraphViewProps = { readonly graph: WorkGraph; readonly onUnit: (unit: string) => void; readonly onGroupSelect?: (group: GraphGroup | null) => void; readonly selectionInInspector?: boolean; readonly opLabels?: NonNullable<ContractInfo['opLabels']> };
+
+/** Dependency graph of a workflow's units grouped by operation: a positioned diagram on wide screens, a list on narrow ones, with the selected group's units and recorded edges. */
+export const GraphView = ({ graph, onUnit, onGroupSelect, selectionInInspector = false, opLabels }: GraphViewProps) => {
   const arrowId = useId();
   const holder = useRef<HTMLDivElement>(null);
   const [selected, setSelected] = useState<string | null>(null);
@@ -249,25 +271,18 @@ export function GraphView({ graph, onUnit, onGroupSelect, selectionInInspector =
           {layout.groups.map(group => {
             const pos = layout.positions.get(group.id);
             if (!pos) return null;
-            const unknown = group.nodes.filter(node => node.ui === 'unknown').length;
-            return <Card key={group.id} data-graph-group={group.id} title={`${predecessorsLabel(group)}\n${countsLabel(group)}`} style={{ left: pos.x, top: pos.y, width: nodeWidth, minHeight: nodeHeight }} className={`absolute min-w-0 p-0 ${selected === group.id ? 'ring-1 ring-foreground' : ''}`}><Button variant="ghost" onPress={() => selectGroup(group)} aria-expanded={selected === group.id}
-              aria-label={`${formatOpLabel(group.op, opLabels)} (${group.op}) · ${countsLabel(group)}`}
-              style={{ minHeight: nodeHeight }} className="h-auto w-full min-w-0 flex-col items-stretch justify-start gap-2 whitespace-normal rounded-[inherit] p-3 text-left">
-              <span className="break-words text-base font-semibold leading-6">{formatOpLabel(group.op, opLabels)} ×{group.nodes.length}</span>
-              <span className="truncate font-mono text-xs text-muted-foreground" title={group.op}>{group.op}</span>
-              <span className="flex flex-wrap items-center gap-2"><StateChip state={group.ui} compact />{unknown > 0 && <span className="text-xs text-muted-foreground">{t('{n} unknown', { n: unknown })}</span>}</span>
-              <span className="text-xs font-normal text-muted-foreground">{t('{done}/{total} units done', { done: group.nodes.filter(node => node.state === 'done').length, total: group.nodes.length })}</span>
-            </Button></Card>;
+            return <GroupBox key={group.id} group={group} position={pos} selected={selected === group.id} title={`${predecessorsLabel(group)}
+${countsLabel(group)}`} counts={countsLabel(group)} opLabels={opLabels} onSelect={selectGroup} />;
           })}
         </div>
       </div>
       <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground" aria-hidden="true">{[...new Set(layout.edges.map(edge => edge.kind))].map(kind => <span key={kind} className="inline-flex items-center gap-1.5"><svg width="24" height="8"><line x1="0" y1="4" x2="24" y2="4" stroke="currentColor" strokeWidth="1.5" strokeDasharray={edgeDash(kind)} /></svg>{kind}</span>)}</div>
       <div className="space-y-2 md:hidden" aria-label={t('Unit list by dependency')}>{layout.groups.map(group => <Card key={group.id} className="p-0"><Button variant="ghost" onPress={() => selectGroup(group)} aria-expanded={selected === group.id} className="h-auto w-full min-w-0 items-start gap-2 whitespace-normal rounded-[inherit] p-3 text-left">{selected === group.id ? <ChevronDown className="size-4 shrink-0" aria-hidden="true" /> : <ChevronRight className="size-4 shrink-0" aria-hidden="true" />}<span className="min-w-0 flex-1"><strong className="block break-words text-base">{formatOpLabel(group.op, opLabels)} ×{group.nodes.length}</strong><span className="block truncate font-mono text-xs text-muted-foreground" title={group.op}>{group.op}</span><span className="block break-words text-xs font-normal text-muted-foreground">{predecessorsLabel(group)}</span><span className="block text-xs font-normal text-muted-foreground">{countsLabel(group)}</span></span><StateChip state={group.ui} compact /></Button></Card>)}</div>
-      {selectedGroup && <Card variant="transparent" className={selectionInInspector ? 'lg:hidden' : undefined}>
+      {selectedGroup && <Card variant="transparent" {...(selectionInInspector ? { className: 'lg:hidden' } : {})}>
         <div className="mb-2 space-y-1"><strong className="text-base">{formatOpLabel(selectedGroup.op, opLabels)} ×{selectedGroup.nodes.length}</strong><p className="break-all font-mono text-xs text-muted-foreground">{selectedGroup.op}</p><p className="break-words text-xs text-muted-foreground">{predecessorsLabel(selectedGroup)}</p><p className="text-xs text-muted-foreground">{countsLabel(selectedGroup)}</p></div>
         <div className="grid gap-1 sm:grid-cols-2">{selectedGroup.nodes.map(node => <Button variant="ghost" key={node.unit} onPress={() => onUnit(node.unit)} className="h-auto min-w-0 items-start gap-2 whitespace-normal px-2 py-2 text-left text-sm"><span className="min-w-0 flex-1"><span className="block break-words font-medium">{node.title}</span><span className="block break-all font-mono text-xs font-normal text-muted-foreground">{node.unit} · {node.state}</span><span className="mt-1 block break-all text-xs font-normal text-muted-foreground">{t('Workflow')}: {node.workflowId ?? '—'} · {node.goalRevision == null ? t('Goal revision not recorded') : t('Goal revision {n}', { n: node.goalRevision })}</span><span className="block break-all text-xs font-normal text-muted-foreground">{t('Subject key')}: <span className="font-mono">{node.subjectKey ?? '—'}</span></span><span className="block break-all text-xs font-normal text-muted-foreground">{t('Current job')}: <span className="font-mono">{node.currentJob ?? '—'}</span></span></span><StateChip state={node.ui} compact /></Button>)}</div>
         {selectedGroup.recordedEdges.length > 0 && <Advanced keepMounted className="mt-3" title={t('Recorded incoming edges')}><ul className="space-y-1 text-xs text-muted-foreground">{selectedGroup.recordedEdges.map(edge => <li key={`${edge.from}:${edge.to}:${edge.kind}:${edge.source}:${edge.createdAt}`} className="break-all font-mono">{edgeLabel(edge)}</li>)}</ul></Advanced>}
       </Card>}
     </>}
   </ConceptBlock>;
-}
+};

@@ -20,6 +20,7 @@ import { LandFacts, ServiceFacts, landTargetTitle, type LandTarget, type LandTic
 import { BlobLinkButton, Metric, Panel, QueryPanel, QueryReadDetails, QueryReadNotice, QueryView, RefLink, at, dash, isIssue, number, stateOf } from '../../components/system/panel';
 import type { ActionRow, BlobLink, HealthSummary, LandRun, ReconcilerView, Ref, ResourcesView, UiState } from '../../contract';
 
+/** The business concept id (C13) under which the System page and its engine tab are filed; it is stamped on data-concept so the rendered DOM traces back to its spec. */
 export const concept: Concept = 'C13';
 
 type SlaClock = { id: string; entity: string; state: string; code: string; severity: string; project: string | null; wf: string | null; enteredAt: number; slaMs: number; dueAt: number; violatedAt: number | null; clearedAt: number | null; clearReason: string | null; di: Ref | null; ui: UiState };
@@ -41,19 +42,21 @@ const healthLabels: Partial<Record<HealthSummary['items'][number]['key'], string
   sla: t('Open SLA windows (warning / critical)'), services: t('Failed services'), seats: t('Failed agent seats'),
   leaks: t('Open leaks'), gc: t('Latest cleanup run #'), land: t('Queued/running integration tickets'),
 };
-function TabSummary({ items }: { readonly items: HealthSummary['items'] }) {
+type TabSummaryProps = { readonly items: HealthSummary['items'] };
+
+const TabSummary = ({ items }: TabSummaryProps) => {
   if (!items.length) return null;
   return <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{items.map((item) => <Metric key={item.key} label={healthLabels[item.key] ?? item.key} value={<StateChip state={item.ui} label={item.value} />} />)}</div>;
-}
+};
 
-function useSystemTarget() {
+const useSystemTarget = () => {
   useRoute();
   const params = new URLSearchParams(window.location.hash.split('?')[1] ?? '');
   const id = params.get('id'), target = params.get('target');
   return { id, token: `${target ?? ''}:${id ?? ''}`, query: new URLSearchParams({ ...(target ? { target } : {}), ...(id ? { id } : {}) }).toString() };
-}
+};
 
-function useTargetDrawer<T>(endpoint: string, intervalMs: number) {
+const useTargetDrawer = <T,>(endpoint: string, intervalMs: number) => {
   const target = useSystemTarget();
   const url = `${endpoint}?${target.query}`;
   const targetRead = useApiQuery<T | null>(url, { topics: ['system'], intervalMs, enabled: Boolean(target.id) });
@@ -66,9 +69,30 @@ function useTargetDrawer<T>(endpoint: string, intervalMs: number) {
     select: (value: T) => setManual({ token: target.token, value }),
     onOpenChange: (open: boolean) => { if (!open) { setManual(null); setDismissed(target.token); } },
   };
-}
+};
 
-function EngineTab() {
+/** The word for the outcome of one recorded action step: unknown until it reports, then passed or error. */
+const stepOutcome = (ok: boolean | null): string => {
+  if (ok == null) return t('Unknown');
+  return ok ? t('Passed') : t('Error');
+};
+
+/** The state an open-violations panel is shown in: bad when any is critical, warning when there are any, none otherwise. */
+const violationState = (rows: readonly Violation[] | undefined): UiState | undefined => {
+  if (!rows) return undefined;
+  if (rows.some((row) => row.severity === 'critical')) return 'bad';
+  return rows.length ? 'warn' : undefined;
+};
+
+/** The title of the services drawer: the name, id or title of the opened service, seat or terminal, else the fallback. */
+const serviceTargetTitle = (active: ServiceTarget | null, fallback: string): string => {
+  if (active?.kind === 'service') return active.row.name;
+  if (active?.kind === 'seat') return active.row.id;
+  if (active?.kind === 'terminal') return active.row.title;
+  return fallback;
+};
+
+const EngineTab = () => {
   const view = useApiQuery<ReconcilerView>('/api/reconciler', { topics: ['system'], intervalMs: 15_000 });
   const actions = useApiQuery<ActionRow[]>('/api/reconciler/actions?limit=50', { topics: ['system'], intervalMs: 30_000 });
   const queue = useApiQuery<{ controller: string; key: string; dueAt: number; reason: string | null; tries: number; lastError: string | null }[]>('/api/reconciler/queue', { topics: ['system'], intervalMs: 15_000 });
@@ -85,7 +109,7 @@ function EngineTab() {
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <Metric label="Leader epoch" value={data.leader?.epoch ?? '—'} help={data.leader ? t('Last heartbeat {ago}', { ago: formatRelative(data.leader.heartbeatAt) }) : t('No leader yet')} />
       <Metric label={t('Queue')} value={data.queueDepth} />
-      <Metric label={t('Starts / 1 hour')} value={data.startsLastHour} help={data.crashLoop ? t('Crash-loop signs') : undefined} />
+      <Metric label={t('Starts / 1 hour')} value={data.startsLastHour} {...(data.crashLoop ? { help: t('Crash-loop signs') } : {})} />
       <Metric label={t('Open violations')} value={data.openViolations} />
     </div>
     {data.leader?.lastError && <SourceWarning>{t('Engine error: {error}', { error: data.leader.lastError })}</SourceWarning>}
@@ -110,15 +134,15 @@ function EngineTab() {
     <Drawer open={Boolean(selected)} onOpenChange={(open) => { if (!open) setSelected(null); }} title={selected ? t('Action {id}', { id: selected.id }) : t('Action')} description={selected ? `${selected.controller} · ${selected.state}` : undefined}>
       {selected && <div className="flex flex-col gap-4 text-sm"><dl className="grid gap-4 sm:grid-cols-2"><div><dt className="text-xs text-muted-foreground">{t('Started')}</dt><dd>{at(selected.startedAt)}</dd></div><div><dt className="text-xs text-muted-foreground">{t('Ended')}</dt><dd>{at(selected.finishedAt)}</dd></div></dl>
         <div>{t('Target:')} <RefLink refValue={selected.target} /></div>{selected.errorSignature && <SourceWarning>{selected.errorSignature}</SourceWarning>}
-        {selected.steps.length > 0 && <DataTable empty={t('No matching results from the available sources.')} rows={selected.steps} getKey={(row) => row.stepNo} columns={[{ key: 'step', header: t('Step'), render: (row) => row.step }, { key: 'at', header: t('At'), render: (row) => at(row.startedAt) }, { key: 'result', header: t('Outcome'), render: (row) => row.ok == null ? t('Unknown') : row.ok ? t('Passed') : t('Error') }]} />}
+        {selected.steps.length > 0 && <DataTable empty={t('No matching results from the available sources.')} rows={selected.steps} getKey={(row) => row.stepNo} columns={[{ key: 'step', header: t('Step'), render: (row) => row.step }, { key: 'at', header: t('At'), render: (row) => at(row.startedAt) }, { key: 'result', header: t('Outcome'), render: (row) => stepOutcome(row.ok) }]} />}
         {selected.result != null && <Advanced title={t('Structured result')} keepMounted><pre className="blob-text">{JSON.stringify(selected.result, null, 2)}</pre></Advanced>}
         <div><h3 className="mb-2 font-medium">Stdout</h3><BlobText blob={selected.stdout} /></div><div><h3 className="mb-2 font-medium">Stderr</h3><BlobText blob={selected.stderr} /></div><BlobLinkButton blob={selected.resultBlob} label={t('Result blob')} />
       </div>}
     </Drawer>
   </ConceptBlock>;
-}
+};
 
-function SlaTab() {
+const SlaTab = () => {
   const clocks = useApiQuery<SlaClock[]>('/api/sla/clocks?open=1', { topics: ['system'], intervalMs: 30_000 });
   const violations = useApiQuery<Violation[]>('/api/sla/violations?open=1', { topics: ['system'], intervalMs: 30_000 });
   const catalog = useApiQuery<Catalog[]>('/api/sla/catalog', { intervalMs: 300_000 });
@@ -128,16 +152,18 @@ function SlaTab() {
       { key: 'code', header: t('Code / entity'), render: (row) => <span title={explain(row.code)?.autoAction ?? row.code}><strong>{row.code}</strong><span className="block text-xs text-muted-foreground">{row.entity}</span></span> },
       { key: 'scope', header: t('Project / workflow'), render: (row) => `${dash(row.project)} / ${dash(row.wf)}` }, { key: 'due', header: t('Due'), render: (row) => at(row.dueAt) }, { key: 'violation', header: t('Violation'), render: (row) => at(row.violatedAt) }, { key: 'status', header: t('State'), render: (row) => <StateChip state={row.ui} label={row.state} compact /> }, { key: 'di', header: t('Decision'), render: (row) => <RefLink refValue={row.di} /> },
     ]} />}</QueryPanel>
-    <QueryPanel defaultOpen title={t('Invariants being violated')} concept="C13" query={violations} url={'/api/sla/violations?open=1'} ui={violations.data?.some((row) => row.severity === 'critical') ? 'bad' : violations.data?.length ? 'warn' : undefined} summary={violations.data ? t('{n} violations', { n: violations.data.length }) : undefined}>{(rows) => <DataTable empty={t('No matching results from the available sources.')} rows={rows} getKey={(row) => row.id} columns={[
+    <QueryPanel defaultOpen title={t('Invariants being violated')} concept="C13" query={violations} url={'/api/sla/violations?open=1'} ui={violationState(violations.data ?? undefined)} summary={violations.data ? t('{n} violations', { n: violations.data.length }) : undefined}>{(rows) => <DataTable empty={t('No matching results from the available sources.')} rows={rows} getKey={(row) => row.id} columns={[
       { key: 'code', header: t('Code'), render: (row) => <span title={explain(row.code)?.autoAction ?? row.code}>{row.code}</span> }, { key: 'severity', header: t('Level'), render: (row) => row.severity }, { key: 'project', header: t('Project'), render: (row) => dash(row.project) }, { key: 'at', header: t('Since'), render: (row) => at(row.violatedAt) }, { key: 'di', header: t('Decision'), render: (row) => <RefLink refValue={row.di} /> }, { key: 'lesson', header: t('Lesson'), render: (row) => <RefLink refValue={row.lesson} /> },
     ]} />}</QueryPanel>
     <QueryPanel title={t('SLA catalog')} concept="C13" query={catalog} url={'/api/sla/catalog'} summary={catalog.data ? t('{n} rules', { n: catalog.data.length }) : undefined}>{(rows) => <DataTable empty={t('No matching results from the available sources.')} rows={rows} getKey={(row) => row.code} columns={[
       { key: 'code', header: t('Code'), render: (row) => row.code }, { key: 'sla', header: t('Due'), render: (row) => row.slaMs == null ? '—' : t('{n} sec', { n: number(row.slaMs / 1000) }) }, { key: 'critical', header: t('Critical after'), render: (row) => row.criticalMs == null ? '—' : t('{n} sec', { n: number(row.criticalMs / 1000) }) }, { key: 'owner', header: t('Accountable owner'), render: (row) => dash(row.owner) }, { key: 'auto', header: t('Automatic action'), render: (row) => dash(row.autoAction) },
     ]} />}</QueryPanel>
   </ConceptBlock>;
-}
+};
 
-function Sparkline({ values }: { readonly values: (number | null)[] }) {
+type SparklineProps = { readonly values: (number | null)[] };
+
+const Sparkline = ({ values }: SparklineProps) => {
   const observed = values.filter((value): value is number => value != null && Number.isFinite(value));
   if (observed.length < 2) return <span className="text-xs text-muted-foreground">{t('Not enough samples')}</span>;
   const max = Math.max(...observed, 1), min = Math.min(...observed, 0), span = Math.max(1, max - min);
@@ -152,8 +178,8 @@ function Sparkline({ values }: { readonly values: (number | null)[] }) {
     connected = true;
   });
   return <div><svg viewBox="0 0 300 64" role="img" aria-label={t('Host sample trend')} className="h-16 w-full text-foreground"><path fill="none" stroke="currentColor" strokeWidth="2" d={points.join(' ')} />{readings.map((reading) => <circle key={reading.key} cx={reading.x} cy={reading.y} r="1.5" fill="currentColor" />)}</svg>{observed.length < values.length && <p className="mt-2 text-xs text-muted-foreground">{t('Missing samples remain gaps.')}</p>}</div>;
-}
-function ResourcesTab() {
+};
+const ResourcesTab = () => {
   const resources = useApiQuery<ResourcesView>('/api/resources', { topics: ['system'], intervalMs: 15_000 });
   const samples = useApiQuery<{ at: number; ramMb: number | null; cpuPct: number | null; freeRamMb: number | null; freeRamPct: number | null; freeDiskGb: number | null; subject: string | null }[]>('/api/resources/samples?kind=host&step=5', { topics: ['system'], intervalMs: 60_000 });
   return <ConceptBlock concept="C14" className="flex flex-col gap-6"><HostCard /><QueryView query={resources} url={'/api/resources'}>{(data) => <>
@@ -172,9 +198,9 @@ function ResourcesTab() {
       <Panel title={t('Recent throttles')} concept="C14" ui={data.deferred.length ? 'warn' : undefined} summary={t('{n} decisions', { n: data.deferred.length })}><DataTable empty={t('No matching results from the available sources.')} rows={data.deferred} getKey={(row) => `${row.at}:${row.job ?? ''}`} columns={[{ key: 'at', header: t('At'), render: (row) => at(row.at) }, { key: 'job', header: 'Job', render: (row) => dash(row.job) }, { key: 'workflow', header: t('Project / workflow'), render: (row) => <span>{dash(row.project)} · <RefLink refValue={row.workflow} /></span> }, { key: 'reason', header: t('Reason'), render: (row) => row.reason }, { key: 'wait', header: t('Waited'), render: (row) => row.waitedMs == null ? '—' : t('{n} sec', { n: number(row.waitedMs / 1000, 1) }) }]} /></Panel>
     </div>
   </>}</QueryView></ConceptBlock>;
-}
+};
 
-function ServicesTab() {
+const ServicesTab = () => {
   const services = useApiQuery<Service[]>('/api/services', { topics: ['system'], intervalMs: 15_000 });
   const seats = useApiQuery<Seat[]>('/api/seats', { topics: ['system'], intervalMs: 15_000 });
   const terminals = useApiQuery<Terminal[]>('/api/terminals?open=1', { topics: ['system'], intervalMs: 15_000 });
@@ -182,7 +208,7 @@ function ServicesTab() {
   const { selected, active, select, targetRead } = drawer;
   const serviceName = active?.kind === 'service' ? active.row.name : null;
   const probes = useApiQuery<{ probes: { at: number; ok: boolean; latencyMs: number | null; detail: unknown }[]; events: { at: number; from: string; to: string; probeMs: number | null; probeError: string | null; action: string | null }[] }>(`/api/services/${encodeURIComponent(serviceName ?? '')}/probes`, { topics: ['system'], intervalMs: 60_000, enabled: Boolean(serviceName) });
-  const title = active?.kind === 'service' ? active.row.name : active?.kind === 'seat' ? active.row.id : active?.kind === 'terminal' ? active.row.title : drawer.id ?? t('Service');
+  const title = serviceTargetTitle(active, drawer.id ?? t('Service'));
   return <ConceptBlock concept="C3" className="flex flex-col gap-6">
     <QueryPanel defaultOpen title={t('Services')} concept="C3" query={services} url={'/api/services'} ui={services.data ? stateOf(services.data) : 'unknown'} summary={services.data ? t('{n} services', { n: services.data.length }) : undefined}>{(rows) => <DataTable empty={t('No matching results from the available sources.')} rows={rows} getKey={(row) => row.name} columns={[{ key: 'name', header: t('Service'), render: (row) => <span className="font-medium">{row.name}</span> }, { key: 'state', header: t('State'), render: (row) => <StateChip state={row.ui} label={row.state} compact /> }, { key: 'probe', header: t('Latest probe'), render: (row) => row.lastProbe ? `${row.lastProbe.ok ? t('Passed') : t('Error')} · ${at(row.lastProbe.at)}` : t('None yet') }, { key: 'failed', header: t('Failed probes / 24 h'), render: (row) => row.failedProbes24h }, { key: 'open', header: '', render: (row) => <Button variant="ghost" size="sm" onClick={() => select({ kind: 'service', row })}>{t('Details')}</Button> }]} />}</QueryPanel>
     <QueryPanel defaultOpen title={t('Agent seats')} concept="C3" query={seats} url={'/api/seats'} ui={seats.data ? stateOf(seats.data) : 'unknown'} summary={seats.data ? t('{sup} Supervisor · {ker} Kernel', { sup: seats.data.filter((row) => row.role === 'supervisor').length, ker: seats.data.filter((row) => row.role === 'kernel').length }) : undefined}>{(rows) => <><p className="mb-3 text-xs text-muted-foreground">{t('One global Supervisor seat; a Kernel is bound to each workflow. Executing ops live inside attempts.')}</p><DataTable empty={t('No matching results from the available sources.')} rows={rows} getKey={(row) => row.id} columns={[{ key: 'seat', header: t('Seat'), render: (row) => <span className="font-medium">{row.id}</span> }, { key: 'role', header: t('Role / workflow'), render: (row) => `${row.role} · ${dash(row.wf)}` }, { key: 'model', header: 'Agent / model', render: (row) => `${dash(row.agent)} / ${dash(row.model)}` }, { key: 'state', header: t('State'), render: (row) => <><StateChip state={row.ui} label={row.state} compact />{row.deaf && <span className="ml-2 text-destructive">{t('Lost signal')}</span>}</> }, { key: 'seen', header: t('Last seen'), render: (row) => at(row.lastSeenAt) }, { key: 'transcript', header: t('Record'), render: (row) => <BlobLinkButton blob={row.transcript} label={t('Record')} /> }, { key: 'open', header: '', render: (row) => <Button variant="ghost" size="sm" onClick={() => select({ kind: 'seat', row })}>{t('Details')}</Button> }]} /></>}</QueryPanel>
@@ -194,9 +220,9 @@ function ServicesTab() {
       }</div>
     </Drawer>
   </ConceptBlock>;
-}
+};
 
-function CleanupTab() {
+const CleanupTab = () => {
   const runs = useApiQuery<GcRun[]>('/api/gc/runs', { topics: ['system'], intervalMs: 60_000 });
   const leaks = useApiQuery<Leak[]>('/api/leaks', { topics: ['system'], intervalMs: 60_000 });
   const [selected, setSelected] = useState<GcRun | null>(null);
@@ -205,9 +231,9 @@ function CleanupTab() {
     <QueryPanel defaultOpen title={t('Cleanup runs')} concept="C15" query={runs} url={'/api/gc/runs'} ui={runs.data ? stateOf(runs.data) : 'unknown'} summary={runs.data ? t('{n} runs', { n: runs.data.length }) : undefined}>{(rows) => <DataTable empty={t('No matching results from the available sources.')} rows={rows} getKey={(row) => row.id} columns={[{ key: 'id', header: t('Run'), render: (row) => row.id }, { key: 'start', header: t('Started'), render: (row) => at(row.startedAt) }, { key: 'trigger', header: t('Source'), render: (row) => row.trigger }, { key: 'freed', header: t('Freed'), render: (row) => t('{n} bytes', { n: number(row.freedBytes) }) }, { key: 'errors', header: t('Error'), render: (row) => row.errors }, { key: 'state', header: t('State'), render: (row) => <StateChip state={row.ui} compact /> }, { key: 'open', header: '', render: (row) => <Button variant="ghost" size="sm" onClick={() => setSelected(row)}>{t('Details')}</Button> }]} />}</QueryPanel>
     <Drawer open={Boolean(selected)} onOpenChange={(open) => { if (!open) setSelected(null); }} title={selected ? t('Cleanup #{id}', { id: selected.id }) : t('Cleanup')} description={selected ? `${selected.trigger} · ${at(selected.startedAt)}` : undefined}><QueryView query={details} url={`/api/gc/runs/${selected?.id ?? 0}`}>{(data) => <div className="flex flex-col gap-4"><p className="text-xs text-muted-foreground">{t('Cleanup actions are recorded separately from verified removal.')}</p><BlobLinkButton blob={data.run.report} label={t('Report')} /><DataTable empty={t('No matching results from the available sources.')} rows={data.items} getKey={(row) => `${row.collector}:${row.target}:${row.at}`} columns={[{ key: 'kind', header: t('Kind'), render: (row) => `${row.collector} · ${row.kind}` }, { key: 'target', header: t('Target'), render: (row) => row.target }, { key: 'action', header: t('Action'), render: (row) => row.action }, { key: 'outcome', header: t('Outcome'), render: (row) => row.outcome }, { key: 'verified', header: t('Removal verified at'), render: (row) => at(row.verifiedGoneAt) }, { key: 'reason', header: t('Reason'), render: (row) => dash(row.reason) }, { key: 'error', header: t('Error'), render: (row) => dash(row.lastError) }]} /></div>}</QueryView></Drawer>
   </ConceptBlock>;
-}
+};
 
-function LandTab() {
+const LandTab = () => {
   const land = useApiQuery<LandView>('/api/land', { topics: ['system'], intervalMs: 30_000 });
   const runs = useApiQuery<LandRun[]>('/api/land/runs?limit=50', { topics: ['system'], intervalMs: 60_000 });
   const lanes = useApiQuery<Lane[]>('/api/lanes', { topics: ['system'], intervalMs: 60_000 });
@@ -223,15 +249,15 @@ function LandTab() {
       {selected ? <LandFacts selected={selected} /> : <QueryView query={targetRead} url={drawer.url} empty={t('No matching record in the runtime source.')}>{(found) => found && <LandFacts selected={found} />}</QueryView>}
     </Drawer>
   </ConceptBlock>;
-}
+};
 
-function SupervisorTab() {
+const SupervisorTab = () => {
   const supervisor = useApiQuery<Supervisor>('/api/supervisor', { topics: ['system'], intervalMs: 30_000 });
   const workers = useApiQuery<SupervisorWorker[]>('/api/supervisor/workers?state=active', { topics: ['system'], intervalMs: 30_000 });
   const notices = useApiQuery<{ id: string; channel: string; kind: string; text: string; sentAt: number; delivery: string; media: BlobLink | null }[]>('/api/notifications', { topics: ['system'], intervalMs: 60_000 });
   const data = supervisor.data;
   return <ConceptBlock concept="C3" className="flex flex-col gap-6 md:gap-8">
-    {data && <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><Metric label={t('Global Supervisor seat')} value={data.seat ? <StateChip state={data.seat.ui} label={data.seat.state} /> : t('No seat yet')} help={data.seat ? `${dash(data.seat.agent)} · ${t('Recorded model')}: ${dash(data.seat.model)}` : undefined} /><Metric label={t('Open decisions')} value={data.decisionsOpen} help={t('{n} overdue', { n: data.overdue })} /><Metric label={t('Not delivered to a seat')} value={data.undelivered} /><Metric label={t('Supervisor workers')} value={data.workersActive} /></div>}
+    {data && <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><Metric label={t('Global Supervisor seat')} value={data.seat ? <StateChip state={data.seat.ui} label={data.seat.state} /> : t('No seat yet')} {...(data.seat ? { help: `${dash(data.seat.agent)} · ${t('Recorded model')}: ${dash(data.seat.model)}` } : {})} /><Metric label={t('Open decisions')} value={data.decisionsOpen} help={t('{n} overdue', { n: data.overdue })} /><Metric label={t('Not delivered to a seat')} value={data.undelivered} /><Metric label={t('Supervisor workers')} value={data.workersActive} /></div>}
     <p className="text-sm text-muted-foreground">{t('The Supervisor maintains the runtime. Workflow Kernels and operation attempts keep their own decisions and evidence.')}</p>
     <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
       <div className="min-w-0"><QueryPanel defaultOpen title={t('What the Supervisor owes')} concept="C3" query={supervisor} url="/api/supervisor" ui={data ? stateOf(data.owed) : 'unknown'} summary={data ? t('{n} items', { n: data.owed.length }) : undefined}>{(current) => <DataTable empty={t('No matching results from the available sources.')} rows={current.owed} getKey={(row) => row.id} columns={[{ key: 'subject', header: t('Work'), render: (row) => <span className="font-medium">{row.subject}</span> }, { key: 'kind', header: t('Kind'), render: (row) => row.kind }, { key: 'open', header: t('Opened at'), render: (row) => at(row.openedAt) }, { key: 'due', header: t('Due'), render: (row) => at(row.dueAt) }, { key: 'state', header: t('State'), render: (row) => <StateChip state={row.ui} label={row.acked ? t('Claimed') : t('Open')} compact /> }]} />}</QueryPanel></div>
@@ -242,9 +268,9 @@ function SupervisorTab() {
     </div>
     <QueryPanel defaultOpen title={t("The Supervisor's workers")} concept="C3" query={workers} url={'/api/supervisor/workers?state=active'} ui={workers.data ? stateOf(workers.data) : 'unknown'} summary={workers.data ? t('{n} active workers', { n: workers.data.length }) : undefined}>{(rows) => <DataTable empty={t('No matching results from the available sources.')} rows={rows} getKey={(row) => row.job} columns={[{ key: 'title', header: t('Work'), render: (row) => <span className="font-medium">{row.title}</span> }, { key: 'agent', header: 'Agent / model', render: (row) => row.attempt ? `${dash(row.attempt.agent)} / ${dash(row.attempt.model)}` : t('Not dispatched') }, { key: 'lane', header: 'Lane', render: (row) => dash(row.lane) }, { key: 'state', header: t('State'), render: (row) => <StateChip state={row.ui} label={row.status} compact /> }, { key: 'transcript', header: t('Record'), render: (row) => <BlobLinkButton blob={row.attempt?.transcript ?? null} label={t('Record')} /> }]} />}</QueryPanel>
   </ConceptBlock>;
-}
+};
 
-function LearningTab() {
+const LearningTab = () => {
   const lessons = useApiQuery<Lesson[]>('/api/supervisor/lessons', { topics: ['system'], intervalMs: 300_000 });
   const rulings = useApiQuery<Ruling[]>('/api/supervisor/rulings', { topics: ['system'], intervalMs: 300_000 });
   const scores = useApiQuery<Score[]>('/api/metrics/ops?window=7d', { topics: ['system'], intervalMs: 300_000 });
@@ -265,9 +291,9 @@ function LearningTab() {
       { key: 'cost', header: t('Measured cost'), numeric: true, render: (row) => <span>{row.costUsd == null ? '—' : `$${number(row.costUsd, 2)}`}<small className="block text-muted-foreground">{t('{known}/{total} measured', { known: row.usageCoverage.costUsd, total: row.usageCoverage.rows })}</small></span> },
     ]} /></>}</QueryPanel>
   </ConceptBlock>;
-}
+};
 
-export default function SystemPage() {
+const SystemPage = () => {
   const route = useRoute();
   const tab = route.kind === 'system' ? route.tab : 'engine';
   const health = useApiQuery<HealthSummary>('/api/health', { topics: ['system'], intervalMs: 15_000 });
@@ -290,4 +316,6 @@ export default function SystemPage() {
     </Tabs>
     <footer className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted-foreground"><span className="inline-flex items-center gap-2"><Clock3 size={13} aria-hidden="true" />{health.observedAt == null ? t('No read timestamp yet') : t('Read observed {at}', { at: formatAbsolute(health.observedAt) })}</span>{health.meta && <span>{t('Response assembled {at}', { at: formatAbsolute(health.meta.at) })}</span>}</footer>
   </ConceptBlock>;
-}
+};
+
+export default SystemPage;

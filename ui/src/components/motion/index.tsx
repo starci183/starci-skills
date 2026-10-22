@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { AnimatePresence, MotionConfig, animate, motion, useInView, useReducedMotion } from 'motion/react';
+import { AnimatePresence, MotionConfig, animate, motion, useInView, useReducedMotion, type MotionStyle } from 'motion/react';
 import type { Concept } from '../concept';
 import { t } from '../../i18n/t';
 import { Accordion } from '../ui/collapsible';
 
+/** The business concept id (frame) under which the shared motion vocabulary is filed; it is stamped on data-concept so the rendered DOM traces back to its spec. */
 export const concept: Concept = 'frame';
 
 /**
@@ -13,41 +14,44 @@ export const concept: Concept = 'frame';
  * padding, margin and gap. Card padding = 6 (24 px, 4 on phones); gap between page blocks = 8 (32 px, 6 on phones).
  */
 export const EASE = [0.2, 0.8, 0.2, 1] as const;
+/** The three animation durations, in seconds, that every transition in the harness is drawn from. */
 export const DURATION = { fast: 0.15, base: 0.2, enter: 0.24 } as const;
 
-export function MotionProvider({ children }: Readonly<{ children: ReactNode }>) {
+/** Wraps the app so every animation follows the operating system's reduced-motion setting and the shared timing. */
+export const MotionProvider = ({ children }: Readonly<{ children: ReactNode }>) => {
   return <MotionConfig reducedMotion="user" transition={{ duration: DURATION.base, ease: EASE }}>{children}</MotionConfig>;
-}
+};
 
 /** Section/page enter: fade + 8 px slide up. `delay` in seconds. */
-export function Enter({ children, className, delay = 0, as = 'div' }: Readonly<{ children: ReactNode; className?: string; delay?: number; as?: 'div' | 'section' | 'li' | 'article' | 'main' }>) {
+export const Enter = ({ children, className, delay = 0, as = 'div' }: Readonly<{ children: ReactNode; className?: string; delay?: number; as?: 'div' | 'section' | 'li' | 'article' | 'main' }>) => {
   const Tag = motion[as];
   return <Tag className={className} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: DURATION.enter, ease: EASE, delay }}>{children}</Tag>;
-}
+};
 
 /** List that staggers its <StaggerItem> children once, on first render (40 ms apart). */
-export function Stagger({ children, className, as = 'div' }: Readonly<{ children: ReactNode; className?: string; as?: 'div' | 'ul' | 'ol' | 'section' }>) {
+export const Stagger = ({ children, className, as = 'div' }: Readonly<{ children: ReactNode; className?: string; as?: 'div' | 'ul' | 'ol' | 'section' }>) => {
   const Tag = motion[as];
   return <Tag className={className} initial="hidden" animate="show" variants={{ hidden: {}, show: { transition: { staggerChildren: 0.04 } } }}>{children}</Tag>;
-}
-export function StaggerItem({ children, className, as = 'div' }: Readonly<{ children: ReactNode; className?: string; as?: 'div' | 'li' | 'article' }>) {
+};
+/** One child of a `Stagger` list, fading and sliding in when its parent reveals it. */
+export const StaggerItem = ({ children, className, as = 'div' }: Readonly<{ children: ReactNode; className?: string; as?: 'div' | 'li' | 'article' }>) => {
   const Tag = motion[as];
   return <Tag className={className} variants={{ hidden: { opacity: 0, y: 6 }, show: { opacity: 1, y: 0, transition: { duration: DURATION.base, ease: EASE } } }}>{children}</Tag>;
-}
+};
 
 /** Hover lift + press for clickable cards. */
-export function Lift({ children, className, onClick }: Readonly<{ children: ReactNode; className?: string; onClick?: () => void }>) {
+export const Lift = ({ children, className, onClick }: Readonly<{ children: ReactNode; className?: string; onClick?: () => void }>) => {
   return <motion.div className={className} onClick={onClick} whileTap={{ scale: 0.995 }} transition={{ duration: DURATION.fast, ease: EASE }}>{children}</motion.div>;
-}
+};
 
 /**
  * "Advanced": secondary/technical details, collapsed by default. Nothing is removed, only demoted.
  * Existing consumers mount details only while expanded. `keepMounted` preserves the retained
  * children of migrated native disclosures; HeroUI owns their hidden state and animation.
  */
-export function Advanced({ children, summary, title = t('Advanced'), defaultOpen = false, open: controlledOpen, onOpenChange, className = '', variant = 'inline', keepMounted = false }: Readonly<{
+export const Advanced = ({ children, summary, title = t('Advanced'), defaultOpen = false, open: controlledOpen, onOpenChange, className = '', variant = 'inline', keepMounted = false }: Readonly<{
   children: ReactNode; summary?: ReactNode; title?: ReactNode; defaultOpen?: boolean; open?: boolean; onOpenChange?: (open: boolean) => void; className?: string; variant?: 'inline' | 'card'; keepMounted?: boolean;
-}>) {
+}>) => {
   const [localOpen, setLocalOpen] = useState(defaultOpen);
   const open = controlledOpen ?? localOpen;
   const card = variant === 'card';
@@ -72,10 +76,10 @@ export function Advanced({ children, summary, title = t('Advanced'), defaultOpen
       </Accordion.Panel>
     </Accordion.Item>
   </Accordion>;
-}
+};
 
 /** Number that counts up to its value when it first scrolls into view (and on change). */
-export function Ticker({ value, format = (n: number) => new Intl.NumberFormat('vi-VN').format(Math.round(n)), className }: Readonly<{ value: number; format?: (n: number) => string; className?: string }>) {
+export const Ticker = ({ value, format = (n: number) => new Intl.NumberFormat('vi-VN').format(Math.round(n)), className }: Readonly<{ value: number; format?: (n: number) => string; className?: string }>) => {
   const ref = useRef<HTMLSpanElement>(null);
   const inView = useInView(ref, { once: true });
   const reduce = useReducedMotion();
@@ -90,16 +94,16 @@ export function Ticker({ value, format = (n: number) => new Intl.NumberFormat('v
     return () => controls.stop();
   }, [value, inView, reduce, format]);
   return <span ref={ref} className={className}>{format(reduce || !inView ? value : settled)}</span>;
-}
+};
 
 /** Bar segment / progress that grows from the left on first render. */
-export function Grow({ className, style, delay = 0, title }: Readonly<{ className?: string; style?: React.CSSProperties; delay?: number; title?: string }>) {
+export const Grow = ({ className, style, delay = 0, title }: Readonly<{ className?: string; style?: MotionStyle; delay?: number; title?: string }>) => {
   return <motion.span className={className} style={{ transformOrigin: 'left center', ...style }} title={title} initial={{ scaleX: 0 }} animate={{ scaleX: 1 }} transition={{ duration: DURATION.enter, ease: EASE, delay }} />;
-}
+};
 
 /** Status chip / label that cross-fades when its text changes. */
-export function Swap({ children, keyValue, className }: Readonly<{ children: ReactNode; keyValue: string; className?: string }>) {
+export const Swap = ({ children, keyValue, className }: Readonly<{ children: ReactNode; keyValue: string; className?: string }>) => {
   return <AnimatePresence mode="wait" initial={false}>
     <motion.span key={keyValue} className={className} initial={{ opacity: 0, y: 3 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -3 }} transition={{ duration: DURATION.fast, ease: EASE }}>{children}</motion.span>
   </AnimatePresence>;
-}
+};

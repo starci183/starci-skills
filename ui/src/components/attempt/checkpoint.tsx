@@ -8,24 +8,31 @@ import type { Status } from '../status';
 import type { Concept } from '../concept';
 import { Advanced } from '../motion';
 
+/** The business concept id (C11) under which the runtime checkpoint receipt is filed; it is stamped on data-concept so the rendered DOM traces back to its spec. */
 export const concept: Concept = 'C11';
 
 /** The report's valid tested Git identity; checkout HEAD and checkpoint are separate facts. */
-export function reportTestedHead(attempt: Pick<AttemptDetailV2, 'report'>): string | null {
+export const reportTestedHead = (attempt: Pick<AttemptDetailV2, 'report'>): string | null => {
   const report = attempt.report?.json;
   return report && typeof report === 'object' && !Array.isArray(report) && 'head' in report && typeof report.head === 'string' && /^[0-9a-f]{40}(?:[0-9a-f]{24})?$/i.test(report.head) ? report.head : null;
-}
+};
 
 /** Describe the recorded commit action only; a missing receipt remains unconfirmed. */
-export function checkpointState(checkpoint: RuntimeCheckpoint | null): { status: Status; label: string } {
+export const checkpointState = (checkpoint: RuntimeCheckpoint | null): { status: Status; label: string } => {
   if (!checkpoint) return { status: 'unknown', label: t('Checkpoint receipt not confirmed') };
   if (checkpoint.committed === true) return { status: 'success', label: t('New runtime commit') };
   if (checkpoint.committed === false) return { status: 'success', label: t('No new commit; recorded SHA reused') };
   return { status: 'unknown', label: t('Commit action not recorded') };
-}
+};
+
+const PathList = ({ value }: Readonly<{ value: readonly string[] | null | undefined }>) => {
+  if (value == null) return <>{t('Not recorded')}</>;
+  if (!value.length) return <>{t('Recorded empty list')}</>;
+  return <ul className="m-0 grid list-none gap-2 p-0">{value.map(file => <li key={file} className="break-all font-mono text-xs leading-5">{file}</li>)}</ul>;
+};
 
 /** Show the Attempt-bound checkpoint and report-tested identity independently of settlement or integration. */
-export function CheckpointReceipt({ attempt }: Readonly<{ attempt: AttemptDetailV2 }>) {
+export const CheckpointReceipt = ({ attempt }: Readonly<{ attempt: AttemptDetailV2 }>) => {
   const checkpoint = attempt.checkpoint;
   const state = checkpointState(checkpoint);
   const tested = reportTestedHead(attempt);
@@ -47,8 +54,8 @@ export function CheckpointReceipt({ attempt }: Readonly<{ attempt: AttemptDetail
     <p className="mb-0 mt-3 text-xs text-muted-foreground">{checkpoint ? t('This receipt records a workflow-branch checkpoint; workflow integration, push and deployment require their own receipts.') : t('The verdict does not establish a checkpoint receipt.')}</p>
     {checkpoint ? <Advanced className="mt-4" title={t('Checkpoint scope & files')} keepMounted>
       <dl className="m-0 grid min-w-0 gap-6 text-sm sm:grid-cols-2">
-        {[{ label: t('Recorded owned paths'), value: checkpoint.scope }, { label: t('Files recorded by the checkpoint'), value: checkpoint.files }].map(({ label, value }) => <div key={label} className="min-w-0"><dt className="text-xs text-muted-foreground">{label}</dt><dd className="m-0 mt-2">{value == null ? t('Not recorded') : value.length ? <ul className="m-0 grid list-none gap-2 p-0">{value.map((file, index) => <li key={`${index}:${file}`} className="break-all font-mono text-xs leading-5">{file}</li>)}</ul> : t('Recorded empty list')}</dd></div>)}
+        {[{ label: t('Recorded owned paths'), value: checkpoint.scope }, { label: t('Files recorded by the checkpoint'), value: checkpoint.files }].map(({ label, value }) => <div key={label} className="min-w-0"><dt className="text-xs text-muted-foreground">{label}</dt><dd className="m-0 mt-2"><PathList value={value} /></dd></div>)}
       </dl>
     </Advanced> : null}
   </section>;
-}
+};

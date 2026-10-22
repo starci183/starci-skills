@@ -12,14 +12,28 @@ import { t } from '../../i18n/t';
 import { CopyButton } from './renderers/common';
 import { TimeAgo } from '../time-ago';
 
+/** Names the C8 evidence concept this module belongs to, for the evidence file viewer. */
 export const concept: Concept = 'C8';
 
 const SEARCHABLE = new Set(['text', 'json', 'diff']);
-function Note({ children, tone }: { readonly children: ReactNode; readonly tone?: 'warning' | 'failed' }) {
-  return <Alert status={tone === 'failed' ? 'danger' : tone === 'warning' ? 'warning' : 'default'}><Alert.Content><Alert.Description>{children}</Alert.Description></Alert.Content></Alert>;
-}
+type NoteProps = Readonly<{ children: ReactNode; tone?: 'warning' | 'failed' }>;
+type BodyProps = Readonly<{ file: EvidenceFile; query: string; blob: BlobText }>;
+type EvidenceViewerProps = Readonly<{ file: EvidenceFile }>;
 
-function Body({ file, query, blob }: { readonly file: EvidenceFile; readonly query: string; readonly blob: BlobText }) {
+const ALERT_STATUS = { warning: 'warning', failed: 'danger' } as const;
+const SKELETON_LINES = [80, 60, 90, 45, 70].map(width => ({ width, style: { width: `${width}%` } }));
+
+/** The note shown beside the file title: the declared encoding's decode note, else the source encoding when it was not UTF-8. */
+const encodingNote = (encoding: EvidenceFile['encoding'], sourceEncoding: string | null): string | null => {
+  if (!isPlainEncoding(encoding)) return encodingNotes[encoding as string] ?? null;
+  return sourceEncoding && sourceEncoding !== 'utf-8' ? t('{encoding} → decoded', { encoding: sourceEncoding }) : null;
+};
+
+const Note = ({ children, tone }: NoteProps) => {
+  return <Alert status={tone === undefined ? 'default' : ALERT_STATUS[tone]}><Alert.Content><Alert.Description>{children}</Alert.Description></Alert.Content></Alert>;
+};
+
+const Body = ({ file, query, blob }: BodyProps) => {
   if (blob.status === 'error' && blob.httpStatus === 410) return <Note tone="warning">{t('Archived evidence is unavailable.')}</Note>;
   if (file.kind === 'image') return <ImageView file={file} />;
   if (file.kind === 'video') return <VideoView file={file} />;
@@ -28,7 +42,7 @@ function Body({ file, query, blob }: { readonly file: EvidenceFile; readonly que
     return <Note>{file.kind === 'pdf' ? t('PDF file') : t('Binary file')} ({formatBytes(file.bytes)}, {file.mediaType}) {t('cannot be previewed.')} <Link href={file.href} target="_blank" rel="noreferrer">{t('Open raw ↗')}</Link></Note>;
   }
   if (blob.status === 'loading' || blob.status === 'idle') return <output className="block space-y-2" aria-label={t('Loading')}>
-    {[80, 60, 90, 45, 70].map(w => <Skeleton key={w} className="h-3" style={{ width: `${w}%` }} />)}</output>;
+    {SKELETON_LINES.map(line => <Skeleton key={line.width} className="h-3" style={line.style} />)}</output>;
   if (blob.status === 'error') return <Note tone="failed">{t('Could not load the content ({error}).', { error: blob.error ?? '' })} <Link href={file.href} target="_blank" rel="noreferrer">{t('Open raw ↗')}</Link></Note>;
   if (blob.text.trim() === '') return <Note>{t('Empty file (no content).')}</Note>;
   const { text } = blob;
@@ -44,16 +58,14 @@ function Body({ file, query, blob }: { readonly file: EvidenceFile; readonly que
     {blob.truncated ? <div className="mb-2"><Note tone="warning">{t('Large file ({size}) — only the first 2000 lines are shown.', { size: formatBytes(file.bytes) })} <Link href={file.href} target="_blank" rel="noreferrer">{t('Open the full raw file ↗')}</Link></Note></div> : null}
     {view}
   </>;
-}
+};
 
 /** Right-hand frame: toolbar, meta line and the type-dispatched body of one evidence file. */
-export function EvidenceViewer({ file }: { readonly file: EvidenceFile }) {
+export const EvidenceViewer = ({ file }: EvidenceViewerProps) => {
   const [query, setQuery] = useState('');
   const blob = useBlobText(file);
   const canSearch = SEARCHABLE.has(file.kind);
-  const encoding = file.encoding;
-  const sourceEncoding = blob.sourceEncoding;
-  const note = !isPlainEncoding(encoding) ? encodingNotes[encoding as string] : sourceEncoding && sourceEncoding !== 'utf-8' ? t('{encoding} → decoded', { encoding: sourceEncoding }) : null;
+  const note = encodingNote(file.encoding, blob.sourceEncoding);
   const sha = useMemo(() => shortSha(file.sha), [file.sha]);
   return <Card<"section"> render={props => <section {...props} />} className="min-w-0 gap-0 overflow-hidden p-0" aria-label={t('View {name}', { name: file.name })}>
     <Card.Header className="flex-row flex-wrap items-center gap-2 border-b px-4 py-3">
@@ -82,4 +94,4 @@ export function EvidenceViewer({ file }: { readonly file: EvidenceFile }) {
     {blob.truncated && canSearch ? <p className="m-0 border-b px-4 py-3 text-xs text-muted-foreground">{t('Search and copy apply to the loaded preview only.')}</p> : null}
     <Card.Content className="max-h-[70vh] min-w-0 overflow-auto p-4"><Body file={file} query={query} blob={blob} /></Card.Content>
   </Card>;
-}
+};

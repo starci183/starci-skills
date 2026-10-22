@@ -1,5 +1,6 @@
 import type { AgentRef, LegRow, LegRowV3 } from '../../../../contract';
 import type { Concept } from '../../../concept';
+/** The business concept id (C7) under which the Op identity helpers is filed; it is stamped on data-concept so the rendered DOM traces back to its spec. */
 export const concept: Concept = 'C7';
 import { agentOf } from '../../../agent/agent-avatar';
 
@@ -9,10 +10,11 @@ const infoOf = (leg: LegRow) => (leg as LegRowV3).info ?? null;
 export const legName = (leg: LegRow) => infoOf(leg)?.nameVi?.trim() || infoOf(leg)?.nameEn?.trim() || leg.op;
 /** One-line goal: Vietnamese, else English, else null. */
 export const legGoal = (leg: LegRow) => infoOf(leg)?.goal.vi ?? infoOf(leg)?.goal.en ?? null;
+/** The yaml-derived Op info attached to a leg, or null while the catalog has none. */
 export const legInfo = infoOf;
 
 /** Distinct recorded attempt agents in first-use order; unbound planned legs have no assignment marks. */
-export function legAgents(leg: LegRow): AgentRef[] {
+export const legAgents = (leg: LegRow): AgentRef[] => {
   if (leg.inPlan && leg.binding === 'unbound') return [];
   const seen = new Map<string, AgentRef>();
   for (const attempt of leg.attempts) {
@@ -22,4 +24,4 @@ export function legAgents(leg: LegRow): AgentRef[] {
     if (!seen.has(key)) seen.set(key, ref);
   }
   return [...seen.values()];
-}
+};

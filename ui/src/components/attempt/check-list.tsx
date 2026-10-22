@@ -12,6 +12,7 @@ import { runtimeObservation, verificationSummary } from './verification';
 import { Advanced } from '../motion';
 import { Button } from '../ui/button';
 
+/** The business concept id (C9) under which the verification check list is filed; it is stamped on data-concept so the rendered DOM traces back to its spec. */
 export const concept: Concept = 'C9';
 
 const evidenceText = (summary: unknown): string | null => {
@@ -25,18 +26,18 @@ const evidenceText = (summary: unknown): string | null => {
   return null;
 };
 
-function CopyButton({ value }: Readonly<{ value: string }>) {
+const CopyButton = ({ value }: Readonly<{ value: string }>) => {
   const [copied, setCopied] = useState(false);
   return <Button type="button" variant="outline" size="xs" title={t('Copy the command')} onClick={() => {
     void navigator.clipboard?.writeText(value).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1400); }, () => undefined);
   }}><Copy className="size-3" aria-hidden="true" />{copied ? t('Copied') : t('Copy')}</Button>;
-}
+};
 
-function matchFile(files: EvidenceFile[], check: CheckRow): EvidenceFile | null {
+const matchFile = (files: EvidenceFile[], check: CheckRow): EvidenceFile | null => {
   return files.find(file => file.check?.id === check.id)
     ?? files.find(file => [check.output?.sha, check.stdout?.sha, check.stderr?.sha].includes(file.sha))
     ?? null;
-}
+};
 
 type Verdict = 'pass' | 'fail' | null;
 type Side = { verdict: Verdict; exit: number | null };
@@ -47,31 +48,37 @@ const verdictOf = (status: CheckRow['status'] | undefined, exit: number | null |
   return null;
 };
 
-function opSide(pair: CheckPair): Side {
+const opSide = (pair: CheckPair): Side => {
   if (pair.op) {
     const exit = pair.op.declaredExitCode ?? pair.op.exitCode;
     return { verdict: verdictOf(pair.op.status, exit), exit };
   }
   const declared = pair.runtime?.declaredExitCode ?? null;
-  return { verdict: declared == null ? null : declared === 0 ? 'pass' : 'fail', exit: declared };
-}
-function runtimeSide(pair: CheckPair): Side {
+  return { verdict: verdictOf(undefined, declared), exit: declared };
+};
+const runtimeSide = (pair: CheckPair): Side => {
   const row = pair.runtime;
   if (!row) return { verdict: null, exit: null };
   const observation = runtimeObservation(row);
   return { verdict: observation === 'pass' || observation === 'fail' ? observation : null, exit: row.exitCode };
-}
+};
 
-function Mark({ verdict, exit, extra }: Readonly<{ verdict: Verdict; exit: number | null; extra?: string | null }>) {
-  const tone = verdict === 'pass' ? 'success' : verdict === 'fail' ? 'failed' : 'queued';
+const markLook = (verdict: Verdict): { tone: string; glyph: string } => {
+  if (verdict === 'pass') return { tone: 'success', glyph: '✓' };
+  if (verdict === 'fail') return { tone: 'failed', glyph: '✗' };
+  return { tone: 'queued', glyph: '—' };
+};
+
+const Mark = ({ verdict, exit, extra }: Readonly<{ verdict: Verdict; exit: number | null; extra?: string | null }>) => {
+  const { tone, glyph } = markLook(verdict);
   return <span className="inline-flex items-center gap-1 whitespace-nowrap text-xs" data-tone={tone} style={{ color: 'var(--tone)' }}>
-    <b className="text-sm">{verdict === 'pass' ? '✓' : verdict === 'fail' ? '✗' : '—'}</b>
+    <b className="text-sm">{glyph}</b>
     {exit != null ? <span className="font-mono">exit {exit}</span> : null}
     {extra ? <span className="text-muted-foreground">· {extra}</span> : null}
   </span>;
-}
+};
 
-function Tails({ check }: Readonly<{ check: CheckRow }>) {
+const Tails = ({ check }: Readonly<{ check: CheckRow }>) => {
   const tails: (readonly [string, BlobLink])[] = [];
   if (check.stdout) tails.push(['stdout', check.stdout]);
   if (check.stderr) tails.push(['stderr', check.stderr]);
@@ -79,20 +86,20 @@ function Tails({ check }: Readonly<{ check: CheckRow }>) {
   if (!tails.length) return null;
   return <Advanced className="mt-4" title={t('Tail {labels}', { labels: tails.map(([label]) => label).join(' / ') })} keepMounted>
     <div className="grid gap-4">{tails.map(([label, blob]) => <div key={label}><p className="mb-2 mt-0 text-xs text-muted-foreground">{label} · {blob.bytes.toLocaleString('vi-VN')} B</p><div className="max-h-56 overflow-auto"><BlobText blob={blob} mode="tail" lines={40} /></div></div>)}</div></Advanced>;
-}
+};
 
 const sidesMismatch = (op: Side, rt: Side): boolean =>
   (op.verdict != null && rt.verdict != null && op.verdict !== rt.verdict)
   || (op.exit != null && rt.exit != null && op.exit !== rt.exit);
 
-function pairRows(pair: CheckPair): CheckRow[] {
+const pairRows = (pair: CheckPair): CheckRow[] => {
   const rows: CheckRow[] = [];
   if (pair.runtime) rows.push(pair.runtime);
   if (pair.op) rows.push(pair.op);
   return rows;
-}
+};
 
-function pairDetails(pair: CheckPair, files: EvidenceFile[]) {
+const pairDetails = (pair: CheckPair, files: EvidenceFile[]) => {
   const rows = pairRows(pair);
   const main = pair.runtime ?? pair.op;
   return {
@@ -102,25 +109,25 @@ function pairDetails(pair: CheckPair, files: EvidenceFile[]) {
     cwd: main?.cwd ?? rows.find(row => row.cwd)?.cwd ?? null,
     file: rows.map(row => matchFile(files, row)).find(Boolean) ?? null,
   };
-}
+};
 
-function pairTone(rt: Side, mismatch: boolean) {
+const pairTone = (rt: Side, mismatch: boolean) => {
   if (rt.verdict === 'fail') return 'failed';
   if (mismatch) return 'warning';
   return rt.verdict === 'pass' ? 'success' : 'queued';
-}
+};
 
-function unconfirmedLabel(status: CheckRow['status'] | undefined) {
+const unconfirmedLabel = (status: CheckRow['status'] | undefined) => {
   if (status === 'unavailable') return t('Unavailable');
   if (status === 'skipped') return t('Skipped');
   return t('Not confirmed');
-}
+};
 
-function RuntimeColumn({ pair, rt, mismatch }: Readonly<{ pair: CheckPair; rt: Side; mismatch: boolean }>) {
+const RuntimeColumn = ({ pair, rt, mismatch }: Readonly<{ pair: CheckPair; rt: Side; mismatch: boolean }>) => {
   return <span className="flex min-w-0 flex-col items-start gap-1"><span className="text-xs font-normal text-muted-foreground">{t('Runtime ran')}</span><Mark verdict={rt.verdict} exit={rt.verdict == null ? null : rt.exit} extra={pair.runtime?.wallMs != null ? formatSpan(pair.runtime.wallMs) : null} />{rt.verdict == null ? <span className="text-xs font-normal text-muted-foreground">{unconfirmedLabel(pair.runtime?.status)}</span> : null}{mismatch ? <span className="inline-flex items-center gap-1 text-xs font-medium" data-tone="warning" style={{ color: 'var(--tone)' }} title={t('Op-declared and runtime-run do not match')}><TriangleAlert className="size-3.5" aria-hidden="true" />{t('Mismatch')}</span> : null}</span>;
-}
+};
 
-function PairBody({ op, rt, mismatch, details, onOpenFile }: Readonly<{ op: Side; rt: Side; mismatch: boolean; details: ReturnType<typeof pairDetails>; onOpenFile: (file: EvidenceFile) => void }>) {
+const PairBody = ({ op, rt, mismatch, details, onOpenFile }: Readonly<{ op: Side; rt: Side; mismatch: boolean; details: ReturnType<typeof pairDetails>; onOpenFile: (file: EvidenceFile) => void }>) => {
   const { rows, evidence, command, cwd, file } = details;
   return <div className="min-w-0 space-y-4 text-sm">
     {evidence ? <p className="m-0 whitespace-pre-line break-words leading-relaxed">{evidence}</p> : null}
@@ -133,9 +140,9 @@ function PairBody({ op, rt, mismatch, details, onOpenFile }: Readonly<{ op: Side
     {rows.map(row => <Tails key={row.id} check={row} />)}
     {rows.map(row => <p key={`identity-${row.id}`} className="m-0 break-all font-mono text-[11px] text-muted-foreground">#{row.id} · {t('run {n}', { n: row.runSeq })} · {t('Input digest')}: {row.inputDigest ?? t('Not recorded')}</p>)}
   </div>;
-}
+};
 
-function PairRow({ pair, files, onOpenFile }: Readonly<{ pair: CheckPair; files: EvidenceFile[]; onOpenFile: (file: EvidenceFile) => void }>) {
+const PairRow = ({ pair, files, onOpenFile }: Readonly<{ pair: CheckPair; files: EvidenceFile[]; onOpenFile: (file: EvidenceFile) => void }>) => {
   const op = opSide(pair);
   const rt = runtimeSide(pair);
   const mismatch = sidesMismatch(op, rt);
@@ -149,10 +156,10 @@ function PairRow({ pair, files, onOpenFile }: Readonly<{ pair: CheckPair; files:
       <PairBody op={op} rt={rt} mismatch={mismatch} details={details} onOpenFile={onOpenFile} />
     </Advanced>
   </li>;
-}
+};
 
 /** One latest run per exact runner/authority/phase/name, selected by the read API. */
-export function CheckList({ attempt, onOpenFile }: Readonly<{ attempt: AttemptDetailV3; onOpenFile: (file: EvidenceFile) => void }>) {
+export const CheckList = ({ attempt, onOpenFile }: Readonly<{ attempt: AttemptDetailV3; onOpenFile: (file: EvidenceFile) => void }>) => {
   const summary = verificationSummary(attempt);
   const pairs = summary.pairs;
   const confirmed = summary.passed;
@@ -165,4 +172,4 @@ export function CheckList({ attempt, onOpenFile }: Readonly<{ attempt: AttemptDe
       <ul className="m-0 list-none divide-y p-0">{pairs.map(pair => <PairRow key={pair.key} pair={pair} files={attempt.files} onOpenFile={onOpenFile} />)}</ul>
     </> : <Empty>{t('No checks recorded for this attempt yet.')}</Empty>}
   </Card>;
-}
+};

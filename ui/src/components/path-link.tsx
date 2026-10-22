@@ -5,16 +5,19 @@ import { Button } from './ui/button';
 import type { Concept } from './concept';
 import { t } from '../i18n/t';
 
+/** The business concept id (frame) under which the host path link is filed; it is stamped on data-concept so the rendered DOM traces back to its spec. */
 export const concept: Concept = 'frame';
 
 const toUrlPath = (value: string) => encodeURI(value.replaceAll('\\', '/'));
 const parentOf = (value: string) => value.replace(/[\\/][^\\/]*$/, '');
 
+type PathLinkProps = { readonly path: string | null | undefined; readonly kind?: 'dir' | 'file'; readonly label?: string };
+
 /**
  * A host path the owner can open: the chip opens it in VS Code (vscode://file/…), with Cursor,
  * containing-folder (files) and copy actions. The handlers open on the viewer's own machine.
  */
-export function PathLink({ path, kind = 'dir', label }: { readonly path: string | null | undefined; readonly kind?: 'dir' | 'file'; readonly label?: string }) {
+export const PathLink = ({ path, kind = 'dir', label }: PathLinkProps) => {
   const [copied, setCopied] = useState(false);
   if (!path) return <span className="text-muted-foreground">—</span>;
   const Icon = kind === 'file' ? File : Folder;
@@ -27,4 +30,4 @@ export function PathLink({ path, kind = 'dir', label }: { readonly path: string 
     {kind === 'file' ? <Link className="path-action" href={`vscode://file/${toUrlPath(parentOf(path))}`} aria-label={`${t('Open the containing folder')}: ${parentOf(path)}`}><span title={t('Open the containing folder')}>{t('folder')}</span></Link> : null}
     <Button variant="ghost" size="xs" type="button" className="path-action" onClick={copy} title={t('Copy path')}>{copied ? t('Copied') : t('Copy')}</Button>
   </span>;
-}
+};

@@ -1,4 +1,5 @@
 import type { Concept } from '../../concept';
+/** Names the C8 evidence concept this module belongs to, for the line-numbered text renderer. */
 export const concept: Concept = 'C8';
 import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { ChevronDownIcon, ChevronUpIcon, SearchIcon, WrapTextIcon } from 'lucide-react';
@@ -14,24 +15,25 @@ const ROW = 20;
 const WINDOW_AT = 5000;
 const HEIGHT = 560;
 
-export function cleanLines(text: string): string[] {
+/** Splits raw output into display lines: ANSI stripped and carriage-return overwrites resolved to the last write. */
+export const cleanLines = (text: string): string[] => {
   return stripAnsi(text).split('\n').map(l => {
     const line = l.endsWith('\r') ? l.slice(0, -1) : l;
     const i = line.lastIndexOf('\r');
     return i >= 0 ? line.slice(i + 1) : line;
   });
-}
+};
 
 type Hit = { line: number; start: number; end: number };
 type Entry = { hit: Hit; idx: number };
 
-function lineTone(line: string): Tone | undefined {
+const lineTone = (line: string): Tone | undefined => {
   if (ERROR_RE.test(line)) return 'failed';
   if (WARN_RE.test(line)) return 'warning';
   return undefined;
-}
+};
 
-function renderLine(line: string, hits: Entry[] | undefined, current: number): ReactNode[] {
+const renderLine = (line: string, hits: Entry[] | undefined, current: number): ReactNode[] => {
   if (!hits?.length) return [line || ' '];
   const out: ReactNode[] = [];
   let at = 0;
@@ -42,13 +44,13 @@ function renderLine(line: string, hits: Entry[] | undefined, current: number): R
   }
   if (at < line.length) out.push(line.slice(at));
   return out;
-}
+};
 
 const HIT_CAP = 10000;
 type HitIndex = { hits: Hit[]; byLine: Map<number, Entry[]>; capped: boolean };
 
 /** Every case-insensitive occurrence of the needle, capped at 10 000 hits. */
-function findHits(lines: readonly string[], q: string): HitIndex {
+const findHits = (lines: readonly string[], q: string): HitIndex => {
   const hits: Hit[] = [];
   const byLine = new Map<number, Entry[]>();
   const needle = q.toLowerCase();
@@ -67,10 +69,10 @@ function findHits(lines: readonly string[], q: string): HitIndex {
     }
   }
   return { hits, byLine, capped: false };
-}
+};
 
 /** Keeps the current hit in view, by row arithmetic when windowed and by measuring the mark otherwise. */
-function useScrollToHit(hit: Hit | undefined, current: number, windowed: boolean): RefObject<HTMLDivElement | null> {
+const useScrollToHit = (hit: Hit | undefined, current: number, windowed: boolean): RefObject<HTMLDivElement | null> => {
   const box = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const el = box.current;
@@ -83,9 +85,9 @@ function useScrollToHit(hit: Hit | undefined, current: number, windowed: boolean
     }
   }, [box, hit, current, windowed]);
   return box;
-}
+};
 
-function WindowedBody({ lines, byLine, current, scrollTop }: Readonly<{ lines: readonly string[]; byLine: Map<number, Entry[]>; current: number; scrollTop: number }>) {
+const WindowedBody = ({ lines, byLine, current, scrollTop }: Readonly<{ lines: readonly string[]; byLine: Map<number, Entry[]>; current: number; scrollTop: number }>) => {
   const first = Math.max(0, Math.floor(scrollTop / ROW) - 30);
   const last = Math.min(lines.length, Math.ceil((scrollTop + HEIGHT) / ROW) + 30);
   const rows = lines.slice(first, last).map((line, offset) => {
@@ -93,18 +95,21 @@ function WindowedBody({ lines, byLine, current, scrollTop }: Readonly<{ lines: r
     return <Line key={i} n={i + 1} tone={lineTone(line)} wrap={false}>{renderLine(line, byLine.get(i), current)}</Line>;
   });
   return <div style={{ height: lines.length * ROW, position: 'relative' }}><div style={{ position: 'absolute', top: first * ROW, left: 0, right: 0 }}>{rows}</div></div>;
-}
+};
 
-function FlatBody({ lines, byLine, current, wrap }: Readonly<{ lines: readonly string[]; byLine: Map<number, Entry[]>; current: number; wrap: boolean }>) {
-  return <>{lines.map((line, i) => <Line key={i} n={i + 1} tone={lineTone(line)} wrap={wrap}>{renderLine(line, byLine.get(i), current)}</Line>)}</>;
-}
+type NumberedLine = { n: number; text: string };
 
-function hitCounter(current: number, hits: readonly Hit[], capped: boolean): string {
+const FlatBody = ({ lines, byLine, current, wrap }: Readonly<{ lines: readonly string[]; byLine: Map<number, Entry[]>; current: number; wrap: boolean }>) => {
+  const numbered = lines.map((text, at): NumberedLine => ({ n: at + 1, text }));
+  return <>{numbered.map(row => <Line key={row.n} n={row.n} tone={lineTone(row.text)} wrap={wrap}>{renderLine(row.text, byLine.get(row.n - 1), current)}</Line>)}</>;
+};
+
+const hitCounter = (current: number, hits: readonly Hit[], capped: boolean): string => {
   return hits.length ? `${current + 1}/${hits.length}${capped ? '+' : ''}` : t('None');
-}
+};
 
 /** Plain text / log / stdout. ANSI stripped, searchable, windowed above 5 000 lines. */
-export function TextView({ text, query, className = '' }: Readonly<{ text: string; query: string; className?: string }>) {
+export const TextView = ({ text, query, className = '' }: Readonly<{ text: string; query: string; className?: string }>) => {
   const lines = useMemo(() => cleanLines(text), [text]);
   const windowed = lines.length > WINDOW_AT;
   const [wrap, setWrap] = useState(true);
@@ -146,4 +151,4 @@ export function TextView({ text, query, className = '' }: Readonly<{ text: strin
       </div>
     </Frame>
   );
-}
+};

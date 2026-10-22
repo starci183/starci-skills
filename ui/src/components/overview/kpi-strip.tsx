@@ -6,13 +6,14 @@ import { compactVi, costVi } from '../usage-view';
 import { Stagger, StaggerItem, Ticker } from '../motion';
 import { t } from '../../i18n/t';
 
+/** Names the C2 overview concept this module belongs to, for the headline KPI strip. */
 export const concept: Concept = 'C2';
 
 type Kpi = { tone: Tone; value: number | null; label: string; note: string };
 const observed = (value: number | null | undefined) => typeof value === 'number' && Number.isFinite(value) ? value : null;
 
 /** Essentials: four big numbers (ops running, workflows needing attention, passed / failed in 24 h) that count up on first view. */
-export function KpiStrip({ summary, needsAttention, loading = false }: Readonly<{ summary: WorkersSummary | null | undefined; needsAttention: number | null | undefined; loading?: boolean }>) {
+export const KpiStrip = ({ summary, needsAttention, loading = false }: Readonly<{ summary: WorkersSummary | null | undefined; needsAttention: number | null | undefined; loading?: boolean }>) => {
   const items: Kpi[] = [
     { tone: 'running', value: observed(summary?.opsRunning), label: t('ops running'), note: t('Active dispatched attempts, before an agent report.') },
     { tone: 'failed', value: observed(needsAttention), label: t('workflows needing attention'), note: t('Workflows with a recorded bad or warning state.') },
@@ -29,10 +30,10 @@ export function KpiStrip({ summary, needsAttention, loading = false }: Readonly<
       <p className="text-xs leading-snug text-muted-foreground">{item.note}</p>
     </div></StaggerItem>)}
   </Card></Stagger>;
-}
+};
 
 /** Secondary numbers (settling ops, queued units, 24 h tokens) shown inside "Advanced". */
-export function KpiExtras({ summary }: Readonly<{ summary: WorkersSummary | undefined }>) {
+export const KpiExtras = ({ summary }: Readonly<{ summary: WorkersSummary | undefined }>) => {
   if (!summary) return null;
   const usage = summary.usage24h;
   const tokens = usage.recorded && observed(usage.inputTokens) != null && observed(usage.outputTokens) != null ? usage.inputTokens! + usage.outputTokens! : null;
@@ -48,4 +49,4 @@ export function KpiExtras({ summary }: Readonly<{ summary: WorkersSummary | unde
   return <dl className="grid gap-3 sm:grid-cols-3">{items.map(item => <div key={item.label} className="flex min-w-0 flex-col gap-1 p-3">
     <dt className="text-xs text-muted-foreground">{item.label}</dt><dd className="text-lg font-semibold tabular-nums leading-tight">{item.value}</dd><p className="text-xs leading-snug text-muted-foreground">{item.note}</p>
   </div>)}</dl>;
-}
+};

@@ -7,42 +7,43 @@ import type { Tone } from '../status';
 import { jsonText } from './frame/util';
 import { Advanced } from '../motion';
 
+/** The business concept id (C6) under which the dispatch admission receipt panel is filed; it is stamped on data-concept so the rendered DOM traces back to its spec. */
 export const concept: Concept = 'C6';
 
 type Quota = NonNullable<AdmissionReservation['quota']>;
 
-function stateTone(state: AdmissionReservation['state']): Tone | undefined {
-  if (state === 'unknown') return 'warning';
-  if (state === 'released') return 'skipped';
-  return undefined;
-}
+const stateToneProps = (state: AdmissionReservation['state']): { tone?: Tone } => {
+  if (state === 'unknown') return { tone: 'warning' };
+  if (state === 'released') return { tone: 'skipped' };
+  return {};
+};
 
-function freshnessLabel(fresh: boolean | null | undefined) {
+const freshnessLabel = (fresh: boolean | null | undefined) => {
   if (fresh === true) return t('fresh when captured');
   if (fresh === false) return t('stale when captured');
   return t('freshness not recorded');
-}
+};
 
-function QuotaDetails({ quota }: Readonly<{ quota: Quota | null | undefined }>) {
+const QuotaDetails = ({ quota }: Readonly<{ quota: Quota | null | undefined }>) => {
   if (!quota) return <span className="text-muted-foreground">{t('Not recorded')}</span>;
   return <span className="flex flex-col gap-1"><span>{quota.auth} · {quota.state} · {freshnessLabel(quota.fresh)}</span><span className="text-xs text-muted-foreground">{t('Observed at')} {formatAbsolute(quota.observedAt)}{quota.usedPercent != null ? ` · ${quota.usedPercent}%` : ''}</span><span className="text-xs text-muted-foreground">{t('Historical observation; current eligibility is not established.')}</span></span>;
-}
+};
 
-function ReceiptRows({ receipt, historical }: Readonly<{ receipt: AdmissionReservation | null; historical: boolean }>) {
+const ReceiptRows = ({ receipt, historical }: Readonly<{ receipt: AdmissionReservation | null; historical: boolean }>) => {
   if (!receipt) return <p className="m-0 text-sm text-muted-foreground">{historical ? t('No admission receipt was captured for this dispatch.') : t('No current receipt matches the captured binding.')}</p>;
   const quota = receipt.quota;
   return <dl className="m-0">
     <InfoRow label={t('Receipt binding')}><CopyId value={receipt.id} /><span className="mt-1 block text-xs text-muted-foreground">{t('fence {fence} · attempt {id}', { fence: receipt.fence, id: receipt.attemptId })}</span></InfoRow>
     <InfoRow label={t('Provider / account')}>{receipt.provider} · <span className="break-all font-mono text-xs">{receipt.account}</span></InfoRow>
     <InfoRow label={t('Bound model / role')}>{receipt.model} · {receipt.role}</InfoRow>
-    <InfoRow label={t('Reservation state')}><InfoChip tone={stateTone(receipt.state)}>{receipt.state}</InfoChip><span className="mt-1 block text-xs text-muted-foreground">{formatAbsolute(receipt.updatedAt)}</span></InfoRow>
+    <InfoRow label={t('Reservation state')}><InfoChip {...stateToneProps(receipt.state)}>{receipt.state}</InfoChip><span className="mt-1 block text-xs text-muted-foreground">{formatAbsolute(receipt.updatedAt)}</span></InfoRow>
     <InfoRow label={historical ? t('Reserved slots at dispatch') : t('Slots held by this receipt')}>{historical || receipt.state !== 'released' ? receipt.slots : 0}<span className="text-xs text-muted-foreground"> · {t('recorded cap {cap}', { cap: receipt.maxParallel })}</span>{receipt.state === 'unknown' ? <span className="mt-1 block text-xs text-muted-foreground">{t('Unknown reservations still occupy their slots.')}</span> : null}</InfoRow>
     {historical ? <InfoRow label={t('Quota at dispatch')}><QuotaDetails quota={quota} /></InfoRow> : null}
   </dl>;
-}
+};
 
 /** Captured admission data and the API's exact fenced match are separate observations. */
-export function AdmissionDetails({ attempt }: Readonly<{ attempt: AttemptDetailV2 }>) {
+export const AdmissionDetails = ({ attempt }: Readonly<{ attempt: AttemptDetailV2 }>) => {
   const admission = attempt.admission;
   const captured = admission?.source === 'contract';
   return <section className="min-w-0" aria-label={t('Admission at dispatch')}>
@@ -53,4 +54,4 @@ export function AdmissionDetails({ attempt }: Readonly<{ attempt: AttemptDetailV
     </div>
     {captured ? <Advanced className="mt-4" title={t('Recorded routing and admission proof')} keepMounted><pre className="m-0 max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-default p-4 font-mono text-xs leading-5">{jsonText({ selection: admission.selection, capturedReceipt: admission.capturedReceipt, currentReceipt: admission.receipt })}</pre></Advanced> : null}
   </section>;
-}
+};

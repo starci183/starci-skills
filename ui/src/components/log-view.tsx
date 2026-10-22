@@ -14,17 +14,30 @@ import { AgentAvatar } from './agent/agent-avatar';
 import { attemptAgent, useAttemptAgents } from './agent/use-running-agents';
 import { t } from '../i18n/t';
 
+/** The business concept id (C17) under which the log and timeline views are filed; it is stamped on data-concept so the rendered DOM traces back to its spec. */
 export const concept: Concept = 'C17';
 
 const timeFormat = new Intl.DateTimeFormat('vi-VN', { timeZone: 'Asia/Bangkok', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
 const shortWf = (wf: string) => wf.replace(/^wf-/, '');
 
-function RefLinks({ refs }: Readonly<{ refs: LogRow['refs'] }>) {
+/** Where a log row came from as text, short enough for the narrow reference column: the workflow id, else the project or machine. */
+const originText = (row: LogRow): string => {
+  if (row.wf) return shortWf(row.wf);
+  return row.db === 'machine' ? t('machine') : row.db;
+};
+
+const Origin = ({ row, wfRef }: Readonly<{ row: LogRow; wfRef: LogRow['refs'][number] | undefined }>) => {
+  if (wfRef) return <Link href={wfRef.href} className="text-[11px]">{shortWf(wfRef.id)}</Link>;
+  return <>{originText(row)}</>;
+};
+
+const RefLinks = ({ refs }: Readonly<{ refs: LogRow['refs'] }>) => {
   if (!refs.length) return <span className="text-muted-foreground">{t('No links yet.')}</span>;
   return <div className="flex flex-wrap gap-3">{refs.map((ref) => <Link key={`${ref.kind}:${ref.project ?? ''}:${ref.id}`} href={ref.href} className="inline-flex items-center gap-1 text-xs"><Link2 size={12} aria-hidden="true" />{ref.kind} · {ref.id}</Link>)}</div>;
-}
+};
 
-export function LogRowItem({ row, fresh = false }: Readonly<{ row: LogRow; fresh?: boolean }>) {
+/** One log row with its time, level and message, expanding to its references, source, trace and raw data. */
+export const LogRowItem = ({ row, fresh = false }: Readonly<{ row: LogRow; fresh?: boolean }>) => {
   const tone = levelTone[row.level];
   const wfRef = row.refs.find((ref) => ref.kind === 'workflow');
   const attemptRef = row.refs.find((ref) => ref.kind === 'attempt');
@@ -65,25 +78,27 @@ export function LogRowItem({ row, fresh = false }: Readonly<{ row: LogRow; fresh
     </div>
     </Advanced>
     <div className="log-row-references min-w-0 truncate px-4 pb-2 font-mono text-[11px] text-muted-foreground md:absolute md:right-4 md:top-4 md:w-[10.5rem] md:px-0 md:pb-0">
-      {wfRef ? <Link href={wfRef.href} className="text-[11px]">{shortWf(wfRef.id)}</Link> : row.wf ? shortWf(row.wf) : row.db === 'machine' ? t('machine') : row.db}
+      <Origin row={row} wfRef={wfRef} />
       {attemptRef && <> · <Link href={attemptRef.href} className="text-[11px]">#{attemptRef.id}</Link></>}
     </div>
   </div>;
-}
+};
 
-export function LogView({ rows, empty = t('No matching log rows.'), freshKeys, regionRef, onRegionScroll }: Readonly<{ rows: LogRow[]; empty?: string; freshKeys?: ReadonlySet<string>; regionRef?: Ref<HTMLDivElement>; onRegionScroll?: (top: number) => void }>) {
+/** The scrollable table of log rows with a sticky header, staggered entry for the first rows and a highlight for fresh ones. */
+export const LogView = ({ rows, empty = t('No matching log rows.'), freshKeys, regionRef, onRegionScroll }: Readonly<{ rows: LogRow[]; empty?: string; freshKeys?: ReadonlySet<string>; regionRef?: Ref<HTMLDivElement>; onRegionScroll?: (top: number) => void }>) => {
   const [staggered] = useState(() => new Set(rows.slice(0, 12).map((row) => row.key)));
   if (!rows.length) return <FeedbackState>{empty}</FeedbackState>;
   return <ConceptBlock concept="C17" aria-label={t('Log rows')}>
     <Card className="overflow-hidden p-0"><Card.Content><div ref={regionRef} onScroll={(event) => onRegionScroll?.(event.currentTarget.scrollTop)} className="max-h-[calc(100dvh-260px)] min-h-64 overflow-y-auto overscroll-contain" data-log-region><div className="sticky top-0 z-10 hidden h-12 items-center border-b bg-default md:grid md:grid-cols-[4.75rem_3.5rem_minmax(0,1fr)_10.5rem] md:gap-x-4 px-4 text-xs font-semibold text-muted-foreground" aria-hidden="true"><span>{t('Time')}</span><span>{t('Level')}</span><span>{t('Content')}</span><span>{t('Workflow · attempt')}</span></div>
-      <Stagger>{rows.map((row) => staggered.has(row.key) ? <StaggerItem key={row.key}><LogRowItem row={row} fresh={freshKeys?.has(row.key)} /></StaggerItem> : <LogRowItem key={row.key} row={row} fresh={freshKeys?.has(row.key)} />)}</Stagger>
+      <Stagger>{rows.map((row) => staggered.has(row.key) ? <StaggerItem key={row.key}><LogRowItem row={row} fresh={freshKeys?.has(row.key) ?? false} /></StaggerItem> : <LogRowItem key={row.key} row={row} fresh={freshKeys?.has(row.key) ?? false} />)}</Stagger>
     </div></Card.Content></Card>
   </ConceptBlock>;
-}
+};
 
-export function TimelineView({ rows, empty = t('No matching timeline entries yet.') }: Readonly<{ rows: TimelineItem[]; empty?: string }>) {
+/** A merged workflow timeline as a stack of cards, each with its state, title, source and the record it points to. */
+export const TimelineView = ({ rows, empty = t('No matching timeline entries yet.') }: Readonly<{ rows: TimelineItem[]; empty?: string }>) => {
   if (!rows.length) return <FeedbackState>{empty}</FeedbackState>;
   return <ConceptBlock concept="C17" className="flex flex-col gap-2" aria-label={t('Timeline')}>
-    {rows.map((row, index) => <Card key={`${row.at}:${row.kind}:${index}`}><Card.Content className="flex flex-wrap items-start gap-4"><StateChip state={row.ui} compact /><div className="min-w-0 flex-1"><h3 className="text-sm font-medium">{row.title}</h3><div className="mt-1 flex flex-wrap gap-2 text-xs text-muted-foreground"><span>{formatAbsolute(row.at)}</span><span>· {row.source}</span><span>· {row.kind}</span></div></div>{row.ref && <Link href={row.ref.href} className="shrink-0 text-xs">{row.ref.id}</Link>}</Card.Content></Card>)}
+    {rows.map((row) => <Card key={row.key}><Card.Content className="flex flex-wrap items-start gap-4"><StateChip state={row.ui} compact /><div className="min-w-0 flex-1"><h3 className="text-sm font-medium">{row.title}</h3><div className="mt-1 flex flex-wrap gap-2 text-xs text-muted-foreground"><span>{formatAbsolute(row.at)}</span><span>· {row.source}</span><span>· {row.kind}</span></div></div>{row.ref && <Link href={row.ref.href} className="shrink-0 text-xs">{row.ref.id}</Link>}</Card.Content></Card>)}
   </ConceptBlock>;
-}
+};

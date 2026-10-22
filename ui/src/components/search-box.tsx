@@ -10,26 +10,28 @@ import { t } from '../i18n/t';
 import { UI_STATES, type Envelope, type ReadErrorMeta, type SearchHit, type SearchIdentity, type SearchView } from '../contract';
 import type { Concept } from './concept';
 
+/** The business concept id (frame) under which the global search dialog is filed; it is stamped on data-concept so the rendered DOM traces back to its spec. */
 export const concept: Concept = 'frame';
+
 type SearchResult = {
   query: string; data: SearchView | null; meta: Envelope<SearchView>['meta'] | null;
   loading: boolean; error: string | null; errorCode: string | null; errorMeta: ReadErrorMeta | null; observedAt: number | null;
 };
 
-function isIdentity(value: unknown): value is SearchIdentity {
+const isIdentity = (value: unknown): value is SearchIdentity => {
   return value !== null && typeof value === 'object'
     && 'store' in value && (value.store === 'machine' || value.store === 'ledger')
     && 'ledgerId' in value && (value.ledgerId === null || typeof value.ledgerId === 'string')
     && 'workflow' in value && (value.workflow === null || typeof value.workflow === 'string')
     && 'kind' in value && typeof value.kind === 'string'
     && 'id' in value && typeof value.id === 'string';
-}
+};
 
-function isSearchRef(value: unknown): value is NonNullable<SearchHit['ref']> {
+const isSearchRef = (value: unknown): value is NonNullable<SearchHit['ref']> => {
   return isIdentity(value) && 'href' in value && typeof value.href === 'string';
-}
+};
 
-function isHit(value: unknown): value is SearchHit {
+const isHit = (value: unknown): value is SearchHit => {
   return value !== null && typeof value === 'object'
     && 'kind' in value && typeof value.kind === 'string'
     && 'id' in value && typeof value.id === 'string'
@@ -39,45 +41,53 @@ function isHit(value: unknown): value is SearchHit {
     && 'ui' in value && (UI_STATES as readonly unknown[]).includes(value.ui)
     && 'matched' in value && isIdentity(value.matched)
     && 'ref' in value && (value.ref === null || isSearchRef(value.ref));
-}
+};
 
-function isSearchView(value: unknown): value is SearchView {
+const isSearchView = (value: unknown): value is SearchView => {
   return value !== null && typeof value === 'object'
     && 'hits' in value && Array.isArray(value.hits) && value.hits.every(isHit)
     && 'limit' in value && typeof value.limit === 'number' && Number.isSafeInteger(value.limit) && value.limit > 0
     && 'truncated' in value && typeof value.truncated === 'boolean';
-}
+};
 
-function hitKey(hit: SearchHit): string {
+const hitKey = (hit: SearchHit): string => {
   const { store, ledgerId, workflow, kind, id } = hit.matched;
   return JSON.stringify([store, ledgerId, workflow, kind, id]);
-}
+};
 
-function targetOf(hit: SearchHit): 'route' | 'blob' | null {
+const targetOf = (hit: SearchHit): 'route' | 'blob' | null => {
   const ref = hit.ref;
   if (!ref) return null;
   if (hit.href !== ref.href) return null;
   if (/^\/api\/blob\/[a-f0-9]{64}$/.test(ref.href)) return 'blob';
   return ref.href.startsWith('#/') && parseRoute(ref.href).kind !== 'not-found' ? 'route' : null;
-}
+};
 
-function initialResult(query: string): SearchResult {
+const initialResult = (query: string): SearchResult => {
   return { query, data: null, meta: null, loading: false, error: null, errorCode: null, errorMeta: null, observedAt: null };
-}
+};
 
-function beginRead(previous: SearchResult, needle: string): SearchResult {
+const beginRead = (previous: SearchResult, needle: string): SearchResult => {
   return { ...(previous.query === needle ? previous : initialResult(needle)), loading: true, error: null, errorCode: null, errorMeta: null };
-}
+};
 
-function RestoreSearchFocus({ restore }: Readonly<{ restore: () => void }>) {
+/** The icon at the end of a search hit that says whether opening it leaves for a blob file, goes to a page, or goes nowhere. */
+const TargetIcon = ({ target }: Readonly<{ target: ReturnType<typeof targetOf> }>) => {
+  if (target === 'blob') return <ExternalLink className="size-4 shrink-0" aria-hidden="true" />;
+  if (target === 'route') return <ArrowRight className="size-4 shrink-0" aria-hidden="true" />;
+  return null;
+};
+
+const RestoreSearchFocus = ({ restore }: Readonly<{ restore: () => void }>) => {
   useEffect(() => () => {
     // Run after the modal has unmounted and HeroUI has restored its focus scope.
     requestAnimationFrame(() => requestAnimationFrame(restore));
   }, [restore]);
   return null;
-}
+};
 
-export function SearchBox() {
+/** The header search button and its command dialog: debounced lookup of an id or keyword across every store, with partial-read and retry states. */
+export const SearchBox = () => {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [retry, setRetry] = useState(0);
@@ -148,7 +158,7 @@ export function SearchBox() {
           const failure = readErrorEnvelope(payload);
           errorCode = failure.error.code;
           errorMeta = failure.meta ?? null;
-          throw new Error('Search read failed');
+          throw new Error('Search read failed', { cause: response.status });
         }
         errorCode = 'INVALID_RESPONSE';
         const payload: unknown = await response.json();
@@ -210,7 +220,7 @@ export function SearchBox() {
                         {alias && <small className="break-all">{t('Matched {kind}: {id}', { kind: hit.matched.kind, id: hit.matched.id })}</small>}
                         {!target && <small>{t('No supported page for this result.')}</small>}
                       </span>
-                      <StateChip state={hit.ui} />{target === 'blob' ? <ExternalLink className="size-4 shrink-0" aria-hidden="true" /> : target === 'route' ? <ArrowRight className="size-4 shrink-0" aria-hidden="true" /> : null}
+                      <StateChip state={hit.ui} /><TargetIcon target={target} />
                     </ListBox.Item>;
                   }}
                 </ListBox>
@@ -222,4 +232,4 @@ export function SearchBox() {
       </Modal.Container>
     </Modal.Backdrop>
   </Modal>;
-}
+};

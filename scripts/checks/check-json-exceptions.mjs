@@ -20,7 +20,7 @@ import { RUNTIME_STATE_DIR } from '../../engine/runtime-root.mjs';
 import { ALLOWLIST_FILE, readAllowlistFile } from '../lib/allowlist.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { declaredTemplateNames, isManagedRender, managedTemplatesOf } from '../lib/managed-json.mjs';
-import { loadSlotManifest } from '../hfs/slots.mjs';
+import { RUNTIME_MANIFEST_FILE, loadSlotManifest, ruleParams } from '../hfs/slots.mjs';
 
 export const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const ignoreLockfiles = process.argv.includes('--ignore-lockfiles');
@@ -87,15 +87,14 @@ const RUNTIME_OWNED_ROOTS = new Set(['.starciwork', 'runtime', RUNTIME_STATE_DIR
 const SPEC_SCRATCH_PREFIXES = Object.freeze(['.starci-wk-spec-', '.tmp-hfs-fe-build-']);
 
 /**
- * Generated mirrors of runtime files that the published packages carry: scripts/hfs/sync-runtime.mjs writes each
- * tree byte for byte from the runtime (its BUNDLES) and `sync-runtime --check` fails on any missing, stale or extra file.
- * The authored originals stay in the inventory; only these exact skill-root paths are skipped, not a same-named tree elsewhere.
+ * The generated roots of the runtime, read from where they are declared once (ruleParams.runtime.generated of knowledge/hfs/runtime-slots.yaml): the
+ * mirrors of runtime files that the published packages carry and the ui message map, all written by scripts/hfs/sync-runtime.mjs, which
+ * fails `sync-runtime --check` on any missing, stale or extra file. The authored originals stay in the inventory; only these exact
+ * skill-root paths are skipped, not a same-named tree elsewhere.
  */
-export const GENERATED_MIRROR_ROOTS = Object.freeze([
-  'packages/eslint/be/runtime',
-  'packages/eslint/fe/runtime',
-  'packages/hfs/runtime',
-]);
+const GENERATED_MIRROR_ROOTS = Object.freeze(
+  ruleParams(loadSlotManifest({ root, file: path.join(root, RUNTIME_MANIFEST_FILE) }), 'runtime').generated.map((entry) => entry.root),
+);
 
 const GENERATED_MIRROR_SET = new Set(GENERATED_MIRROR_ROOTS);
 

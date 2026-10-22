@@ -1,4 +1,4 @@
-import { useId } from 'react';
+import { useId, type CSSProperties } from 'react';
 import { Card, Link } from '@heroui/react';
 import type { AttemptBrief, PipelineView } from '../../contract';
 import { statusLabels, statusTone, toneVar } from '../status';
@@ -8,6 +8,7 @@ import { formatDayTime, formatDuration, formatHm } from './leg/time';
 import { t } from '../../i18n/t';
 import { FeedbackState } from '../feedback-state';
 
+/** The business concept id (C7) under which the attempt Gantt chart is filed; it is stamped on data-concept so the rendered DOM traces back to its spec. */
 export const concept: Concept = 'C7';
 
 const LABEL_W = 190; const ROW_PAD = 6; const BAR_H = 16; const LANE_H = 22; const TOP = 26; const RIGHT = 24;
@@ -22,7 +23,7 @@ const isLive = (a: DispatchedAttempt) => a.open && closedAt(a) == null;
 const settlementPending = (a: DispatchedAttempt) => a.open && closedAt(a) != null && recordedTime(a.settledAt) == null;
 
 type TipFacts = { a: DispatchedAttempt; label: string; endpoint: string; elapsed: string; sequence: string; reportedAt: number | null; terminalAt: number | null; settledAt: number | null; pending: boolean };
-function barTip({ a, label, endpoint, elapsed, sequence, reportedAt, terminalAt, settledAt, pending }: TipFacts): string {
+const barTip = ({ a, label, endpoint, elapsed, sequence, reportedAt, terminalAt, settledAt, pending }: TipFacts): string => {
   const lines = [
     `#${a.id} · ${t('try {n}', { n: a.try })} · ${sequence} · ${label}`,
     a.model ?? a.agent ?? t('unknown model'),
@@ -35,10 +36,25 @@ function barTip({ a, label, endpoint, elapsed, sequence, reportedAt, terminalAt,
   if (settledAt != null) lines.push(t('Settled at {at}', { at: formatDayTime(settledAt) }));
   else if (pending) lines.push(t('No settlement time recorded'));
   return lines.join('\n');
-}
+};
+
+const endpointText = (settledAt: number | null, terminalAt: number | null, live: boolean): string => {
+  if (settledAt != null) return formatDayTime(settledAt);
+  if (terminalAt != null) return formatDayTime(terminalAt);
+  return live ? t('now') : t('No end time recorded');
+};
+
+type BarLinkProps = { readonly href: string; readonly tip: string; readonly left: number; readonly top: number; readonly width: number };
+
+const BarLink = ({ href, tip, left, top, width }: BarLinkProps) => {
+  const style: CSSProperties = { left, top, width, height: BAR_H };
+  return <span title={tip}><Link href={href} aria-label={tip} className="pointer-events-auto absolute rounded-sm focus-visible:outline-2 focus-visible:outline-ring" style={style}><span className="sr-only">{tip}</span></Link></span>;
+};
+
+type AttemptGanttProps = { readonly pipeline: PipelineView; readonly now: number };
 
 /** Actual dispatch timeline per leg, independent of the Op and Unit dependency graphs. */
-export function AttemptGantt({ pipeline, now }: { readonly pipeline: PipelineView; readonly now: number }) {
+export const AttemptGantt = ({ pipeline, now }: AttemptGanttProps) => {
   const hatchId = useId();
   const rows = pipeline.legs.map(leg => ({ leg, atts: leg.attempts.filter(wasDispatched) })).filter(r => r.atts.length);
   if (!rows.length) return <FeedbackState>{t('No attempts to draw a timeline for yet.')}</FeedbackState>;
@@ -89,7 +105,7 @@ export function AttemptGantt({ pipeline, now }: { readonly pipeline: PipelineVie
     const tone = statusTone[pending ? 'settling' : a.status];
     const bx = x(a.dispatchedAt), bw = Math.max(6, x(endOf(a)) - bx);
     const by = top + ROW_PAD + lane * LANE_H + (LANE_H - BAR_H) / 2;
-    const endpoint = settledAt != null ? formatDayTime(settledAt) : terminalAt != null ? formatDayTime(terminalAt) : live ? t('now') : t('No end time recorded');
+    const endpoint = endpointText(settledAt, terminalAt, live);
     const elapsed = settledAt != null || terminalAt != null || live ? formatDuration(endOf(a) - a.dispatchedAt) : t('Observed through {at}', { at: formatDayTime(endOf(a)) });
     const sequence = Number.isFinite(a.dispatchSeq) ? t('dispatch {n}', { n: a.dispatchSeq }) : t('Dispatch sequence not recorded');
     const tip = barTip({ a, label, endpoint, elapsed, sequence, reportedAt, terminalAt, settledAt, pending });
@@ -130,9 +146,9 @@ export function AttemptGantt({ pipeline, now }: { readonly pipeline: PipelineVie
         <text x={Math.min(nowX + 4, width - 52)} y={TOP + 10} fontSize="10.5" fontWeight="600" style={{ fill: 'var(--foreground)' }}>{t('now')}</text>
       </g>}
     </svg>
-    <div className="pointer-events-none absolute inset-0">{plotBars.map(bar => <span key={bar.a.id} title={bar.tip}><Link href={bar.a.href} aria-label={bar.tip} className="pointer-events-auto absolute rounded-sm focus-visible:outline-2 focus-visible:outline-ring" style={{ left: bar.bx, top: bar.by, width: bar.bw, height: BAR_H }}><span className="sr-only">{bar.tip}</span></Link></span>)}</div>
+    <div className="pointer-events-none absolute inset-0">{plotBars.map(bar => <BarLink key={bar.a.id} href={bar.a.href} tip={bar.tip} left={bar.bx} top={bar.by} width={bar.bw} />)}</div>
     </div>
     </Card.Content></Card>
     <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground"><span>{t('Short marker: report')}</span><span>{t('Diamond: terminal closure')}</span><span>{t('Full marker: settlement')}</span><span>{t('Dashed outline: settlement pending')}</span></div>
   </div>;
-}
+};

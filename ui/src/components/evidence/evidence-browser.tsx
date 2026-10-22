@@ -8,8 +8,10 @@ import { statusFromCheck, statusFromUi } from '../status';
 import { EvidenceViewer } from './evidence-viewer';
 import { encodingLabels, formatBytes, isPlainEncoding } from './format';
 import { t } from '../../i18n/t';
+import { MediaImage } from '../ui/media-image';
 
 export { useBlobText } from './use-blob-text';
+/** Names the C8 evidence concept this module belongs to, for the evidence file browser. */
 export const concept: Concept = 'C8';
 
 const GROUPS: { id: EvidenceGroup; title: string; hint: string }[] = [
@@ -26,9 +28,9 @@ const UNKNOWN_CHECK = t('(unknown check)');
 const checkFailed = (file: EvidenceFile) => file.check?.ui === 'bad' || file.check?.status === 'fail' || file.check?.status === 'error';
 
 /** Default = first failing check output, else first evidence file, else the first file. */
-export function defaultEvidence(files: EvidenceFile[]): EvidenceFile | null {
+export const defaultEvidence = (files: EvidenceFile[]): EvidenceFile | null => {
   return files.find(f => f.group === 'check' && checkFailed(f)) ?? files.find(f => f.group === 'evidence') ?? files[0] ?? null;
-}
+};
 
 const KEY_BASES = new Set(['manifest.yaml', 'result.md', 'scope-evidence.json', 'work-graph.json', 'report.json']);
 const v3 = (file: EvidenceFile) => file as Partial<EvidenceFileV3>;
@@ -37,7 +39,7 @@ const isKey = (file: EvidenceFile) => v3(file).key ?? KEY_BASES.has(file.base);
 const fileName = (file: EvidenceFile) => file.label ?? file.base;
 
 /** Prefer server dupOf/empty/key; otherwise dedupe by sha and treat 0 bytes as empty. */
-export function organise(files: EvidenceFile[]) {
+export const organise = (files: EvidenceFile[]) => {
   const byId = new Map(files.map(f => [f.artifactId, f]));
   const firstBySha = new Map<string, EvidenceFile>();
   const dupOf = new Map<number, number>();
@@ -54,10 +56,10 @@ export function organise(files: EvidenceFile[]) {
   for (const [dup, orig] of dupOf) { const list = also.get(orig) ?? []; list.push(byId.get(dup) as EvidenceFile); also.set(orig, list); }
   const visible = files.filter(f => !dupOf.has(f.artifactId) && !isEmpty(f));
   return { visible, empty, also, hidden: dupOf.size };
-}
+};
 const keyFirst = (list: EvidenceFile[]) => [...list.filter(isKey), ...list.filter(f => !isKey(f))];
 
-function Row({ file, also }: Readonly<{ file: EvidenceFile; also?: EvidenceFile[] }>) {
+const Row = ({ file, also }: Readonly<{ file: EvidenceFile; also?: EvidenceFile[] | undefined }>) => {
   return <span className="flex w-full min-w-0 flex-col gap-1 text-left text-sm">
     <span className="flex min-w-0 items-center gap-2">
       <FileTypeBadge kind={file.kind} />
@@ -71,21 +73,26 @@ function Row({ file, also }: Readonly<{ file: EvidenceFile; also?: EvidenceFile[
     <Description className="truncate font-mono text-xs" title={file.name}>{file.name}</Description>
     {also?.length ? <Description className="truncate text-xs" title={also.map(fileName).join(', ')}>{t('also: {names}', { names: also.map(fileName).join(', ') })}</Description> : null}
   </span>;
-}
+};
 
-function Thumb({ file }: Readonly<{ file: EvidenceFile }>) {
+/** The preview inside a thumbnail: the image, the first frame of a video, or the file-type badge for anything else. */
+const ThumbPreview = ({ file }: Readonly<{ file: EvidenceFile }>) => {
+  if (file.kind === 'image') return <MediaImage src={file.href} alt={file.name} loading="lazy" frameClassName="size-full" className="size-full object-cover" />;
+  if (file.kind === 'video') return <video src={`${file.href}#t=0.1`} muted preload="metadata" className="size-full object-cover" />;
+  return <FileTypeBadge kind={file.kind} />;
+};
+
+const Thumb = ({ file }: Readonly<{ file: EvidenceFile }>) => {
   return <span className="flex min-w-0 flex-col gap-2 text-left">
     <span className="flex aspect-video items-center justify-center overflow-hidden rounded bg-default">
-      {file.kind === 'image' ? <img src={file.href} alt={file.name} loading="lazy" className="size-full object-cover" />
-        : file.kind === 'video' ? <video src={`${file.href}#t=0.1`} muted preload="metadata" className="size-full object-cover" />
-        : <FileTypeBadge kind={file.kind} />}
+      <ThumbPreview file={file} />
     </span>
     <span className="flex items-center gap-2"><FileTypeBadge kind={file.kind} /><Label className="min-w-0 truncate text-xs" title={file.name}>{file.label ?? file.base}</Label></span>
   </span>;
-}
+};
 
 /** Grouped file tree (left) + type-aware viewer frame (right); stacked on mobile. */
-export function EvidenceBrowser({ files, selected, onSelect }: Readonly<{ files: EvidenceFile[]; selected: number | null; onSelect: (artifactId: number) => void }>) {
+export const EvidenceBrowser = ({ files, selected, onSelect }: Readonly<{ files: EvidenceFile[]; selected: number | null; onSelect: (artifactId: number) => void }>) => {
   const current = useMemo(() => files.find(f => f.artifactId === selected) ?? defaultEvidence(files), [files, selected]);
   const listRef = useRef<HTMLDivElement>(null);
   const org = useMemo(() => organise(files), [files]);
@@ -149,4 +156,4 @@ export function EvidenceBrowser({ files, selected, onSelect }: Readonly<{ files:
     </Card>
     {current ? <EvidenceViewer key={current.artifactId} file={current} /> : null}
   </div>;
-}
+};

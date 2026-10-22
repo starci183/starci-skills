@@ -1,9 +1,7 @@
-// The harness UI adopts the typed half of the front-end canon first: the typed-source config of @starci/eslint-canon-fe lints all of `src/`
-// with types, the React Hooks rules, the type-aware typescript-eslint rules and the Sonar way rules, all at error. The canon's own
-// product-structure rules (starciPlainSourceConfig, which fe-kit already runs) are the next adoption step. The one rule below is the
-// UI's own and only adds: a colour is a design token, never a literal.
-// The canon is imported from this repository's own source; `npm run lint` links the plugins it resolves (packages/fe-kit/scripts/link-peers.mjs).
-import { starciTypedSourceConfig } from "../packages/eslint/fe/index.mjs"
+// The harness UI is canon-governed like any StarCi frontend tree: the plain-source config of @starci/eslint-canon-fe lints all of `src/` with types, the React Hooks rules,
+// the Sonar way rules and every canon rule that needs no HFS slot view, all at error. The one rule below is the UI's own and only adds: a colour is a design token,
+// never a literal. The canon is imported from this repository's own source; `npm run lint` links the plugins it resolves (packages/fe-kit/scripts/link-peers.mjs).
+import { starciPlainSourceConfig } from "../packages/eslint/fe/index.mjs"
 
 const literalColour = /(?:^|[\s:[(])#[0-9a-f]{3,8}(?![0-9a-f])|\b(?:rgb|rgba|hsl|hsla|oklch|oklab|color)\s*\(/i
 
@@ -28,7 +26,7 @@ const noLiteralColours = {
 }
 
 export default [
-  ...starciTypedSourceConfig({ root: import.meta.dirname }),
+  ...starciPlainSourceConfig({ root: import.meta.dirname }),
   {
     files: ["src/**/*.{ts,tsx}"],
     plugins: { starci: { rules: { "no-literal-colours": noLiteralColours } } },

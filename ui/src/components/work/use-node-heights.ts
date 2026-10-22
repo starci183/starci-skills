@@ -3,7 +3,7 @@ import { useEffect, useState, type RefObject } from 'react';
 type NodeHeightOptions = Readonly<{ selector: string; dataKey: string; source: unknown; width?: number }>;
 
 /** Measure rendered nodes after source or width changes, retaining the map when rounded heights match. */
-export function useNodeHeights(holder: RefObject<HTMLElement | null>, { selector, dataKey, source, width }: NodeHeightOptions): ReadonlyMap<string, number> {
+export const useNodeHeights = (holder: RefObject<HTMLElement | null>, { selector, dataKey, source, width }: NodeHeightOptions): ReadonlyMap<string, number> => {
   const [heights, setHeights] = useState<ReadonlyMap<string, number>>(new Map());
   useEffect(() => {
     const cards = [...(holder.current?.querySelectorAll<HTMLElement>(selector) ?? [])];
@@ -17,4 +17,4 @@ export function useNodeHeights(holder: RefObject<HTMLElement | null>, { selector
     return () => observer.disconnect();
   }, [holder, selector, dataKey, source, width]);
   return heights;
-}
+};
