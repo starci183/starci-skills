@@ -432,6 +432,19 @@ calls:
     required: [url, page, worktree]
     receipt: [result]
     note: Rebind only the workflow's persisted input page after helper restart. Never navigate an unrelated owner tab.
+  terminal-create:
+    command: terminal create
+    kind: mutation
+    replay: none
+    flags: [worktree, shell, title, command]
+    required: [worktree, shell, title, command]
+    receipt: [result]
+    creates: terminal
+    note: >-
+      A plain shell for `starci workflow start-in-orca`: scripts/api/orca/terminal-create.mjs selects the runtime's own registered worktree, shell powershell.exe, the title
+      `[Start] <workflow>` and the start relay (scripts/kernel/start-relay.mjs) with validated arguments as the startup
+      command. It launches no agent: the Kernel is still an orchestration worker-start worker. Never environment, focus
+      or retry-request; the caller never retries a lost receipt and reads orca terminal list first.
   terminal-list:
     command: terminal list
     kind: read

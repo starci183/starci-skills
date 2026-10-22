@@ -6,6 +6,10 @@ until every S* row in `docs/goal.md` holds with fresh evidence, then `1.0.0` fre
 
 ## [Unreleased]
 
+### Added
+- `starci workflow start-in-orca --repo <app> [--goal <workflow_id>]` starts an approved goal from a shell Orca did not open (the owner's chat, an agent's tool shell), where `starci workflow start` is refused `no_active_sender_terminal`. It opens one plain PowerShell terminal in the runtime's worktree (it launches no agent) whose startup command runs `starci workflow start` there, waits for its receipt and answers with the start's output and exit code. The terminal stays open as the Kernel's entry coordinator.
+- The runtime may create plain Orca shells: `terminal create` leaves `api.yaml` `forbiddenForStarciOrchestration` and `check-host-boundary` no longer scans for it (the owner's ruling to drop the ban rather than keep an exception). Agents are still launched only by `orchestration worker-start`, `check-host-boundary` still refuses an agent CLI spawned as a child process, and the `RAW_TERMINAL_CREATE` guard still refuses an agent typing `orca terminal create`.
+
 ## [1.0.0-alpha.26] — 2026-10-22
 
 ### Changed
