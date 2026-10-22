@@ -340,7 +340,7 @@ export function variables(app, scope, presets, sonarKey, manifest = loadSlotMani
     nodeMajor: String(NODE_MAJOR),
     sonarKey: sonarKey ?? app.project,
     sonarHostLine: sonarHostLine(quality.sonar),
-    sonarExclusions: [presets?.sonarExclusions, '**/.next/**', '**/node_modules/**', '**/src/messages/**', ...(lite ? ['supabase/types/**'] : [])].filter(Boolean).join(','),
+    sonarExclusions: [presets?.sonarExclusions, '**/.next/**', '**/node_modules/**', ...(lite ? ['supabase/types/**'] : [])].filter(Boolean).join(','),
     sonarSources: ['be/apps', 'be/src', 'fe/apps', ...(packages ? ['fe/packages'] : [])].join(','),
     lcovReport: LCOV_REPORT,
     ...ciWorkflowCommands(source, LCOV_REPORT, source.qualityDeclared === false ? undefined : source.quality, { app }),

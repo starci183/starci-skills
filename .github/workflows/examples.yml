@@ -138,11 +138,12 @@ jobs:
         id: policy
         working-directory: .
         run: |
-          if [ -f "$APP_DIR/codecov.yml" ]; then
-            echo "tests=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "tests=false" >> "$GITHUB_OUTPUT"
+          # Every example app measures its tests (codecov.yml is its generated test policy): a missing policy fails, never skips the tests.
+          if [ ! -f "$APP_DIR/codecov.yml" ]; then
+            echo "::error title=Test policy missing::$APP_DIR has no codecov.yml; run npx starci app sync --write in it"
+            exit 1
           fi
+          echo "tests=true" >> "$GITHUB_OUTPUT"
           # A lite example (hfs.json edition lite) has unit specs and no e2e world (owner ruling 2026-10-12).
           if grep -Eq '"edition"[[:space:]]*:[[:space:]]*"lite"' "$APP_DIR/hfs.json"; then
             echo "e2e=false" >> "$GITHUB_OUTPUT"

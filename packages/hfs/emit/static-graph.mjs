@@ -28,6 +28,20 @@ const undef = { t: 'undef' };
 const nul = { t: 'nul' };
 const free = (why) => ({ t: 'free', why });
 
+/**
+ * JavaScript's abstract equality (`==`) for the literal kinds this graph forces - string, number, boolean - without
+ * the `==` operator: one type compares strictly, a boolean compares as its number, and a number meets a string as
+ * Number(string), exactly as the language coerces them (so '' == 0, '1' == true, NaN never equals).
+ */
+export function looseLiteralEqual(x, y) {
+  if (typeof x === typeof y) return x === y;
+  if (typeof x === 'boolean') return looseLiteralEqual(Number(x), y);
+  if (typeof y === 'boolean') return looseLiteralEqual(x, Number(y));
+  if (typeof x === 'number' && typeof y === 'string') return x === Number(y);
+  if (typeof x === 'string' && typeof y === 'number') return Number(x) === y;
+  return false;
+}
+
 export function createGraphReader({ ts, host }) {
   const files = new Map();
   const classes = new Map();
@@ -194,7 +208,7 @@ export function createGraphReader({ ts, host }) {
     const nullish = (v) => v.t === 'undef' || v.t === 'nul';
     if (nullish(a) && nullish(b)) return loose ? true : a.t === b.t;
     if (nullish(a) || nullish(b)) return ['lit', 'class', 'obj', 'arr'].includes(nullish(a) ? b.t : a.t) ? false : null;
-    if (a.t === 'lit' && b.t === 'lit') return loose ? a.v == b.v : a.v === b.v; // eslint-disable-line eqeqeq
+    if (a.t === 'lit' && b.t === 'lit') return loose ? looseLiteralEqual(a.v, b.v) : a.v === b.v;
     if (a.t === 'class' && b.t === 'class') return a === b;
     return null;
   }

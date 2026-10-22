@@ -28,12 +28,9 @@ export function sizeGrowthSharedSpec({ side, tester, fileSizeGrowth, budget, fil
       const run = runGit(args, { dir, config: { "user.email": "t@example.com", "user.name": "t" } })
       if (run.error || run.status !== 0) throw run.error ?? new Error(`git ${args[0]} exited ${run.status}: ${run.stderr}`)
     }
-    try {
-      git("init", "-q", "-b", "main") // the rule's baseline is the merge base with main: the fixture names its own branch, whatever init.defaultBranch is
-    } catch {
-      t.skip("git is not available")
-      return
-    }
+    // The rule's baseline is the merge base with main: the fixture names its own branch, whatever init.defaultBranch is.
+    // git is a prerequisite of the canon's own rule, so a failing init fails this spec rather than skipping it.
+    git("init", "-q", "-b", "main")
     mkdirSync(join(dir, "src"))
     const file = join(dir, "src", fileName)
     writeFileSync(file, lines(budget + 2))

@@ -285,7 +285,7 @@ kinds:
     # layout capture - the chrome is never drawn, so it can never be invented per worker.
     reads: [srs, sds, brand, shell, grammar, design, asset]
     # The representative direction PNGs and their exact prompts live in the ui node's `assets/`, so `asset`
-    # belongs here or `IO_DRIFT` refuses the shipped operator catalog.
+    # belongs here: the op reads them back when it extends a direction.
     # `shell`: the op draws or captures the missing shell + ancestor layouts and the lockup itself when it owns the
     # shell foundation (owner ruling 2026-09-29 draw-from-todo), so it writes the layout tree beside the ui record.
     writes: [design, asset, shell]

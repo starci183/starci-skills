@@ -16,7 +16,6 @@ import {
   TextAction,
   WorkspaceShell,
 } from '../common/index.js';
-// @ts-expect-error - asset import for the storybook render only
 import turtleUrl from './assets/turtle.png';
 
 /**

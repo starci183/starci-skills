@@ -8,7 +8,7 @@ import { computeImageHash } from "./image-hash"
 import { ensureImages } from "./images"
 import { createLedger } from "./ledger"
 import type { RegistryClient } from "./registry"
-import { scriptedExec } from "./script.spec"
+import { scriptedExec } from "./script.spec.helper"
 
 interface FakeRegistry extends RegistryClient {
     readonly store: Map<string, Set<string>>

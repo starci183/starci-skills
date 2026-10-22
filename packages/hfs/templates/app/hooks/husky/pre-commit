@@ -7,7 +7,7 @@ git diff --cached --name-only --diff-filter=ACMR -z --relative=be -- '*.ts' '*.m
   xargs -0 -n 50 sh -c 'if [ "$#" -gt 0 ]; then cd be && npx eslint -- "$@"; fi' sh || exit $?
 git diff --cached --name-only --diff-filter=ACMR -z --relative=fe -- '*.ts' '*.tsx' '*.mts' '*.cts' '*.js' '*.jsx' '*.mjs' '*.cjs' |
   xargs -0 -n 50 sh -c 'if [ "$#" -gt 0 ]; then cd fe && npx eslint --max-warnings=0 --no-warn-ignored -- "$@"; fi' sh || exit $?
-styles=$(git diff --cached --name-only --diff-filter=ACMR --relative=fe -- '*.css' || true)
+styles=$(git diff --cached --name-only --diff-filter=ACMR --relative=fe -- '*.css') || exit $?
 if [ -n "$styles" ]; then
   (cd fe && npx stylelint $styles)
 fi

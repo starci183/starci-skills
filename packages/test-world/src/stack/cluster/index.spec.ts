@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, it } from "node:test"
 import { Docker } from "../docker"
 import { clusterNames, DEFAULT_K3S_IMAGE, renderRegistryConfig } from "./config"
 import { createCluster } from "./index"
-import { scriptedExec } from "./script.spec"
+import { scriptedExec } from "./script.spec.helper"
 
 const names = clusterNames(DEFAULT_K3S_IMAGE)
 

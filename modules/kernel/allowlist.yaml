@@ -36,8 +36,6 @@ not-codes:
     reason: "SonarQube token type label passed when minting a token, not a failure code"
   - literal: INIT_CWD
     reason: "the env var npm sets for a lifecycle script; package-clean-test.mjs drops it from the clean install env, not a code"
-  - literal: IO_DRIFT
-    reason: "only named in a comment in kinds.yaml; no emit site found in scripts/engine/modules"
   - literal: LEDGER_SCHEMA
     reason: "schema id constant, not a code"
   - literal: LEDGER_VERSION
@@ -583,8 +581,6 @@ json-exceptions:
 dead-script-entries:
   - path: scripts/route/route-model.mjs
     reason: "CLI the owner runs to preview a model pick: `route-model --plan` prints the tier's per-step selection record (docs/config-format.md); the Kernel seat resolves its tier members through scripts/agent/tiers.mjs, so no code spawns it"
-  - path: scripts/supervisor/release-cut.mjs
-    reason: "release flow function (cutRelease) that the CLI exposes as `starci release cut` (docs/git-governance.md); the CLI lane wires it and removes this entry"
   - path: scripts/api/orca/task-list.mjs
     reason: "typed call of modules/host/orca/calls.yaml; no runtime code lists Tasks"
   - path: scripts/api/orca/project-setup-delete.mjs
@@ -593,18 +589,6 @@ dead-script-entries:
     reason: "CLI run by the owner (RED14: the examples meet their own standard); a spec reads it"
   - path: scripts/checks/check-example-derived.mjs
     reason: "CLI of the example work standard (scripts/work/validate/check-example-work.mjs); a spec reads it"
-  - path: scripts/example/example-evidence.mjs
-    reason: "CLI of the example work standard (scripts/work/validate/check-example-work.mjs); specs read it"
-  - path: scripts/example/example-verify.mjs
-    reason: "CLI of the example work standard (scripts/work/validate/check-example-work.mjs); a spec reads it"
-  - path: scripts/gates/repo-presentation.mjs
-    reason: "gate CLI that a product repository runs (docs/repo-presentation.md); no spec"
-  - path: scripts/route/route-op.mjs
-    reason: "routing CLI named by the op prompts (docs/ops.md); no spec"
-  - path: scripts/uat/assisted-runner.mjs
-    reason: "UAT runner CLI named by the op prompts; specs read it"
-  - path: scripts/work/validate/check-evidence-binding.mjs
-    reason: "validator CLI (docs/verify-proof.md); a spec reads it"
   - path: scripts/work/validate/work-change.mjs
     reason: "validator CLI of work records (docs); a spec reads it"
 

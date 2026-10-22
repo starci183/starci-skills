@@ -10,5 +10,5 @@ contracts/
 .starcistacks/
 .starciwork/
 **/__generated__/
-**/messages/**
+**/i18n/messages/**
 supabase/types/

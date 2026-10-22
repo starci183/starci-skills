@@ -235,7 +235,7 @@ const serviceOfUrl = (doc, url) => {
   try { const u = new URL(url); port = Number(u.port || (u.protocol === 'https:' ? 443 : 80)); } catch { return { service: null, port: null }; }
   const ports = doc?.configuration?.ports ?? {};
   const byPort = Object.entries(ports).find(([, p]) => Number(p) === port)?.[0] ?? null;
-  const byOrigin = Object.entries(doc?.target?.origins ?? {}).find(([, o]) => { try { return new URL(o).port == port; } catch { return false; } })?.[0] ?? null; // eslint-disable-line eqeqeq
+  const byOrigin = Object.entries(doc?.target?.origins ?? {}).find(([, o]) => { try { return Number(new URL(o).port) === port; } catch { return false; } })?.[0] ?? null;
   return { service: byPort ?? byOrigin, port };
 };
 
