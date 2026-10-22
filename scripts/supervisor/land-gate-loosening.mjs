@@ -7,7 +7,7 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import { readYamlFile } from '../lib/read-yaml.mjs';
 import { diff } from '../api/git/diff.mjs';
 import { show } from '../api/git/show.mjs';
-import { approvalIdOf, approved, looseningsOf } from '../lib/gate-loosening.mjs';
+import { approvalIdOf, approved, looseningsOf, renamedPrefixesOf } from '../lib/gate-loosening.mjs';
 
 const RULES_FILE = 'modules/kernel/gate-loosening.yaml';
 const RULINGS_FILE = 'modules/kernel/owner-rulings.yaml';
@@ -30,7 +30,10 @@ export function judgeChange({ dir, base, head, rules }) {
   if (!rules) return null;
   const changed = diff([`${base}..${head}`, '--no-color', '--no-renames', '-U0'], { cwd: dir, maxBuffer: DIFF_BUFFER });
   if (changed.status !== 0) return null;
-  const findings = looseningsOf(changed.stdout, rules);
+  // The paths the change renamed (git's own rename detection, with no candidate limit): entries that only move with them are no loosening.
+  const statuses = diff([`${base}..${head}`, '--no-color', '--name-status', '-M', '-l0'], { cwd: dir, maxBuffer: DIFF_BUFFER });
+  if (statuses.status !== 0) return null;
+  const findings = looseningsOf(changed.stdout, rules, { renamed: renamedPrefixesOf(statuses.stdout) });
   if (!findings.length) return null;
   return { findings, id: approvalIdOf(findings), approved: approved(findings, rulingsAt(dir, base)) };
 }

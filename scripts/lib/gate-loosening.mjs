@@ -9,6 +9,10 @@
 //   spec-deleted       a spec file deleted in a change that also changes product code
 //   assertion-weakened a spec that loses more assertions than it gains in a change that also changes product code
 //   spec-skipped       a skip marker added to a spec in a change that also changes product code
+// A change that renames paths (a git rename, `git diff -M`) may MOVE the entries that name them: a removed line and an added line of the
+// same file that are equal once every renamed prefix of the removed line is rewritten to its new name are one entry moved, not a check
+// removed and an exception added (renamedPrefixesOf, movedLinesOf). A moved entry that also changes in any other way (a widened glob, an
+// extra path) is still judged as a removal and an addition.
 // The finding id is `<kind>:<file>:<detail>`; the fingerprint of a change is the digest of its sorted ids, the name under which the owner
 // approves exactly that loosening (an owner-rulings entry `gate-loosening-<fingerprint>`).
 import { shortHash } from './hash.mjs';
@@ -31,6 +35,64 @@ export function parseDiff(text) {
     else if (line.startsWith('-') && !line.startsWith('---')) current.removed.push(line.slice(1));
   }
   return files;
+}
+
+/** The rename lines `R<score> <old> <new>` (tab separated) of `git diff --name-status -M`: [{from, to}]. */
+const renamesOf = (nameStatus) => String(nameStatus ?? '').split(/\r?\n/).map((line) => line.split('\t'))
+  .filter((fields) => /^R\d*$/.test(fields[0] ?? '') && fields.length === 3).map(([, from, to]) => ({ from, to }));
+
+/** The moved prefix of one renamed file: its old and new path without the trailing segments they share. */
+function movedPrefixOf({ from, to }) {
+  const before = from.split('/');
+  const after = to.split('/');
+  while (before.length > 1 && after.length > 1 && before.at(-1) === after.at(-1)) { before.pop(); after.pop(); }
+  return { from: before.join('/'), to: after.join('/') };
+}
+
+/**
+ * The path prefixes a change renamed, from its `git diff --name-status -M` output: [{from, to}], longest `from` first. A prefix is kept only
+ * when every renamed file under it moved to the same new prefix; an old prefix that went two ways names no single move and is dropped.
+ */
+export function renamedPrefixesOf(nameStatus) {
+  const targets = new Map();
+  for (const { from, to } of renamesOf(nameStatus).map(movedPrefixOf)) {
+    if (from === to) continue;
+    if (!targets.has(from)) targets.set(from, new Set());
+    targets.get(from).add(to);
+  }
+  return [...targets].filter(([, to]) => to.size === 1).map(([from, to]) => ({ from, to: [...to][0] }))
+    .sort((a, b) => b.from.length - a.from.length || byCodeUnit(a.from, b.from));
+}
+
+const escapeRegExp = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/** `line` with every renamed prefix rewritten to its new name; a prefix matches only as a whole path (not inside a longer name). */
+function renamedLine(line, prefixes) {
+  return prefixes.reduce((text, { from, to }) => text.replace(new RegExp(`(?<![\\w./-])${escapeRegExp(from)}(?![\\w.-])`, 'g'), to), line);
+}
+
+/**
+ * One file of a change without its moved entries: each removed line whose renamed form is exactly an added line is paired with it, and
+ * both are left out. A line the rename does not touch is never paired, so an entry merely removed or added stays.
+ */
+export function movedLinesOf(entry, prefixes) {
+  if (!prefixes.length) return entry;
+  const unpaired = new Map();
+  for (const line of entry.added) unpaired.set(line, (unpaired.get(line) ?? 0) + 1);
+  const paired = new Map();
+  const removed = entry.removed.filter((line) => {
+    const moved = renamedLine(line, prefixes);
+    if (moved === line || (unpaired.get(moved) ?? 0) <= 0) return true;
+    unpaired.set(moved, unpaired.get(moved) - 1);
+    paired.set(moved, (paired.get(moved) ?? 0) + 1);
+    return false;
+  });
+  const added = entry.added.filter((line) => {
+    if ((paired.get(line) ?? 0) <= 0) return true;
+    paired.set(line, paired.get(line) - 1);
+    return false;
+  });
+  return { ...entry, added, removed };
 }
 
 const keyWords = (key) => key.replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
@@ -136,9 +198,12 @@ function specFindings(entry, files, rules) {
 
 const changesProduct = (files, rules) => files.some((entry) => !isSpec(entry.file, rules) && rules.productPrefixes.some((prefix) => entry.file.startsWith(prefix)));
 
-/** Every loosening of the change `diffText`, sorted: [{id, kind, file, detail}]. `rules` is modules/kernel/gate-loosening.yaml. */
-export function looseningsOf(diffText, rules) {
-  const files = parseDiff(diffText);
+/**
+ * Every loosening of the change `diffText`, sorted: [{id, kind, file, detail}]. `rules` is modules/kernel/gate-loosening.yaml; `renamed`
+ * is the change's renamed prefixes (renamedPrefixesOf), whose moved entries are no loosening.
+ */
+export function looseningsOf(diffText, rules, { renamed = [] } = {}) {
+  const files = parseDiff(diffText).map((entry) => movedLinesOf(entry, renamed));
   const product = changesProduct(files, rules);
   const found = files.flatMap((entry) => [
     ...(rules.gateFiles.includes(entry.file) ? [...checksRemoved(entry), ...thresholdsLowered(entry, rules)] : []),

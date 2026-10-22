@@ -45,6 +45,8 @@ const CHECK_ENTRIES = [
   'scripts/hfs/rules/staged-specs.mjs',
   // The run-folder shapes of `starci uat record`, proven by the package spec src/uat-run-folder.spec.mjs over this copy.
   'scripts/lib/uat-run-folder.mjs',
+  // What loosens a gate over one change's diff, rename-aware, proven by the package spec src/gate-loosening.spec.mjs over this copy.
+  'scripts/lib/gate-loosening.mjs',
 ];
 /** Static imports and `new URL(<relative>.yaml, import.meta.url)` reads (the framework-pinned knowledge file) are followed. */
 const IMPORT_SPEC = /(?:\bfrom\s+|\bimport\s*\(\s*|\bimport\s+)['"](\.[^'"]+)['"]/g;

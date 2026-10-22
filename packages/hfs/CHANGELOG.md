@@ -1,6 +1,7 @@
 # Changelog
 
 ## 4.7.21 - 2026-10-22
+- Added: the bundled runtime copy of `scripts/lib/gate-loosening.mjs`, which judges whether one change loosens a gate. It is rename-aware: an allowlist or rule entry that only moves with a git rename of the paths it names (the removed line, with every renamed prefix rewritten, equals an added line) is no loosening, while an entry that also widens, or one added beside the move, still is. Spec: `src/gate-loosening.spec.mjs`.
 - Added: the bundled runtime copy of `scripts/lib/uat-run-folder.mjs`, the pure half of `starci uat record`: a UAT run folder holds exactly manifest.yaml, result.md, screens/*.png and videos/*.webm (each of its type by its bytes), an example's fixture store receives each verified blob once, and the work/evidence@1 document cites every file by sha256 with an outcome that is pass only when the walk exited 0 and its manifest says pass. Spec: `src/uat-run-folder.spec.mjs`.
 - Fixed: the release gate's Sonar read retries a network error or HTTP 5xx up to 5 times with backoff inside its 600 s wait; a 4xx and every gate status keep their verdict. Spec: `src/sonar-quality-gate.spec.mjs`.
 - Fixed: `starci app db dump` archives its parts with tar run inside the scratch directory and relative names only (no `-C`, no absolute path): GNU tar, first on PATH under Git Bash on Windows, read the absolute drive-letter archive path as a remote host and every backup failed with `DB_BACKUP_TOOL_FAILED`. Spec: `src/db-dump-archive.spec.mjs`.
