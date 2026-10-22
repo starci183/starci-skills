@@ -6447,6 +6447,25 @@ starci workflow start
 starci workflow start --repo <path> --goal <workflow_id>
 ```
 
+### starci workflow start-in-orca
+
+start an approved goal from a shell Orca did not open, through one plain Orca relay terminal
+
+| flag | type | |
+| --- | --- | --- |
+| `--repo` | string |  |
+| `--goal` | string |  |
+| `--agent` | string |  |
+| `--timeout-ms` | string |  |
+
+exit: 0 approved Kernel booted or already live; 1 the relay terminal was not created, gave no receipt in time, or workflow start refused; 2 bad usage, or this shell is already an Orca terminal (run starci workflow start); 3 the previous Kernel dispatch is still alive; 75 Orca is not answering (host unavailable)
+
+json: flag
+
+```sh
+starci workflow start-in-orca --repo <path> --goal <workflow_id>
+```
+
 ### starci workflow status
 
 the workflow projection — phase, frontier, leases and pending owner asks

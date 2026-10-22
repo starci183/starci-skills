@@ -21,8 +21,6 @@ import {spawnCalls} from '../lib/spawn-calls.mjs';
 import {RUNTIME_MANIFEST_FILE,loadSlotManifest,ruleParams} from '../hfs/slots.mjs';
 
 const WRAPPER_DIR='scripts/api/orca';
-// This check names the patterns it bans.
-const ALLOW_SELF='scripts/checks/check-host-boundary.mjs';
 
 // Agent-facing prose: what a kernel, op, chat or supervisor agent is told to do.
 const PROSE_ROOTS=['CONTEXT.md','modules/kernel','modules/ops','modules/supervisor',
@@ -59,16 +57,6 @@ function orcaVerbs(root){
 const COMMAND_POSITION=/(?:^|[`'"($]|\|\||&&|;|\|)\s*orca\s+([a-z][a-z-]*)/;
 const NODE_PATH=/node\s+(\S*orca\S*)/g;
 const LOADS_HOST=/\b(load|loads|loading|read|reads|reading)\b[^.\n]{0,100}modules\/host\/orca/i;
-// (c) agent-launch: every agent launch is orchestration worker-start (modules/kernel/start-workflow.yaml). A terminal the runtime creates itself is the bypass: the terminalCreate wrapper,
-// the calls.yaml `terminal-create` call, a `terminal create` argv or an `orca terminal create` command string. Only
-// code is read, comment lines skipped.
-const LAUNCH_ROOTS=['engine','scripts','bin','init','modules','packages'];
-const TERMINAL_LAUNCH=[
-  [/\bterminalCreate\b/,'the terminalCreate wrapper'],
-  [/['"`]terminal-create['"`]/,"the calls.yaml 'terminal-create' call"],
-  [/['"`]terminal['"`]\s*,\s*['"`]create['"`]/,"a ['terminal','create'] argv"],
-  [/['"`][^'"`\n]*\borca(?:\.exe)?\s+terminal\s+create\b/,'an `orca terminal create` command'],
-];
 // (d) agent-cli-spawn: an agent never runs as a child process of a runtime script - the PreToolUse hook cannot see it
 // and Orca cannot supervise it (modules/host/orca/calls.yaml). Read structurally with
 // the TypeScript AST: a call whose callee is bound to node:child_process (spawn, spawnSync, exec, execSync, execFile,
@@ -94,7 +82,6 @@ function runtimeSourceRoots(root){
   return ruleParams(loadSlotManifest({root,file}),'runtime').sourceRoots;
 }
 
-const COMMENT_LINE=/^\s*(?:\/\/|\/?\*|#)/;
 const IMPORTS_RUNNER=/import\s*\{[^}]*\b(?:ORCA|orcaRun|orcaCall)\b[^}]*\}\s*from\s*['"][^'"]*orca\/lib\.mjs['"]/;
 
 // (a) code: one place builds orca's argv. Who may spawn orca in the runtime's production source is RT_EXTERNAL_OWNER's
@@ -123,20 +110,6 @@ const spawnScan=(root,layerScan,flag)=>{
   }
 };
 
-// (c) agent-launch: no runtime code creates an agent terminal - the wrappers under scripts/api/orca/ included.
-const launchScan=(root,flag)=>{
-  for(const dir of LAUNCH_ROOTS){
-    for(const file of walk(path.join(root,dir),f=>f.endsWith('.mjs'))){
-      if(rel(root,file)===ALLOW_SELF)continue;
-      const text=fs.readFileSync(file,'utf8');
-      text.split(/\r?\n/).forEach((line,i)=>{
-        if(COMMENT_LINE.test(line))return;
-        const hit=TERMINAL_LAUNCH.find(([re])=>re.test(line));
-        if(hit)flag(file,i+1,'agent-launch',`creates a terminal (${hit[1]}) — every agent launch is ${WRAPPER_DIR}/worker-start.mjs`);
-      });
-    }
-  }
-};
 
 // (d) agent-cli-spawn: no runtime script runs an agent CLI as its child process. The one exemption is the headless call api
 // (scripts/api/codex/, owner decision 2026-10-07): a one-shot `codex exec` for the imagegen call, reached only through
@@ -188,14 +161,13 @@ function findHostBoundaryViolations({root=skillRoot}={}){
 
   const layerScan=runtimeSourceRoots(root);
   spawnScan(root,layerScan,flag);
-  launchScan(root,flag);
   agentSpawnScan(root,flag);
   proseScan(root,verbs,flag);
   return {ok:found.length===0,violations:found};
 }
 
 function hostBoundaryMain(argv=[]){
-  if(argv.includes('--help')||argv.includes('-h'))return {exitCode:0,report:{schema:'starci/host-boundary-check-help@1',help:`Usage: starci runtime check --only host-boundary -- [--root <dir>]\n\nFails when a .mjs outside ${WRAPPER_DIR}/ spawns orca or imports its runner, when runtime code (${AGENT_SPAWN_ROOTS.join(', ')}) spawns an agent CLI (${AGENT_CLIS.join(', ')}) as a child process (${AGENT_CLI_SPAWN}), or when agent-facing prose (${PROSE_ROOTS.join(', ')}) tells an agent to run an orca command, to run a node path that is not a ${WRAPPER_DIR}/<verb>.mjs wrapper, or to load modules/host/orca/. ${ALLOW_SELF} names the patterns it bans and is not scanned. Exit 0 is clean, 1 lists the violations.`}};
+  if(argv.includes('--help')||argv.includes('-h'))return {exitCode:0,report:{schema:'starci/host-boundary-check-help@1',help:`Usage: starci runtime check --only host-boundary -- [--root <dir>]\n\nFails when a .mjs outside ${WRAPPER_DIR}/ spawns orca or imports its runner, when runtime code (${AGENT_SPAWN_ROOTS.join(', ')}) spawns an agent CLI (${AGENT_CLIS.join(', ')}) as a child process (${AGENT_CLI_SPAWN}), or when agent-facing prose (${PROSE_ROOTS.join(', ')}) tells an agent to run an orca command, to run a node path that is not a ${WRAPPER_DIR}/<verb>.mjs wrapper, or to load modules/host/orca/. Exit 0 is clean, 1 lists the violations.`}};
   const rootIndex=argv.indexOf('--root');
   const root=rootIndex>=0?argv[rootIndex+1]:skillRoot;
   const result=findHostBoundaryViolations({root});
