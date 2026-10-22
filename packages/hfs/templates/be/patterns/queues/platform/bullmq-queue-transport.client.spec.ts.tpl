@@ -93,7 +93,7 @@ describe("BullmqQueueTransportClient", () => {
         })
         const processor = factory.worker.mock.calls[0]?.[1]
         await processor?.(mock<BullmqJob>({ id: "job-1", data: { orderId: "order-1" }, attemptsMade: 2 }))
-        await processor?.(mock<BullmqJob>({ id: undefined, data: { orderId: "order-2" }, attemptsMade: 0 }))
+        await processor?.({ data: { orderId: "order-2" }, attemptsMade: 0 } satisfies BullmqJob)
 
         expect(handler.handle).toHaveBeenNthCalledWith(1, {
             id: "job-1",

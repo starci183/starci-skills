@@ -4,12 +4,11 @@ import { Badge, type BadgeTone } from "@starci/grammar/common"
 type StatusChipProps = {
     readonly label: string
     readonly tone: BadgeTone
-    readonly isSkeleton?: boolean
 }
 
 /** Leaf: one pill-shaped status label. */
 export const StatusChip = (props: StatusChipProps) => (
-    <Badge tone={props.tone} isSkeleton={props.isSkeleton}>
+    <Badge tone={props.tone}>
         {props.label}
     </Badge>
 )

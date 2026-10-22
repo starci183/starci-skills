@@ -806,7 +806,7 @@ no contract copy under `fe/`.
   `all`. No ESLint formatting rule exists. Pre-commit runs `prettier --check` on the staged files, and CI enters the format check through `starci gate run --root <app>` (R19).
 - **Pins.** `canon-pins.yaml` holds exact versions. One version per dependency across the root and workspace manifests, root `overrides` for
   react, next and grammar, no nested copies (R14, R15). Raising a version is a change in `.claude` first, then each app
-  moves to the new pin in its own upgrade lane. `tsconfig` extends `@starci/tsconfig` with `strict`, `noUncheckedIndexedAccess`,
+  moves to the new pin in its own upgrade lane. `tsconfig` extends `@starci/tsconfig` with `strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`,
   `noImplicitOverride`, `noFallthroughCasesInSwitch`, `allowJs: false` and never lowers a flag (R22).
 - **Size budgets.** Backend file 500 lines, function 80, `app.module.ts` 250, `<app>.options.ts` 200, `compose/<area>.ts` 120,
   `main.ts` 80 (absolute, R246), owner `index.ts` 60 exports (integration provider entries 80), feature 250 source

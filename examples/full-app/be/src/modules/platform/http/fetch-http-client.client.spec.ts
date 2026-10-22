@@ -53,7 +53,8 @@ describe("FetchHttpClient JSON requests", () => {
             client.request({ method: "GET", url: "https://service.test/health", timeoutMs: 2500 }),
         ).resolves.toEqual({ status: 204, body: undefined })
 
-        expect(fetch).toHaveBeenCalledWith("https://service.test/health", objectLike({ headers: {}, body: undefined }))
+        expect(fetch).toHaveBeenCalledWith("https://service.test/health", objectLike({ headers: {} }))
+        expect(jest.mocked(fetch).mock.calls[0]?.[1]).not.toHaveProperty("body")
     })
 })
 

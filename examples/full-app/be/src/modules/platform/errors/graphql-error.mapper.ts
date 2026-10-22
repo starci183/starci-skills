@@ -23,8 +23,8 @@ export const formatGraphqlError = (
     const description = describeGraphqlFailure(errors, error)
     return {
         message: description.code,
-        locations: formatted.locations,
-        path: formatted.path,
+        ...(formatted.locations === undefined ? {} : { locations: formatted.locations }),
+        ...(formatted.path === undefined ? {} : { path: formatted.path }),
         extensions: { code: description.code, kind: description.kind, params: description.params },
     }
 }

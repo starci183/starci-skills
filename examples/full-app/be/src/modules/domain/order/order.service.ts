@@ -65,7 +65,7 @@ export class OrderService {
         const evaluation = evaluateCheckout(lines, products)
         if (evaluation.kind === "refused") return evaluation
         const placed = await this.entityManager.transaction(async (manager) => {
-            const confirmed = await this.confirm({ manager, personId, plan: evaluation.value, idempotencyKey })
+            const confirmed = await this.confirm({ manager, personId, plan: evaluation.value, ...(idempotencyKey === undefined ? {} : { idempotencyKey }) })
             if (!confirmed.replayed) {
                 await this.bus.publish(
                     OrderPlacedEvent.create({

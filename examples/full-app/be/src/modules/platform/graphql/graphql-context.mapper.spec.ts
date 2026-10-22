@@ -14,8 +14,8 @@ const connectionExtra = (
     remoteAddress?: string,
     authorization?: string,
 ): ConnectionExtra => ({
-    request: { headers, socket: { remoteAddress } },
-    authorization,
+    request: { headers, socket: remoteAddress === undefined ? {} : { remoteAddress } },
+    ...(authorization === undefined ? {} : { authorization }),
 })
 
 const SUBJECT: unique symbol = Symbol("graphql/graphql-context.mapper")

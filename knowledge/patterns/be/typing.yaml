@@ -27,7 +27,7 @@ rules:
     requirement: |-
       Use `interface` for object shapes and `type` for unions, intersections and aliases; arrays are `Array<T>` or
       `ReadonlyArray<T>`. `tsconfig.json` is `{ "extends": "@starci/tsconfig/be.json", "compilerOptions": { "paths": <the three aliases> } }`
-      and nothing else; `be.json` sets `strict`, `noUncheckedIndexedAccess`, `noImplicitOverride`, `noImplicitReturns`,
+      and nothing else; `be.json` sets `strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `noImplicitOverride`, `noImplicitReturns`,
       `noFallthroughCasesInSwitch`, `noUnusedLocals`, `noUnusedParameters`, `allowJs: false`, `isolatedModules`,
       `experimentalDecorators` and `emitDecoratorMetadata`, and an app lowers no flag. TypeScript types do not validate
       untrusted runtime data.

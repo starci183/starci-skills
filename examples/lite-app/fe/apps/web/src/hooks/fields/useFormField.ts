@@ -16,8 +16,12 @@ export const useFormField = <TValues extends FieldValues>(
 ): FormFieldBinding => {
     const { field, fieldState } = useController({ control, name })
     const value: unknown = field.value
+    const message = fieldState.error?.message
     return {
-        state: { value: typeof value === "string" ? value : "", errorMessage: fieldState.error?.message },
+        state: {
+            value: typeof value === "string" ? value : "",
+            ...(message === undefined ? {} : { errorMessage: message }),
+        },
         on: { change: field.onChange, blur: field.onBlur },
     }
 }

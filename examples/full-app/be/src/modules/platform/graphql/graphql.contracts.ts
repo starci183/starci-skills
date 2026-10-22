@@ -32,14 +32,6 @@ export interface ConnectionSocket {
     readonly remoteAddress?: string
 }
 
-/** What the connection handler of the subscription server receives when a client initialises: its params and its extras. */
-export interface SubscriptionConnection {
-    /** The params the client sent when it initialised the connection. */
-    readonly connectionParams?: Readonly<Record<string, unknown>>
-    /** The extras the server keeps for the connection, unchecked. */
-    readonly extra: unknown
-}
-
 /** What the app reads of the upgrade request of a subscription connection. */
 export interface ConnectionRequest {
     /** The request headers. */

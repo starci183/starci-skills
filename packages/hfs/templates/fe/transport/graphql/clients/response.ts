@@ -6,7 +6,7 @@ const TRANSPORT_FAILED = "TRANSPORT_FAILED"
 
 /** What an Apollo query or mutation resolves to under the `all` error policy: the data it got and the error it met. */
 export interface ApolloOutcome<TData> {
-    readonly data?: TData | null
+    readonly data: TData | null | undefined
     readonly error?: unknown
 }
 

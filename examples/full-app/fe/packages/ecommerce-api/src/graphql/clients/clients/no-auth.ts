@@ -12,7 +12,7 @@ import type { ErrorReporter } from "../links/error"
 /** What the anonymous client takes: the service's GraphQL endpoint, the abort signal and the error reporter. */
 export interface CreateNoAuthApolloClientOptions {
     readonly uri: string
-    readonly signal?: AbortSignal
+    readonly signal: AbortSignal | undefined
     readonly report?: ErrorReporter
 }
 

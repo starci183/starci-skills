@@ -8,7 +8,7 @@ import type { GraphqlContext } from "./graphql.contracts"
 import { localizeError, localizeErrorsPlugin } from "./localize-errors.mapper"
 
 const singleResponse = (errors?: ReadonlyArray<GraphQLFormattedError>): GraphQLResponse =>
-    mock<GraphQLResponse>({ body: { kind: "single", singleResult: { errors } } })
+    mock<GraphQLResponse>({ body: { kind: "single", singleResult: errors === undefined ? {} : { errors } } })
 
 const requestContext = (
     response: GraphQLResponse,

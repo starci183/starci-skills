@@ -14,7 +14,8 @@ export const isConnectionExtra = (value: unknown): value is ConnectionExtra =>
 
 /** Keeps the Authorization connection param on the connection when a subscription client initialises it. */
 export const rememberAuthorization = (params: ConnectionParams | undefined, extra: ConnectionExtra): void => {
-    extra.authorization = typeof params?.authorization === "string" ? params.authorization : undefined
+    if (typeof params?.authorization === "string") extra.authorization = params.authorization
+    else delete extra.authorization
 }
 
 /** The context of an operation: the HTTP pair as it arrived, or the request built from the subscription connection. */

@@ -60,15 +60,17 @@ export default defineConfig({
         trace: "retain-on-failure",
         screenshot: "only-on-failure",
     },
-    webServer: IS_LOCAL
+    ...(IS_LOCAL
         ? {
-              command: "npm run start -w @full-app/app",
-              cwd: APP_ROOT,
-              url: `${BASE_URL}/en/browse`,
-              env: { PORT: String(SHOP_PORT) },
-              reuseExistingServer: true,
-              timeout: 180_000,
+              webServer: {
+                  command: "npm run start -w @full-app/app",
+                  cwd: APP_ROOT,
+                  url: `${BASE_URL}/en/browse`,
+                  env: { PORT: String(SHOP_PORT) },
+                  reuseExistingServer: true,
+                  timeout: 180_000,
+              },
           }
-        : undefined,
+        : {}),
     projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
 })

@@ -8,7 +8,7 @@ type OrderSummaryProps = {
     readonly amount: string
     readonly customerTerm: string
     readonly amountTerm: string
-    readonly isSkeleton?: boolean
+    readonly isSkeleton: boolean
 }
 
 /** Composite: several leaves in one reusable unit. No interaction, no product data of its own. */

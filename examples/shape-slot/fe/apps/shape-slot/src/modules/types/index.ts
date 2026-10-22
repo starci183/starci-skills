@@ -43,7 +43,7 @@ export type Slot<T> = {
     readonly isLoading?: boolean
     readonly isForbidden?: boolean
     readonly isError?: boolean
-    readonly items?: T
+    readonly items: T | undefined
 }
 
 /** Resolved copy of the data-status recipe for one slot. */

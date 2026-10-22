@@ -109,7 +109,7 @@ describe("CredentialGuard", () => {
         async (params) => {
             const metadata = { kind: "tool-token", workflow: "checkout" } as const
             const { guard, authenticator } = await build(metadata, PRINCIPAL)
-            const request: FakeRequest = { headers: {}, params }
+            const request: FakeRequest = { headers: {}, ...(params === undefined ? {} : { params }) }
 
             await expect(guard.canActivate(contextOf(request))).resolves.toBe(true)
             expect(authenticator.authenticate).toHaveBeenCalledWith(metadata, "", undefined)

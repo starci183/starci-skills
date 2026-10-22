@@ -17,8 +17,8 @@ export const handoffSchema: z.ZodType<Handoff> = z.object({
     status: z.enum(["prepared", "sent", "returned"]),
     fingerprint: z.string(),
     revision: z.number(),
-    receiptId: z.string().optional(),
-    reason: z.string().optional(),
+    receiptId: z.string().exactOptional(),
+    reason: z.string().exactOptional(),
 })
 
 /** The wire shape of the recorded send attempts. */

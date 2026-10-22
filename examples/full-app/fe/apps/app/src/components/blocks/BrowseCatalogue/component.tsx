@@ -84,7 +84,7 @@ export const BrowseCatalogueBase = (props: BrowseCatalogueBaseProps) => {
                                 key={product.id}
                                 name={product.name}
                                 price={product.price}
-                                imageUrl={product.imageUrl}
+                                {...(product.imageUrl === undefined ? {} : { imageUrl: product.imageUrl })}
                             >
                                 <Text as="p" size="sm" tone="muted">
                                     {props.props.stockLabel.replace("{count}", String(product.stock))}

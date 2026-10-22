@@ -70,7 +70,7 @@ export class @@Channel@@WebsocketModule extends ConfigurableModuleClass implemen
     }
 
     private async authenticate(client: @@Channel@@Socket): Promise<void> {
-        client.data.principal = undefined
+        delete client.data.principal
         const token = client.handshake.auth.accessToken
         if (typeof token !== "string" || token.length === 0) throw new Error("Unauthorized")
         const verified = await this.verifyAccessToken(token)

@@ -8,7 +8,7 @@ export interface SignInFormBaseProps {
         readonly emailLabel: string
         readonly passwordLabel: string
         readonly submitLabel: string
-        readonly failure?: string
+        readonly failure: string | undefined
     }
     readonly on: { readonly submit: (input: FormData) => void }
 }

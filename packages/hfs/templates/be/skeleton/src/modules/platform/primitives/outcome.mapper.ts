@@ -8,7 +8,7 @@ export const ok = <V>(value: V): OutcomeOk<V> => ({ kind: "ok", value })
 export const refused = <C extends string>(code: C, params?: ErrorParams): OutcomeRefused<C> => ({
     kind: "refused",
     code,
-    params,
+    ...(params === undefined ? {} : { params }),
 })
 
 /**
@@ -20,5 +20,5 @@ export const unwrapOutcome = <V, C extends K, K extends string>(
     ErrorClass: OutcomeErrorClass<K>,
 ): V => {
     if (outcome.kind === "ok") return outcome.value
-    throw new ErrorClass({ code: outcome.code, params: outcome.params })
+    throw new ErrorClass({ code: outcome.code, ...(outcome.params === undefined ? {} : { params: outcome.params }) })
 }

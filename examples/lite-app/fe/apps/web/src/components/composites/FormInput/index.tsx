@@ -29,14 +29,14 @@ export const FormInput = (props: FormInputProps) => (
     <Input
         id={props.input.id}
         name={props.input.name}
-        kind={props.input.kind}
-        placeholder={props.input.placeholder}
+        {...(props.input.kind === undefined ? {} : { kind: props.input.kind })}
+        {...(props.input.placeholder === undefined ? {} : { placeholder: props.input.placeholder })}
         label={props.field.label}
         isRequired
         value={props.field.value}
         onValueChange={props.onChange}
         onBlur={props.onBlur}
-        errorMessage={props.field.errorMessage}
+        {...(props.field.errorMessage === undefined ? {} : { errorMessage: props.field.errorMessage })}
         isError={props.field.errorMessage !== undefined}
     />
 )

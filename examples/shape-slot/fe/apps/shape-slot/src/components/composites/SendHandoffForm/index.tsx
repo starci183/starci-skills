@@ -19,14 +19,14 @@ type SendHandoffFormLabels = {
 /** One field as atoms: its value and its already-translated error, if any. */
 type SendHandoffFormField = {
     readonly value: string
-    readonly error?: string
+    readonly error: string | undefined
 }
 
 /** Atoms only: react-hook-form stays in the connected half; the composite sees values and errors. */
 export type SendHandoffFormData = {
     readonly isOpen: boolean
     readonly isSending: boolean
-    readonly error?: string
+    readonly error: string | undefined
     readonly fingerprint: SendHandoffFormField
     readonly revision: SendHandoffFormField
     readonly note: SendHandoffFormField

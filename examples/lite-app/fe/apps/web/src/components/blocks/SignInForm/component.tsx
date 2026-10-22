@@ -8,7 +8,7 @@ export interface SignInFormBaseProps {
     readonly props: {
         readonly title: string
         readonly submitLabel: string
-        readonly failure?: string
+        readonly failure: string | undefined
         readonly email: FormInputField
         readonly password: FormInputField
     }

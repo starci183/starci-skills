@@ -25,8 +25,8 @@ export const StateBlock = (props: StateBlockProps) => (
     <div className={stateBlockClassNames.frame}>
         <EmptyNotice
             message={props.title}
-            description={props.description}
-            iconSource={props.mascot ? DuckMascot : undefined}
+            {...(props.description === undefined ? {} : { description: props.description })}
+            {...(props.mascot ? { iconSource: DuckMascot } : {})}
         />
         {props.children}
     </div>

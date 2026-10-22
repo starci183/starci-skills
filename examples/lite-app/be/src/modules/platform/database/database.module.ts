@@ -9,6 +9,9 @@ import { PRIMARY_CONNECTION } from "./primary.connection"
 import { PRIMARY_ENTITY_MANAGER } from "./primary.decorators"
 import { SeedRunnerService } from "./seed-runner.service"
 
+/** The `schema` option of a connection, left out when the connection names none. */
+const schemaOption = (schema: string | undefined): Partial<Record<"schema", string>> => (schema === undefined ? {} : { schema })
+
 /** The token each declared connection provides its shared EntityManager under. */
 type EntityManagerToken = typeof PRIMARY_ENTITY_MANAGER
 
@@ -43,7 +46,7 @@ export class DatabaseModule extends ConfigurableModuleClass {
                         name: connection.name,
                         type: "postgres",
                         url: connection.url.reveal(),
-                        schema: connection.schema,
+                        ...schemaOption(connection.schema),
                         synchronize: false,
                         retryAttempts: 2,
                     }),

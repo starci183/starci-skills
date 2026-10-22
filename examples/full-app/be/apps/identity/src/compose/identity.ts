@@ -19,7 +19,7 @@ export function identityModules(options: IdentityAppOptions): Array<DynamicModul
             isGlobal: true,
             verifier: SessionService,
             credentialAuthenticator: ServiceKeyService,
-            serviceKeys: options.identity.serviceKeys,
+            ...options.identity,
         }),
     ]
 }

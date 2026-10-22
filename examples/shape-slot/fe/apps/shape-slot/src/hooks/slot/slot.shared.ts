@@ -2,7 +2,7 @@ import type { Slot } from "@/modules/types"
 
 /** The part of a query result a slot is derived from. */
 type SlotSource<T> = {
-    readonly data?: T
+    readonly data: T | undefined
     readonly isLoading: boolean
     readonly error?: { readonly status?: number }
 }

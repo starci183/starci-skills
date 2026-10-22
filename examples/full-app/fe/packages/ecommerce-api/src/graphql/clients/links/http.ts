@@ -4,7 +4,7 @@ import { HttpLink } from "@apollo/client"
 export interface CreateHttpLinkParams {
     readonly uri: string
     readonly withCredentials?: boolean
-    readonly signal?: AbortSignal
+    readonly signal: AbortSignal | undefined
 }
 
 /** The terminal link: POSTs the operation to the GraphQL endpoint of the back-end service the app names. */
@@ -12,5 +12,5 @@ export const createHttpLink = ({ uri, withCredentials = false, signal }: CreateH
     new HttpLink({
         uri,
         credentials: withCredentials ? "include" : "same-origin",
-        fetchOptions: { signal },
+        fetchOptions: signal === undefined ? {} : { signal },
     })
