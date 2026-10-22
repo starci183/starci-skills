@@ -1,5 +1,5 @@
 // db dump archives its plaintext parts with tar run inside the scratch directory, relative names only: GNU tar (first on PATH
-// under Git Bash on Windows) reads an absolute `C:\...` argument as a remote host, which failed every backup there.
+// under Git Bash on Windows) reads an absolute drive-letter argument as a remote host, which failed every backup there.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';

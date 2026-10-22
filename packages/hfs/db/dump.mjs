@@ -22,7 +22,7 @@ export const ARCHIVE_NAME = 'backup.tar';
 
 /**
  * Archive `parts` of `scratch` into scratch/backup.tar. tar runs inside scratch with relative names only: no -C and no
- * absolute path, because GNU tar (Git Bash puts it first on Windows) reads `C:\...` as a remote `host:path`, while bsdtar
+ * absolute path, because GNU tar (Git Bash puts it first on Windows) reads a drive-letter path (the `C:` of an absolute Windows path) as a remote `host:path`, while bsdtar
  * does not; relative arguments mean the same to both. Returns the archive's absolute path.
  */
 export function archiveParts(ctx, scratch, parts) {
