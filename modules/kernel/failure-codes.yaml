@@ -20696,6 +20696,16 @@ provision-goal-grant-unsupported:
   owner: runtime-core
   kind: verb-refusal
 
+provision-journal-blob-refused:
+  title: "Provision journal blob refused"
+  title_vi: "Provision journal không lưu được blob"
+  meaning_vi: "Ledger không giữ dòng blobs cho plan, receipt hoặc metadata của operation, nên operation không được ghi vào journal."
+  causes_vi:
+    - "Dòng blobs bị ràng buộc của ledger từ chối (ví dụ một redaction claim ngoài v1, binary hoặc NULL) và INSERT OR IGNORE bỏ qua nó."
+  nextStep_vi: "Sửa bản ghi blob của provision theo ràng buộc của engine/db/schema/runtime.sql rồi chạy lại cùng --operation; không sửa ledger tay."
+  owner: runtime-core
+  kind: runtime-fault
+
 provision-journal-recovery-required:
   title: "Provision journal recovery required"
   title_vi: "Provision journal cần recovery"

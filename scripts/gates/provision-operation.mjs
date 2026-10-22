@@ -34,16 +34,34 @@ const PUBLIC_FAILURES = new Set(['provider-operation-failed', 'provision-action-
   'provision-native-caller-unverified', 'provision-native-attempt-unverified', 'provision-native-attempt-stale',
   'provision-native-placement-unverified', 'provision-goal-grant-stale', 'provision-filed-contract-unverified',
   'provision-operation-id-invalid', 'provision-operation-intent-conflict', 'provision-accept-state-refused', 'provision-executor-stale', 'provision-state-invalid',
-  'provision-goal-grant-unsupported', 'provision-goal-grant-unaccepted', 'provision-goal-grant-missing', 'provision-goal-grant-refused']);
+  'provision-goal-grant-unsupported', 'provision-goal-grant-unaccepted', 'provision-goal-grant-missing', 'provision-goal-grant-refused',
+  'provision-journal-blob-refused']);
 const OUTCOME_CODES = Object.freeze({ applied: 'provider-write-applied', verified: 'provider-result-verified', failed: 'provider-operation-failed', unknown: 'provider-outcome-unknown', partial: 'provider-operation-partial' });
 const safeCode = code => PUBLIC_FAILURES.has(code) ? code : 'provider-operation-failed';
 
 /** Return one closed, value-free CLI refusal without serializing an exception or provider body. */
-const provisionRefusal = code => ({ code: 2, data: { schema: 'starci/provision-operation@1', ok: false, code: safeCode(code) } });
+const provisionRefusal = (code, detail) => ({ code: 2, data: { schema: 'starci/provision-operation@1', ok: false, code: safeCode(code),
+  ...(detail ? { detail } : {}) } });
 
+/**
+ * The non-secret line an unclassified failure carries beside provider-operation-failed: the error's own code (an identifier such as
+ * ERR_SQLITE_ERROR) or its class name, never its message, which may quote a provider body or a value.
+ */
+const IDENTIFIER = /^[A-Za-z][A-Za-z0-9_.-]{0,63}$/u;
+const unclassifiedDetail = error => {
+  const id = [error?.code, error?.name].find(value => typeof value === 'string' && IDENTIFIER.test(value));
+  const named = id ? ' ' + id : '';
+  return `unclassified runtime failure${named}; the operation journal holds its state`;
+};
+
+/**
+ * Store a public provision record (plan, receipt, metadata): it carries no private value, so its redaction claim is NULL ("not
+ * needed"), the only claim besides 'v1' and 'binary' that blobs.redaction admits. A blob row the ledger did not keep refuses.
+ */
 function blob(ledger, value) {
   const stored = putBlob(Buffer.from(canonicalJSON(structuredClone(value))), { mediaType: 'application/json' });
-  ledger.write.recordBlob({ sha256: stored.sha, bytes: stored.size, mediaType: stored.mediaType, fileUri: blobPath(stored.sha), redaction: 'public-provision-record' });
+  const row = ledger.write.recordBlob({ sha256: stored.sha, bytes: stored.size, mediaType: stored.mediaType, fileUri: blobPath(stored.sha), redaction: null });
+  if (row?.sha256 !== stored.sha) throw fail('provision-journal-blob-refused');
   return stored.sha;
 }
 
@@ -273,12 +291,13 @@ function recoveryState(state, error) {
 function recoverOperation(state, error) {
   const owned = failures.has(error) || isProvisionCustodyFailure(error) || isProvisionOperationFailure(error);
   const code = owned ? safeCode(error.code) : 'provider-operation-failed';
+  const detail = code === 'provider-operation-failed' ? unclassifiedDetail(error) : undefined;
   if (state.accepted && state.row?.state === 'running') {
     try { state.row = state.ledger.write.updateProvisionOperation({ operationId: state.row.operation_id, generation: state.row.generation,
       state: recoveryState(state, error), code }); }
     catch { return provisionRefusal('provision-journal-recovery-required'); }
   }
-  return provisionRefusal(code);
+  return provisionRefusal(code, detail);
 }
 
 function closeOperation(state) {

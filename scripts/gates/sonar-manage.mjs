@@ -37,6 +37,24 @@ const research = Object.freeze({readAt: '2026-10-19', sources: [
   'Token values cannot be retrieved after generation; unknown effects require reconciliation.'],
 verification: 'Fixture behavior and native scaffold qualification precede separately authorized live provider and consumer proof.'});
 
+/**
+ * The non-secret cause of a refused Sonar action: the refusal's code (provision-target-unknown, sonar-host-credential-unavailable)
+ * or one of this module's own declaration sentences, never a provider body, a path or a value. Null when neither applies.
+ */
+const refusalDetail = error => {
+  if (typeof error?.code === 'string' && /^[a-z][a-z0-9-]{0,63}$/u.test(error.code)) return error.code;
+  const message = typeof error?.message === 'string' ? error.message : '';
+  return /^[A-Z][A-Za-z ,'-]{0,119}$/u.test(message) ? message : null;
+};
+
+/** The public result of a refused Sonar action, with its non-secret detail when one applies. */
+const refusedAction = error => {
+  const detail = refusalDetail(error);
+  const named = detail ? ' (' + detail + ')' : '';
+  return {code: 2, data: {ok: false, code: 'sonar-managed-execution-failed', ...(detail ? {detail} : {})},
+    text: `Sonar action refused${named}; check the declared target, action scope and private credential references.`};
+};
+
 const selectedRows = (rows, field, selected) => {
   if (!Array.isArray(rows) || !rows.length || rows.length > 100 || rows.some(row => !row || typeof row !== 'object')
       || new Set(rows.map(row => row[field])).size !== rows.length) throw new Error('Sonar target does not declare unique selected resources');
@@ -455,8 +473,8 @@ export async function runSonarManage(ctx) {
       apply: callbacks => executeAction({verb, action, target, request, callbacks, reconcile: false, env: ctx.env}),
       reconcile: callbacks => executeAction({verb, action, target, request, callbacks, reconcile: true, env: ctx.env}),
     });
-  } catch {
-    return {code: 2, data: {ok: false, code: 'sonar-managed-execution-failed'}, text: 'Sonar action refused; check the declared target, action scope and private credential references.'};
+  } catch (error) {
+    return refusedAction(error);
   }
 }
 
