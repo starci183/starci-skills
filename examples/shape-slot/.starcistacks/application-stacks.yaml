@@ -3,7 +3,7 @@ schema: starci/application-stacks@1
 ci:
   github: {repository: starci183/starci-skills, defaultBranch: main, workflow: examples.yml}
   secrets:
-    - {name: SONAR_TOKEN, scope: repository, purpose: Optional SonarCloud analysis token for the public example, optional: true}
+    - {name: SONAR_TOKEN, scope: repository, purpose: SonarCloud analysis token for the public example}
     - {name: SOPS_AGE_KEY, scope: repository, purpose: Documentation-only deploy age identity; this example has no real deploy, optional: true}
     - {name: VPS_SSH_KEY, scope: repository, purpose: Documentation-only deploy SSH key; this example has no real deploy, optional: true}
     - {name: VPS_KNOWN_HOSTS, scope: repository, purpose: Documentation-only pinned host keys; this example has no real deploy, optional: true}
@@ -44,13 +44,13 @@ services:
     runtimeSecrets: [SONAR_TOKEN]
     ci:
       workflow: .github/workflows/examples.yml
-      wiring: optional-follow-up
+      wiring: required
       token: SONAR_TOKEN
       hostVar: SONAR_HOST_URL
       organizationVar: SONAR_ORGANIZATION
       provisioning: >-
         The runtime tag workflow scans only when the host repository has the secret SONAR_TOKEN and the variables SONAR_HOST_URL and SONAR_ORGANIZATION;
-        the project key on SonarCloud is <SONAR_ORGANIZATION>_<key above>. The rendered app CI leaves analysis as an optional follow-up.
+        the project key on SonarCloud is <SONAR_ORGANIZATION>_<key above>. The rendered app CI requires the analysis.
         The release cut scans with the SONAR_TOKEN of the runtime's secret.env and the organization of the runtime's config.yaml (sonar.organization).
     ownerAction:
       needed: SONAR_TOKEN (a SonarCloud token) in .claude/secret.env and as the repository secret, the SonarCloud organization key as config.yaml sonar.organization and as the repository variable SONAR_ORGANIZATION.
@@ -64,7 +64,7 @@ services:
     target: 100
     components: auto
     required: true
-    ci: {wiring: optional-follow-up, workflow: .github/workflows/examples.yml}
+    ci: {wiring: required, workflow: .github/workflows/examples.yml}
     ownerAction: none
   dependabot:
     provider: github
@@ -91,5 +91,5 @@ services:
     host: {public: 'https://ghcr.io'}
     auth: github-token
     projects: [{repository: shape-slot, key: shape-slot}]
-    ci: {wiring: optional-follow-up}
+    ci: {wiring: required}
     ownerAction: none

@@ -7,18 +7,19 @@ name: examples
 #
 # The release candidate: a push of release/candidate-<version> runs the same automatic steps as the tag push (no Codecov or Sonar upload), and
 # `starci release cut` waits for that run of the release sha before main and the tag move (OWNER RULING candidate-ci, 2026-10-18).
-# Two triggers, one workflow (owner ruling: e2e runs manually only; rule CI_TRIGGERS_RELEASE_ONLY: CI runs once per release):
+# Two triggers, one workflow (rule CI_TRIGGERS_RELEASE_ONLY: CI runs once per release):
 #   push of a v* tag      per app: install, typecheck (tsc over be, then turbo over the fe workspaces), starci app lint (with the Sonar import file),
 #                         the unit project with coverage (per-file 100 on the logic of be/src/modules/**; it writes be/coverage/lcov.info), the Codecov
 #                         upload under the app's flag, the be build (tsc and tsc-alias) and the fe build (turbo, the packages first, then
 #                         every Next app), and the Sonar scan and quality gate where a server is configured
-#                         (SonarCloud: secrets.SONAR_TOKEN and vars.SONAR_ORGANIZATION, the same the runtime's ci.yml reads; project <organization>_starci-example-<app>; otherwise the job notes the skip). A second job, `images`, builds the
+#                         (SonarCloud: secrets.SONAR_TOKEN and vars.SONAR_ORGANIZATION, the same the runtime's ci.yml reads; project <organization>_starci-example-<app>; a missing setting fails the job). A second job, `images`, builds the
 #                         deployable images declared by every example (full: be+fe; lite: be only; the matrix is
 #                         `check-examples-ci.mjs --images`) and never pushes
-#   workflow_dispatch     the same, plus the layers that start the docker stack through the test world, chosen by the
-#                         `layers` input: integration, e2e, or both. They never run on a tag push (npm run check
-#                         refuses an integration or e2e step that is not gated on workflow_dispatch). A third manual job,
-#                         `browser`, runs each app's one Playwright journey against a stack it provisions itself.
+#                         The layers that start the docker stack through the test world (integration, and e2e for a full app) run in
+#                         every one of these runs, after the unit project (npm run check refuses an integration or e2e step that a
+#                         workflow_dispatch condition gates), and so does the `browser` job: each app's one Playwright journey against a
+#                         stack it provisions itself.
+#   workflow_dispatch     the same run on demand.
 # The release cut's Sonar proof (scripts/supervisor/release-l4-sonar.mjs) reads the same projects on SonarCloud with the dashboard gate (scripts/gates/sonar-local.mjs dashboard).
 #
 # Codecov and Sonar upload only in the tag run (startsWith(github.ref, refs/tags/v)): a manual dispatch checks the app but publishes no measurement.
@@ -31,12 +32,6 @@ on:
     branches: ['release/candidate-*']
     tags: ['v*']
   workflow_dispatch:
-    inputs:
-      layers:
-        description: The docker-stack layers to run on top of the automatic steps (manual only)
-        type: choice
-        options: [integration-and-e2e, integration, e2e]
-        default: integration-and-e2e
 
 permissions:
   contents: read
@@ -206,37 +201,44 @@ jobs:
           restore-keys: turbo-${{ matrix.app }}-
       - name: Front-end build
         run: npm run build:fe
-      # Manual only: the docker-stack layers run on workflow_dispatch, never on the tag push.
-      - name: Integration tests (test world, manual)
-        if: ${{ steps.policy.outputs.tests == 'true' && github.event_name == 'workflow_dispatch' && contains(inputs.layers, 'integration') }}
+      # The docker-stack layers run in every run of this workflow (the candidate, the tag and a dispatch), after the unit project.
+      - name: Integration tests (test world)
+        if: ${{ !cancelled() && steps.policy.outputs.tests == 'true' }}
         run: npm run test:integration -- --ci
-      - name: E2E tests (test world, manual)
-        if: ${{ steps.policy.outputs.tests == 'true' && steps.policy.outputs.e2e == 'true' && github.event_name == 'workflow_dispatch' && contains(inputs.layers, 'e2e') }}
+      - name: E2E tests (test world)
+        if: ${{ !cancelled() && steps.policy.outputs.tests == 'true' && steps.policy.outputs.e2e == 'true' }}
         run: npm run test:e2e -- --ci
+      # Sonar is required in the tag run: a missing setting fails the job here with the names of what is missing.
+      - name: Sonar settings
+        if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/v') }}
+        run: |
+          missing=""
+          [ -z "$SONAR_TOKEN" ] && missing="$missing secrets.SONAR_TOKEN"
+          [ -z "$SONAR_ORGANIZATION" ] && missing="$missing vars.SONAR_ORGANIZATION"
+          if [ -n "$missing" ]; then
+            echo "::error title=Sonar settings missing::${{ matrix.app }} cannot be scanned; missing repository settings:$missing"
+            exit 1
+          fi
       - name: Sonar scan
-        if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/v') && env.SONAR_TOKEN != '' && env.SONAR_ORGANIZATION != '' }}
+        if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/v') }}
         uses: SonarSource/sonarqube-scan-action@c7ee0f9df90b7aa20e8dcf9695dcfe2e7da5b4f2 # v7.2.1
         with:
           projectBaseDir: ${{ env.APP_DIR }}
           args: -Dsonar.organization=${{ env.SONAR_ORGANIZATION }} -Dsonar.projectKey=${{ env.SONAR_ORGANIZATION }}_starci-example-${{ matrix.app }}
       - name: Sonar quality gate
-        if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/v') && env.SONAR_TOKEN != '' && env.SONAR_ORGANIZATION != '' }}
+        if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/v') }}
         uses: SonarSource/sonarqube-quality-gate-action@7a5fffe8e523c40e0c740b6bc2712ab503e52efa # v1.2.1
         timeout-minutes: 10
         with:
           scanMetadataReportFile: ${{ env.APP_DIR }}/.scannerwork/report-task.txt
-      - name: Sonar skipped (no server configured)
-        if: ${{ startsWith(github.ref, 'refs/tags/v') && (env.SONAR_TOKEN == '' || env.SONAR_ORGANIZATION == '') }}
-        run: echo "::notice title=Sonar skipped::SonarCloud is not configured for this repository (secrets.SONAR_TOKEN and vars.SONAR_ORGANIZATION, the runtime's own ci.yml settings), so ${{ matrix.app }} was not scanned."
 
-  # The one Playwright journey of each example app (owner ruling: manual only, like the docker-stack layers). It
+  # The one Playwright journey of each example app, in every run like the docker-stack layers. It
   # provisions the whole product itself: ephemeral env values for the compose services (never the sealed demo
   # secrets), the infra containers, migrations and seeds, the host-run apis, and the built shop app that
   # Playwright's webServer serves.
   browser:
     name: browser ${{ matrix.app }}
     needs: apps
-    if: ${{ github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     strategy:

@@ -7,7 +7,7 @@
 //   .github/workflows/examples.yml  one workflow whose job matrix is THIS module's `--matrix` output (every examples/*
 //                                   folder whose hfs.json is of kind app): install, typecheck, lint, unit with coverage,
 //                                   the Codecov upload under the app's flag, the front-end build and the Sonar gate on
-//                                   push and pull_request; integration and e2e on workflow_dispatch only (owner ruling).
+//                                   push and pull_request; integration and e2e in every run.
 //   codecov.yml                     one flag per example app, and one component per service app plus platform, rendered here from the
 //                                   same coverage scope as the app's own codecov.yml, be/jest.config.js and sonar.coverage.exclusions (the
 //                                   slot manifest's \`coverage\` field, derived once by scripts/hfs/coverage-scope.mjs), each held at 100
@@ -190,9 +190,12 @@ const matrixJobFindings = (matrixJobs, add) => {
 };
 
 const stackLayerFindings = (jobs, add) => {
-  for (const [id, job] of Object.entries(jobs)) for (const step of job?.steps ?? []) {
-    if (/\btest:(integration|e2e|contract)\b/.test(String(step.run ?? '')) && !/github\.event_name\s*==\s*'workflow_dispatch'/.test(String(step.if ?? '')))
-      add('EXAMPLES_CI_STACK_LAYER_AUTOMATIC', `${WORKFLOW}#jobs.${id}`, `the step "${step.name ?? step.run}" starts the docker stack and must run on workflow_dispatch only (if: github.event_name == 'workflow_dispatch' ...)`);
+  for (const [id, job] of Object.entries(jobs)) {
+    for (const step of job?.steps ?? []) {
+      if (/\btest:(integration|e2e|contract)\b/.test(String(step.run ?? '')) && /\bworkflow_dispatch\b/.test(String(step.if ?? '')))
+        add('EXAMPLES_CI_STACK_LAYER_AUTOMATIC', `${WORKFLOW}#jobs.${id}`, `the step "${step.name ?? step.run}" starts the docker stack and must run in every run, not only on workflow_dispatch`);
+    }
+    if (/\bworkflow_dispatch\b/.test(String(job?.if ?? ''))) add('EXAMPLES_CI_STACK_LAYER_AUTOMATIC', `${WORKFLOW}#jobs.${id}`, `the job ${id} is gated on workflow_dispatch: a layer that only a person starts is never proven`);
   }
 };
 
@@ -222,9 +225,9 @@ const workflowFindings = (doc, text, apps, add) => {
   const matrixJobs = Object.entries(jobs).filter(([id, job]) => id !== IMAGES_JOB && job?.strategy?.matrix);
   if (!matrixJobs.length) add('EXAMPLES_CI_MATRIX_NOT_DERIVED', WORKFLOW, 'no job runs the example apps as a matrix');
   matrixJobFindings(matrixJobs, add);
-  // Owner ruling: integration, e2e and contract (the docker-stack layers) run on workflow_dispatch only.
+  // Integration, e2e and contract (the docker-stack layers) run in every run, never only on workflow_dispatch.
   stackLayerFindings(jobs, add);
-  if (!doc.on?.workflow_dispatch) add('EXAMPLES_CI_NO_MANUAL_TRIGGER', WORKFLOW, 'the workflow needs a workflow_dispatch trigger for the manual integration and e2e layers');
+  if (!Object.hasOwn(doc.on ?? {}, 'workflow_dispatch')) add('EXAMPLES_CI_NO_MANUAL_TRIGGER', WORKFLOW, 'the workflow needs a workflow_dispatch trigger to run the same proof on demand');
   hardcodedAppFindings(apps, text, add);
 };
 

@@ -10,91 +10,30 @@ const exampleCommand = (source, command) => source?.runtimeExample
 
 const UPLOAD_ARTIFACT = 'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2';
 const DOWNLOAD_ARTIFACT = 'actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0';
-const SONAR_CONDITION = "${{ !cancelled() && startsWith(github.ref, 'refs/tags/v') && env.SONAR_TOKEN != '' }}";
+const SONAR_CONDITION = "${{ !cancelled() && startsWith(github.ref, 'refs/tags/v') }}";
 
-/** Optional uploads require reachable upload and authentication endpoints without exposing identity tokens. */
-function codecovProbe(codecov, condition) {
-  if (!codecov.optional) return [];
-  return [
-    '      - name: Codecov availability',
-    '        id: codecov-availability',
-    `        if: ${condition}`,
-    '        env:',
-    `          CODECOV_AUTH: ${codecov.auth}`,
-    '        run: |',
-    "          node --input-type=module <<'NODE'",
-    "          import fs from 'node:fs';",
-    '          let available = false;',
-    '          try {',
-    "            const upload = await fetch('https://ingest.codecov.io/upload/v4', { signal: AbortSignal.timeout(10000) });",
-    '            available = upload.status < 500;',
-    "            if (available && process.env.CODECOV_AUTH === 'oidc') {",
-    "              const url = new URL(process.env.ACTIONS_ID_TOKEN_REQUEST_URL);",
-    "              url.searchParams.set('audience', 'https://codecov.io');",
-    "              const identity = await fetch(url, { headers: { Authorization: 'Bearer ' + process.env.ACTIONS_ID_TOKEN_REQUEST_TOKEN }, signal: AbortSignal.timeout(10000) });",
-    '              available = identity.ok && Boolean((await identity.json()).value);',
-    '            }',
-    '          } catch { available = false; }',
-    "          fs.appendFileSync(process.env.GITHUB_OUTPUT, 'up=' + available + '\\n');",
-    "          if (!available) console.log('::notice::codecov upload skipped: upload endpoint or OIDC token unavailable (services.codecov.optional)');",
-    '          NODE',
-  ];
-}
-
-/** Optional Sonar only runs analysis when the provider reports UP within ten seconds. */
-function sonarProbe(sonar) {
-  if (!sonar.optional) return [];
-  return [
-    '      - name: Sonar availability',
-    '        id: sonar-availability',
-    `        if: ${SONAR_CONDITION}`,
-    '        run: |',
-    `          if curl -fsS --max-time 10 "$SONAR_HOST_URL/api/system/status" | node -e "let s='';process.stdin.on('data',c=>s+=c);process.stdin.on('end',()=>{try{process.exit(JSON.parse(s).status==='UP'?0:1)}catch{process.exit(1)}})"; then`,
-    '            echo "up=true" >> "$GITHUB_OUTPUT"',
-    '          else',
-    '            echo "up=false" >> "$GITHUB_OUTPUT"',
-    '            echo "::notice::sonar skipped: $SONAR_HOST_URL not reachable (services.sonar.optional)"',
-    '          fi',
-  ];
-}
-
-/** Codecov reports missing coverage without failing twice; uploads retain the release-tag condition and required authentication. */
+/** Codecov uploads on release tags with its required authentication; a missing report, an unavailable endpoint or a rejected upload fails the job. */
 function codecovSteps(lcovReport, codecov) {
   if (codecov.enabled === false || codecov.wiring === 'not-used') return [
     '      - name: coverage upload',
     '        run: echo "codecov disabled in .starcistacks/application-stacks.yaml"',
   ].join('\n');
-  const condition = `\${{ !cancelled() && startsWith(github.ref, 'refs/tags/v') && hashFiles('${lcovReport}') != '' }}`;
-  const uploadCondition = codecov.optional ? condition.replace(' }}', " && steps.codecov-availability.outputs.up == 'true' }}") : condition;
   return [
-    '      - name: coverage upload skipped',
-    `        if: \${{ !cancelled() && hashFiles('${lcovReport}') == '' }}`,
-    '        run: |',
-    `          echo "::notice::codecov upload skipped: no coverage file at ${lcovReport} (the test step failed or produced none)"`,
-    '          exit 0',
-    ...codecovProbe(codecov, condition),
     '      - name: coverage upload',
-    ...(codecov.optional ? ['        id: codecov-upload', '        continue-on-error: true'] : []),
     '        uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5.5.5',
-    `        if: ${uploadCondition}`,
+    "        if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/v') }}",
     '        with:',
     codecov.auth === 'token' ? `          token: \${{ secrets.${codecov.token} }}` : '          use_oidc: true',
     `          files: ${lcovReport}`,
     '          disable_search: true',
-    `          fail_ci_if_error: ${!codecov.optional}`,
-    ...(codecov.optional ? [
-      '      - name: Codecov upload unavailable',
-      "        if: ${{ !cancelled() && steps.codecov-upload.outcome == 'failure' }}",
-      '        run: |',
-      '          echo "::notice::codecov upload skipped: upload unavailable (services.codecov.optional)"',
-    ] : []),
+    '          fail_ci_if_error: true',
   ].join('\n');
 }
 
-/** Sonar consumes the test coverage and fast lint artifacts only on release tags with a configured token. */
+/** Sonar is required: on release tags it consumes the test coverage and lint artifacts, and a missing token fails the job with a clear refusal. */
 function sonarJob(sonar, lcovReport, lcovArtifact, nodeMajor, timeout) {
   if (!sonar) return '';
-  const condition = sonar.optional ? SONAR_CONDITION.replace(' }}', " && steps.sonar-availability.outputs.up == 'true' }}") : SONAR_CONDITION;
+  const condition = SONAR_CONDITION;
   const host = sonar.provider === 'sonarcloud' ? 'https://sonarcloud.io' : `\${{ vars.${sonar.hostVar} }}`;
   const header = [
     '  sonar:',
@@ -107,7 +46,10 @@ function sonarJob(sonar, lcovReport, lcovArtifact, nodeMajor, timeout) {
     '    steps:',
   ].join('\n');
   const steps = [
-    ...sonarProbe(sonar),
+    '      - name: Sonar token',
+    `        if: ${condition}`,
+    '        run: |',
+    `          if [ -z "$SONAR_TOKEN" ]; then echo "::error::SONAR_TOKEN is not set: Sonar is required, so a missing token fails this job (secret ${sonar.token})"; exit 1; fi`,
     `      - uses: ${DOWNLOAD_ARTIFACT}`,
     `        if: ${condition}`,
     '        with:',
@@ -208,12 +150,22 @@ function sonarMergeSteps(condition) {
 }
 
 const STANDARD = new URL('../runtime/knowledge/hfs/ci-standard.yaml', import.meta.url);
-/** The per-job settings of the managed CI: ci.jobs.<job>.timeoutMinutes and ci.jobs.test.shards of the manifest over the defaults of the CI standard. */
-function ciJobSettings(declaration) {
+/** jest --shard=i/N gives each shard ceil(specs / N) spec files in order, so shard N is empty unless (N - 1) * ceil(specs / N) < specs. */
+export function filledShards(specs, wanted) {
+  for (let shards = wanted; shards > 1; shards -= 1) if ((shards - 1) * Math.ceil(specs / shards) < specs) return shards;
+  return 1;
+}
+
+/** The unit specs of the be source: every *.spec.ts outside the test kind folders (src/tests/<kind>), the files the unit project runs. */
+const unitSpecCount = (source) => (source?.files ?? []).filter((file) => file.endsWith('.spec.ts') && !file.includes('/tests/')).length;
+
+/** The per-job settings of the managed CI: ci.jobs.<job>.timeoutMinutes and ci.jobs.test.shards of the manifest over the defaults of the CI standard, the shards capped at the count the unit specs fill (an empty shard would fail, never pass empty). */
+function ciJobSettings(declaration, source) {
   const { defaults, heap } = parseYaml(fs.readFileSync(STANDARD, 'utf8'));
   const jobs = declaration?.ci?.jobs ?? {};
   const timeout = (job) => String(jobs[job]?.timeoutMinutes ?? defaults.timeoutMinutes[job]);
-  const shards = Number(jobs.test?.shards ?? defaults.shards);
+  const wanted = Number(jobs.test?.shards ?? defaults.shards);
+  const shards = source?.files?.length ? filledShards(unitSpecCount(source), wanted) : wanted;
   return {
     nodeOptions: `--max-old-space-size=${heap.minMiB}`,
     timeoutFast: timeout('fast'), timeoutLint: timeout('lint'), timeoutTest: timeout('test'), timeoutCoverage: timeout('coverage'),
@@ -230,7 +182,7 @@ export function ciWorkflowCommands(source, lcovReport = 'be/coverage/lcov.info',
   const audit = quality?.audit ?? { level: 'high', omitDev: true };
   const lcovArtifact = 'coverage-lcov';
   const build = frontendBuild(source, app);
-  const settings = ciJobSettings(buildDeclaration(source));
+  const settings = ciJobSettings(buildDeclaration(source), source);
   const side = '${{ matrix.side }}';
   return {
     ...settings,
@@ -247,28 +199,24 @@ export function ciWorkflowCommands(source, lcovReport = 'be/coverage/lcov.info',
     auditCommand: `npm audit${audit.omitDev ? ' --omit=dev' : ''} --audit-level=${audit.level}`,
     sonarTokenSecret: sonar?.token ?? 'SONAR_TOKEN',
     sonarHostVar: sonar?.hostVar ?? 'SONAR_HOST_URL',
-    sonarEnv: sonar ? `    env:\n      SONAR_TOKEN: \${{ secrets.${sonar.token} }}` : '',
-    // One lint job per side (the lint matrix): with a Sonar token each side writes its own report, uploaded as sonar-lint-<side> and merged by the sonar job.
-    ciLintSteps: [
+    // One lint job per side (the lint matrix): with Sonar each side writes its own report, uploaded as sonar-lint-<side> and merged by the sonar job.
+    ciLintSteps: (sonar ? [
+      '      - name: lint with Sonar import',
+      `        run: ${exampleCommand(source, 'npm run lint -- --side ' + side + ' --sonar reports/lint.' + side + '.sonar.json')}`,
+      '        env:',
+      `          NODE_OPTIONS: ${settings.nodeOptions}`,
+      `      - uses: ${UPLOAD_ARTIFACT}`,
+      // Inside an if: expression the matrix value is an argument of format(), never a nested ${{ }} (actionlint: a nested expression makes the condition always true).
+      "        if: always() && hashFiles(format('reports/lint.{0}.sonar.json', matrix.side)) != ''",
+      '        with:',
+      `          name: sonar-lint-${side}`,
+      `          path: reports/lint.${side}.sonar.json`,
+    ] : [
       '      - name: lint',
-      ...(sonar ? ["        if: env.SONAR_TOKEN == ''"] : []),
       `        run: ${exampleCommand(source, 'npm run lint -- --side ' + side)}`,
       '        env:',
       `          NODE_OPTIONS: ${settings.nodeOptions}`,
-      ...(sonar ? [
-        '      - name: lint with Sonar import',
-        "        if: env.SONAR_TOKEN != ''",
-        `        run: ${exampleCommand(source, 'npm run lint -- --side ' + side + ' --sonar reports/lint.' + side + '.sonar.json')}`,
-        '        env:',
-        `          NODE_OPTIONS: ${settings.nodeOptions}`,
-        `      - uses: ${UPLOAD_ARTIFACT}`,
-        // Inside an if: expression the matrix value is an argument of format(), never a nested ${{ }} (actionlint: a nested expression makes the condition always true).
-        "        if: always() && env.SONAR_TOKEN != '' && hashFiles(format('reports/lint.{0}.sonar.json', matrix.side)) != ''",
-        '        with:',
-        `          name: sonar-lint-${side}`,
-        `          path: reports/lint.${side}.sonar.json`,
-      ] : []),
-    ].join('\n'),
+    ]).join('\n'),
     codecovSteps: codecovSteps(lcovReport, codecov),
     sonarJob: sonarJob(sonar, lcovReport, lcovArtifact, nodeMajor, settings.timeoutSonar),
     lcovArtifact,

@@ -59,7 +59,7 @@ items:
     check: ci-standard
   - id: test-sharding
     title: the unit run in shards, merged once
-    requires: "the test job is a matrix over shard (ci.jobs.test.shards, default defaults.shards); each shard runs npm test with --shard=<i>/<N>, STARCI_COVERAGE_SHARD=1 (the preset measures only the files the shard loads, no all-files instrumentation, no per-file threshold) and uploads its istanbul JSON; the coverage job merges them by source location (starci app coverage merge, @starci/jest-preset/merge) and the coverage proof then requires every measured file to be present in the merge at 100 per file"
+    requires: "the test job is a matrix over shard (ci.jobs.test.shards, default defaults.shards); each shard runs npm test with --shard=<i>/<N> and STARCI_COVERAGE_SHARD=1 (the preset owns shard mode: it measures only the files the shard loads, no all-files instrumentation, no per-file threshold) and uploads its istanbul JSON, with no --passWithNoTests and no --coverageThreshold flag; the shard count never exceeds what the unit specs fill (jest gives shard i the slice of ceil(specs / N) specs, so an empty shard is impossible) ; the coverage job merges them by source location (starci app coverage merge, @starci/jest-preset/merge) and the coverage proof then requires every measured file to be present in the merge at 100 per file"
     covers: [app-ci]
     check: ci-standard
   - id: lint-parallel
@@ -77,10 +77,10 @@ items:
     requires: "the build job builds every fe app with that app's own public build values (static NEXT_PUBLIC_* from the declaration), never a shared env"
     covers: [app-ci]
     by: [render packages/hfs/sync/ci-commands.mjs, R300 FE_PUBLIC_BUILD_ARG_MISSING]
-  - id: optional-providers
-    title: optional providers probe, then skip with a notice
-    requires: "an optional Codecov or Sonar step (continue-on-error) is preceded in its job by its availability probe (id codecov-availability / sonar-availability); a strict provider fails the job"
-    covers: [app-ci]
+  - id: required-providers
+    title: Codecov and Sonar are required, nothing continues on error
+    requires: "no step or job sets continue-on-error; a Codecov upload sets fail_ci_if_error: true; no Codecov or Sonar step has an availability probe or an `if` that reads a secret, CODECOV_TOKEN or SONAR_TOKEN (the sonar job refuses a missing token with its own failing step); a red step is red"
+    covers: [app-ci, runtime]
     check: ci-standard
   - id: timeouts
     title: a timeout on every job, configurable per job

@@ -69,7 +69,7 @@ function assertScaffoldTestLanes(app) {
     const scripts = manifest.scripts ?? {};
     const dependencies = { ...manifest.dependencies, ...manifest.devDependencies };
     if (file === 'package.json') {
-      assert.deepEqual(Object.keys(scripts).filter(name => /^test(?::|$)/.test(name)).sort(), ['test', 'test:affected', 'test:integration'], 'the root runs the unit project and the optional integration project');
+      assert.deepEqual(Object.keys(scripts).filter(name => /^test(?::|$)/.test(name)).sort(), ['test', 'test:integration'], 'the root runs the unit project and the optional integration project');
       for (const tool of ['@nestjs/testing', '@starci/jest-preset', '@types/jest', 'jest', 'ts-jest']) assert.equal(typeof dependencies[tool], 'string', `the root installs ${tool}`);
       for (const tool of ['@playwright/test', '@starci/test-world', 'cypress', 'testcontainers', 'vitest']) assert.equal(dependencies[tool], undefined, `the root has the test-world or browser tool ${tool}`);
       continue;

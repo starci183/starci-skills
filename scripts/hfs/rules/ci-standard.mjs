@@ -4,8 +4,8 @@
 //   full-history-base-ref  every actions/checkout fetches the full history; a job that lints writes STARCI_BASE_REF before it lints
 //   heap-per-step          every heavy step (heap.steps) declares NODE_OPTIONS --max-old-space-size >= heap.minMiB on the step
 //   sonar-lint-per-side    a lint with --sonar names --side
-//   optional-providers     an optional (continue-on-error) Codecov or Sonar step follows its availability probe in the same job
-//   test-sharding          the test job is a shard matrix; each shard runs --shard=i/N without the per-file threshold; the coverage job merges, then proves
+//   required-providers      no continue-on-error; Codecov fail_ci_if_error true; no availability probe, no secret-gated Codecov or Sonar step
+//   test-sharding          the test job is a shard matrix; each shard runs --shard=i/N with STARCI_COVERAGE_SHARD and no threshold or pass-empty flag; the coverage job merges, then proves
 //   lint-parallel          the lint job is a matrix over side [be, fe]
 //   cache-saved-always     no cache keyed by the commit sha; actions/cache/save runs under if: always()
 //   timeouts               every job declares timeout-minutes
@@ -79,7 +79,7 @@ function testSharding(doc, say) {
   if (unit && !total) out.push(say('test-sharding', 'the unit run must pass --shard=${{ matrix.shard }}/<N>'));
   if (total && Array.isArray(shards) && Number(total[1]) !== shards.length) out.push(say('test-sharding', `the unit run's shard total ${total[1]} must equal the ${shards.length} matrix shards`));
   if (unit && String(unit.env?.STARCI_COVERAGE_SHARD ?? '') !== '1') out.push(say('test-sharding', 'a shard runs the unit step with STARCI_COVERAGE_SHARD: "1": it measures only the files it loads and writes the istanbul JSON the coverage job merges'));
-  if (unit && !runOf(unit).includes('--coverageThreshold={}')) out.push(say('test-sharding', 'a shard measures without the per-file threshold (--coverageThreshold={}); the coverage job proves it on the merged report'));
+  if (unit && /--passWithNoTests|--coverageThreshold/.test(runOf(unit))) out.push(say('test-sharding', 'a shard passes neither --passWithNoTests nor --coverageThreshold: the preset owns shard mode (no per-file threshold; the coverage job proves it on the merged report) and the shard count never exceeds what the unit specs fill'));
   const coverage = record(doc.jobs?.coverage) ? stepsOf(doc.jobs.coverage) : [];
   const merge = coverage.findIndex((step) => /app coverage merge\b/.test(runOf(step)));
   const proof = coverage.findIndex((step) => COVERAGE_PROOF.test(runOf(step)));
@@ -146,18 +146,28 @@ function sonarLintPerSide(doc, say) {
   return out;
 }
 
-function optionalProviders(doc, say) {
+const PROVIDER_STEP = /^(?:codecov\/codecov-action|SonarSource\/)/;
+const PROVIDER_SECRET_GATE = /\bsecrets\.|\bCODECOV_TOKEN\b|\bSONAR_TOKEN\b/;
+const PROBE_IDS =new Set(['codecov-availability', 'sonar-availability']);
+const truthy = (value) => value === true || String(value).toLowerCase() === 'true';
+
+/** The findings of one step: it continues on error, it is a probe, or it is a Codecov or Sonar step that a secret gates or that tolerates a failed upload. */
+function providerStepFindings(id, step, say) {
+  const name = step.name ?? usesOf(step) ?? step.id;
   const out = [];
-  const probes = [['codecov/codecov-action@', 'codecov-availability'], ['SonarSource/sonarqube-scan-action@', 'sonar-availability']];
-  for (const [id, job] of jobsOf(doc)) {
-    const steps = stepsOf(job);
-    steps.forEach((step, index) => {
-      const probe = probes.find(([prefix]) => usesOf(step).startsWith(prefix));
-      if (!probe || step['continue-on-error'] !== true) return;
-      if (!steps.slice(0, index).some((earlier) => earlier.id === probe[1])) out.push(say('optional-providers', `job ${id}: the optional ${usesOf(step).split('@')[0]} step must follow its availability probe (id ${probe[1]})`));
-    });
-  }
+  if (truthy(step['continue-on-error'])) out.push(say('required-providers', `job ${id}, step ${name}: continue-on-error lets a red step pass`));
+  if (PROBE_IDS.has(step.id)) out.push(say('required-providers', `job ${id}: ${step.id} probes a required provider to skip it; an unreachable provider is red`));
+  if (!PROVIDER_STEP.test(usesOf(step))) return out;
+  if (PROVIDER_SECRET_GATE.test(String(step.if ?? ''))) out.push(say('required-providers', `job ${id}, step ${name}: gated on a secret, so a missing token skips it instead of failing the job`));
+  if (usesOf(step).startsWith('codecov/codecov-action@') && !truthy(step.with?.fail_ci_if_error)) out.push(say('required-providers', `job ${id}, step ${name}: the upload must set fail_ci_if_error: true`));
   return out;
+}
+
+function requiredProviders(doc, say) {
+  return jobsOf(doc).flatMap(([id, job]) => [
+    ...(truthy(job['continue-on-error']) ? [say('required-providers', `job ${id}: continue-on-error lets a red job pass`)] : []),
+    ...stepsOf(job).flatMap((step) => providerStepFindings(id, step, say)),
+  ]);
 }
 
 function timeouts(doc, say) {
@@ -188,7 +198,7 @@ export function ciStandardFindings({ doc, file, scope, edition = 'full', standar
     'full-history-base-ref': () => fullHistory(doc, say),
     'heap-per-step': () => heapPerStep(doc, standard, say),
     'sonar-lint-per-side': () => sonarLintPerSide(doc, say),
-    'optional-providers': () => optionalProviders(doc, say),
+    'required-providers': () => requiredProviders(doc, say),
     'test-sharding': () => testSharding(doc, say),
     'lint-parallel': () => lintParallel(doc, say),
     'cache-saved-always': () => cacheSavedAlways(doc, say),

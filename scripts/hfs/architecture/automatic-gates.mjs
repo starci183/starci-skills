@@ -10,7 +10,7 @@ const E2E_COMMAND = new RegExp([
   String.raw`src\/tests\/(?:world|integration|e2e|contract)\b|`,
   String.raw`jest[^\n|&;]*(?:e2e|integration|contract)`,
 ].join(''), 'u');
-const UNIT_RUN_SCRIPTS = ['test', 'test:unit', 'test:ci', 'test:affected', 'test:coverage', 'test:cov'];
+const UNIT_RUN_SCRIPTS = ['test', 'test:unit', 'test:ci', 'test:coverage', 'test:cov'];
 
 const runsE2e = text => E2E_COMMAND.test(String(text).replace(/--ignore-pattern[= ]+(?:"[^"]*"|'[^']*'|\S+)/gu, ''));
 const withoutComments = text => text.split('\n').filter(line => !/^\s*#/u.test(line)).join('\n');

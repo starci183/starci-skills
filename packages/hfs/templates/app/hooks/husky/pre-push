@@ -21,8 +21,10 @@ refuse() {
 release_gate() {
   if [ -n "$gate" ]; then return 0; fi
   gate="no annotated tag v[0-9]* on HEAD $head"
-  for tag in $(git tag --points-at HEAD --list 'v[0-9]*' 2>/dev/null || true); do
-    if [ "$(git cat-file -t "refs/tags/$tag" 2>/dev/null || true)" != "tag" ]; then continue; fi
+  tags=$(git tag --points-at HEAD --list 'v[0-9]*' 2>/dev/null) || { gate="cannot list the tags of HEAD $head"; return 0; }
+  for tag in $tags; do
+    kind=$(git cat-file -t "refs/tags/$tag" 2>/dev/null) || continue
+    if [ "$kind" != "tag" ]; then continue; fi
     if [ ! -f "$record" ]; then gate="no L4 record $record"; continue; fi
     flat=$(tr -d ' \t\r\n' < "$record")
     case "$flat" in

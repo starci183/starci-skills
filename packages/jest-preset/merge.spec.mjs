@@ -92,7 +92,7 @@ test('the merged shards equal the unsharded run per file; a file no shard loads 
   const { root, be } = fixture();
   try {
     jest(be, ['--coverageThreshold={}', '--coverageDirectory', path.join(be, 'coverage', 'whole')]);
-    for (const shard of [1, 2, 3]) jest(be, [`--shard=${shard}/3`, '--passWithNoTests', '--coverageDirectory', path.join(be, 'coverage', 'shards', `shard-${shard}`)], { STARCI_COVERAGE_SHARD: '1' });
+    for (const shard of [1, 2, 3]) jest(be, [`--shard=${shard}/3`, '--coverageDirectory', path.join(be, 'coverage', 'shards', `shard-${shard}`)], { STARCI_COVERAGE_SHARD: '1' });
     const previous = process.cwd();
     process.chdir(be);
     let merged;

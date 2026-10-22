@@ -5,7 +5,7 @@ sources:
 ci:
   github: {repository: starci183/starci-skills, defaultBranch: main, workflow: examples.yml}
   secrets:
-    - {name: SONAR_TOKEN, scope: repository, purpose: Optional SonarCloud analysis token for the host repository, optional: true}
+    - {name: SONAR_TOKEN, scope: repository, purpose: SonarCloud analysis token for the host repository}
     - {name: SOPS_AGE_KEY, scope: repository, purpose: Unused example deploy workflow age identity, optional: true}
     - {name: VPS_SSH_KEY, scope: repository, purpose: Unused example deploy workflow SSH key, optional: true}
     - {name: VPS_KNOWN_HOSTS, scope: repository, purpose: Unused example deploy workflow pinned SSH host keys, optional: true}
@@ -80,7 +80,7 @@ environments:
     # browser/stack.mjs generates ephemeral values for an isolated browser run.
     # Production secret custody is outside this dev-only example scope.
     secrets: []
-# Delivery and quality services for this public example; host CI analysis is optional.
+# Delivery and quality services for this public example; host CI analysis is required.
 operations:
   # `starci sonar project ensure --target sonarcloud` ensures this project on SonarCloud and its quality gate starci-quality: the gate exists in the
   # organization with exactly the conditions of knowledge/sonar-gate.yaml and is selected for the project. The admin credential is the
@@ -116,7 +116,7 @@ services:
     runtimeSecrets: [SONAR_TOKEN]
     ci:
       workflow: .github/workflows/examples.yml
-      wiring: optional-follow-up
+      wiring: required
       token: SONAR_TOKEN
       hostVar: SONAR_HOST_URL
       organizationVar: SONAR_ORGANIZATION
@@ -136,7 +136,7 @@ services:
     components: auto
     required: true
     ci:
-      wiring: optional-follow-up
+      wiring: required
       workflow: .github/workflows/examples.yml
     ownerAction: none
   dependabot:
@@ -165,7 +165,7 @@ services:
     auth: github-token
     projects: [{repository: full-app, key: full-app}]
     ci:
-      wiring: optional-follow-up
+      wiring: required
       provisioning: The public example has no deploy images; a real app grants packages write to its automatic GitHub workflow token.
     ownerAction: none
 k8s:

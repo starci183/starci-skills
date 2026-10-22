@@ -28,7 +28,14 @@ const PREFIX = /^[A-Za-z][A-Za-z0-9._-]{0,19}$/u;
 export const VERSION = /^(\d+)\.(\d+)\.(\d+)$/u;
 const THRESHOLD_MISS = /coverage threshold .* not met/gu;
 const WRAPPED = new Set(['npm', 'npx']);
-const SCRIPT_GATES = ['typecheck', 'build:be', 'lint', 'build:fe', 'test'];
+// Every row the managed CI runs, so a release that does not wait for its candidate CI (release.requireCi false) still ran them all locally:
+// fast (audit, format, typecheck), lint, test + coverage (the managed `test` script is the per-file 100 threshold), build, the lite database lint and types, and Sonar.
+const SCRIPT_GATES = ['format:check', 'typecheck', 'build:be', 'lint', 'db:lint', 'build:fe', 'test'];
+// A full app has a test world (integration, e2e and contract projects, always present: the managed `test:e2e` script marks it), so those layers are rows of its gate;
+// a lite app's integration project exists only where it has integration specs, so it has no world rows.
+const WORLD_SCRIPTS = ['test:integration', 'test:e2e', 'test:contract'];
+const DB_TYPES_SCRIPTS = ['db:start', 'db:reset', 'db:types', 'db:stop'];
+const DB_TYPES_COMMITTED = { name: 'db-types-committed', command: ['git', 'diff', '--exit-code', '--', 'supabase/types/database.types.ts'], summary: null, env: {} };
 const MAX_PATCH = 100;
 
 /** True for a branch or remote name git can take as one argument (no leading dash, only path-like characters). */
@@ -41,10 +48,18 @@ const scriptGate = (script) => ({
   env: {},
 });
 
-/** Default gates run app-check, the enabled audit, then every managed script present in the app. */
+/** The lite database-types rows of the managed CI, in its order: start Supabase, apply the migrations, regenerate the types, require them committed, stop. */
+function dbTypesGates(scripts) {
+  if (!DB_TYPES_SCRIPTS.every((script) => typeof scripts?.[script] === 'string')) return [];
+  const [start, reset, types, stop] = DB_TYPES_SCRIPTS.map(scriptGate);
+  return [start, reset, types, DB_TYPES_COMMITTED, stop];
+}
+
+/** Default gates run app-check, the enabled audit, then every managed script present in the app and the database-types rows, Sonar following when it is declared. */
 function defaultGates(scripts, audit) {
   const present = SCRIPT_GATES.filter((script) => typeof scripts?.[script] === 'string');
-  return [{ name: 'app-check', command: ['npx', 'starci', 'app', 'check'], summary: null, env: {} }, ...(audit ? [audit] : []), ...present.map(scriptGate)];
+  const world = typeof scripts?.['test:e2e'] === 'string' ? WORLD_SCRIPTS.filter((script) => typeof scripts?.[script] === 'string') : [];
+  return [{ name: 'app-check', command: ['npx', 'starci', 'app', 'check'], summary: null, env: {} }, ...(audit ? [audit] : []), ...present.map(scriptGate), ...world.map(scriptGate), ...dbTypesGates(scripts)];
 }
 
 /** Shared quality settings retain the release reader's audit validation, disabled mode and legacy string host compatibility. */
@@ -218,7 +233,7 @@ export function launch(argv, platform) {
   return [argv[0], argv.slice(1)];
 }
 
-/** Sonar availability is public and bounded; HTTP uses the existing injected fetch seam. */
+/** Sonar availability is public and bounded; HTTP uses the existing injected fetch seam. An unreachable host is a red row: Sonar is required. */
 async function sonarAvailability(ctx, gate) {
   const sonar = gate.provider;
   if (!sonar) return null;
@@ -228,13 +243,10 @@ async function sonarAvailability(ctx, gate) {
     up = response.ok && (await response.json()).status === 'UP';
   } catch { up = false; }
   if (up) return null;
-  const detail = sonar.optional
-    ? `notice: sonar skipped: ${sonar.host} not reachable (services.sonar.optional)`
-    : `${SONAR_UNREACHABLE}: ${sonar.host} did not report UP within ten seconds`;
-  return { skipped: sonar.optional === true, pass: false, detail };
+  return { pass: false, detail: `${SONAR_UNREACHABLE}: ${sonar.host} did not report UP within ten seconds` };
 }
 
-/** Unreachable optional providers remain explicit skipped rows, with a real log and no scan invocation. */
+/** An unreachable Sonar host stays a red row with a real log and no scan invocation. */
 async function runAvailableGate(ctx, gate, options) {
   const availability = await sonarAvailability(ctx, gate);
   const log = path.join(options.dir, `${gate.name}.log`);
@@ -334,7 +346,7 @@ function inspect(ctx, config, options) {
 }
 
 function planLines(config, facts, dir, recordPath) {
-  const out = [`L4 record      ${recordPath}`, `logs           ${dir}`, '', 'gates (required gates must pass, optional provider outages are skipped, in this order):'];
+  const out = [`L4 record      ${recordPath}`, `logs           ${dir}`, '', 'gates (every gate must pass, in this order):'];
   for (const gate of config.gates) {
     const summary = gate.summary ? ` (summary: ${gate.summary})` : '';
     out.push(`  ${gate.name.padEnd(17)} ${gate.command.join(' ')}${summary}`);
@@ -353,7 +365,7 @@ function assertUnmoved(ctx, head) {
 function writeRecord(ctx, { head, tag, results, recordPath, requireCi }) {
   const record = {
     schema: 'starci-app-l4-record/1', head, tag, createdAt: new Date(ctx.now()).toISOString(), producedBy: 'starci app release gate',
-    note: 'Required gates passed on a clean HEAD; optional provider skips are explicit and every entry links its log and sha256.',
+    note: 'Every gate passed on a clean HEAD; every entry links its log and sha256.',
     ci: requireCi === true ? { required: true, note: 'starci app release push waits for the candidate CI of this sha (release.requireCi=true)' } : { required: false, note: CI_NOT_REQUIRED },
     gates: results,
   };
@@ -366,15 +378,13 @@ async function runAll(ctx, config, options) {
   fs.mkdirSync(options.dir, { recursive: true });
   return config.gates.reduce(async (pending, gate) => {
     const results = await pending;
-    if (results.some((result) => !result.pass && !result.skipped)) return results;
+    if (results.some((result) => !result.pass)) return results;
     return [...results, await runAvailableGate(ctx, gate, options)];
   }, Promise.resolve([]));
 }
 
 function summaryOf(result) {
-  let status = result.pass ? 'PASS' : 'FAIL';
-  if (result.skipped) status = 'SKIPPED';
-  return `${status} ${result.name} (${result.detail}, ${result.seconds}s) log ${result.log}`;
+  return `${result.pass ? 'PASS' : 'FAIL'} ${result.name} (${result.detail}, ${result.seconds}s) log ${result.log}`;
 }
 
 /**
@@ -382,7 +392,8 @@ function summaryOf(result) {
  * writes the L4 record and creates the annotated tag. options: { execute, sonar, source, tagPrefix, platform }.
  */
 export async function releaseGate(ctx, config, options = {}) {
-  if (options.sonar) config = { ...config, gates: [...config.gates.filter((gate) => gate.name !== 'sonar'), sonarGate(config.services, ctx.env)] };
+  // Sonar is a row of the managed CI, so it is a row of the local gate whenever the app declares it (and when --sonar asks for it); a missing token is a refusal, never a skip.
+  if (options.sonar || config.services?.sonar) config = { ...config, gates: [...config.gates.filter((gate) => gate.name !== 'sonar'), sonarGate(config.services, ctx.env)] };
   const credentialNames = config.gates.find(gate => gate.provider)?.credentialNames ?? ['SONAR_TOKEN', config.services?.sonar?.token].filter(Boolean);
   ctx = Object.create(ctx, {env: {value: withoutCredentials(ctx.env, credentialNames)}});
   // The CI verdict of a release is the candidate run of its own sha, judged by `starci app release push` (candidate-ci.mjs, OWNER RULING candidate-ci 2026-10-18):
@@ -397,7 +408,7 @@ export async function releaseGate(ctx, config, options = {}) {
   if (options.execute !== true) return { ok: true, lines: [...plan, '', 'dry run: no gate was run, nothing written. preconditions OK.'], data: { ...base, red: [], executed: false } };
   const results = await runAll(ctx, config, { dir, platform: options.platform ?? process.platform, credentialNames });
   const report = results.map(summaryOf);
-  const failed = results.filter((result) => !result.pass && !result.skipped);
+  const failed = results.filter((result) => !result.pass);
   if (failed.length > 0) return { ok: false, lines: [...plan, ...report, `gate(s) red: ${failed.map((item) => item.name).join(', ')}. No L4 record, no tag.`], data: { ...base, executed: true, results } };
   assertUnmoved(ctx, facts.head);
   writeRecord(ctx, { head: facts.head, tag: facts.chosen.tag, results, recordPath, requireCi: config.requireCi });

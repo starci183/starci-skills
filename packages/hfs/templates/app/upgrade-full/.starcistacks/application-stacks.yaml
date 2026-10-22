@@ -32,24 +32,23 @@ k8s:
   reason: The upgrade establishes the full local stack first; deployment topology is selected separately.
 ci:
   secrets:
-    - {name: SONAR_TOKEN, scope: repository, purpose: Sonar analysis token provisioned for this app, optional: true}
+    - {name: SONAR_TOKEN, scope: repository, purpose: Sonar analysis token provisioned for this app}
     - {name: SOPS_AGE_KEY, scope: repository, purpose: Decrypt app members during deployment, optional: true}
     - {name: VPS_SSH_KEY, scope: repository, purpose: Deployment SSH key, optional: true}
     - {name: VPS_KNOWN_HOSTS, scope: repository, purpose: Pinned deployment SSH host keys, optional: true}
   vars:
-    - {name: SONAR_HOST_URL, scope: repository, value: "https://sonar.{{project}}.example.invalid", purpose: Documentation endpoint to replace with this app's public Sonar host, optional: true}
+    - {name: SONAR_HOST_URL, scope: repository, value: "https://sonar.{{project}}.example.invalid", purpose: Documentation endpoint to replace with this app's public Sonar host}
     - {name: VPS_HOST, scope: repository, value: 203.0.113.10, purpose: Documentation deployment address to replace before use, optional: true}
     - {name: VPS_USER, scope: repository, value: deploy, purpose: Documentation deployment user to replace before use, optional: true}
 services:
   sonar:
     provider: sonarqube
-    optional: true
     mode: disabled
     reason: Enable the repository's Sonar service when a host and project token are provisioned.
     qualityGate: starci-quality
     credentials: []
     projects: [{repository: "{{project}}", key: "{{project}}"}]
-    ci: {wiring: optional-follow-up, workflow: .github/workflows/ci.yml, token: SONAR_TOKEN, hostVar: SONAR_HOST_URL}
+    ci: {wiring: required, workflow: .github/workflows/ci.yml, token: SONAR_TOKEN, hostVar: SONAR_HOST_URL}
     ownerAction: none
   codecov:
     provider: codecov
@@ -59,7 +58,7 @@ services:
     target: 100
     components: auto
     required: true
-    ci: {wiring: optional-follow-up, workflow: .github/workflows/ci.yml}
+    ci: {wiring: required, workflow: .github/workflows/ci.yml}
     ownerAction: none
   dependabot:
     provider: github
@@ -86,5 +85,5 @@ services:
     host: {public: https://ghcr.io}
     auth: github-token
     projects: [{repository: "{{project}}", key: "{{project}}"}]
-    ci: {wiring: optional-follow-up}
+    ci: {wiring: required}
     ownerAction: none

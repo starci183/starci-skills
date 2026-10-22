@@ -14,8 +14,8 @@ name: ci
 # dispatch of main): SonarCloud names an analysis after the checked-out ref, so a tag run would open a branch named after the tag, and the commit of
 # a release tag was already scanned by the main push that carried it. The runtime is analysed on SonarCloud (https://sonarcloud.io, fixed in this
 # job; the apps and examples use the host's local SonarQube in ext/sonar through examples.yml and never this job): the dependent main-only Sonar job
-# waits for the quality gate and fails on a red gate, and it runs only where secrets.SONAR_TOKEN, vars.SONAR_ORGANIZATION and vars.SONAR_PROJECT_KEY
-# all exist; otherwise a notice names each missing setting (never a silent pass). The root sonar-project.properties carries sources and exclusions;
+# waits for the quality gate and fails on a red gate, and it needs secrets.SONAR_TOKEN, vars.SONAR_ORGANIZATION and vars.SONAR_PROJECT_KEY
+# to exist: a missing one fails the job and names it (never a silent pass). The root sonar-project.properties carries sources and exclusions;
 # the organization and the project key come from the variables.
 
 on:
@@ -139,8 +139,21 @@ jobs:
 
       # SonarCloud analysis of the runtime (full history from the checkout above, for blame and the new-code period). The scan waits for the quality gate
       # (sonar.qualitygate.wait, up to an hour: SonarCloud queues) and the step fails on a red gate.
+      # Sonar is required on main: a missing repository setting fails the job here with the names of what is missing.
+      - name: Sonar settings
+        if: ${{ !cancelled() && github.ref == 'refs/heads/main' }}
+        run: |
+          missing=""
+          [ -z "$SONAR_TOKEN" ] && missing="$missing secrets.SONAR_TOKEN"
+          [ -z "$SONAR_ORGANIZATION" ] && missing="$missing vars.SONAR_ORGANIZATION"
+          [ -z "$SONAR_PROJECT_KEY" ] && missing="$missing vars.SONAR_PROJECT_KEY"
+          if [ -n "$missing" ]; then
+            echo "::error title=Sonar settings missing::the runtime cannot be scanned on SonarCloud; missing repository settings:$missing"
+            exit 1
+          fi
+
       - name: Sonar scan (SonarCloud) and quality gate
-        if: ${{ success() && !cancelled() && github.ref == 'refs/heads/main' && env.SONAR_TOKEN != '' && env.SONAR_ORGANIZATION != '' && env.SONAR_PROJECT_KEY != '' }}
+        if: ${{ success() && !cancelled() && github.ref == 'refs/heads/main' }}
         uses: SonarSource/sonarqube-scan-action@c7ee0f9df90b7aa20e8dcf9695dcfe2e7da5b4f2 # v7.2.1
         timeout-minutes: 75
         with:
@@ -149,15 +162,6 @@ jobs:
             -Dsonar.projectKey=${{ env.SONAR_PROJECT_KEY }}
             -Dsonar.qualitygate.wait=true
             -Dsonar.qualitygate.timeout=3600
-
-      - name: Sonar skipped (SonarCloud settings missing)
-        if: ${{ !cancelled() && github.ref == 'refs/heads/main' && (env.SONAR_TOKEN == '' || env.SONAR_ORGANIZATION == '' || env.SONAR_PROJECT_KEY == '') }}
-        run: |
-          missing=""
-          [ -z "$SONAR_TOKEN" ] && missing="$missing secrets.SONAR_TOKEN"
-          [ -z "$SONAR_ORGANIZATION" ] && missing="$missing vars.SONAR_ORGANIZATION"
-          [ -z "$SONAR_PROJECT_KEY" ] && missing="$missing vars.SONAR_PROJECT_KEY"
-          echo "::notice title=Sonar skipped::the runtime was not scanned on SonarCloud; missing repository settings:$missing"
 
   # A pushed release tag becomes a GitHub Release: named after the tag, its body exactly the CHANGELOG section of that version (the same
   # section `starci release cut` made the annotated tag message from: `starci release notes`), marked a pre-release when the version has a
