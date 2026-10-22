@@ -441,7 +441,7 @@ calls:
     receipt: [result]
     creates: terminal
     note: >-
-      A plain shell for `starci workflow start-in-orca`: scripts/api/orca/terminal-create.mjs selects the runtime's own registered worktree, shell powershell.exe, the title
+      A plain shell for a `starci workflow start` run outside Orca (scripts/kernel/orca-relay.mjs): scripts/api/orca/terminal-create.mjs selects the runtime's own registered worktree, shell powershell.exe, the title
       `[Start] <workflow>` and the start relay (scripts/kernel/start-relay.mjs) with validated arguments as the startup
       command. It launches no agent: the Kernel is still an orchestration worker-start worker. Never environment, focus
       or retry-request; the caller never retries a lost receipt and reads orca terminal list first.

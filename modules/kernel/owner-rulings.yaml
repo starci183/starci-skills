@@ -660,7 +660,7 @@ rulings:
     source: "the owner in the lead chat (the owner's words in Vietnamese: \"Cho phép\"), relayed by the lead to the alpha.26 lane with feat/orca-terminal-open 611f27653"
     ruling: "The runtime may create a plain Orca shell: `terminal create` is an official host verb (modules/host/orca/calls.yaml terminal-create) and leaves api.yaml forbiddenForStarciOrchestration; check-host-boundary no longer bans it. The shell launches no agent: an agent is still launched only by orchestration worker-start, and a task is never dispatched into a terminal the runtime made. This is a feature ruling, not a loosening: the gate-loosening table (modules/kernel/gate-loosening.yaml) does not watch check scripts or the Orca forbidden list, so this entry, not a gate-loosening fingerprint, is the owner's record of the removed ban."
     supersedes: []
-    enforcedBy: [scripts/checks/check-host-boundary.mjs, modules/host/orca/api.yaml, modules/host/orca/calls.yaml, scripts/kernel/start-in-orca.mjs]
+    enforcedBy: [scripts/checks/check-host-boundary.mjs, modules/host/orca/api.yaml, modules/host/orca/calls.yaml, scripts/kernel/orca-relay.mjs]
 
 supersedes:
   'ruling:R212/case-2': ['ruling:R212/case-1']

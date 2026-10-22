@@ -289,7 +289,7 @@ starciOrchestrationAllowlist:
 forbiddenForStarciOrchestration:
   # Every agent launch is orchestration worker-start (modules/kernel/start-workflow.yaml): the runtime
   # never creates an agent terminal and never dispatches a Task into a terminal it made. A plain shell it creates
-  # (calls.yaml terminal-create, `starci workflow start-in-orca`) launches no agent.
+  # (calls.yaml terminal-create, the relay of a `starci workflow start` run outside Orca) launches no agent.
   - orchestration dispatch
   - orchestration coordinator-start
   - orchestration coordinator-stop

@@ -1,10 +1,10 @@
 #!/usr/bin/env node
-// start-relay.mjs — internal entry: the startup command of the plain Orca shell `starci workflow start-in-orca` opens
-// (scripts/api/orca/terminal-create.mjs). Inside that shell Orca has set
+// start-relay.mjs — internal entry: the startup command of the plain Orca shell a `starci workflow start` run outside
+// Orca opens (scripts/kernel/orca-relay.mjs, scripts/api/orca/terminal-create.mjs). Inside that shell Orca has set
 // ORCA_TERMINAL_HANDLE, so `starci workflow start` (scripts/kernel/start-workflow.mjs, launched by the supervisor) gets
 // the sender terminal it needs. The relay prints the start's output in the shell and writes the receipt the caller waits
 // for; the shell stays open because it coordinates the Kernel's entry Run.
-// Arguments: --result <file> --repo <app> [--goal <workflow_id>] [--agent <agent>].
+// Arguments: --result <file> --repo <app> [--goal <workflow_id>] [--agent <agent>] [--json].
 import fs from 'node:fs';
 import path from 'node:path';
 import { skillRoot } from '../../engine/runtime-root.mjs';
@@ -34,7 +34,7 @@ const writeReceipt = (receipt) => {
 
 if (terminal) {
   console.log(`starci workflow start (relay in Orca terminal ${terminal}) for ${goal ?? 'the oldest queued goal'} of ${repo} ...`);
-  const run = runNode([START, '--repo', repo, ...(goal ? ['--goal', goal] : []), ...(agent ? ['--agent', agent] : []), '--launched-by', 'supervisor'],
+  const run = runNode([START, '--repo', repo, ...(goal ? ['--goal', goal] : []), ...(agent ? ['--agent', agent] : []), ...(process.argv.includes('--json') ? ['--json'] : []), '--launched-by', 'supervisor'],
     { cwd: skillRoot, timeout: START_TIMEOUT_MS });
   const stdout = String(run.stdout ?? '').trimEnd();
   const stderr = String(run.stderr ?? '').trimEnd();
@@ -46,7 +46,7 @@ if (terminal) {
     : `start-relay: workflow start exited ${exitCode}; this terminal closes.`);
   process.exitCode = exitCode;
 } else {
-  writeReceipt({ exitCode: 2, stdout: '', stderr: '', error: 'ORCA_TERMINAL_HANDLE is not set: the relay runs only inside the Orca terminal start-in-orca opens' });
+  writeReceipt({ exitCode: 2, stdout: '', stderr: '', error: 'ORCA_TERMINAL_HANDLE is not set: the relay runs only inside the Orca terminal orca-relay opens' });
   console.error('start-relay: ORCA_TERMINAL_HANDLE is not set; nothing was started');
   process.exitCode = 2;
 }
