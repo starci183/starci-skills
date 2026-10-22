@@ -26,9 +26,8 @@ test('the config sets only options prettier knows, and no plugin (a plugin is a 
   assert.equal('plugins' in config, false);
 });
 
-test('prettier itself accepts the config when it is installed', async (t) => {
-  let prettier;
-  try { prettier = await import('prettier'); } catch { t.skip('prettier is not installed in the runtime checkout'); return; }
+test('prettier itself accepts the config (prettier is the subject of this spec, a devDependency of the package)', async () => {
+  const prettier = await import('prettier');
   const out = await prettier.format('const a = {b:1,\n c:"x"};\nfunction f(){return a}', { ...config, parser: 'typescript' });
   assert.equal(out, 'const a = { b: 1, c: "x" }\nfunction f() {\n    return a\n}\n');
 });
