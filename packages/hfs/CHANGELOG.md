@@ -1,5 +1,8 @@
 # Changelog
 
+## 4.7.22 - 2026-10-22
+- Fixed: the bundled runtime carries `modules/schemas/provision-operation.schema.yaml`; 4.7.21 left it out, so `starci app check` and `starci app lint` failed with ENOENT in every app whose stack declaration has an `operations` block. The composition reads both schemas through `new URL(..., import.meta.url)`, the form the runtime copy follows. Spec: `src/provision-operation-schema-bundle.spec.mjs`.
+
 ## 4.7.21 - 2026-10-22
 - Fixed: the release gate's Sonar read retries a network error or HTTP 5xx up to 5 times with backoff inside its 600 s wait; a 4xx and every gate status keep their verdict. Spec: `src/sonar-quality-gate.spec.mjs`.
 - Fixed: `starci app db dump` archives its parts with tar run inside the scratch directory and relative names only (no `-C`, no absolute path): GNU tar, first on PATH under Git Bash on Windows, read the absolute drive-letter archive path as a remote host and every backup failed with `DB_BACKUP_TOOL_FAILED`. Spec: `src/db-dump-archive.spec.mjs`.
