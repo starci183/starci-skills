@@ -3,7 +3,7 @@
 const METADATA_SOURCE = require.resolve("./unit-metadata.generated.cjs")
 const METADATA_TEXT = require("node:fs").readFileSync(METADATA_SOURCE, "utf8")
 
-/** Only synthetic conditional guards inside compiler-emitted parameter metadata map to the dedicated ignore anchor. */
+/** Only synthetic conditional guards inside compiler-emitted parameter metadata map to the generated-metadata anchor: a zero-width position at its end, which no line covers, so they are measured nowhere and source metadata calls stay measured. */
 function factory(compiler) {
   const ts = compiler.configSet.compilerModule
   const source = ts.createSourceMapSource(METADATA_SOURCE, METADATA_TEXT)
@@ -12,7 +12,7 @@ function factory(compiler) {
       if (isGeneratedMetadata(ts, node)) {
         const guard = (child) => {
           if (isGeneratedGuard(ts, child)) {
-            ts.setSourceMapRange(child, { pos: METADATA_TEXT.indexOf("\n") + 1, end: METADATA_TEXT.length - 1, source })
+            ts.setSourceMapRange(child, { pos: METADATA_TEXT.length, end: METADATA_TEXT.length, source })
             ts.setEmitFlags(child, ts.getEmitFlags(child) | ts.EmitFlags.NoNestedSourceMaps)
             return child
           }
@@ -54,10 +54,10 @@ function restoreMetadataSource(result) {
 function createTransformer(options) {
   const delegate = require("ts-jest").default.createTransformer(options)
   return {
-    getCacheKey: (...args) => delegate.getCacheKey(...args) + ":starci-unit-metadata-5",
+    getCacheKey: (...args) => delegate.getCacheKey(...args) + ":starci-unit-metadata-6",
     process: (...args) => restoreMetadataSource(delegate.process(...args)),
     processAsync: async (...args) => restoreMetadataSource(await delegate.processAsync(...args)),
   }
 }
 
-module.exports = { name: "starci-unit-metadata", version: 5, factory, createTransformer }
+module.exports = { name: "starci-unit-metadata", version: 6, factory, createTransformer }

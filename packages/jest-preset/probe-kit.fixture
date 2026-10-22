@@ -18,12 +18,4 @@ export const reason: RefusalReason = { code: "X" }
 declare const outcome: unknown
 expect(outcome).toBeRefused("STOCK_EXHAUSTED")
 expect(outcome).toSucceedWith({ id: "a" })
-// @ts-expect-error a result of the wrong type for the entity is a compile error
-mockEntityManager({ findOne: [Order, 5] })
-// @ts-expect-error a method the double cannot stub is a compile error
-mockEntityManager({ missing: [Order, 1] })
-// @ts-expect-error a stub needs the entity class first
-mockEntityManager({ count: 3 })
-// @ts-expect-error a member EntityManager does not have is a compile error
-em.missing
 

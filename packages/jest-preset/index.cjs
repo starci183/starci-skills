@@ -232,7 +232,6 @@ function starciJestConfig(options) {
   // all-files instrumentation of collectCoverageFrom is off there: it instruments an unloaded file with another transform (other functions and branches).
   const shard = process.env.STARCI_COVERAGE_SHARD === "1"
   return {
-    testTimeout: 120_000,
     coverageProvider: "v8",
     ...(shard ? {} : {
       collectCoverageFrom: collectCoverageFrom(coverage),
