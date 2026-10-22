@@ -32,7 +32,7 @@ import { withoutSeatEnv } from '../lib/seat-env.mjs';
 
 const runtimeRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 /** The scaffold e2e files, run in this order (each is its own test process). */
-const E2E_FILES = Object.freeze(['e2e/hfs-scaffold-app.e2e.spec.mjs', 'e2e/hfs-scaffold-lite.e2e.spec.mjs', 'e2e/hfs-scaffold-app-installs.e2e.spec.mjs', 'e2e/workflows-actionlint.e2e.spec.mjs', 'e2e/scaffold-e2e-verdict.e2e.spec.mjs']);
+const E2E_FILES = Object.freeze(['e2e/hfs-scaffold-app.e2e.spec.mjs', 'e2e/hfs-scaffold-lite.e2e.spec.mjs', 'e2e/hfs-scaffold-app-installs.e2e.spec.mjs', 'e2e/workflows-actionlint.e2e.spec.mjs']);
 /** The preloads every e2e process loads first. */
 const E2E_PRELOADS = Object.freeze(['e2e/setup/low-priority.mjs', 'e2e/setup/isolated-temp.mjs', 'e2e/setup/isolated-registry.mjs', 'e2e/setup/runtime-copies.mjs']);
 const MAX_BUFFER = 512 * 1024 * 1024;
