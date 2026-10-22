@@ -1,0 +1,24 @@
+group: uat
+verb: record
+owner: runtime
+summary: walk one UAT flow in a recorded browser outside a Kernel and file the run as its evidence
+impl: {script: scripts/uat/uat-record.mjs}
+positional:
+  - {name: command, required: true, variadic: true}
+flags:
+  - {name: work, type: string, required: true, summary: "the .starciwork root holding the flow"}
+  - {name: flow, type: string, required: true, summary: "the work/uat-flow@1 record id to walk"}
+  - {name: cwd, type: string, summary: "directory the Playwright command runs in (default: the Work root's parent)"}
+  - {name: environment, type: string, summary: "environment label of the evidence (default: local)"}
+  - {name: base-url, type: string, summary: "the origin the walk drove, named in the evidence provenance"}
+conventions:
+  - "the command holds one UAT slot and runs through the browser recorder, as a uat.verify step does (video, trace, screenshots)"
+  - "it writes manifest.yaml, result.md and screens/*.png into UAT_RUN_DIR; the recorder adds videos/<flow>.webm"
+  - "every run file becomes a blob; an example's Work also gets the same verified bytes in examples/.runtimes/<app>/artifacts"
+  - "evidence.yaml is written with actor uat-record; the outcome is pass only when the command exits 0 and its manifest says pass"
+  - "the flow record's own index.yaml is never edited: state, proves and blockedBy are a person's or a Kernel operation's act"
+exit: {"0": "the walk passed and its evidence is filed", "1": "the walk was recorded and filed but did not pass", "2": "refused: the flow, the run folder or a file is invalid, and nothing is written"}
+json: always
+examples:
+  - starci uat record --work <app>/.starciwork --flow uat.checkout.place-order --cwd <app> -- npx playwright test -c browser/playwright.config.ts uat-place-order.ts
+editions: [full]

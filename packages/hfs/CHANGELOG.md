@@ -1,6 +1,7 @@
 # Changelog
 
 ## 4.7.21 - 2026-10-22
+- Added: the bundled runtime copy of `scripts/lib/uat-run-folder.mjs`, the pure half of `starci uat record`: a UAT run folder holds exactly manifest.yaml, result.md, screens/*.png and videos/*.webm (each of its type by its bytes), an example's fixture store receives each verified blob once, and the work/evidence@1 document cites every file by sha256 with an outcome that is pass only when the walk exited 0 and its manifest says pass. Spec: `src/uat-run-folder.spec.mjs`.
 - Fixed: the release gate's Sonar read retries a network error or HTTP 5xx up to 5 times with backoff inside its 600 s wait; a 4xx and every gate status keep their verdict. Spec: `src/sonar-quality-gate.spec.mjs`.
 - Fixed: `starci app db dump` archives its parts with tar run inside the scratch directory and relative names only (no `-C`, no absolute path): GNU tar, first on PATH under Git Bash on Windows, read the absolute drive-letter archive path as a remote host and every backup failed with `DB_BACKUP_TOOL_FAILED`. Spec: `src/db-dump-archive.spec.mjs`.
 - Fixed: the bundled stacks gate validates a declaration's `operations` block with the composed provision-operation schema instead of crashing on its cross-file `$ref`; the bundled schema lets a SonarCloud admin credential name a runtime secret.env variable (`hostConnection: sonar-runtime-secret-env`).

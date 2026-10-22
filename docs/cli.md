@@ -5336,6 +5336,36 @@ starci uat assisted-runner inspect --request <request.yaml> --receipt <receipt.y
 starci uat assisted-runner signal --request <request.yaml> --receipt <receipt.yaml> --value ok
 ```
 
+### starci uat record
+
+walk one UAT flow in a recorded browser outside a Kernel and file the run as its evidence
+
+| flag | type | |
+| --- | --- | --- |
+| `--work` | string | required |
+| `--flow` | string | required |
+| `--cwd` | string |  |
+| `--environment` | string |  |
+| `--base-url` | string |  |
+
+Positionals: command
+
+Conventions:
+
+- the command holds one UAT slot and runs through the browser recorder, as a uat.verify step does (video, trace, screenshots)
+- it writes manifest.yaml, result.md and screens/*.png into UAT_RUN_DIR; the recorder adds videos/<flow>.webm
+- every run file becomes a blob; an example's Work also gets the same verified bytes in examples/.runtimes/<app>/artifacts
+- evidence.yaml is written with actor uat-record; the outcome is pass only when the command exits 0 and its manifest says pass
+- the flow record's own index.yaml is never edited: state, proves and blockedBy are a person's or a Kernel operation's act
+
+exit: 0 the walk passed and its evidence is filed; 1 the walk was recorded and filed but did not pass; 2 refused: the flow, the run folder or a file is invalid, and nothing is written
+
+json: always
+
+```sh
+starci uat record --work <app>/.starciwork --flow uat.checkout.place-order --cwd <app> -- npx playwright test -c browser/playwright.config.ts uat-place-order.ts
+```
+
 ### starci uat slots
 
 inspect UAT slots, end the ones whose lessee is gone, or run a command while holding one

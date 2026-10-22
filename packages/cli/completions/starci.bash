@@ -39,7 +39,7 @@ _starci() {
         supervisor) COMPREPLY=( $(compgen -W "actions bridge channel decide direct-commits gate-stability gc land lesson-actions notify owed poll push push-mains ram-cap report revision-ack start status stop telegram-bridge tell watchdog workers" -- "$cur") );;
         task) COMPREPLY=( $(compgen -W "list register show" -- "$cur") );;
         typecheck) COMPREPLY=( $(compgen -W "run" -- "$cur") );;
-        uat) COMPREPLY=( $(compgen -W "assisted-runner slots" -- "$cur") );;
+        uat) COMPREPLY=( $(compgen -W "assisted-runner record slots" -- "$cur") );;
         work) COMPREPLY=( $(compgen -W "asset-slot brand brand-direction brand-palette check-example-work compose-direction decision-critic draw-acceptance draw-dna draw-feedback draw-gates draw-grammar draw-layer draw-loop draw-rationale draw-render draw-review draw-source draw-taste evidence-binding example-critique example-derive example-evidence example-verify grammar-geometry grammar-knowledge grammar-proposal grammar-registry-pin graph hygiene imagegen layout-render layout-tree render-proof shell-conformance ui-proof-brief" -- "$cur") );;
         worker) COMPREPLY=( $(compgen -W "close list read release show start stop" -- "$cur") );;
         workflow) COMPREPLY=( $(compgen -W "assess bias custody define purge start status stop" -- "$cur") );;
@@ -898,6 +898,11 @@ _starci() {
         uat:assisted-runner:--after) return 0;;
         uat:assisted-runner:--value) COMPREPLY=( $(compgen -W "ok fail cancel" -- "$cur") ); return 0;;
         uat:assisted-runner:--actor) return 0;;
+        uat:record:--work) return 0;;
+        uat:record:--flow) return 0;;
+        uat:record:--cwd) return 0;;
+        uat:record:--environment) return 0;;
+        uat:record:--base-url) return 0;;
         uat:slots:--record-dir) return 0;;
         work:brand:--source) return 0;;
         work:brand:--stage) COMPREPLY=( $(compgen -W "decide verify" -- "$cur") ); return 0;;
@@ -1326,6 +1331,7 @@ _starci() {
         task:show) COMPREPLY=( $(compgen -W "--json --cwd --quiet --help --edition" -- "$cur") );;
         typecheck:run) COMPREPLY=( $(compgen -W "--level --changed --project --json --cwd --quiet --help --edition" -- "$cur") );;
         uat:assisted-runner) COMPREPLY=( $(compgen -W "--request --receipt --after --value --actor --json --cwd --quiet --help --edition" -- "$cur") );;
+        uat:record) COMPREPLY=( $(compgen -W "--work --flow --cwd --environment --base-url --json --cwd --quiet --help --edition" -- "$cur") );;
         uat:slots) COMPREPLY=( $(compgen -W "--dry-run --record-dir --json --cwd --quiet --help --edition" -- "$cur") );;
         work:asset-slot) COMPREPLY=( $(compgen -W "--json --cwd --quiet --help --edition" -- "$cur") );;
         work:brand) COMPREPLY=( $(compgen -W "--source --stage --grammar-root --json --cwd --quiet --help --edition" -- "$cur") );;

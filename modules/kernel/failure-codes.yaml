@@ -6816,6 +6816,36 @@ TRANSCRIPT_MISSING:
   owner: runtime-core
   kind: runtime-fault
 
+UAT_RECORD_ASSET_INVALID:
+  title: "UAT record run file invalid"
+  title_vi: "File của lần chạy UAT không hợp lệ"
+  meaning_vi: "Một file của thư mục chạy rỗng hoặc byte của nó không đúng loại (PNG cho ảnh, WebM cho video), hoặc blob được curate không băm ra đúng tên."
+  causes_vi:
+    - "Spec ghi ảnh hoặc video hỏng, hoặc bộ ghi Playwright không tạo được video."
+  nextStep_vi: "Sửa spec của luồng để ghi đúng file rồi chạy lại starci uat record; không đặt file bằng tay."
+  owner: runtime-core
+  kind: verb-refusal
+
+UAT_RECORD_FLOW_UNKNOWN:
+  title: "UAT record flow unknown"
+  title_vi: "Không có luồng UAT được chọn"
+  meaning_vi: "--flow không phải bản ghi work/uat-flow@1 của cây .starciwork được chỉ định."
+  causes_vi:
+    - "Sai id luồng hoặc sai --work."
+  nextStep_vi: "Chỉ định đúng id uat.* và gốc .starciwork chứa nó."
+  owner: runtime-core
+  kind: verb-refusal
+
+UAT_RECORD_RUN_INCOMPLETE:
+  title: "UAT record run folder incomplete"
+  title_vi: "Thư mục chạy UAT thiếu phần"
+  meaning_vi: "Thư mục chạy phải chứa đúng manifest.yaml (có outcome), result.md, screens/*.png và videos/*.webm; thiếu, thừa hoặc manifest không đọc được thì bị từ chối và không ghi gì."
+  causes_vi:
+    - "Spec không ghi manifest, result hoặc ảnh vào UAT_RUN_DIR, hoặc lệnh không phải lệnh Playwright nên không có video."
+  nextStep_vi: "Để spec ghi đủ các file vào UAT_RUN_DIR và chạy lệnh Playwright qua starci uat record."
+  owner: runtime-core
+  kind: verb-refusal
+
 UAT_RESULT_INVALID:
   title: "UAT result bytes cannot be verified"
   title_vi: "Không xác minh được byte kết quả nghiệm thu"
