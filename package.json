@@ -100,7 +100,7 @@
     "@jest/globals": "29.7.0",
     "@nestjs/common": "11.1.27",
     "@nestjs/core": "11.1.27",
-    "@nestjs/testing": "11.1.27",
+    "@nestjs/testing": "12.2.0",
     "@typescript-eslint/parser": "8.71.0",
     "@types/jest": "29.5.14",
     "acorn": "8.16.0",
