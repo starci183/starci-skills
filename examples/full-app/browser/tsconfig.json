@@ -1,0 +1,11 @@
+{
+  "extends": "@starci/tsconfig/e2e.json",
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM"],
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "types": ["node"]
+  },
+  "include": ["playwright.config.ts", "journeys/*.ts"]
+}

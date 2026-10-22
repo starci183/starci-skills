@@ -608,6 +608,8 @@ slots:
     # The browser journey of the product (Playwright, owner ruling: one minimal journey per example app, run manually): the config, its
     # journeys and the script that provisions the stack it runs against. It is the product's, never the front end's (FE_NO_TESTS keeps
     # refusing any test or test tooling inside fe/). Declared by `browser: true` in hfs.json; the managed script `test:browser` exists only then.
+    # Its optional tsconfig.json (extending @starci/tsconfig/e2e.json) is the program that type-checks the config and the journeys,
+    # which Playwright only transpiles: without it a changed journey has no owning tsconfig and the op gate cannot type-check it.
     path: "browser/"
     presence: opt-in
     litePresence: forbidden     # a browser journey runs against a provisioned stack: e2e, which lite does not have
@@ -616,7 +618,7 @@ slots:
     tier: none
     tests: none
     requires: [playwright.config.ts, journeys/]
-    allows: [playwright.config.ts, stack.mjs, "journeys/*.ts"]
+    allows: [playwright.config.ts, tsconfig.json, stack.mjs, "journeys/*.ts"]
   - id: app.github-meta
     since: 3.1.0
     profiles: [app]
