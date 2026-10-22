@@ -15,11 +15,11 @@ export { sealProvisionValues, provisionChildEnvironment, provisionNativeChildEnv
 const METADATA = new Set(['resourceId', 'generationName', 'destinationRef', 'phase', 'code', 'nativeRecordSha256', 'nativeTag', 'ceTaskId']);
 const OUTCOMES = new Set(['applied', 'verified', 'failed', 'unknown', 'partial']);
 const activeLocks = new Set();
-const PROOF = new Set(['analysisId', 'revision', 'ceTaskId', 'issues', 'qualityGate', 'metrics', 'publicKeys', 'privateCount', 'privateValuesVerified', 'logins', 'name', 'type', 'projectKey', 'credentialAccepted', 'custodyWritten', 'valueToNameBindingVerified', 'authentication', 'sessionCleanup', 'jwtExpiryRemaining', 'nativeGateVerified', 'nativeTag', 'nativeRecordSha256', 'nativeGates']);
+const PROOF = new Set(['analysisId', 'revision', 'ceTaskId', 'issues', 'qualityGate', 'metrics', 'publicKeys', 'privateCount', 'privateValuesVerified', 'logins', 'name', 'type', 'projectKey', 'credentialAccepted', 'custodyWritten', 'valueToNameBindingVerified', 'authentication', 'sessionCleanup', 'jwtExpiryRemaining', 'nativeGateVerified', 'nativeTag', 'nativeRecordSha256', 'nativeGates', 'conditions', 'project']);
 const METRICS = new Set(['coverage', 'line_coverage', 'branch_coverage', 'duplicated_lines_density', 'violations', 'ncloc', 'new_coverage', 'new_violations', 'bugs', 'vulnerabilities', 'code_smells']);
 const failures = new WeakSet();
 const authorityFailures = new WeakSet();
-const fail = code => { const error = Object.assign(new Error(code), { code }); failures.add(error); return error; };
+const fail = (code, detail) => { const error = Object.assign(new Error(code), { code, ...(detail ? { detail } : {}) }); failures.add(error); return error; };
 const refusedAuthority = code => { const error = fail(code); authorityFailures.add(error); return error; };
 const PUBLIC_FAILURES = new Set(['provider-operation-failed', 'provision-action-policy-mismatch', 'provision-target-action-refused',
   'provision-credential-role-required', 'provision-destination-required', 'provision-adapter-result-invalid', 'provision-proof-invalid',
@@ -116,13 +116,18 @@ const PROOF_RULES = Object.freeze({
   nativeRecordSha256: value => /^[a-f0-9]{64}$/u.test(value ?? ''),
   nativeTag: validNativeTag,
   nativeGates: value => Number.isSafeInteger(value) && value >= 0,
+  // A Sonar quality gate readback: the number of its verified conditions and the project step's own result code.
+  conditions: value => Number.isSafeInteger(value) && value >= 0 && value <= 100,
+  project: value => typeof value === 'string' && /^sonar-project-[a-z-]{1,64}$/u.test(value),
   metrics: proofMetrics, publicKeys: proofArray, logins: proofArray,
 });
 
 function publicProof(proof) {
   if (!proof || typeof proof !== 'object' || Array.isArray(proof)) throw fail('provision-proof-invalid');
   for (const [key, value] of Object.entries(proof)) {
-    if (!PROOF.has(key) || !(PROOF_RULES[key] ?? proofScalar)(value)) throw fail('provision-proof-invalid');
+    const keyName = /^[A-Za-z][A-Za-z0-9]{0,63}$/u.test(key) ? key : 'an unnamed key';
+    if (!PROOF.has(key)) throw fail('provision-proof-invalid', `the adapter proof key ${keyName} is outside the provision proof vocabulary`);
+    if (!(PROOF_RULES[key] ?? proofScalar)(value)) throw fail('provision-proof-invalid', `the adapter proof value of ${keyName} has an invalid shape`);
   }
   return proof;
 }
@@ -291,7 +296,7 @@ function recoveryState(state, error) {
 function recoverOperation(state, error) {
   const owned = failures.has(error) || isProvisionCustodyFailure(error) || isProvisionOperationFailure(error);
   const code = owned ? safeCode(error.code) : 'provider-operation-failed';
-  const detail = code === 'provider-operation-failed' ? unclassifiedDetail(error) : undefined;
+  const detail = code === 'provider-operation-failed' ? unclassifiedDetail(error) : error?.detail;
   if (state.accepted && state.row?.state === 'running') {
     try { state.row = state.ledger.write.updateProvisionOperation({ operationId: state.row.operation_id, generation: state.row.generation,
       state: recoveryState(state, error), code }); }
