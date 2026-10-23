@@ -63,7 +63,10 @@ const compile = (source: string): ReadonlyArray<{ readonly line: number; readonl
     const configFile = join(__dirname, "..", "..", "tsconfig.json")
     const read = ts.readConfigFile(configFile, ts.sys.readFile)
     const parsed = ts.parseJsonConfigFileContent(read.config, ts.sys, dirname(configFile))
-    const options: ts.CompilerOptions = { ...parsed.options, noEmit: true, declaration: false, rootDir: undefined, outDir: undefined }
+    // The probe is compiled in memory: no output root and no output directory (left out, not set to undefined: exactOptionalPropertyTypes).
+    const options: ts.CompilerOptions = { ...parsed.options, noEmit: true, declaration: false }
+    delete options.rootDir
+    delete options.outDir
     const file = join(__dirname, "type-probe.ts").split(sep).join("/")
     const host = ts.createCompilerHost(options)
     const readSource = host.getSourceFile.bind(host)
