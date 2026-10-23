@@ -3,7 +3,7 @@
 // test proofs of the runtime (owner ruling no-runtime-specs, 2026-10-17: the runtime carries no specs of its own; package specs and the scaffold e2e decide).
 // It runs e2e/hfs-scaffold-app.e2e.spec.mjs (the full scaffold: npm ci, typecheck, lint, the be unit run, cli migrate over a real Postgres) and
 // e2e/hfs-scaffold-lite.e2e.spec.mjs (the lite scaffold over its own local Supabase stack) and e2e/hfs-scaffold-app-installs.e2e.spec.mjs (the registry-install
-// proof of e2e/hfs-scaffold-app.spec.mjs over fresh installs of the packed @starci tarballs: `starci release app-installs --source`) under the e2e preloads (e2e/setup: low priority and the file
+// proof of e2e/hfs-scaffold-app.spec.mjs over fresh installs of the packed @starci tarballs: `starci release app-installs --source`), e2e/workflows-actionlint.e2e.spec.mjs and e2e/git-commit-body.e2e.spec.mjs (`starci git commit` keeps a multi-line body) under the e2e preloads (e2e/setup: low priority and the file
 // watchdog, a private temp root with the repository-root guard, a private machine registry, the regenerated runtime copies).
 // A skipped test is red here: the proof is that every scaffold test RAN (Docker, npm and the source canon registry are prerequisites, never optional).
 // Before the run it prepares the built output the source canon registry packs (it packs with --ignore-scripts, so a package's prepack never builds it): the
@@ -32,7 +32,7 @@ import { withoutSeatEnv } from '../lib/seat-env.mjs';
 
 const runtimeRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 /** The scaffold e2e files, run in this order (each is its own test process). */
-const E2E_FILES = Object.freeze(['e2e/hfs-scaffold-app.e2e.spec.mjs', 'e2e/hfs-scaffold-lite.e2e.spec.mjs', 'e2e/hfs-scaffold-app-installs.e2e.spec.mjs', 'e2e/workflows-actionlint.e2e.spec.mjs']);
+const E2E_FILES = Object.freeze(['e2e/hfs-scaffold-app.e2e.spec.mjs', 'e2e/hfs-scaffold-lite.e2e.spec.mjs', 'e2e/hfs-scaffold-app-installs.e2e.spec.mjs', 'e2e/workflows-actionlint.e2e.spec.mjs', 'e2e/git-commit-body.e2e.spec.mjs']);
 /** The preloads every e2e process loads first. */
 const E2E_PRELOADS = Object.freeze(['e2e/setup/low-priority.mjs', 'e2e/setup/isolated-temp.mjs', 'e2e/setup/isolated-registry.mjs', 'e2e/setup/runtime-copies.mjs']);
 const MAX_BUFFER = 512 * 1024 * 1024;

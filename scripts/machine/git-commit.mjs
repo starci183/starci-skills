@@ -56,13 +56,25 @@ function subjectFor(args) {
   return { subject };
 }
 
+// The body of --body or --body-file, or the text that refuses them. A launcher that goes through a command shell (the Windows
+// cmd shim of starci) ends an argument at its first newline, so a multi-line body travels in a file or on stdin (`--body-file -`).
+function bodyOf(args, readText) {
+  const file = args['body-file'] == null ? '' : String(args['body-file']);
+  if (!file) return { body: String(args.body ?? '').trim() };
+  if (args.body != null) return { error: 'pass --body or --body-file, not both' };
+  try {
+    return { body: String(readText(file === '-' ? 0 : file)).replace(/\r\n/g, '\n').trim() };
+  } catch (error) {
+    return { error: `cannot read --body-file ${file}: ${error?.code ?? error?.message ?? error}` };
+  }
+}
+
 // The commit message (subject, body, trailers) and its trailers.
-function messageOf({ subject, args, ctx, branch }) {
+function messageOf({ subject, body, args, ctx, branch }) {
   const coAuthor = String(args['co-author'] ?? ctx?.env?.STARCI_CO_AUTHOR ?? '').trim();
   const lane = String(args.lane ?? (branch.startsWith('lane/') ? branch : '')).trim();
   const trailers = [...(coAuthor ? [`Co-Authored-By: ${coAuthor}`] : []), ...(lane ? [`Lane: ${lane}`] : [])];
   const paragraphs = [subject];
-  const body = String(args.body ?? '').trim();
   if (body) paragraphs.push(body);
   if (trailers.length) paragraphs.push(trailers.join('\n'));
   return { message: paragraphs.join('\n\n'), trailers };
@@ -96,11 +108,13 @@ function dryRunPlan({ api, root, addPaths, message, subject, trailers }, refusal
 export async function gitCommit(ctx, deps = {}) {
   const refusal = (text, code = 2) => verbRefusal('starci git commit', text, code,
     { schema: 'starci/git-commit@1', ok: false });
-  const api = { add, commit, diff, porcelainStatus, revParse, revParseQuery, symbolicRef, exists: fs.existsSync, ...deps };
+  const api = { add, commit, diff, porcelainStatus, revParse, revParseQuery, symbolicRef, exists: fs.existsSync, readText: (file) => fs.readFileSync(file, 'utf8'), ...deps };
   const args = ctx?.args ?? {};
   const titled = subjectFor(args);
   if (titled.error) return refusal(titled.error);
   const { subject } = titled;
+  const given = bodyOf(args, api.readText);
+  if (given.error) return refusal(given.error);
 
   const cwd = path.resolve(ctx?.cwd ?? process.cwd());
   const top = api.revParseQuery(['--show-toplevel'], { cwd });
@@ -117,7 +131,7 @@ export async function gitCommit(ctx, deps = {}) {
   const checked = resolvePaths(requested, cwd, root, api.exists);
   if (checked.error) return refusal(checked.error);
   const addPaths = checked.paths ?? [];
-  const { message, trailers } = messageOf({ subject, args, ctx, branch });
+  const { message, trailers } = messageOf({ subject, body: given.body, args, ctx, branch });
   if (args['dry-run']) return dryRunPlan({ api, root, addPaths, message, subject, trailers }, refusal);
 
   if (addPaths.length) {
@@ -127,7 +141,8 @@ export async function gitCommit(ctx, deps = {}) {
   const paths = stagedFiles(root, api.diff);
   if (paths == null) return refusal('could not read the staged files', 1);
   if (!paths.length && !api.revParse(root, 'MERGE_HEAD')) return refusal('nothing to commit', 1);
-  const made = api.commit(['-m', message], { cwd: root });
+  // The message goes to git on stdin (-F -), never as an argument: no newline, quote or length of it meets a command line.
+  const made = api.commit(['-F', '-'], { cwd: root, input: `${message}\n` });
   if (!ok(made)) return refusal(`git commit failed: ${output(made, 'stderr') || output(made) || 'unknown error'}`, 1);
   const sha = api.revParse(root, 'HEAD');
   if (!sha) return refusal('commit succeeded but HEAD could not be resolved', 1);

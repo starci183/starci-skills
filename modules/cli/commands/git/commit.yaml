@@ -9,11 +9,13 @@ conventions:
   - "subjects use `type(scope): summary`; types are feat, fix, refactor, test, docs, chore, land and release"
   - keep one logical change in each commit and pass explicit paths instead of staging unrelated work
   - hooks run the L0 checks; never bypass them and never amend a pushed or landed commit
+  - "a multi-line body goes through --body-file (a file, or - for stdin): a command-shell launcher such as the Windows cmd shim ends an argument at its first newline"
 flags:
   - {name: type, type: enum, enum: [feat, fix, refactor, test, docs, chore, land, release], required: true, summary: the conventional commit type}
   - {name: scope, type: string, summary: the optional subject scope}
   - {name: summary, type: string, required: true, summary: the lowercase subject summary without a trailing period}
   - {name: body, type: string, summary: the optional commit body}
+  - {name: body-file, type: string, summary: "a file holding the commit body, or - for stdin; the way to pass a multi-line body"}
   - {name: paths, type: list, summary: existing repository paths to stage before committing}
   - {name: lane, type: string, summary: the lane or workflow id for the Lane trailer}
   - {name: co-author, type: string, summary: the identity for the Co-Authored-By trailer}
@@ -27,4 +29,5 @@ json: starci/git-commit@1
 examples:
   - starci git commit --type fix --scope cli --summary "handle an empty index"
   - starci git commit --type docs --summary "explain backup refs" --paths docs/git-governance.md --dry-run
+  - starci git commit --type fix --summary "keep the body" --body-file -
 editions: [full]
