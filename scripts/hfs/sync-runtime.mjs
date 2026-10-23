@@ -53,6 +53,8 @@ const CHECK_ENTRIES = [
   'scripts/lib/json-formats.mjs',
   // Which UPPER_SNAKE literals of a script are read values and not emitted failure codes (the failure-codes check), proven by src/failure-code-reads.spec.mjs over this copy.
   'scripts/lib/failure-code-reads.mjs',
+  // Why the provision control verb could not read or accept a prepared operation, proven by src/provision-control-failure.spec.mjs over this copy.
+  'scripts/lib/provision-control-failure.mjs',
   // The Sonar gate data and its pure judgments, read by the package specs that render a CI declaration.
   'scripts/gates/sonar-gate.mjs',
   // The .starcistacks services gate (checkStarciStacks), proven by src/hfs-stacks-runtime-shape.spec.mjs over this copy.

@@ -10,6 +10,7 @@ import { withProvisionCredentials, assertProvisionCustodyScope, isProvisionCusto
 import { repositoryHome } from '../hfs/repo-identity.mjs';
 import { resolveProvisionAuthority } from './provision-authority.mjs';
 import { canonicalPath, pathKey } from '../lib/path-key.mjs';
+import { provisionControlFailure } from '../lib/provision-control-failure.mjs';
 export { sealProvisionValues, provisionChildEnvironment, provisionNativeChildEnvironment } from './provision-custody.mjs';
 
 const METADATA = new Set(['resourceId', 'generationName', 'destinationRef', 'phase', 'code', 'nativeRecordSha256', 'nativeTag', 'ceTaskId']);
@@ -26,7 +27,7 @@ const PUBLIC_FAILURES = new Set(['provider-operation-failed', 'provision-action-
   'provision-checkpoint-invalid', 'provision-acceptance-required', 'provision-reconcile-unsupported', 'provision-reconcile-required',
   'provision-target-busy', 'provision-target-reconciliation-held', 'provision-target-lock-lost', 'provision-journal-recovery-required',
   'provision-cleanup-recovery-required', 'provision-operation-unknown', 'provision-plan-input-drift', 'provision-owner-checkpoint-required',
-  'provision-plan-digest-mismatch', 'provision-control-unavailable', 'owner-terminal-required', 'owner-plan-not-accepted',
+  'provision-plan-digest-mismatch', 'provision-control-unavailable', 'provision-plan-blob-missing', 'owner-terminal-required', 'owner-plan-not-accepted',
   'credential-reference-invalid', 'credential-custody-scope-refused', 'credential-custody-missing', 'credential-custody-unavailable',
   'credential-member-missing', 'credential-host-owner-required', 'credential-host-owner-unavailable', 'credential-destination-aliases-input',
   'credential-native-context-unverified',
@@ -354,20 +355,23 @@ export async function runProvisionOperation(ctx, input) {
 
 /** Inspect a prepared plan or record its real native terminal checkpoint without provider effects. */
 export async function runProvisionControl(ctx) {
-  let ledger;
+  let ledger, row = null, stage = 'ledger';
   return completeProvision(async () => {
     try {
       const ledgerRoot = repositoryHome(ctx.cwd), file = ledgerFileFor(ledgerRoot, { env: ctx.env });
       ledger = inspectLedger({ file });
-      let row = provisionOperation(ledger.db, ctx.args.operation);
+      row = provisionOperation(ledger.db, ctx.args.operation);
       if (!row) return provisionRefusal('provision-operation-unknown');
+      stage = 'plan';
       const plan = readJson(row.plan_sha);
+      stage = 'target';
       const selected = resolveProvisionTarget({ cwd: ctx.cwd, targetId: row.target_id });
       if (selected.declaration.sha256 !== plan.target.declaration.sha256) return provisionRefusal('provision-plan-input-drift');
       const command = ctx.positionals[0];
       if (command !== 'accept') return { code: 0, data: { schema: 'starci/provision-operation@1', ok: true,
         operation: descriptor(row), ...(command === 'plan' ? { plan } : {}) } };
       if (ctx.role !== 'owner' || typeof ctx.confirmProvisionPlan !== 'function') return provisionRefusal('provision-owner-checkpoint-required');
+      stage = 'accept';
       const authorityInput = { ledger, target: selected, operationId: row.operation_id, planSha: row.plan_sha };
       const authority = resolveProvisionAuthority(ctx, authorityInput);
       if (!authority.ok || authority.bound) return provisionRefusal('provision-owner-checkpoint-required');
@@ -385,7 +389,10 @@ export async function runProvisionControl(ctx) {
       ledger = openLedger({ file, repoRoot: ledgerRoot });
       row = ledger.write.acceptProvisionOperation({ operationId, planSha });
       return { code: 0, data: { schema: 'starci/provision-operation@1', ok: true, operation: descriptor(row) } };
-    } catch { return provisionRefusal('provision-control-unavailable'); }
+    } catch (error) {
+      const failure = provisionControlFailure(error, { stage, planSha: row?.plan_sha ?? null, operationId: row?.operation_id ?? null });
+      return provisionRefusal(failure.code, failure.detail);
+    }
   }, () => {
     try { ledger?.close(); return false; }
     catch { return true; }

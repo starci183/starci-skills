@@ -20571,6 +20571,16 @@ provision-control-unavailable:
   owner: runtime-core
   kind: verb-refusal
 
+provision-plan-blob-missing:
+  title: "Provision plan blob missing"
+  title_vi: "Không thấy plan blob của operation"
+  meaning_vi: "Ledger có operation nhưng blob store của runtime đang chạy không giữ plan blob của nó."
+  causes_vi:
+    - "Operation được prepare bởi một runtime khác (lane runtime) có blob store riêng."
+  nextStep_vi: "Chạy control bằng runtime đã prepare operation, hoặc prepare lại operation bằng runtime này."
+  owner: runtime-core
+  kind: verb-refusal
+
 provision-credential-role-required:
   title: "Provision credential role required"
   title_vi: "Thiếu declared credential role"

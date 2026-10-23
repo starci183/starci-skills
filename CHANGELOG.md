@@ -19,6 +19,9 @@ until every S* row in `docs/goal.md` holds with fresh evidence, then `1.0.0` fre
 - The rule catalog has no `specNa`, `exampleNa` or unreachable witness (170 + 108 markers): about 100 deleted runtime specs that proved bundled checkers are package specs again; only a rule whose enforcers all run inside the runtime (kinds `runtime`, `work-validate`) needs no package spec.
 - Owner rulings removed or amended: `ambient-id-test-world-exemption` (BE_AMBIENT_ID has no test-world exemption), `quality-services-optional`, `alpha20-ci-override-owner-only`, `ci-override-574bfcaca06c` (the verb `starci release ci-override` and its record are gone; a red candidate CI never passes).
 
+### Fixed
+- `starci provision operation plan|status|accept` no longer hides every failure behind `provision-control-unavailable`: a plan blob the ledger names but this runtime's blob store does not hold (an operation prepared by a lane runtime, read by the published CLI) is `provision-plan-blob-missing`, naming the blob and the operation, and any other failure names its stage (`ledger`, `plan`, `target`, `accept`) and the error's identifier (`scripts/lib/provision-control-failure.mjs`).
+
 ## [1.0.0-alpha.27] — 2026-10-23
 
 ### Changed
