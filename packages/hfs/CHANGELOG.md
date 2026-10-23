@@ -1,5 +1,8 @@
 # Changelog
 
+## 4.7.26 - 2026-10-23
+- Changed: the bundled canon pins select @starci/cli 1.7.26, @starci/eslint-canon-be 3.4.33 and @starci/eslint-canon-fe 8.4.32.
+
 ## 4.7.25 - 2026-10-23
 - Fixed: with fe packages, the managed `lint` and `lint:fix` scripts build them first (`turbo run build --filter=./fe/packages/*`, turbo.json already declares lint dependsOn ^build): the typed front-end canon of @starci/eslint-canon-fe 8.4.30 read a fresh full scaffold's i18n package as unresolved types (`no-unsafe-*`), so `starci app lint` was red on a new app.
 - Fixed: the skeleton specs cover the express-adapter guard of the edge security and the GraphQL error mapper without locations or path, so a fresh scaffold's unit run holds per-file 100; the skeleton templates and the Supabase auth partial are prettier-formatted (`HFS_FORMAT` was red on a fresh lite scaffold).

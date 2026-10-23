@@ -6,8 +6,10 @@ until every S* row in `docs/goal.md` holds with fresh evidence, then `1.0.0` fre
 
 ## [Unreleased]
 
+## [1.0.0-alpha.27] — 2026-10-23
+
 ### Changed
-- Candidate package pins select HFS 4.7.25, CLI 1.7.25, jest preset 2.3.5, test-world 1.2.3, tsconfig 2.0.7, prettier config 1.0.4, back-end canon 3.4.32 and front-end canon 8.4.31 (HFS 4.7.24, CLI 1.7.24 and the canons 3.4.31 and 8.4.30 were published first and superseded the same day: a fresh scaffold was red on them).
+- Candidate package pins select HFS 4.7.26, CLI 1.7.26, jest preset 2.3.5, test-world 1.2.3, tsconfig 2.0.7, prettier config 1.0.4, back-end canon 3.4.33 and front-end canon 8.4.32. HFS 4.7.24 and 4.7.25, CLI 1.7.24 and 1.7.25 and the canons 3.4.31/3.4.32 and 8.4.30/8.4.31 were published first and superseded the same day (a fresh scaffold was red on the first, and the CLI of both still installed runtime 1.0.0-alpha.26).
 - The managed lint builds an app's fe packages before the typed front-end canon reads their types; the scaffold skeletons hold per-file 100 and prettier after the lanes' strictness changes.
 - A skipped conclusion is red, never a pass (owner ruling 2026-10-22): the release cut's candidate verdict and `starci release ci-status` count a skipped run or watched check as red, and `starci app release push` counts a skipped job of a green candidate run as red. The runtime's SonarCloud analysis moves from `ci.yml` to its own `sonar.yml` (main and `release/candidate-*`), so no run carries a skipped Sonar job and the cut waits for the Sonar gate of the release sha (`candidate.workflows: [ci, examples, sonar]`). The candidate grace is 45 minutes (a queued run is listed and never counts against it) and the wait stays bounded at 240 minutes from the push.
 - The root runtime archive equals the tracked set: its cold proof refuses any packed path git does not track, apart from the declared generated copies, which must equal what `sync-runtime` writes; `files` leaves out the examples' Next, turbo and Supabase CLI caches (alpha.26 tried to pack 303 MB of ignored `.next` caches).
