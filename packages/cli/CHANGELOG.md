@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.7.30 - 2026-10-24
+- Changed: pins @starci/hfs 4.7.30 (the multer security override of a new app).
+
 ## 1.7.29 - 2026-10-24
 - Fixed: `starci runtime install` fetches runtime 1.0.0-alpha.29.
 - Changed: pins @starci/hfs 4.7.29.

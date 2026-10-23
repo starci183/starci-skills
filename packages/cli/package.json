@@ -1,6 +1,6 @@
 {
   "name": "@starci/cli",
-  "version": "1.7.29",
+  "version": "1.7.30",
   "description": "The single catalog-driven command line for StarCi apps and runtimes.",
   "type": "module",
   "license": "MIT",
@@ -12,7 +12,7 @@
     "./package.json": "./package.json"
   },
   "dependencies": {
-    "@starci/hfs": "4.7.29"
+    "@starci/hfs": "4.7.30"
   },
   "scripts": {
     "test": "node --test src/*.spec.mjs"

@@ -1,5 +1,8 @@
 # Changelog
 
+## 8.4.37 - 2026-10-24
+- Changed: the bundled canon pins add the multer 2.5.0 security override and select @starci/hfs 4.7.30 and @starci/cli 1.7.30.
+
 ## 8.4.36 - 2026-10-24
 - Changed: the bundled canon pins select zod 4.6.7, @starci/hfs 4.7.29 and @starci/cli 1.7.29.
 

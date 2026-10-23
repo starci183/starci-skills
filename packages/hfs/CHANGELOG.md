@@ -1,5 +1,8 @@
 # Changelog
 
+## 4.7.30 - 2026-10-24
+- Changed: a new app root overrides multer to its canon pin 2.5.0: @nestjs/platform-express depends on exactly multer 2.4.0, which carries GHSA-q7qp-rjg7-q26m (high); the bundled canon pins add `multer` and select @starci/cli 1.7.30, @starci/eslint-canon-be 3.4.38 and @starci/eslint-canon-fe 8.4.37.
+
 ## 4.7.29 - 2026-10-24
 - Added: a new full app ships its test world (`scaffold/test-world.mjs`, `templates/be/test-world/`): the `@starci/test-world` declaration under `be/src/tests/world/`, an integration spec of readiness over the real database and one e2e spec per api app, so the integration, e2e and contract rows of the release gate run real specs.
 - Added: `starci app upgrade [--plan]` on a full app without `be/src/tests/world/global-setup.ts` adds that world and the test devDependencies it lacks at canon pins, never overwriting a file (`HFS_UPGRADE_FILE_CONFLICT`); proven by `src/main.spec.mjs`.
