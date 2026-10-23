@@ -68,6 +68,7 @@
     "!ui/**/.git-starci-status-backup/",
     "!ui/**/*-preview.png",
     "!ui/**/*.log",
+    "!ui/eslint.config.mjs",
     "*.md",
     "config.example.yaml",
     "secret.env.example",
