@@ -15,8 +15,9 @@ import { bypassMarkerFindings } from '../runtime/scripts/hfs/rules/bypass-marker
 import { runWorkHygiene } from '../sync/hygiene.mjs';
 
 const RULES = Object.freeze({
-  gateFiles: ['modules/host/orca/api.yaml'],
+  gateFiles: ['knowledge/hfs/ci-standard.yaml'],
   allowlistFiles: [],
+  capabilityFiles: ['modules/host/', 'scripts/checks/check-host-boundary.mjs'],
   checkCode: ['scripts/checks/', 'scripts/hfs/rules/', 'packages/hfs/templates/', 'packages/eslint/', '.github/workflows/', 'packages/hfs/release/gate.mjs'],
   thresholds: { floors: ['min', 'branches'], ceilings: ['max'] },
   productPrefixes: ['scripts/'],
@@ -62,11 +63,11 @@ test('a marker spelled inside a string, or in a file that is no check, is no byp
   assert.deepEqual(kindsOf({ 'scripts/checks/a.mjs': { removed: [moved] }, 'scripts/checks/b.mjs': { added: [moved] } }), []);
 });
 
-test('a ban list loses an entry: a forbidden-list verb, a pattern-table row, a quoted entry', () => {
-  assert.deepEqual(kindsOf({ 'modules/host/orca/api.yaml': { removed: ['  - terminal create'] } }), ['check-removed modules/host/orca/api.yaml']);
+test('a ban list loses an entry: a gate-file item, a pattern-table row, a quoted entry', () => {
+  assert.deepEqual(kindsOf({ 'knowledge/hfs/ci-standard.yaml': { removed: ['  - job-shape'] } }), ['check-removed knowledge/hfs/ci-standard.yaml']);
   const row = "  [/\\bterminalCreate\\b/,'the terminalCreate wrapper'],";
-  assert.deepEqual(kindsOf({ 'scripts/checks/check-host-boundary.mjs': { removed: [row] } }), ['check-removed scripts/checks/check-host-boundary.mjs']);
-  assert.deepEqual(kindsOf({ 'scripts/checks/check-host-boundary.mjs': { removed: ["  'terminal create',"] } }), ['check-removed scripts/checks/check-host-boundary.mjs']);
+  assert.deepEqual(kindsOf({ 'scripts/checks/check-ban-list.mjs': { removed: [row] } }), ['check-removed scripts/checks/check-ban-list.mjs']);
+  assert.deepEqual(kindsOf({ 'scripts/checks/check-ban-list.mjs': { removed: ["  'terminal create',"] } }), ['check-removed scripts/checks/check-ban-list.mjs']);
   assert.deepEqual(kindsOf({ 'scripts/checks/a.mjs': { removed: [row] }, 'scripts/checks/b.mjs': { added: [row] } }), [], 'a row moved to another file stays');
   assert.deepEqual(kindsOf({ 'scripts/checks/gone.mjs': { removed: [row], deleted: true } }), [], 'a deleted script is judged by its registration, not here');
 });
@@ -158,4 +159,11 @@ test('the pre-commit hook ends on every failing step: the stylelint step cannot 
   assert.match(hook, /npx stylelint "\$@"/);
   assert.doesNotMatch(hook, /if \[ -n "\$styles" \]/);
   assert.doesNotMatch(hook, /\|\| true|set \+e|--no-verify/);
+});
+
+test('what the runtime may do is a capability, not a gate: a change to the Orca verb list or its boundary check is no finding', () => {
+  assert.deepEqual(kindsOf({ 'modules/host/orca/api.yaml': { removed: ['  - terminal create'] } }), []);
+  assert.deepEqual(kindsOf({ 'modules/host/orca/api.yaml': { added: ['  - terminal create'] } }), []);
+  const row = "  [/\bterminalCreate\b/,'the terminalCreate wrapper'],";
+  assert.deepEqual(kindsOf({ 'scripts/checks/check-host-boundary.mjs': { removed: [row, '  flag(file, 1, "x");'] } }), []);
 });

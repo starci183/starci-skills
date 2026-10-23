@@ -15,8 +15,6 @@ gateFiles:
   - modules/kernel/command-policy.yaml
   - modules/kernel/verdict-contract.yaml
   - modules/kernel/op-incident-policy.yaml
-  # The host boundary: a verb removed from forbiddenForStarciOrchestration is a ban lifted (owner-rulings orca-terminal-create-official was one).
-  - modules/host/orca/api.yaml
   # The standards the checks and CI follow: a rule, a job or a pinned condition removed is a check removed.
   - knowledge/hfs/ci-standard.yaml
   - knowledge/sonar-gate.yaml
@@ -61,6 +59,14 @@ checkCode:
   - .github/workflows/
   - codecov.yml
   - sonar-project.properties
+
+# What the runtime may do is a capability, not a quality gate (owner ruling, 2026-10-23: Orca is part of the runtime core): the host
+# definitions (modules/host/, e.g. the verbs the runtime may ask Orca for) and the boundary check that mirrors them are never watched; changing
+# them is a feature change, never a loosening. The detector watches quality checks: lint, types, tests, coverage, CI, hooks, Sonar, release
+# gates and canon rules.
+capabilityFiles:
+  - modules/host/
+  - scripts/checks/check-host-boundary.mjs
 
 # Files whose entries are exceptions: a list item added to one is a loosening.
 allowlistFiles:

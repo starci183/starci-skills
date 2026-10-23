@@ -24,7 +24,7 @@ const clip = (text) => (text.length > 90 ? `${text.slice(0, 89)}…` : text);
 const listed = (file, entries = []) => entries.some((entry) => (entry.endsWith('/') ? file.startsWith(entry) : file === entry));
 
 /** Whether `file` is a check, a canon template, a lint package, a workflow or a hook (checkCode); its specs and fixtures spell markers on purpose and are not. */
-export const isCheckCode = (file, rules) => listed(file, rules.checkCode) && !SPEC_NAME.test(file) && !FIXTURE_NAME.test(file);
+export const isCheckCode = (file, rules) => listed(file, rules.checkCode) && !listed(file, rules.capabilityFiles) && !SPEC_NAME.test(file) && !FIXTURE_NAME.test(file);
 
 const WORD = String.raw`\b(?:findings|violations|failures|errors|problems|issues|found|flag|fail)\s*(?:\.push\(|\()`;
 const EXIT = String.raw`process\.exit(?:Code)?\b|\bassert[.(]|\bexpect\(|\bok\s*:\s*false\b`;
