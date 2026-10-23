@@ -9,7 +9,7 @@ Humans maintain structured knowledge under `knowledge/**/*.yaml`. Agents and ope
 | --- | --- | --- |
 | Authored knowledge | `knowledge/**/*.yaml` | Edit topics here under `starci/knowledge-source@1`. |
 | Current code references | `examples/index.yaml` and its indexed app sources | The `starci/code-example-catalog@1` metadata points to the actual source, compiler configs and tests; it does not duplicate code. |
-| Calibration data | `knowledge/ui/proof/calibration/calibration.json` | Explicit data exception; all other authored JSON knowledge is rejected. |
+| Calibration data | `knowledge/ui/proof/calibration/calibration.yaml` | Reference dataset of the calibration anchors, authored as YAML like all other knowledge; authored JSON knowledge is rejected. |
 | Runtime | `knowledge/**/*.yaml` | Read directly from source. Public names are the authored files: `index.yaml`, `foo.yaml`. |
 
 Operator `supportingReferences` and `CONTEXT.md` name the current law in `docs/architecture.md` and `docs/code-pattern-enforcement.md`, pattern topics under `knowledge/patterns/*/index.yaml`, and `examples/index.yaml`. The single catalog reader resolves its indexed app inputs; declared READs retain their actual Source paths and hashes.

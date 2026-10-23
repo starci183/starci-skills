@@ -5,6 +5,11 @@
 # not itself a record, has no id, and authors none of the fields it computes.
 schema: work/derived@1
 records:
+  ac.checkout.cart.clear-leaves-other-carts-untouched:
+    schema: work/acceptance-criterion@1
+    feature: checkout
+    state: null
+    effectiveState: null
   br.checkout.cart:
     schema: work/business-rule@1
     feature: checkout
@@ -109,11 +114,6 @@ records:
     feature: null
     state: null
     effectiveState: null
-  full-app:
-    schema: work/workspace@1
-    feature: null
-    state: null
-    effectiveState: null
   event.checkout.order-placed:
     schema: work/event@1
     feature: checkout
@@ -178,6 +178,11 @@ records:
         - contract.identity.internal.sessions
         - integration.identity.keycloak
         - ui.identity.sign-in
+  full-app:
+    schema: work/workspace@1
+    feature: null
+    state: null
+    effectiveState: null
   gap.checkout.live-proof:
     schema: work/gap@1
     feature: checkout
@@ -279,8 +284,7 @@ records:
     schema: work/uat-flow@1
     feature: checkout
     state: todo
-    effectiveState: suspended
-    suspensionReason: evidence-marked-stale
+    effectiveState: blocked
     blockers:
       - id: gap.checkout.live-proof
         rootKind: gap
@@ -292,8 +296,7 @@ records:
     schema: work/uat-flow@1
     feature: identity
     state: todo
-    effectiveState: suspended
-    suspensionReason: evidence-marked-stale
+    effectiveState: blocked
     blockers:
       - id: gap.identity.live-proof
         rootKind: gap
@@ -335,21 +338,21 @@ tally:
   overall:
     done: 1
     todo: 18
-    stale: 17
-    blocked: 0
+    stale: 15
+    blocked: 2
     total: 36
   byFeature:
     checkout:
       done: 1
       todo: 14
-      stale: 10
-      blocked: 0
+      stale: 9
+      blocked: 1
       total: 25
     identity:
       done: 0
       todo: 4
-      stale: 7
-      blocked: 0
+      stale: 6
+      blocked: 1
       total: 11
   gaps:
     - id: gap.checkout.live-proof
@@ -438,6 +441,9 @@ frontier:
     feature: identity
     title: Account sign-in direction
 unclassifiedEdges:
+  - from: ac.checkout.cart.clear-leaves-other-carts-untouched
+    field: rule
+    target: br.checkout.cart
   - from: event.checkout.order-placed
     field: producer
     target: fr.checkout.place-order

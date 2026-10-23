@@ -13,22 +13,21 @@
 // The findings carry stable codes (scripts/lib/failure-code-findings.mjs): RT_CODE_UNCATALOGUED, RT_CODE_STALE, RT_CODE_MALFORMED,
 // RT_CODE_SOLE_EMITTER.
 // What counts as an emitted code (see `emittedCodes`):
-//   UPPER  a quoted UPPER_SNAKE literal of two or more segments ('TARGET_MISSING'), except the names in the not-codes
-//          section of modules/kernel/allowlist.yaml (environment variables, Node/SQLite error names, key names)
-//          and any name the code itself reads as an env var; exact AST recognition sites also exclude closed CLI enums and boolean guards;
+//   UPPER  a quoted UPPER_SNAKE literal of two or more segments ('TARGET_MISSING'), except what the scanner proves is not emitted: a name the code itself reads as an env var, a vendor env prefix, a
+//          literal in a comment, a compared or queried value, a membership test or an enum member (scripts/lib/failure-code-reads.mjs); exact AST recognition sites also exclude closed CLI enums and boolean guards;
 //   KEBAB  a kebab-case literal with a hyphen in a code position: `code: 'x-y'`, `reason: 'x-y'`, `rejected: 'x-y'`,
 //          a reason template that starts with one (`reason: \`x-y:${...}\``), or the last string argument of refuse(...).
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { readAllowlist } from '../lib/allowlist.mjs';
 import { FAILURE_CODE_VIETNAMESE_FIELDS } from '../lib/language.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { byCodeUnit } from '../lib/list.mjs';
 import { CODE_FINDINGS, PLUGIN_ENFORCERS } from '../lib/failure-code-findings.mjs';
 import { loadCatalog } from '../cli/catalog.mjs';
 import { failureSourceIndex, ownedResultCodes } from '../lib/failure-code-owned-results.mjs';
+import { nonEmittingOffsets } from '../lib/failure-code-reads.mjs';
 import { protocolEnumOffsets, environmentOffsets, catchRecognitionOffsets } from '../lib/failure-code-protocol-enums.mjs';
 import { parseSource, ts as sourceTs } from '../hfs/runtime-rules/source-ast.mjs';
 
@@ -48,7 +47,6 @@ const SKIP_FILES = new Set([CATALOG_FILE, 'scripts/checks/check-failure-codes.mj
 const NOT_CODE_VENDOR_PREFIX = /^(?:ORCA|NODE|CODEX|CLAUDE|OPENAI|CLOUDFLARE|TELEGRAM|ANTHROPIC|GITHUB|GIT|DEVIN|LOCALAPPDATA|APPDATA|USERPROFILE|HTTP|SQLITE|ERR)_/;
 const NOT_CODE_SONAR_PREFIX = /^SONAR_(?!(?:TUNNEL_NOT_RUNNING|DB_PASSWORD_MISMATCH|UNREACHABLE)$)/;
 const NOT_CODE_PREFIX = { test: (code) => NOT_CODE_VENDOR_PREFIX.test(code) || NOT_CODE_SONAR_PREFIX.test(code) };
-const readNotCodes = (base) => new Set(readAllowlist('not-codes', base).map((entry) => entry.literal));
 
 const skipDir = (name) => name === 'node_modules' || name === '.git' || name === 'dist';
 function* walk(dir) {
@@ -67,6 +65,9 @@ const ENV_LIST_NAME_PART = String.raw`\b[A-Z][A-Z0-9_]*_ENV[A-Z0-9_]*`;
 const ENV_LIST_ASSIGNMENT_PART = String.raw`\s*=\s*`;
 const ENV_LIST_VALUE_PART = String.raw`(?:(?:new Set|Object\.freeze)\()?(?:\[([^\]]*)\]|('[^']*'|"[^"]*"))`;
 const ENV_LIST_RE = new RegExp(`${ENV_LIST_NAME_PART}${ENV_LIST_ASSIGNMENT_PART}${ENV_LIST_VALUE_PART}`, 'g');
+// The same constant as a frozen object of env names (RELOAD_ENV = Object.freeze({ handoverFrom: 'STARCI_RELOAD_HANDOVER_FROM' })): its string values are env names.
+const ENV_OBJECT_VALUE_PART = String.raw`Object\.freeze\(\{([^}]*)\}\)`;
+const ENV_OBJECT_RE = new RegExp(`${ENV_LIST_NAME_PART}${ENV_LIST_ASSIGNMENT_PART}${ENV_OBJECT_VALUE_PART}`, 'g');
 // A bracketed code in text: a message prefix ('[TARGET_MISSING] ...'), a comment or a YAML flow list. In JavaScript a
 // bracket around one identifier is code, not text: an element access (`baseline[KEY]`), an array literal (`[ROOT]`)
 // or a computed key (`{ [KEY]: v }`) reads a constant and emits nothing; `codeBrackets` finds those by parsing.
@@ -115,6 +116,21 @@ function codeBrackets(rel, text) {
   return out;
 }
 
+const QUOTED_ENV_NAME = /['"]([A-Z][A-Z0-9_]+)['"]/g;
+const ENV_READ_RES = [
+  /\b(?:(?:process\.)?env(?:\.|\[\s*['"])|readEnv\(\s*['"])([A-Z][A-Z0-9_]+)/g,
+  /\benv[A-Z][A-Za-z0-9]*\(\s*['"]([A-Z][A-Z0-9_]+)['"]/g,
+];
+
+/** The names a source text reads as environment variables: direct reads, env*(...) helpers, and the literals of an *_ENV constant (list, set or frozen object). */
+function envNamesOf(text) {
+  const names = new Set();
+  for (const re of ENV_READ_RES) for (const m of text.matchAll(re)) names.add(m[1]);
+  const constants = [...text.matchAll(ENV_OBJECT_RE)].map((m) => m[1]).concat([...text.matchAll(ENV_LIST_RE)].map((m) => m[1] ?? m[2]));
+  for (const body of constants) for (const name of body.matchAll(QUOTED_ENV_NAME)) names.add(name[1]);
+  return names;
+}
+
 /** The scanned [rel, text] pairs and the names a file reads as an environment variable (never codes). */
 const sourceTexts = (base) => {
   const envNames = new Set();
@@ -124,8 +140,7 @@ const sourceTexts = (base) => {
     if (SKIP_FILES.has(rel)) continue;
     const text = fs.readFileSync(file, 'utf8');
     texts.push([rel, text]);
-    for (const m of text.matchAll(/\b(?:(?:process\.)?env(?:\.|\[\s*['"])|readEnv\(\s*['"])([A-Z][A-Z0-9_]+)/g)) envNames.add(m[1]);
-    for (const list of text.matchAll(ENV_LIST_RE)) for (const name of (list[1] ?? list[2]).matchAll(/['"]([A-Z][A-Z0-9_]+)['"]/g)) envNames.add(name[1]);
+    for (const name of envNamesOf(text)) envNames.add(name);
   }
   return { texts, envNames };
 };
@@ -150,36 +165,36 @@ function gitRevisionArgs(text) {
 }
 
 /** The codes one scanned source emits, pushed through `add`. */
-const upperCodeFindings = (rel, text, NOT_CODES, envNames, add, recognition) => {
+const upperCodeFindings = (rel, text, envNames, add, recognition) => {
   const revisions = rel.endsWith('.mjs') ? gitRevisionArgs(text) : new Set();
   for (const m of text.matchAll(UPPER_RE)) {
     const code = m[2];
     if (revisions.has(m.index)) continue;
     if (recognition?.has(m.index)) continue;
-    if (NOT_CODES.has(code) || NOT_CODE_PREFIX.test(code) || envNames.has(code)) continue;
+    if (NOT_CODE_PREFIX.test(code) || envNames.has(code)) continue;
     add(code, 'upper', rel, lineOf(text, m.index));
   }
   const brackets = [...text.matchAll(BRACKET_RE)];
   const inCode = rel.endsWith('.mjs') && brackets.length ? codeBrackets(rel, text) : null;
   for (const m of brackets) {
     if (inCode?.has(m.index)) continue;
-    if (NOT_CODES.has(m[1]) || NOT_CODE_PREFIX.test(m[1]) || envNames.has(m[1])) continue;
+    if (NOT_CODE_PREFIX.test(m[1]) || envNames.has(m[1])) continue;
     add(m[1], 'upper', rel, lineOf(text, m.index));
   }
 };
 
-const kebabCodeFindings = (rel, text, NOT_CODES, add) => {
+const kebabCodeFindings = (rel, text, add) => {
   if (!rel.endsWith('.mjs')) return;
-  const addKebab = (code, at) => { if (!NOT_CODES.has(code)) add(code, 'kebab', rel, lineOf(text, at)); };
+  const addKebab = (code, at) => add(code, 'kebab', rel, lineOf(text, at));
   for (const m of text.matchAll(LIST_RE)) {
     for (const item of m[1].matchAll(new RegExp(`['"](${KEBAB})['"]`, 'g'))) addKebab(item[1], m.index);
   }
   for (const re of KEBAB_RES) for (const m of text.matchAll(re)) addKebab(m[m.length - 1], m.index);
 };
 
-const fileEmittedCodes = (rel, text, { NOT_CODES, envNames, add, recognition }) => {
-  upperCodeFindings(rel, text, NOT_CODES, envNames, add, recognition);
-  kebabCodeFindings(rel, text, NOT_CODES, add);
+const fileEmittedCodes = (rel, text, { envNames, add, recognition }) => {
+  upperCodeFindings(rel, text, envNames, add, recognition);
+  kebabCodeFindings(rel, text, add);
 };
 
 /** The validated CLI owner and field of each closed flag enum; a shared spelling alone never grants an exclusion. */
@@ -190,13 +205,13 @@ function cliEnums(base) {
 }
 
 /** Preserve the scanner's code spelling and not-code policy while adding finite values proved to reach code sinks. */
-function ownedCodeFindings(compiler, index, {NOT_CODES, envNames, add}) {
+function ownedCodeFindings(compiler, index, {envNames, add}) {
   const upper = new RegExp(UPPER_RE.source), kebab = new RegExp(`^${KEBAB}$`);
   for (const entry of ownedResultCodes(compiler, index)) {
     let kind = null;
     if (upper.exec(JSON.stringify(entry.code))?.[2] === entry.code) kind = 'upper';
     else if (kebab.test(entry.code)) kind = 'kebab';
-    if (!kind || NOT_CODES.has(entry.code) || NOT_CODE_PREFIX.test(entry.code) || envNames.has(entry.code)) continue;
+    if (!kind || NOT_CODE_PREFIX.test(entry.code) || envNames.has(entry.code)) continue;
     for (const site of entry.sites) add(entry.code, kind, site.file, site.line);
   }
 }
@@ -209,27 +224,27 @@ function emittedCodes(base = root) {
     if (e.sites.length < 6 && !e.sites.some((s) => s.file === file && s.line === line)) e.sites.push({ file, line });
     found.set(code, e);
   };
-  const NOT_CODES = readNotCodes(base);
   const { texts, envNames } = sourceTexts(base);
   const typescript = sourceTs(), scriptTexts = new Map(texts.filter(([rel]) => rel.endsWith('.mjs')));
   const index = failureSourceIndex(typescript, scriptTexts, file => parseSource(scriptTexts.get(file), file));
   const recognition = protocolEnumOffsets(typescript, index, cliEnums(base));
-  for (const classified of [environmentOffsets(typescript, index), catchRecognitionOffsets(typescript, index)]) {
+  const reads = new Map([...index.values()].map(info => [info.file, nonEmittingOffsets(typescript, info.source, [UPPER_RE, BRACKET_RE])]));
+  for (const classified of [environmentOffsets(typescript, index), catchRecognitionOffsets(typescript, index), reads]) {
     for (const [file, offsets] of classified) {
       const exact = recognition.get(file) ?? new Set();
       for (const offset of offsets) exact.add(offset);
       recognition.set(file, exact);
     }
   }
-  for (const [rel, text] of texts) fileEmittedCodes(rel, text, { NOT_CODES, envNames, add, recognition: recognition.get(rel) });
-  ownedCodeFindings(typescript, index, {NOT_CODES, envNames, add});
+  for (const [rel, text] of texts) fileEmittedCodes(rel, text, { envNames, add, recognition: recognition.get(rel) });
+  ownedCodeFindings(typescript, index, {envNames, add});
   for (const v of vocabularyCodes(base)) found.set(v.code, v);
   return [...found.values()].sort((a, b) => byCodeUnit(a.code, b.code));
 }
 
 // The entry's scalar fields. Its Vietnamese fields (FAILURE_CODE_VIETNAMESE_FIELDS) are the one declared exception of the English-only document law (HFS_DOC_NOT_ENGLISH); causes_vi is their list companion.
 const FIELDS = ['title', ...FAILURE_CODE_VIETNAMESE_FIELDS.filter((field) => field !== 'causes_vi'), 'owner', 'kind'];
-const CODE_KINDS = Object.freeze(['check-finding', 'settle-reason', 'dispatch-refusal', 'blocker', 'check-status', 'verb-refusal', 'runtime-fault', 'input-invalid']);
+const CODE_KINDS = Object.freeze(['check-finding', 'settle-reason', 'dispatch-refusal', 'blocker', 'check-status', 'verb-refusal', 'runtime-fault', 'input-invalid', 'event-kind', 'outcome-reason', 'classification']);
 
 /** Read the catalog: a flat map code -> entry. */
 export function readCatalog(base = root) {

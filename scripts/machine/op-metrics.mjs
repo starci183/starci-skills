@@ -52,7 +52,7 @@ import { clipLine } from '../lib/clip.mjs'; import { isMain } from '../lib/is-ma
 const SNAPSHOT_KIND = 'supervisor-op-metrics';
 /** metrics_snapshots.kind of these snapshots (DBTREE B6). */
 const METRICS_KIND = 'op-health';
-export const WAIT_KINDS = Object.freeze(['owner-gate', 'peer-wait', 'dependency', 'retry-cap', 'deferred-settle', 'queued-ready', 'throttled']);
+const WAIT_KINDS = Object.freeze(['owner-gate', 'peer-wait', 'dependency', 'retry-cap', 'deferred-settle', 'queued-ready', 'throttled']);
 /** queuedBecause values that are the runtime's capacity, not the workflow's own order. */
 const THROTTLE_CAUSES = Object.freeze(['pool-full', 'circuit-open', 'max-ops', 'path-lease', 'host-resources-low']);
 

@@ -3702,6 +3702,37 @@ starci release sync-runtime --prepare-grammar
 
 resolve runtime operations from structured routing inputs
 
+### starci route model
+
+resolve which tier members may take a workload from the declarative model-selection rules
+
+| flag | type | |
+| --- | --- | --- |
+| `--kind` | string |  |
+| `--role` | enum implement|verify|decide|plan|write |  |
+| `--domain` | string |  |
+| `--risk` | enum low|medium|high|critical |  |
+| `--floor` | enum probation|standard|high|critical |  |
+| `--tools` | list |  |
+| `--context-tokens` | string |  |
+| `--external` | boolean |  |
+| `--unapproved` | boolean |  |
+| `--no-review` | boolean |  |
+| `--no-checks` | boolean |  |
+| `--difficulty` | enum easy|medium|hard|insane |  |
+| `--plan` | boolean |  |
+| `--repo` | string |  |
+| `--models-dir` | string |  |
+| `--verbose` | boolean |  |
+
+exit: 0 a member is picked; 1 no eligible model; 2 bad usage
+
+json: flag
+
+```sh
+starci route model --kind interface.draw --plan --json
+```
+
 ### starci route op
 
 resolve the operation that serves a structured routing request

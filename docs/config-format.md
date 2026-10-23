@@ -194,7 +194,7 @@ the live facts. Precedence: hard filter, owner bias, a live seat keeps its membe
 6. **Reserve, launch, attest.** A proved no-effect failure continues down the chain in the same attempt; an unknown effect
    stops for reconciliation (`modules/kernel/start-workflow.yaml` `spawn.fallThrough`).
 7. **Record**: every pick keeps its tier, the chain after each step, who was dropped and why, and the winner with the
-   deciding step. `workflow start --plan`, `route-model --plan` and the route receipt print it.
+   deciding step. `workflow start --plan`, `starci route model --plan` and the route receipt print it.
 
 The Devin grant gate stays: a pool whose `registry.yaml` `capacityAuthority` is `explicit-workflow-quota` is in the hard
 filter unless `allocation.grants` opens it for the role and slot count.

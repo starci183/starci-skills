@@ -25,7 +25,7 @@ starci runtime verify --base <ref>
 
 `starci runtime verify` joins the runtime check, the package clean-test of the packages the change touches and the scaffold e2e on one commit, one receipt; the runtime has no specs of its own (owner ruling `no-runtime-specs`). The release cut runs every package suite and the scaffold e2e again.
 
-Review source changes and test failures. Do not weaken validators to produce a green release. Knowledge is authored as YAML under `knowledge/` and read directly; see [knowledge YAML](knowledge-yaml.md). The runtime bundles its YAML dependency in `engine/yaml.mjs`; retain its license notice (`engine/yaml-license.json`, THIRD_PARTY_NOTICES.md) when deliberately changing that dependency.
+Review source changes and test failures. Do not weaken validators to produce a green release. Knowledge is authored as YAML under `knowledge/` and read directly; see [knowledge YAML](knowledge-yaml.md). The runtime bundles its YAML dependency in `engine/yaml.mjs`; retain its license notice (`engine/yaml-license.yaml`, THIRD_PARTY_NOTICES.md) when deliberately changing that dependency.
 
 ## Example apps: CI and the local Sonar dashboard
 

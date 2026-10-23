@@ -137,6 +137,7 @@ ruleParams:
       - {id: schema-catalog, run: scripts/checks/check-schema-catalog.mjs}
       - {id: schema-shared, run: scripts/checks/check-schema-shared.mjs}
       - {id: json-exceptions, run: scripts/checks/check-json-exceptions.mjs}
+      - {id: example-derived, run: scripts/checks/check-example-derived.mjs}
       - {id: one-allowlist, run: scripts/checks/check-one-allowlist.mjs}
       - {id: generated-untracked, run: scripts/checks/check-generated-untracked.mjs}
       - {id: work-deep, run: scripts/work/validate/check-work-deep.mjs}
@@ -387,7 +388,7 @@ slots:
     rules: [RT_TIER_DIRECTION, RT_BASE_IMPURE, RT_EXTERNAL_OWNER]
   - id: runtime.vendored-yaml
     profiles: [runtime]
-    # The vendored, frozen YAML bundle (engine/yaml-license.json names its license): a dependency copy, not authored source.
+    # The vendored, frozen YAML bundle (engine/yaml-license.yaml names its license): a dependency copy, not authored source.
     path: engine/yaml.mjs
     presence: required
     tracked: tracked
@@ -397,7 +398,7 @@ slots:
     rules: [RT_TIER_DIRECTION, RT_BASE_IMPURE, RT_EXTERNAL_OWNER]
   - id: runtime.foundation-data
     profiles: [runtime]
-    path: engine/yaml-license.json
+    path: engine/yaml-license.yaml
     presence: required
     tracked: tracked
     tier: none
@@ -771,7 +772,7 @@ slots:
     coverage: none
   - id: runtime.example
     profiles: [runtime]
-    # A product example app; its inside is judged by the PRODUCT HFS (hfs.json kind app; check-example-architecture).
+    # A product example app; its inside is judged by the PRODUCT HFS (hfs.json kind app; the examples workflow runs `starci app lint` in each).
     path: "examples/<app>/"
     presence: required
     tracked: tracked

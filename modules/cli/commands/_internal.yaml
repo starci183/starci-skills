@@ -5,7 +5,6 @@ internal:
   - {path: scripts/api/orca/account-list.mjs, why: "Internal Orca API wrapper", usedBy: [scripts/agent/quota/orca-account.mjs]}
   - {path: scripts/api/orca/agent-context.mjs, why: "Internal Orca API wrapper", usedBy: [scripts/checks/check-providers.mjs]}
   - {path: scripts/api/orca/check.mjs, why: "Internal Orca API wrapper", usedBy: [scripts/kernel/cli.mjs]}
-  - {path: scripts/api/orca/project-setup-delete.mjs, why: "Internal Orca API wrapper", usedBy: [scripts/machine/worktree-orca.mjs]}
   - {path: scripts/api/orca/reply.mjs, why: "Internal Orca API wrapper", usedBy: [scripts/kernel/verbs/reply.mjs]}
   - {path: scripts/api/orca/repo-add.mjs, why: "Internal Orca API wrapper", usedBy: [scripts/machine/worktree-orca.mjs]}
   - {path: scripts/api/orca/run-create.mjs, why: "Internal Orca API wrapper", usedBy: [scripts/agent/lib.mjs]}
@@ -15,7 +14,6 @@ internal:
   - {path: scripts/api/orca/run-use.mjs, why: "Internal Orca API wrapper", usedBy: [scripts/kernel/orca-runs.mjs]}
   - {path: scripts/api/orca/send.mjs, why: "Internal Orca API wrapper", usedBy: [scripts/kernel/cli.mjs]}
   - {path: scripts/api/orca/status.mjs, why: "Internal Orca API wrapper", usedBy: [scripts/reconciler/services.mjs]}
-  - {path: scripts/api/orca/task-list.mjs, why: "Internal Orca API wrapper", usedBy: [scripts/kernel/cli.mjs]}
   - {path: scripts/api/orca/task-update.mjs, why: "Internal Orca API wrapper", usedBy: [scripts/work/draw-critic.mjs]}
   - {path: scripts/api/orca/terminal-close.mjs, why: "Internal Orca API wrapper", usedBy: [scripts/kernel/close-op-terminal.mjs]}
   - {path: scripts/api/orca/terminal-list.mjs, why: "Internal Orca API wrapper", usedBy: [scripts/checks/check-orca-tree.mjs]}
@@ -39,7 +37,6 @@ internal:
   - {path: scripts/checks/check-dead-scripts.mjs, why: "Runtime check-suite member", usedBy: [scripts/checks/check-runtime.mjs]}
   - {path: scripts/checks/check-doc-language.mjs, why: "Runtime check-suite member", usedBy: [scripts/checks/check-runtime.mjs]}
   - {path: scripts/checks/check-entry.mjs, why: "Runtime check-suite member", usedBy: [scripts/checks/check-runtime.mjs]}
-  - {path: scripts/checks/check-example-architecture.mjs, why: "Runtime check-suite member", usedBy: [scripts/checks/check-runtime.mjs]}
   - {path: scripts/checks/check-example-derived.mjs, why: "Runtime check-suite member", usedBy: [scripts/checks/check-runtime.mjs]}
   - {path: scripts/checks/check-example-yaml.mjs, why: "Examples workflow matrix check", usedBy: [.github/workflows/examples.yml]}
   - {path: scripts/checks/check-examples-ci.mjs, why: "Examples workflow matrix printer", usedBy: [.github/workflows/examples.yml]}
@@ -111,7 +108,6 @@ internal:
   - {path: scripts/reconciler/notifier.mjs, why: "Fleet notification controller", usedBy: [scripts/reconciler/controllers/workers.mjs]}
   - {path: scripts/reconciler/sla.mjs, why: "Workflow SLA controller", usedBy: [scripts/reconciler/engine.mjs]}
   - {path: scripts/guards/release-push-gate.mjs, why: "Body of the generated pre-push hook of the runtime repository", usedBy: [scripts/guards/git-hooks.mjs]}
-  - {path: scripts/route/route-model.mjs, why: "Model-route selector and --plan preview", usedBy: [scripts/goal/define-goal.mjs]}
   - {path: scripts/route/route-plan.mjs, why: "Goal route-plan helper", usedBy: [scripts/goal/define-goal.mjs]}
   - {path: scripts/uat/test-secret.mjs, why: "Runtime test-secret reader behind the app secret owner", usedBy: [scripts/supervisor/push-mains.mjs]}
   - {path: scripts/work/purge-workflow.mjs, why: "Finished-workflow purge helper", usedBy: [scripts/housekeeping/hk-ledger.mjs]}

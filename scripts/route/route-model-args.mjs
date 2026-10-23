@@ -4,8 +4,8 @@ import { normalizeDifficulty } from '../agent/models.mjs';
 
 const VALUE_OPTIONS = new Map([
   ['--kind', 'kind'], ['--role', 'role'], ['--domain', 'domain'], ['--risk', 'risk'], ['--floor', 'floor'],
-  ['--tools', 'tools'], ['--contextTokens', 'contextTokens'], ['--difficulty', 'difficulty'],
-  ['--modelsDir', 'modelsDir'], ['--repo', 'repo'],
+  ['--tools', 'tools'], ['--context-tokens', 'contextTokens'], ['--difficulty', 'difficulty'],
+  ['--models-dir', 'modelsDir'], ['--repo', 'repo'],
 ]);
 const FLAG_OPTIONS = new Map([
   ['--external', ['external', true]], ['--unapproved', ['approved', false]], ['--no-review', ['review', false]],
@@ -14,7 +14,7 @@ const FLAG_OPTIONS = new Map([
 
 function printHelp(helpFile) {
   const header = fs.readFileSync(helpFile, 'utf8').split('\n');
-  const from = header.findIndex((line) => line.startsWith('// Internal entry:'));
+  const from = header.findIndex((line) => line.startsWith('// Entry:'));
   const to = header.findIndex((line) => line.startsWith('// Owner config:'));
   console.log(header.slice(from, to).map((line) => line.replace(/^\/\/ ?/, '')).join('\n').trimEnd());
 }

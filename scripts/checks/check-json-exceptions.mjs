@@ -1,13 +1,9 @@
 #!/usr/bin/env node
 /**
- * Fail if any authored *.json under the skill root is outside the json-exceptions
- * section of modules/kernel/allowlist.yaml (the ONE allowlist of the runtime).
+ * Fail if any authored *.json under the skill root is not of a declared format (scripts/lib/json-formats.mjs): a JSON file is admitted
+ * because a tool requires that format (npm, tsc, turbo, next-intl, Claude Code, the stack tooling) or because it is managed canon
+ * (a template a managed slot of the slot manifest names, or its render), never because a path was listed. Authored config is YAML.
  * Inventory-only helper.
- *
- * The allowlist names exact files (`exceptions[]`) and exact directories (`directories[]`). A registered
- * directory admits the *.json files directly inside it, for an append-only record kept as one JSON file per
- * entry (benchmark/snapshots/<date>-<N>h.json): the next snapshot needs no new line. It is not a wildcard -
- * the path is exact, subdirectories stay in the inventory, and the directory must exist.
  *
  * Usage:
  *   starci runtime check --only json-exceptions
@@ -17,7 +13,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { RUNTIME_STATE_DIR } from '../../engine/runtime-root.mjs';
-import { ALLOWLIST_FILE, readAllowlistFile } from '../lib/allowlist.mjs';
+import { JSON_FORMATS, jsonFormatOf } from '../lib/json-formats.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { declaredTemplateNames, isManagedRender, managedTemplatesOf } from '../lib/managed-json.mjs';
 import { loadSlotManifest } from '../hfs/slots.mjs';
@@ -91,65 +87,13 @@ const SPEC_SCRATCH_PREFIXES = Object.freeze(['.starci-wk-spec-', '.tmp-hfs-fe-bu
  * tree byte for byte from the runtime (its BUNDLES) and `sync-runtime --check` fails on any missing, stale or extra file.
  * The authored originals stay in the inventory; only these exact skill-root paths are skipped, not a same-named tree elsewhere.
  */
-export const GENERATED_MIRROR_ROOTS = Object.freeze([
+const GENERATED_MIRROR_ROOTS = Object.freeze([
   'packages/eslint/be/runtime',
   'packages/eslint/fe/runtime',
   'packages/hfs/runtime',
 ]);
 
 const GENERATED_MIRROR_SET = new Set(GENERATED_MIRROR_ROOTS);
-
-/** One allowlist entry's path: a non-empty relative skill path, forward slashes, no wildcard. */
-function entryPath(entry, list) {
-  if (!entry || typeof entry.path !== 'string' || !entry.path.trim()) {
-    throw new Error(`Each json-exceptions ${list} entry needs a non-empty path string`);
-  }
-  if (entry.path.includes('*') || entry.path.includes('?') || entry.path.includes('[')) {
-    throw new Error(`Wildcards are not allowed in json-exceptions: ${entry.path}`);
-  }
-  if (path.isAbsolute(entry.path) || entry.path.split(/[/\\]/).includes('..')) {
-    throw new Error(`json-exceptions path must be a relative skill path: ${entry.path}`);
-  }
-  const normalized = entry.path.replaceAll('\\', '/');
-  if (normalized !== entry.path) {
-    throw new Error(`json-exceptions path must use forward slashes: ${entry.path}`);
-  }
-  if (normalized.endsWith('/') || normalized.split('/').includes('.')) {
-    throw new Error(`json-exceptions path must be exact, without a trailing slash or '.': ${entry.path}`);
-  }
-  if (typeof entry.reason !== 'string' || !entry.reason.trim()) {
-    throw new Error(`json-exceptions entry needs reason: ${entry.path}`);
-  }
-  return normalized;
-}
-
-function sortedUnique(paths, list) {
-  const sorted = [...paths].sort((a, b) => a.localeCompare(b));
-  if (paths.some((p, i) => p !== sorted[i])) {
-    throw new Error(`json-exceptions ${list} paths must be uniquely sorted (localeCompare)`);
-  }
-  if (new Set(paths).size !== paths.length) {
-    throw new Error(`json-exceptions ${list} paths must be unique`);
-  }
-  return Object.freeze(sorted);
-}
-
-function loadAllowlist(allowlistFile) {
-  if (!fs.existsSync(allowlistFile)) {
-    throw new Error(`JSON exceptions allowlist is required: ${path.relative(root, allowlistFile).replaceAll('\\', '/')}`);
-  }
-  const section = readAllowlistFile('json-exceptions', allowlistFile);
-  if (!section || typeof section !== 'object' || !Array.isArray(section.exceptions)) {
-    throw new Error(`${ALLOWLIST_FILE} json-exceptions must define exceptions[]`);
-  }
-  if (section.directories !== undefined && !Array.isArray(section.directories)) {
-    throw new Error(`${ALLOWLIST_FILE} json-exceptions.directories must be a list when present`);
-  }
-  return {
-    files: sortedUnique(section.exceptions.map(entry => entryPath(entry, 'exceptions')), 'exceptions'),
-    directories: sortedUnique((section.directories ?? []).map(entry => entryPath(entry, 'directories')), 'directories'),
-  };
-}
 
 function shouldSkipDir(relativePosix, name) {
   if (SKIP_DIR_NAMES.has(name)) return true;
@@ -217,11 +161,8 @@ function managedRenderReader(skillRoot) {
   };
 }
 
-/** The parent directory of a relative path ('' for a root file). */
-const dirOf = rel => (rel.includes('/') ? rel.slice(0, rel.lastIndexOf('/')) : '');
-
 /** Splits the walked .json files into offenders (unregistered) and generatedPresent. */
-function partitionFound(found, ignoreLocks, allow, allowDirs, isManaged = () => false) {
+function partitionFound(found, ignoreLocks, isManaged = () => false) {
   const offenders = [];
   const generatedPresent = [];
   for (const rel of found) {
@@ -232,63 +173,27 @@ function partitionFound(found, ignoreLocks, allow, allowDirs, isManaged = () => 
       generatedPresent.push(rel);
       continue;
     }
-    if (!allow.has(rel) && !allowDirs.has(dirOf(rel)) && !isManaged(rel)) offenders.push(rel);
+    if (!jsonFormatOf(rel) && !isManaged(rel)) offenders.push(rel);
   }
   return { offenders, generatedPresent };
 }
 
-/** The allowlist paths and registered directories that are not on disk under `skillRoot`. */
-function missingEntries(skillRoot, allowlist, directories, ignoreLocks) {
-  const missing = [];
-  for (const rel of allowlist) {
-    if (ignoreLocks && /(^|\/)package-lock\.json$/.test(rel)) continue;
-    if (!fs.existsSync(path.join(skillRoot, rel))) missing.push(rel);
-  }
-  for (const rel of directories) {
-    const abs = path.join(skillRoot, rel);
-    if (!fs.existsSync(abs) || !fs.statSync(abs).isDirectory()) missing.push(`${rel}/`);
-  }
-  return missing;
-}
-
-function checkJsonExceptions({
-  root: optionRoot,
-  skillRoot: skillRootOption,
-  allowlistFile,
-  ignoreLockfiles: ignoreLocks = ignoreLockfiles,
-} = {}) {
+function checkJsonExceptions({ root: optionRoot, skillRoot: skillRootOption, ignoreLockfiles: ignoreLocks = ignoreLockfiles } = {}) {
   const skillRoot = optionRoot ?? skillRootOption ?? root;
-  const listFile = allowlistFile ?? path.join(skillRoot, ...ALLOWLIST_FILE.split('/'));
-  const { files: allowlist, directories } = loadAllowlist(listFile);
   const found = [];
   walkJsonFiles(skillRoot, '', found);
   found.sort((a, b) => a.localeCompare(b));
-
-  const { offenders, generatedPresent } = partitionFound(found, ignoreLocks, new Set(allowlist), new Set(directories), managedRenderReader(skillRoot));
-  const missingAllowlist = missingEntries(skillRoot, allowlist, directories, ignoreLocks);
-
-  return {
-    ok: offenders.length === 0 && missingAllowlist.length === 0,
-    offenders,
-    missingAllowlist,
-    generatedPresent,
-    allowed: allowlist,
-    allowedDirectories: directories,
-  };
+  const { offenders, generatedPresent } = partitionFound(found, ignoreLocks, managedRenderReader(skillRoot));
+  return { ok: offenders.length === 0, offenders, generatedPresent };
 }
+
+const JSON_FORMATS_COUNT = JSON_FORMATS.length;
 
 function main() {
   const result = checkJsonExceptions();
-  if (result.missingAllowlist.length) {
-    process.stderr.write(
-      `Allowlist path missing on disk (${result.missingAllowlist.length}):\n` +
-        result.missingAllowlist.map(p => `  ${p}`).join('\n') +
-        '\n'
-    );
-  }
   if (result.offenders.length) {
     process.stderr.write(
-      `Authored JSON outside ${ALLOWLIST_FILE} (${result.offenders.length}):\n` +
+      `Authored JSON of no declared format (${result.offenders.length}); author it as YAML or declare the tool-required format in scripts/lib/json-formats.mjs:\n` +
         result.offenders.map(p => `  ${p}`).join('\n') +
         '\n'
     );
@@ -298,10 +203,7 @@ function main() {
     return;
   }
   process.stdout.write(
-    `OK: no authored JSON outside allowlist (${result.allowed.length} exceptions, ` +
-      `${result.allowedDirectories.length} registered director${result.allowedDirectories.length === 1 ? 'y' : 'ies'}` +
-      (ignoreLockfiles ? ', lockfiles ignored' : '') +
-      `; ${result.generatedPresent.length} known generated path(s) skipped).\n`
+    `OK: every JSON file is of a declared format or managed canon (${JSON_FORMATS_COUNT} formats; ${result.generatedPresent.length} known generated path(s) skipped${ignoreLockfiles ? ', lockfiles ignored' : ''}).\n`
   );
 }
 

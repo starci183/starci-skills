@@ -850,7 +850,7 @@ schemas:
     file: modules/schemas/allowlist.schema.yaml
     dialect: json-schema
     subsystem: build
-    governs: "The ONE explicit allowlist of the runtime, modules/kernel/allowlist.yaml: every exception list a runtime check keeps is a named section (not-codes, json-exceptions, dead-script-entries, export-used), each entry carrying the reason the exception exists, each section shrink-only."
+    governs: "The ONE explicit allowlist of the runtime, modules/kernel/allowlist.yaml: every exception list a runtime check keeps is a named section (export-used, sonar-rules), each entry carrying the reason the exception exists, each section shrink-only."
     binds: "modules/kernel/allowlist.yaml sections and their {literal|path, reason} entries"
     usedBy: [scripts/lib/allowlist.mjs (readAllowlist), scripts/checks/check-one-allowlist.mjs (sprawl guard)]
     business:

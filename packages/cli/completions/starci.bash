@@ -2,7 +2,7 @@
 _starci() {
     local cur prev group verb
     COMPREPLY=()
-    cur="${COMP_WORDS[COMP_CWORD]}"
+    cur="${COMP_WORDS[$COMP_CWORD]}"
     prev=""
     if [ "$COMP_CWORD" -gt 0 ]; then prev="${COMP_WORDS[COMP_CWORD-1]}"; fi
     group="${COMP_WORDS[1]}"
@@ -31,7 +31,7 @@ _starci() {
         provision) COMPREPLY=( $(compgen -W "operation" -- "$cur") );;
         reconciler) COMPREPLY=( $(compgen -W "once reopen restart start status stop up" -- "$cur") );;
         release) COMPREPLY=( $(compgen -W "app-installs check ci-override ci-status clean-test cut images notes proof publish scaffold-e2e sync-runtime" -- "$cur") );;
-        route) COMPREPLY=( $(compgen -W "op" -- "$cur") );;
+        route) COMPREPLY=( $(compgen -W "model op" -- "$cur") );;
         runtime) COMPREPLY=( $(compgen -W "architecture artefacts benchmark-snapshot check deploy derived-fields doctor example-secrets gen-catalog gen-ops housekeeping import-held-secret install ledger-hygiene link machine-db owner-claims-audit readme-blocks revision-scope status update validate verify version" -- "$cur") );;
         smoke) COMPREPLY=( $(compgen -W "scaffold" -- "$cur") );;
         sonar) COMPREPLY=( $(compgen -W "analysis browse project release settings token user" -- "$cur") );;
@@ -713,6 +713,16 @@ _starci() {
         release:publish:--pre-land-ref) return 0;;
         release:publish:--expect-sha) return 0;;
         release:publish:--examples) return 0;;
+        route:model:--kind) return 0;;
+        route:model:--role) COMPREPLY=( $(compgen -W "implement verify decide plan write" -- "$cur") ); return 0;;
+        route:model:--domain) return 0;;
+        route:model:--risk) COMPREPLY=( $(compgen -W "low medium high critical" -- "$cur") ); return 0;;
+        route:model:--floor) COMPREPLY=( $(compgen -W "probation standard high critical" -- "$cur") ); return 0;;
+        route:model:--tools) return 0;;
+        route:model:--context-tokens) return 0;;
+        route:model:--difficulty) COMPREPLY=( $(compgen -W "easy medium hard insane" -- "$cur") ); return 0;;
+        route:model:--repo) return 0;;
+        route:model:--models-dir) return 0;;
         route:op:--kind) return 0;;
         route:op:--node-kind) return 0;;
         route:op:--phase) return 0;;
@@ -1264,6 +1274,7 @@ _starci() {
         release:publish) COMPREPLY=( $(compgen -W "--plan --publish --runtime-package --npm-user --poll-minutes --pre-land-ref --expect-sha --examples --json --cwd --quiet --help --edition" -- "$cur") );;
         release:scaffold-e2e) COMPREPLY=( $(compgen -W "--json --cwd --quiet --help --edition" -- "$cur") );;
         release:sync-runtime) COMPREPLY=( $(compgen -W "--check --prepare-grammar --json --cwd --quiet --help --edition" -- "$cur") );;
+        route:model) COMPREPLY=( $(compgen -W "--kind --role --domain --risk --floor --tools --context-tokens --external --unapproved --no-review --no-checks --difficulty --plan --repo --models-dir --verbose --json --cwd --quiet --help --edition" -- "$cur") );;
         route:op) COMPREPLY=( $(compgen -W "--kind --node-kind --phase --intent --ops-dir --json --cwd --quiet --help --edition" -- "$cur") );;
         runtime:architecture) COMPREPLY=( $(compgen -W "--base --json --cwd --quiet --help --edition" -- "$cur") );;
         runtime:artefacts) COMPREPLY=( $(compgen -W "--migrate --json --cwd --quiet --help --edition" -- "$cur") );;
