@@ -145,12 +145,17 @@ jobs:
             exit 1
           fi
           echo "tests=true" >> "$GITHUB_OUTPUT"
-          # A lite example (hfs.json edition lite) has unit specs and no e2e world (owner ruling 2026-10-12).
-          if grep -Eq '"edition"[[:space:]]*:[[:space:]]*"lite"' "$APP_DIR/hfs.json"; then
-            echo "e2e=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "e2e=true" >> "$GITHUB_OUTPUT"
-          fi
+          # The layers the app holds specs for, read by the same derivation the release cut plans its rows from (scripts/supervisor/release-l4-layers.mjs):
+          # a layer with no spec file has nothing to run. A lite example (hfs.json edition lite, R212) has no e2e world, and its integration specs run only
+          # on its local Supabase CLI stack, which the release cut's lite integration row starts (release-supabase-run.mjs), never in CI.
+          node --input-type=module -e "
+            import fs from 'node:fs';
+            import { testLayersOf } from './scripts/supervisor/release-l4-layers.mjs';
+            const layers = testLayersOf(process.env.APP_DIR);
+            const lite = JSON.parse(fs.readFileSync(process.env.APP_DIR + '/hfs.json', 'utf8')).edition === 'lite';
+            const out = ['integration=' + (layers.integration && !lite), 'e2e=' + (layers.e2e && !lite)];
+            fs.appendFileSync(process.env.GITHUB_OUTPUT, out.join('\n') + '\n');
+          "
       # The generated inputs (gitignored) first: the fe apps import the typed document table codegen writes, before any type-check or lint.
       - name: Codegen
         run: npm run codegen --silent
@@ -207,9 +212,9 @@ jobs:
           restore-keys: turbo-${{ matrix.app }}-
       - name: Front-end build
         run: npm run build:fe
-      # The docker-stack layers run in every run of this workflow (the candidate, the tag and a dispatch), after the unit project.
+      # The docker-stack layers of a full app run in every run of this workflow (the candidate, the tag and a dispatch), after the unit project, for each layer it holds specs in.
       - name: Integration tests (test world)
-        if: ${{ !cancelled() && steps.policy.outputs.tests == 'true' }}
+        if: ${{ !cancelled() && steps.policy.outputs.tests == 'true' && steps.policy.outputs.integration == 'true' }}
         run: npm run test:integration -- --ci
       - name: E2E tests (test world)
         if: ${{ !cancelled() && steps.policy.outputs.tests == 'true' && steps.policy.outputs.e2e == 'true' }}
