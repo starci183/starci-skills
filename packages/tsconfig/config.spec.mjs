@@ -147,7 +147,8 @@ test('an explicit undefined in an optional property fails to compile under every
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-tsconfig-exact-'));
   try {
     const source = path.join(dir, 'optional.ts');
-    fs.writeFileSync(source, 'export const options: { readonly signal?: AbortSignal } = { signal: undefined }\n');
+    // A type of its own: the be preset's ES2023 lib has no DOM types and a clean install has no @types/node, so AbortSignal would not resolve.
+    fs.writeFileSync(source, 'type Signal = { readonly aborted: boolean }\nexport const options: { readonly signal?: Signal } = { signal: undefined }\n');
     for (const name of PRESETS) {
       const options = { ...effective(name), noEmit: true, incremental: false, plugins: undefined };
       const codes = ts.getPreEmitDiagnostics(ts.createProgram([source], options)).map((d) => d.code);
