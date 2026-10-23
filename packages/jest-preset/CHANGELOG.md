@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.3.5 - 2026-10-23
+- Changed: the preset sets no `testTimeout` (the jest default applies; a world spec sets its own), owner ruling 2026-10-22: no loosening.
+- Changed: the type probes assert their compiler diagnostics (file, line, code) from their own rejected fixtures instead of inline ts directives; the generated metadata anchor carries no `c8 ignore`; a spec refuses any inline suppression in the package.
+
 ## 2.3.4 - 2026-10-21
 - Changed: supersedes 2.3.3, published from a lane whose history the owner refused (an unapproved allowlist entry) and therefore a superseded orphan that is not used; this version carries the same work plus the standalone scaffold fix.
 - Changed: the Sonar exclusions live in `sonar-exclusions.cjs` (published, require-free), which `sonarExclusions()` reads; @starci/hfs ships the same file byte for byte so `npx @starci/cli app scaffold` renders them without installing this preset. The list is unchanged.

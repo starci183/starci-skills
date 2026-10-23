@@ -88,7 +88,7 @@ const childEnvironment = (env, attempt) => {
  * selection over the working tree minus everything git does not track is the selection over the tracked set, so the archive equals it.
  * Returns null, or the detail of the red. `deps.trackedUnder` and `deps.generatedDrift` are the seams of the two reads.
  */
-export function untrackedPackedFiles({ files, root, deps = {} }) {
+function untrackedPackedFiles({ files, root, deps = {} }) {
   const tracked = (deps.trackedUnder ?? gitTrackedUnder)(root);
   if (!tracked?.length) return { unrun: 'the tracked file inventory of the root is unavailable or empty' };
   const trackedSet = new Set(tracked);

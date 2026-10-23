@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.7.24 - 2026-10-23
+- Changed: the catalog documents the candidate wait (a skipped conclusion is red, the 45-minute grace for a run to be listed) and the runtime's sonar workflow.
+- Changed: pins @starci/hfs 4.7.24.
+
 ## 1.7.23 - 2026-10-22
 - Changed: pins @starci/hfs 4.7.23.
 

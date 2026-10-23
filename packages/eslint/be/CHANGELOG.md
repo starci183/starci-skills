@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 3.4.31 - 2026-10-23
+- Changed: the `spec-no-skip` rule text says nothing skips, the contract layer included: a missing sandbox is a failing test of `sandbox.describe` from `@starci/test-world` 1.2.3.
+- Changed: the bundled canon pins select @starci/hfs 4.7.24 and @starci/cli 1.7.24.
 - Changed: no Sonar way rule is left to the server (owner ruling 2026-10-22, no loosening): S3403 `different-types-comparison`, S3800 `function-return-type`, S3782 `argument-type` and S6582 `@typescript-eslint/prefer-optional-chain` run at error, `unicorn/consistent-function-scoping` runs with its default options (arrow functions included). S7785 (top-level await) is recorded as not applicable to a CommonJS back end (`SONAR_WAY_NOT_APPLICABLE`).
 - Added: the `@typescript-eslint/no-unsafe-assignment`, `-member-access`, `-call`, `-return` and `-argument` rules at error.
 

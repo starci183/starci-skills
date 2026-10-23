@@ -2,6 +2,8 @@
 
 ## 1.2.3 - 2026-10-22
 
+- Changed: `sandbox.describe` no longer skips: when a required sandbox key is missing it registers one failing test naming the keys and never runs the body.
+- Changed: no inline suppression: lazy loads go through one `lazyRequire`, the type tests assert the compiler's diagnostics, and the package lint (inline config refused, every ts directive banned) runs in `npm test`.
 - Changed: the package compiles with `exactOptionalPropertyTypes` on (owner ruling 2026-10-22, no loosening; it was off): optional options that callers pass an `undefined` through say `| undefined`, and a `fetch` body or header that may be absent is spread in only when present.
 
 ## 1.2.0 - 2026-10-02
