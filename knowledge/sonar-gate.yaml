@@ -8,7 +8,7 @@ purpose: |
   conditions and selects it for the project, and (2) judges an op's slice - the lines it changed - against
   the same numbers. Code-writing ops cannot settle done while the slice is red
   (scripts/kernel/sonar-settle.mjs). Changing a number here changes every repository on the next scan.
-  The gate has two parts: `newCode` (the recent work: coverage, duplication, blocker/critical issues, hotspots) and
+  The gate has two parts: `newCode` (the recent work: coverage, duplication, issues of every severity, hotspots) and
   `overall` (the whole code: coverage, no imported HFS, ESLint or stylelint finding, no bug, code smell or
   vulnerability, every hotspot reviewed, no duplicated-lines excess, no cognitive-complexity issue). The one Sonar
   mechanism of the HFS canon is packages/hfs/README.md section "Sonar".
@@ -26,15 +26,15 @@ newCode:
   coverage:
     metric: new_coverage
     minPercent: 100
-  # SonarQube's ignoreSmallChanges: fewer changed lines than this are not held to duplication.
-  ignoreBelowChangedLines: 20
+  # SonarQube's ignoreSmallChanges floor: 0, so a change of any size is held to duplication.
+  ignoreBelowChangedLines: 0
   duplication:
     metric: new_duplicated_lines_density
     maxPercent: 3
   issues:
-    # An open issue of these severities on a changed line fails the slice; lesser ones are listed, never blocking.
-    blockingSeverities: [BLOCKER, CRITICAL]
-    metrics: {BLOCKER: new_blocker_violations, CRITICAL: new_critical_violations}
+    # An open issue of any severity on a changed line fails the slice: there is no lesser severity that is only listed.
+    blockingSeverities: [BLOCKER, CRITICAL, MAJOR, MINOR, INFO]
+    metrics: {BLOCKER: new_blocker_violations, CRITICAL: new_critical_violations, MAJOR: new_major_violations, MINOR: new_minor_violations, INFO: new_info_violations}
     max: 0
   hotspots:
     metric: new_security_hotspots_reviewed
@@ -92,13 +92,13 @@ lite:
     coverage:
       metric: new_coverage
       minPercent: 100
-    ignoreBelowChangedLines: 20
+    ignoreBelowChangedLines: 0
     duplication:
       metric: new_duplicated_lines_density
       maxPercent: 3
     issues:
-      blockingSeverities: [BLOCKER, CRITICAL]
-      metrics: {BLOCKER: new_blocker_violations, CRITICAL: new_critical_violations}
+      blockingSeverities: [BLOCKER, CRITICAL, MAJOR, MINOR, INFO]
+      metrics: {BLOCKER: new_blocker_violations, CRITICAL: new_critical_violations, MAJOR: new_major_violations, MINOR: new_minor_violations, INFO: new_info_violations}
       max: 0
     hotspots:
       metric: new_security_hotspots_reviewed
@@ -139,9 +139,9 @@ reasoning: |
   lives there, the feature tier is thin (R203) and proven by integration and e2e, and the front end has no unit tests.
   duplication 3: the Sonar way value; the worst project today is 2.1, so 3 rejects a real copy-paste block and
   passes ordinary work.
-  blocker/critical 0: the two severities that are defects, not style. main carries old debt of both kinds
-  (one product repository carries 3 blocker and 137 critical), so the SLICE verdict reads only changed lines and never main's backlog;
-  major and lower are reported on the summary and never fail a slice.
+  issues 0 at every severity (blocker, critical, major, minor, info), owner ruling 2026-10-22 (no loosening): a lesser severity is not a
+  lesser finding. The SLICE verdict reads only changed lines and never main's backlog; the overall condition holds the whole project.
+  A change of any size is held to duplication (ignoreBelowChangedLines 0).
   overall issues 0 and overall duplication 3: the server gate is also the owner's definition of done for the HFS canon:
   a repository that carries any open ESLint, stylelint or HFS finding is not green, whatever the age of the line. The
   op slice keeps judging changed lines (an op cannot fix a repository's whole backlog); the dashboard and CI show the

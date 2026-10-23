@@ -57,16 +57,32 @@ function projectOptions(ts, repoRoot, files) {
   return projects.sort((a, b) => b.directory.length - a.directory.length);
 }
 
+/**
+ * The standard library the type checker reads. Without it `Array`, `ReadonlyArray` and `Promise` are unresolved, so the callback
+ * parameter of `rows.filter(...).map((row) => t(row.label))` has no type and a key typed as a union of literals cannot be read.
+ */
+const LIB_FILE = 'lib.es2023.d.ts';
+const libraryFiles = new Map();
+const isLibraryFile = (ts, file) => /(?:^|[/\\])lib\.[\w.-]+\.d\.ts$/u.test(file) && slash(file).startsWith(slash(path.dirname(ts.getDefaultLibFilePath({}))));
+function libraryFile(ts, file) {
+  if (!isLibraryFile(ts, file)) return undefined;
+  if (!libraryFiles.has(file)) {
+    const text = ts.sys.readFile(file);
+    libraryFiles.set(file, text === undefined ? undefined : ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true));
+  }
+  return libraryFiles.get(file);
+}
+
 function trackedProgram(ts, repoRoot, files, sources) {
-  const options = { noLib: true, types: [], allowJs: true, resolveJsonModule: true, jsx: ts.JsxEmit.Preserve, target: ts.ScriptTarget.Latest, module: ts.ModuleKind.ESNext, moduleResolution: ts.ModuleResolutionKind.Bundler };
+  const options = { lib: [LIB_FILE], types: [], allowJs: true, resolveJsonModule: true, jsx: ts.JsxEmit.Preserve, target: ts.ScriptTarget.Latest, module: ts.ModuleKind.ESNext, moduleResolution: ts.ModuleResolutionKind.Bundler };
   const projects = projectOptions(ts, repoRoot, files);
   const catalogs = new Set(files.filter(file => JSON_CATALOG.test(file)).map(file => slash(path.resolve(repoRoot, file))));
   const host = {
-    getSourceFile: file => sources.get(slash(path.resolve(file))),
-    getDefaultLibFileName: () => '', writeFile: () => {},
+    getSourceFile: file => sources.get(slash(path.resolve(file))) ?? libraryFile(ts, file),
+    getDefaultLibFileName: libOptions => ts.getDefaultLibFilePath(libOptions), writeFile: () => {},
     getCurrentDirectory: () => repoRoot, getDirectories: () => [],
-    fileExists: file => sources.has(slash(path.resolve(file))) || catalogs.has(slash(path.resolve(file))),
-    readFile: file => sources.get(slash(path.resolve(file)))?.text,
+    fileExists: file => sources.has(slash(path.resolve(file))) || catalogs.has(slash(path.resolve(file))) || isLibraryFile(ts, file),
+    readFile: file => sources.get(slash(path.resolve(file)))?.text ?? (isLibraryFile(ts, file) ? ts.sys.readFile(file) : undefined),
     getCanonicalFileName: slash, useCaseSensitiveFileNames: () => true,
     getNewLine: () => '\n',
   };

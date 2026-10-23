@@ -11,8 +11,8 @@
     "dev:harness": "node ../packages/cli/bin/starci.mjs harness start",
     "prebuild": "npm run generate:i18n",
     "build": "npm run lint && tsc --noEmit && vite build",
-    "prelint": "npm run generate:i18n",
-    "lint": "eslint src/app.tsx src/router.ts src/api src/i18n src/components src/pages",
+    "prelint": "npm run generate:i18n && node ../packages/fe-kit/scripts/link-peers.mjs",
+    "lint": "eslint src",
     "serve": "npm run dev:harness",
     "preview": "vite preview --host 127.0.0.1"
   },

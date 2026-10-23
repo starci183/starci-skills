@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+- Added: the type-aware rules the back end already borrowed, at error: `@typescript-eslint/no-floating-promises`, `no-misused-promises`, `switch-exhaustiveness-check` and the `no-unsafe-assignment`, `-member-access`, `-call`, `-return`, `-argument` family.
+- Changed: no Sonar way rule is left to the server (owner ruling 2026-10-22, no loosening): S3403, S3800, S3782 and S6582 run at error, `unicorn/consistent-function-scoping` runs with its default options, and S7785 (`unicorn/prefer-top-level-await`) runs in the front end (ESM).
+- Added: `starciPlainSourceConfig({ root })` for a TypeScript front-end tree that is no HFS app (a runtime package, the harness UI): typed linting, the inline-directive fence, the React Hooks, type-aware and Sonar way rules and every canon rule that needs no slot view (`SLOT_FREE_RULES`), all at error.
+
 ## 8.4.29 - 2026-10-22
 - Changed: the bundled canon pins select @starci/hfs 4.7.23 and @starci/cli 1.7.23.
 

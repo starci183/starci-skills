@@ -154,14 +154,17 @@ function UnitDetail({ project, wf, selected, state, graphMode }: { readonly proj
 
 function UnitsTab({ project, wf, graph, graphTab }: { readonly project: string; readonly wf: string; readonly graph: QuerySnapshot<WorkGraph>; readonly graphTab: boolean }) {
   const state = query().get('state');
-  const url = `/api/workflows/${encodeURIComponent(project)}/${encodeURIComponent(wf)}/units?limit=200${state ? `&state=${encodeURIComponent(state)}` : ''}`;
+  const stateParam = state ? `&state=${encodeURIComponent(state)}` : '';
+  const url = `/api/workflows/${encodeURIComponent(project)}/${encodeURIComponent(wf)}/units?limit=200${stateParam}`;
   const units = usePagedApiQuery<UnitRow>(url, { topics: [`wf:${project}:${wf}`, 'system'], intervalMs: 20_000, getKey: unit => `${unit.workflowId}:${unit.unit}` });
   const contract = useApiQuery<ContractInfo>('/api/contract', { topics: ['system'], intervalMs: 60_000 });
   const selected = query().get('unit');
   const graphMode = graphTab || query().get('view') === 'graph';
   const href = (unit: string | null, filter = state, view = graphMode) => {
     const params = query(); params.set('tab', 'units'); params.delete('unit'); params.delete('state'); params.delete('view');
-    if (unit) params.set('unit', unit); if (filter) params.set('state', filter); if (view) params.set('view', 'graph');
+    if (unit) params.set('unit', unit);
+    if (filter) params.set('state', filter);
+    if (view) params.set('view', 'graph');
     return `${rootHref(project, wf)}?${params}`;
   };
   const rank: Record<UnitRow['ui'], number> = { bad: 0, running: 1, warn: 2, waiting: 3, unknown: 4, ok: 5, done: 6 };
@@ -383,9 +386,24 @@ function InfraTab({ project, wf }: { readonly project: string; readonly wf: stri
   </Panel>;
 }
 
+/** The op-chain opener resets when the workflow or tab changes; a selected leg opens it (closing the drawer keeps it mounted and focused). */
+function useChainOpen(project: string, wf: string, tab: WorkflowTab, legOp: string | null) {
+  const chainDefault = tab === 'units' || tab === 'graph';
+  const [chainOpen, setChainOpen] = useState(() => chainDefault || Boolean(legOp));
+  const chainScope = JSON.stringify([project, wf, tab]);
+  const [chainSync, setChainSync] = useState({ scope: chainScope, leg: legOp });
+  if (chainSync.scope !== chainScope || chainSync.leg !== legOp) {
+    setChainSync({ scope: chainScope, leg: legOp });
+    if (chainSync.scope !== chainScope) setChainOpen(chainDefault || Boolean(legOp));
+    else if (legOp) setChainOpen(true);
+  }
+  return [chainOpen, setChainOpen] as const;
+}
+
 export function WorkflowPage({ project, wf, tab = 'units' }: { readonly project: string; readonly wf: string; readonly tab?: WorkflowTab }) {
   const [now, setNow] = useState(() => Date.now());
-  const [chainOpen, setChainOpen] = useState(() => tab === 'units' || tab === 'graph' || Boolean(query().get('leg')));
+  const legOp = query().get('leg');
+  const [chainOpen, setChainOpen] = useChainOpen(project, wf, tab, legOp);
   useEffect(() => { const timer = window.setInterval(() => setNow(Date.now()), 30_000); return () => window.clearInterval(timer); }, []);
   const base = `/api/workflows/${encodeURIComponent(project)}/${encodeURIComponent(wf)}`;
   const detail = useApiQuery<WorkflowDetailV2>(base, { topics: [`wf:${project}:${wf}`, 'system'], intervalMs: 20_000 });
@@ -393,10 +411,6 @@ export function WorkflowPage({ project, wf, tab = 'units' }: { readonly project:
   const graph = useApiQuery<WorkGraph>(`${base}/graph`, { topics: [`wf:${project}:${wf}`, 'system'], intervalMs: 30_000, enabled: tab === 'units' || tab === 'graph' });
   const decisions = usePagedApiQuery<DecisionRow>(`/api/decisions?project=${encodeURIComponent(project)}&wf=${encodeURIComponent(wf)}&limit=200`, { topics: ['decisions'], intervalMs: 20_000, getKey: item => item.key });
   const row = detail.data;
-  const legOp = query().get('leg');
-  useEffect(() => { setChainOpen(tab === 'units' || tab === 'graph'); }, [project, wf, tab]);
-  // A selected leg opens its graph; closing the drawer preserves the mounted opener and its focus target.
-  useEffect(() => { if (legOp) setChainOpen(true); }, [project, wf, tab, legOp]);
   const pipe = pipeline.data ?? null;
   const selectedLeg: LegRow | null = pipe && legOp ? pipe.legs.find(leg => leg.op === legOp) ?? null : null;
   const withLeg = (op: string | null) => {
@@ -407,7 +421,8 @@ export function WorkflowPage({ project, wf, tab = 'units' }: { readonly project:
   if (detail.error && !row) return <div className="mx-auto flex w-full max-w-[1600px] min-w-0 flex-col gap-4"><Link href="#/" className="w-fit text-sm">{t('← Overview')}</Link><FeedbackState error onRetry={() => refreshQuery(base)}>{detail.error}</FeedbackState></div>;
   if (!row) return <div className="mx-auto w-full max-w-[1600px] min-w-0"><PageSkeleton label={t('Reading the workflow…')} /></div>;
   const activeTab = tab === 'graph' ? 'units' : tab;
-  const tabHref = (id: WorkflowTab) => `${rootHref(project, wf)}?tab=${id}${legOp ? `&leg=${encodeURIComponent(legOp)}` : ''}`;
+  const legParam = legOp ? `&leg=${encodeURIComponent(legOp)}` : '';
+  const tabHref = (id: WorkflowTab) => `${rootHref(project, wf)}?tab=${id}${legParam}`;
   const decisionsUrl = `/api/decisions?project=${encodeURIComponent(project)}&wf=${encodeURIComponent(wf)}&limit=200`;
   const advancedSummary = t('infra & cost · attempts per leg · slices · {decisions} awaiting decision · {blocked} blocking', { decisions: row.counts.decisionsOpen, blocked: row.blockedBy.length });
   return <Stagger className="mx-auto flex w-full max-w-[1600px] min-w-0 flex-col gap-6 min-[760px]:gap-8">
@@ -442,7 +457,7 @@ export function WorkflowPage({ project, wf, tab = 'units' }: { readonly project:
         </div>
       </Advanced>
     </CardContent></Card></ConceptBlock></StaggerItem>
-    {selectedLeg && pipe && <LegDrawer project={project} wf={wf} leg={selectedLeg} pipeline={pipe} onClose={() => withLeg(null)} />}
+    {selectedLeg && pipe && <LegDrawer project={project} wf={wf} leg={selectedLeg} pipeline={pipe} now={now} onClose={() => withLeg(null)} />}
     <StaggerItem><Tabs selectedKey={activeTab} variant="secondary" className="min-w-0 gap-4">
       <Tabs.ListContainer><Tabs.List aria-label={t('Workflow content')}>{tabs.map(item => <Tabs.Tab key={item.id} id={item.id} href={tabHref(item.id)} data-concept={item.concept} className="w-auto shrink-0 whitespace-nowrap">{item.label}{item.id === 'units' && ` ${row.units.total}`}{item.id === 'attempts' && pipe && ` ${pipe.attempts}`}<Tabs.Indicator /></Tabs.Tab>)}</Tabs.List></Tabs.ListContainer>
       <Tabs.Panel id="units" className="min-w-0">{(tab === 'units' || tab === 'graph') && <UnitsTab key={`${project}:${wf}`} project={project} wf={wf} graph={graph} graphTab={tab === 'graph'} />}</Tabs.Panel>

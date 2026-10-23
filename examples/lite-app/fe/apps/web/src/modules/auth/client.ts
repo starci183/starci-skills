@@ -9,18 +9,18 @@ import type { AuthClient, AuthFailure, AuthSession } from "./contracts"
  */
 export const authCookieOptions = () => ({ httpOnly: false, secure: cookieSecure(), sameSite: "lax" }) as const
 
-let client: SupabaseClient | undefined
+let authentication: SupabaseClient["auth"] | undefined
 
 /**
  * The cookie-backed browser client of the server PKCE flow, used for Supabase Auth only.
  * The callback exchanges the code; this client shares its verifier and session cookies. It never calls `.from()`, `.rpc()` or storage:
  * data goes through modules/api to the back end, which verifies the access token.
  */
-const supabase = (): SupabaseClient =>
-    (client ??= createBrowserClient(supabaseUrl(), supabaseAnonKey(), {
+const authOf = (): SupabaseClient["auth"] =>
+    (authentication ??= createBrowserClient(supabaseUrl(), supabaseAnonKey(), {
         cookieOptions: authCookieOptions(),
         auth: { flowType: "pkce", detectSessionInUrl: false, persistSession: true, autoRefreshToken: true },
-    }))
+    }).auth)
 
 const sessionOf = (session: Session | null): AuthSession | undefined =>
     session === null
@@ -44,15 +44,15 @@ const failureOf = (error: ProviderError | null): AuthFailure | undefined =>
 
 /** The identity-provider client of a lite app: Supabase Auth in the browser. */
 export const authClient: AuthClient = {
-    session: async () => sessionOf((await supabase().auth.getSession()).data.session),
-    accessToken: async () => (await supabase().auth.getSession()).data.session?.access_token,
-    refreshAccessToken: async () => (await supabase().auth.refreshSession()).data.session?.access_token,
+    session: async () => sessionOf((await authOf().getSession()).data.session),
+    accessToken: async () => (await authOf().getSession()).data.session?.access_token,
+    refreshAccessToken: async () => (await authOf().refreshSession()).data.session?.access_token,
     signInWithPassword: async (email, password) =>
-        failureOf((await supabase().auth.signInWithPassword({ email, password })).error),
-    signOut: async () => failureOf((await supabase().auth.signOut()).error),
+        failureOf((await authOf().signInWithPassword({ email, password })).error),
+    signOut: async () => failureOf((await authOf().signOut()).error),
     // Supabase reports INITIAL_SESSION on subscribe, then every change: the subscription alone keeps the session current.
     onChange: (listener) => {
-        const { data } = supabase().auth.onAuthStateChange((_event, session) => listener(sessionOf(session)))
+        const { data } = authOf().onAuthStateChange((_event, session) => listener(sessionOf(session)))
         return () => data.subscription.unsubscribe()
     },
 }

@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+- Changed: the bundled R280 detector (`HFS_UNUSED_SYMBOL`) resolves more catalog keys so a product needs fewer `i18n-dynamic-keys.yaml` entries: the type checker reads the standard library (a key typed as a union of literals is read through `filter`/`map` callbacks), a `??` or `||` default holds both operands, a nullish branch of a property owner is skipped, and a table of constants is read through the `readonly` fields of the interface or alias that types it. Spec: `src/unused-symbol-flow.spec.mjs`.
+- Changed: the bundled `knowledge/sonar-gate.yaml` holds every issue severity on changed lines and a change of any size to duplication (`ignoreBelowChangedLines: 0`).
+
 ## 4.7.23 - 2026-10-22
 - Changed: the rendered `sonar-project.properties` leaves the message catalogs (`**/messages/*.messages.ts`, `**/messages/*.json`) out of Sonar's copy-paste detection (`sonar.cpd.exclusions`, owner ruling 2026-10-22). A catalog repeats its keys once per language, which CPD read as duplicated code (35% new duplicated lines on NIVO v0.3.1 once prettier formatted the catalogs); they stay sources, so lint, analysis and every other rule still hold them. Spec: `src/sonar-cpd-messages.spec.mjs`.
 

@@ -22,7 +22,7 @@
   },
   "scripts": {
     "link-peers": "node scripts/link-peers.mjs",
-    "lint": "eslint src",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "lint": "node node_modules/eslint/bin/eslint.js src",
+    "typecheck": "node node_modules/typescript/bin/tsc --noEmit -p tsconfig.json"
   }
 }

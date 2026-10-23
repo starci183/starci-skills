@@ -2,7 +2,7 @@ import * as React from "react"
 import { Description, Drawer } from "@heroui/react"
 import { cn } from "@/lib/utils"
 import { t } from "../../i18n/t"
-import { OverlayFocusLifecycle } from "./dialog"
+import { OverlayFocusLifecycle, useFocusGeneration } from "./dialog"
 
 const DescriptionContext = React.createContext<string | undefined>(undefined)
 
@@ -21,15 +21,15 @@ function SheetTrigger({ asChild = false, children, ...props }:
   return <Drawer.Trigger data-ui="sheet-trigger" {...props}>{children}</Drawer.Trigger>
 }
 
-function SheetClose(props: React.ComponentProps<typeof Drawer.CloseTrigger>) {
+function SheetClose(props: Readonly<React.ComponentProps<typeof Drawer.CloseTrigger>>) {
   return <Drawer.CloseTrigger data-ui="sheet-close" aria-label={t('Close')} {...props} />
 }
 
-function SheetPortal({ children }: { children?: React.ReactNode }) {
+function SheetPortal({ children }: Readonly<{ children?: React.ReactNode }>) {
   return <>{children}</>
 }
 
-function SheetOverlay(props: React.ComponentProps<typeof Drawer.Backdrop>) {
+function SheetOverlay(props: Readonly<React.ComponentProps<typeof Drawer.Backdrop>>) {
   return <Drawer.Backdrop data-ui="sheet-overlay" {...props} />
 }
 
@@ -42,7 +42,7 @@ function SheetContent({ className, children, side = "right", showCloseButton = t
     containerProps?: Omit<React.ComponentProps<typeof Drawer.Content>, "children" | "placement">
   }) {
   const descriptionId = React.useContext(DescriptionContext)
-  const generation = React.useRef(0)
+  const generation = useFocusGeneration()
   const describedBy = Object.hasOwn(props, 'aria-describedby') ? props['aria-describedby'] : descriptionId
   return <SheetOverlay {...backdropProps}>
     <Drawer.Content placement={side} className="starci-sheet-container" {...containerProps}>
@@ -63,7 +63,7 @@ function SheetHeader({ className, ...props }: React.ComponentProps<"div">) {
   return <Drawer.Header data-ui="sheet-header" className={cn("gap-1.5", className)} {...props} />
 }
 
-function SheetBody(props: React.ComponentProps<typeof Drawer.Body>) {
+function SheetBody(props: Readonly<React.ComponentProps<typeof Drawer.Body>>) {
   return <Drawer.Body data-ui="sheet-body" {...props} />
 }
 
@@ -71,7 +71,7 @@ function SheetFooter({ className, ...props }: React.ComponentProps<"div">) {
   return <Drawer.Footer data-ui="sheet-footer" className={cn("gap-2", className)} {...props} />
 }
 
-function SheetTitle({ className, ...props }: React.ComponentProps<typeof Drawer.Heading>) {
+function SheetTitle({ className, ...props }: Readonly<React.ComponentProps<typeof Drawer.Heading>>) {
   return <Drawer.Heading data-ui="sheet-title" className={cn("font-sans font-medium", className)} {...props} />
 }
 

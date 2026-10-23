@@ -27,12 +27,10 @@ describe("SepaySignatureService", () => {
 
             expect(() => service.verify(delivery)).not.toThrow()
             expect(() => service.verify({ ...delivery, rawBody: Buffer.from("{}") })).toThrow(
-                expect.objectContaining({ code: HttpSecurityErrorCode.WebhookSignatureInvalid }),
+                HttpSecurityErrorCode.WebhookSignatureInvalid,
             )
             clock.advance(1001)
-            expect(() => service.verify(delivery)).toThrow(
-                expect.objectContaining({ code: HttpSecurityErrorCode.WebhookReplayed }),
-            )
+            expect(() => service.verify(delivery)).toThrow(HttpSecurityErrorCode.WebhookReplayed)
         } finally {
             await moduleRef.close()
         }

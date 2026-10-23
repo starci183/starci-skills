@@ -27,7 +27,7 @@ export const DisplayControls = () => {
     const { resolvedTheme, setTheme } = useTheme()
 
     const isDark = resolvedTheme === "dark"
-    const nextLocale = locales.find((one: string) => one !== locale) ?? locales[0]
+    const nextLocale = locales.find((one: string) => one !== locale) ?? locale
 
     return (
         <DisplayControlsBase

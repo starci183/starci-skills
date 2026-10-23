@@ -4,6 +4,9 @@ import type { OrderApiClient } from "@modules/integrations/order-api"
 import { ORDER_API_CAPABILITY_MODULES } from "../../world/test-capabilities.options"
 import { useTestWorld } from "../../world/use-test-world"
 
+/** Asymmetric matchers read as `unknown`: jest types them `any`, which may not flow into a property or a typed argument. */
+const textContaining = (text: string): unknown => expect.stringContaining(text)
+
 /** The ids of the rows and keys this spec arranges: deterministic, so a failing run reproduces. */
 const ids = fakeIds()
 
@@ -30,7 +33,7 @@ describe("order-api: order service client (integration)", () => {
     it("a session the order service refuses is the declared unavailable refusal naming its code", async () => {
         await expect(orderApi().getBuyerStatus(`unknown-${ids.next()}`)).rejects.toMatchObject({
             code: OrderApiErrorCode.Unavailable,
-            params: { reason: expect.stringContaining("UNAUTHENTICATED") },
+            params: { reason: textContaining("UNAUTHENTICATED") },
         })
     })
 

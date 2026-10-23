@@ -42,6 +42,9 @@ test("the config is one ignore block and one typed rule block over every source,
     for (const [name, setting] of Object.entries(block.rules)) assert.equal(levelOf(setting), "error", `${name} is not an error`)
     for (const name of Object.keys(BORROWED)) assert.ok(name in block.rules, `${name} is borrowed`)
     assert.deepEqual(block.rules["@typescript-eslint/consistent-type-assertions"], ["error", { assertionStyle: "never" }])
+    for (const name of ["no-unsafe-assignment", "no-unsafe-member-access", "no-unsafe-call", "no-unsafe-return", "no-unsafe-argument"]) {
+        assert.equal(block.rules[`@typescript-eslint/${name}`], "error", `${name} is borrowed at error`)
+    }
 })
 
 test("the factory takes only the HFS view: no globs, ignores or rule overrides", async () => {

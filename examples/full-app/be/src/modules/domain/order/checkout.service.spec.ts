@@ -10,6 +10,9 @@ import { productView } from "@tests/fixtures/builders/catalog.builder"
 import { CheckoutService } from "./checkout.service"
 import { OrderErrorCode } from "./errors/order.error"
 
+/** Asymmetric matchers read as `unknown`: jest types them `any`, which may not flow into a property or a typed argument. */
+const anything = (): unknown => expect.anything()
+
 const shirt = productView()
 
 const build = async (entityManager: MockEntityManager) => {
@@ -54,7 +57,7 @@ describe("CheckoutService", () => {
             })
             expect(catalog.byIds).toHaveBeenCalledWith({ ids: ["sku-1"] })
             expect(cart.add).toHaveBeenCalledWith({
-                manager: expect.anything(),
+                manager: anything(),
                 personId: "p-1",
                 productId: "sku-1",
                 quantity: 2,
@@ -97,7 +100,7 @@ describe("CheckoutService", () => {
 
             expect(await checkout.emptyCart({ personId: "p-1" })).toEqual({ cleared: true })
 
-            expect(cart.clear).toHaveBeenCalledWith({ manager: expect.anything(), personId: "p-1" })
+            expect(cart.clear).toHaveBeenCalledWith({ manager: anything(), personId: "p-1" })
             expect(tx.commits).toBe(1)
         })
     })

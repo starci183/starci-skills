@@ -7,6 +7,9 @@ import type { Timer } from "@modules/platform/retry"
 import { HTTP_SECURITY_ERROR_KINDS, HttpSecurityError, HttpSecurityErrorCode } from "./errors/http-security.error"
 import { ReadinessService } from "./readiness.service"
 
+/** Asymmetric matchers read as `unknown`: jest types them `any`, which may not flow into a property or a typed argument. */
+const anyOf = (type: unknown): unknown => expect.any(type)
+
 const build = async () => {
     const database = mock<DatabaseProbeService>()
     const timer = mock<Timer>()
@@ -30,7 +33,7 @@ describe("ReadinessService", () => {
         await expect(service.probeRequired()).resolves.toEqual({ ok: true })
 
         expect(database.probe).toHaveBeenCalledTimes(1)
-        expect(timer.schedule).toHaveBeenCalledWith(expect.any(Function), 1000)
+        expect(timer.schedule).toHaveBeenCalledWith(anyOf(Function), 1000)
     })
 
     it("preserves the database failure under the unavailable error kind that answers 503", async () => {
@@ -54,7 +57,7 @@ describe("ReadinessService", () => {
             cause: new Error("Required database readiness timed out"),
         })
 
-        expect(timer.schedule).toHaveBeenCalledWith(expect.any(Function), 1000)
+        expect(timer.schedule).toHaveBeenCalledWith(anyOf(Function), 1000)
         timer.schedule.mock.calls.at(0)?.[0]()
         await expected
         expect(cancel).toHaveBeenCalledTimes(1)

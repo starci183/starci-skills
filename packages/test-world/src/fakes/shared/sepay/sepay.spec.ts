@@ -9,7 +9,7 @@ const call = async (method: string, url: string, apiKey: string, body?: unknown)
     const response = await fetch(url, {
         method,
         headers: { "content-type": "application/json", authorization: `Bearer ${apiKey}` },
-        body: body === undefined ? undefined : JSON.stringify(body),
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     })
     return { status: response.status, json: (await response.json()) as Json }
 }

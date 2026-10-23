@@ -7,6 +7,9 @@ import { DatabaseReadinessService } from "./database-readiness.service"
 import { DatabaseError, DatabaseErrorCode } from "./errors/database.error"
 import { PRIMARY_ENTITY_MANAGER } from "./primary.decorators"
 
+/** Asymmetric matchers read as `unknown`: jest types them `any`, which may not flow into a property or a typed argument. */
+const anyOf = (type: unknown): unknown => expect.any(type)
+
 const build = async () => {
     const manager = mockEntityManager()
     const deadlines = mock<DeadlineScheduler>()
@@ -53,7 +56,7 @@ describe("DatabaseReadinessService", () => {
             params: { dependency: "primary" },
             cause,
         })
-        expect(deadlines.schedule).toHaveBeenCalledWith(expect.any(Function), 1000)
+        expect(deadlines.schedule).toHaveBeenCalledWith(anyOf(Function), 1000)
     })
 
     it("cancels the deadline when starting the primary query throws synchronously", async () => {
@@ -84,7 +87,7 @@ describe("DatabaseReadinessService", () => {
             const check = expect(service.check()).rejects.toMatchObject({
                 code: DatabaseErrorCode.RequiredUnavailable,
                 params: { dependency: "primary" },
-                cause: expect.any(DatabaseError),
+                cause: anyOf(DatabaseError),
             })
 
             await jest.advanceTimersByTimeAsync(1000)

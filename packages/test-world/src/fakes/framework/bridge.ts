@@ -20,7 +20,7 @@ export const createFakeBridge = (controlUrl: string, fakeName: string, webhookTa
             response = await fetch(url, {
                 method: body === undefined ? "GET" : "POST",
                 headers: body === undefined ? {} : { "content-type": "application/json" },
-                body: body === undefined ? undefined : JSON.stringify(body),
+                ...(body === undefined ? {} : { body: JSON.stringify(body) }),
                 signal: AbortSignal.timeout(CONTROL_TIMEOUT_MS),
             })
         } catch (cause) {

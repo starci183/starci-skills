@@ -14,7 +14,7 @@ import unicorn from "eslint-plugin-unicorn"
 import { starciBeConfig } from "./index.mjs"
 import { SOURCE_FILES } from "./lib/config.mjs"
 import { OUTSIDE_THE_SCAN_FILES, SONAR_SYNTAX_RULES } from "./runtime/scripts/lib/sonar-syntax-rules.mjs"
-import { SONAR_WAY_EXTRA, sonarWayRules } from "./runtime/scripts/lib/sonar-way.mjs"
+import { SONAR_WAY_EXTRA, SONAR_WAY_NOT_APPLICABLE, sonarWayRules } from "./runtime/scripts/lib/sonar-way.mjs"
 import { fixtureHfs } from "./fixtures/typed/tester.mjs"
 
 const levelOf = (setting) => (Array.isArray(setting) ? setting[0] : setting)
@@ -30,17 +30,24 @@ test("the factory's third block is Sonar way over the scanned source, every rule
         "no-duplicate-imports", "unicorn/prefer-native-coercion-functions", "unicorn/prefer-includes", "unicorn/prefer-set-has"]) {
         assert.ok(name in block.rules, `${name} is mapped`)
     }
-    for (const owned of ["sonarjs/no-nested-conditional", "sonarjs/unused-import", "sonarjs/void-use", "sonarjs/deprecation", "unicorn/prefer-top-level-await",
-        "sonarjs/no-unused-vars", "sonarjs/different-types-comparison", "sonarjs/function-return-type", "sonarjs/argument-type", "max-params", "@typescript-eslint/prefer-optional-chain"]) {
-        assert.ok(!(owned in block.rules), `${owned} stays with its owner or is not judged`)
+    for (const owned of ["sonarjs/no-nested-conditional", "sonarjs/unused-import", "sonarjs/void-use", "sonarjs/deprecation", "sonarjs/no-unused-vars", "max-params"]) {
+        assert.ok(!(owned in block.rules), `${owned} stays with its owner`)
     }
+    for (const name of ["sonarjs/different-types-comparison", "sonarjs/function-return-type", "sonarjs/argument-type", "@typescript-eslint/prefer-optional-chain"]) {
+        assert.equal(levelOf(block.rules[name]), "error", `${name} is not left to the server`)
+    }
+    assert.ok(!("unicorn/prefer-top-level-await" in block.rules), "a CommonJS back end has no top-level await (S7785 is not applicable)")
+    assert.deepEqual(SONAR_WAY_NOT_APPLICABLE.be, { S7785: "top-level await does not exist in the CommonJS output of a back end" })
+    assert.deepEqual(block.rules["unicorn/consistent-function-scoping"], ["error"], "arrow functions are judged too")
 })
 
 test("every mapped row names a Sonar id and every sonarjs rule Sonar way switches on is mapped or owned", () => {
     const { rules, mapped } = sonarWayRules(sonarjs)
+    assert.ok("unicorn/prefer-top-level-await" in rules && unicorn.rules["prefer-top-level-await"], "the front end (ESM) runs S7785")
+    assert.ok(!("unicorn/prefer-top-level-await" in sonarWayRules(sonarjs, "be").rules), "the back end (CommonJS) does not")
     assert.ok(mapped.every((row) => /^S\d+$/.test(row.sonar)), "a row without its Sonar id")
     const on = Object.entries(sonarjs.configs.recommended.rules).filter(([, setting]) => levelOf(setting) === "error").map(([name]) => name)
-    assert.equal(on.filter((name) => !(name in rules)).length, 8, "only the owned and the server-parity left-outs are not run")
+    assert.equal(on.filter((name) => !(name in rules)).length, 5, "only the five rules another owner enforces at error are not run under their sonarjs name")
     for (const row of SONAR_WAY_EXTRA.filter((entry) => entry.rule.startsWith("unicorn/"))) assert.ok(unicorn.rules[row.rule.slice("unicorn/".length)], `${row.rule} exists in the pinned unicorn`)
 })
 
@@ -64,7 +71,8 @@ test("a nested template literal or an eighth parameter is refused in scanned sou
 // Parity with the server: a product scan with 0 issues on the server (Sonar way) and these forms are what the 1.7.19 lint reported
 // there. The injected constructor and the narrowed comparison are clean source to the server, so they are clean to the lint.
 const SERVER_CLEAN = [
-    "function Injectable(): ClassDecorator { return () => undefined }",
+    "const noDecoration = (): void => undefined",
+    "function Injectable(): ClassDecorator { return noDecoration }",
     "@Injectable()",
     "export class DeskDailyService {",
     "    constructor(private readonly a: number, private readonly b: number, private readonly c: number, private readonly d: number,",

@@ -7,6 +7,9 @@ import type { ProbeCheckerService } from "./probe-checker.service"
 import type { Probe } from "./probes.port"
 import type { ReadinessReport } from "./readiness.contracts"
 
+/** The cancel of a deadline that was never scheduled. */
+const noCancel = (): void => undefined
+
 const READINESS_TIMEOUT_MS = 1000
 
 @Injectable()
@@ -20,7 +23,7 @@ export class ReadinessService {
 
     /** Returns ready only when the app's required dependencies answer within one second. */
     async probeRequired(): Promise<ReadinessReport> {
-        let cancel: () => void = () => undefined
+        let cancel: () => void = noCancel
         try {
             if (this.probes.length === 0) throw new ProbesError({ code: ProbesErrorCode.DependencyUnavailable })
             await Promise.race([

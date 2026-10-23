@@ -12,6 +12,10 @@
  * that consumer's copies, so the junctions are what eslint/tsc see and never the
  * copy an app bundle actually links.
  *
+ * The lint and type checks of this kit and of the harness UI (ui/) run the front-end lint canon from this repository's own source
+ * (packages/eslint/fe), which resolves its plugins (typescript-eslint, sonarjs, unicorn, react-hooks) from its own location; the
+ * consumer's node_modules, which installed exactly those for its own lint, is junctioned there as well.
+ *
  * Usage: node packages/fe-kit/scripts/link-peers.mjs [consumer]
  *   consumer defaults to the declared reference example app (any example app root under the runtime's
  *   examples tree; the app root holds the one install).
@@ -33,6 +37,8 @@ const PEERS = [
     "@starci/grammar",
     "@types/react",
     "@types/react-dom",
+    "eslint",
+    "typescript",
 ]
 
 const linked = []
@@ -49,6 +55,12 @@ for (const name of PEERS) {
     // Junctions need no elevation on Windows and follow directory moves like symlinks.
     symlinkSync(target, link, "junction")
     linked.push(name)
+}
+
+const canonModules = resolve(KIT_ROOT, "..", "eslint", "fe", "node_modules")
+if (!existsSync(canonModules) && existsSync(consumerNodeModules)) {
+    symlinkSync(consumerNodeModules, canonModules, "junction")
+    linked.push("the lint canon's node_modules")
 }
 
 if (missing.length > 0) {

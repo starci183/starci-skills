@@ -48,6 +48,25 @@ test('nest.json is gone: be.json is the one back-end preset, and the package exp
   for (const target of Object.values(manifest.exports)) assert.ok(fs.existsSync(path.join(here, target)), target);
 });
 
+const STRICT_FLAGS = ['strict', 'noImplicitAny', 'strictNullChecks', 'noUncheckedIndexedAccess', 'noImplicitOverride', 'noImplicitReturns', 'noFallthroughCasesInSwitch', 'noUnusedLocals', 'noUnusedParameters'];
+
+for (const name of PRESETS) {
+  test(`${name} inherits every strictness flag of base.json, none of them lowered`, () => {
+    const options = effective(name);
+    for (const flag of STRICT_FLAGS) assert.equal(options[flag], true, `${name} ${flag}`);
+    assert.equal(options.allowUnusedLabels, false, `${name} allowUnusedLabels`);
+  });
+}
+
+test('no preset below base.json states a strictness flag, and skipLibCheck is stated once, in base.json', () => {
+  const owned = new Set([...STRICT_FLAGS, 'allowUnusedLabels', 'skipLibCheck']);
+  for (const name of PRESETS.filter((preset) => preset !== 'base.json')) {
+    const raw = JSON.parse(fs.readFileSync(path.join(here, name), 'utf8'));
+    for (const key of Object.keys(raw.compilerOptions ?? {})) assert.equal(owned.has(key), false, `${name} restates ${key}; base.json owns it`);
+  }
+  assert.equal(effective('base.json').skipLibCheck, true);
+});
+
 test('be.json carries every flag of the locked back-end contract, none of them lowered', () => {
   const be = effective('be.json');
   for (const flag of ['strict', 'noImplicitAny', 'strictNullChecks', 'noUncheckedIndexedAccess', 'noImplicitOverride', 'noImplicitReturns', 'noFallthroughCasesInSwitch', 'noUnusedLocals', 'noUnusedParameters', 'isolatedModules', 'experimentalDecorators', 'emitDecoratorMetadata']) {

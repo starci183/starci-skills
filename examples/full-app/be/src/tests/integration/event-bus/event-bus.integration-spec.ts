@@ -9,8 +9,16 @@ import { EVENT_BUS_CAPABILITY_MODULES } from "../../world/test-capabilities.opti
 import { ProbeBehavior } from "../../world/probe-consumer.module"
 import { useTestWorld } from "../../world/use-test-world"
 
+/** Asymmetric matchers read as `unknown`: jest types them `any`, which may not flow into a property or a typed argument. */
+const objectLike = (shape: Record<string, unknown>): unknown => expect.objectContaining(shape)
+
 /** The ids of the rows and keys this spec arranges: deterministic, so a failing run reproduces. */
 const ids = fakeIds()
+
+const eventId = (): string => `probe-${ids.next()}`
+
+/** A resolver that was not captured yet. */
+const noop = (): void => undefined
 
 /** How many 250 ms polls a spec watches for something that must NOT happen (the relay passes every 100 ms, so each poll spans two). */
 const QUIET_POLLS = 8
@@ -25,7 +33,6 @@ describe("event bus (integration)", () => {
     const world = useTestWorld({ modules: EVENT_BUS_CAPABILITY_MODULES })
 
     const bus = (): EventBus => world.resolve<EventBus>(EVENT_BUS)
-    const eventId = (): string => `probe-${ids.next()}`
 
     it("event-bus/atomic-with-transaction: the outbox row commits with the change and is gone with a rollback", () =>
         commitsOutboxAtomically(world, bus, eventId))
@@ -56,9 +63,7 @@ async function commitsOutboxAtomically(
         }),
     ).rejects.toThrow("ORDER_PLACEMENT_FAILED")
 
-    expect(await readRows(world.db.order, OUTBOX_OF_EVENT, [kept])).toEqual([
-        expect.objectContaining({ event_name: "probe.ping" }),
-    ])
+    expect(await readRows(world.db.order, OUTBOX_OF_EVENT, [kept])).toEqual([objectLike({ event_name: "probe.ping" })])
     expect(await readRows(world.db.order, OUTBOX_OF_EVENT, [lost])).toEqual([])
     const sent = await world.waitFor("the relay marks the committed row sent", async () => {
         const rows = await readRows(world.db.order, OUTBOX_OF_EVENT, [kept])
@@ -74,7 +79,7 @@ async function relaysAfterCommit(
 ): Promise<void> {
     const behavior = world.resolve(ProbeBehavior)
     const id = eventId()
-    let commit: () => void = () => undefined
+    let commit: () => void = noop
     const gate = new Promise<void>((resolve) => {
         commit = resolve
     })
@@ -124,7 +129,7 @@ async function requeuesDeadLetter(
     })
     expect(behavior.attempts).toEqual([1, 2, 3, 4, 5])
     expect(letters).toEqual([
-        expect.objectContaining({
+        objectLike({
             eventName: "probe.ping",
             eventId: id,
             reason: "ORDER_PLACEMENT_FAILED",

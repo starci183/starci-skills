@@ -9,6 +9,9 @@ import type { Logger } from "@modules/platform/logging"
 import { OutboxLogEvent } from "./outbox.log-events"
 import { OutboxRelayPolicy } from "./outbox-relay.policy"
 
+/** Asymmetric matchers read as `unknown`: jest types them `any`, which may not flow into a property or a typed argument. */
+const anyOf = (type: unknown): unknown => expect.any(type)
+
 interface Row {
     readonly id: string
 }
@@ -60,7 +63,7 @@ describe("OutboxRelayPolicy", () => {
             await expect(relay.relay()).resolves.toBe(2)
 
             expect(relay.deliver).toHaveBeenCalledWith(rows)
-            expect(relay.mark).toHaveBeenCalledWith(expect.any(Object), rows)
+            expect(relay.mark).toHaveBeenCalledWith(anyOf(Object), rows)
             expect(relay.mark).toHaveBeenCalledTimes(1)
             expect(first.commits).toBe(1)
             expect(second.commits).toBe(1)

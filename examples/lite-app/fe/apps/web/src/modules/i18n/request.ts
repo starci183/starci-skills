@@ -1,8 +1,18 @@
 import "server-only"
 import { hasLocale } from "next-intl"
+import type { AbstractIntlMessages } from "next-intl"
 import { getRequestConfig } from "next-intl/server"
 import { headers } from "next/headers"
 import { PRODUCT_TIME_ZONE, routing } from "./routing"
+
+/** The message tree a catalog module exports as its default: the module is read as `unknown` and checked, never trusted as `any`. */
+const isMessages = (value: unknown): value is AbstractIntlMessages => typeof value === "object" && value !== null
+
+const messagesOf = (loaded: unknown): AbstractIntlMessages => {
+    const messages = typeof loaded === "object" && loaded !== null && "default" in loaded ? loaded.default : undefined
+    if (!isMessages(messages)) throw new TypeError("A message catalog module must export its messages as default")
+    return messages
+}
 
 /** The header the next-intl middleware sets on the request with the locale it negotiated. */
 const LOCALE_HEADER = "x-next-intl-locale"
@@ -17,7 +27,7 @@ export default getRequestConfig(async () => {
     return {
         locale,
         timeZone: PRODUCT_TIME_ZONE,
-        messages: (await import(`./messages/${locale}.json`)).default,
+        messages: messagesOf(await import(`./messages/${locale}.json`)),
         getMessageFallback: ({ namespace, key }) => `web:${namespace ?? ""}.${key}`,
     }
 })

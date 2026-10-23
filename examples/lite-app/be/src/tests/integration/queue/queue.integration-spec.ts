@@ -3,6 +3,13 @@ import { fakeIds } from "@starci/jest-preset"
 import type { QueueOptions } from "@modules/platform/queue"
 import { useTestWorld, TestWorldError, TestWorldErrorCode, type TestWorld, createQueueProof } from "../../world/kit"
 
+/** Asymmetric matchers read as `unknown`: jest types them `any`, which may not flow into a property or a typed argument. */
+const anyOf = (type: unknown): unknown => expect.any(type)
+const objectLike = (shape: Record<string, unknown>): unknown => expect.objectContaining(shape)
+
+/** A resolver that was not captured yet. */
+const noop = (): void => undefined
+
 const options: QueueOptions = {
     relayIntervalMs: 1,
     relayBatch: 20,
@@ -23,11 +30,11 @@ const registerAtomicQueueProof = (proof: () => QueueProof) => {
         const { world, producer, nextBooking } = proof()
         const kept = nextBooking()
         const lost = nextBooking()
-        let inserted: () => void = () => {}
+        let inserted: () => void = noop
         const ready = new Promise<void>((resolve) => {
             inserted = resolve
         })
-        let commit: () => void = () => {}
+        let commit: () => void = noop
         const observationComplete = new Promise<void>((resolve) => {
             commit = resolve
         })
@@ -76,7 +83,7 @@ const registerRelayIdentityProof = (proof: () => QueueProof) => {
         expect(sent).toHaveLength(1)
         expect(sent[0]?.message).toEqual({ jobId: row?.id, payload: { bookingId } })
         expect(await world.modules.outboxRows(world.db.primary, bookingId)).toEqual([
-            expect.objectContaining({ id: row?.id, sent_at: expect.any(Date) }),
+            objectLike({ id: row?.id, sent_at: anyOf(Date) }),
         ])
     })
 }

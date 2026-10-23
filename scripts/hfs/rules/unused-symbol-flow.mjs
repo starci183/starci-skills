@@ -2,7 +2,7 @@
 // followed through variables, parameters (state.arguments), array callbacks, for-of and literal tables.
 import { nameText as nameOf } from '../../lib/ts-ast.mjs';
 import { unwrapCatalogExpression as unwrap } from '../../lib/ts-analysis.mjs';
-import { excludesNull, propertiesOf, propertyValues, writesTarget } from './unused-symbol-properties.mjs';
+import { excludesNull, ownerProperty, propertiesOf, propertyValues, writesTarget } from './unused-symbol-properties.mjs';
 
 const ARRAY_CALLBACK = /^(?:map|flatMap|forEach|filter|find|some|every)$/u;
 
@@ -142,6 +142,64 @@ function callValues(state, node, seen) {
     ? resolveAll(state, returnedExpressions(ts, fn), seen) : [node];
 }
 
+const unionMembers = type => {
+  if (!type) return [];
+  return type.isUnion() ? type.types : [type];
+};
+
+/** The object literals the program builds for a declared object type: those the checker types by that interface or alias. */
+function literalsByType(state) {
+  const { ts, checker } = state;
+  if (state.typedLiterals) return state.typedLiterals;
+  const index = new Map();
+  const visit = node => {
+    if (ts.isObjectLiteralExpression(node)) {
+      const type = checker.getContextualType(node);
+      const owners = unionMembers(type);
+      for (const owner of owners) {
+        const symbol = owner.aliasSymbol ?? owner.symbol;
+        if (symbol) index.set(symbol, [...index.get(symbol) ?? [], node]);
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  for (const source of state.flowSources?.values() ?? []) visit(source);
+  state.typedLiterals = index;
+  return index;
+}
+
+/** A property declared `readonly` on an interface or type literal cannot be reassigned, so only the object literals typed by it write it. */
+const readonlyDeclaration = (ts, symbol, name) => {
+  const member = symbol.members?.get(name) ?? symbol.declarations?.flatMap(declaration => ts.isTypeAliasDeclaration(declaration) ? [declaration.type] : [])
+    .find(type => ts.isTypeLiteralNode(type))?.symbol?.members?.get(name);
+  return Boolean(member?.declarations?.length) && member.declarations.every(declaration => ts.getCombinedModifierFlags(declaration) & ts.ModifierFlags.Readonly);
+};
+
+/**
+ * What a read of `owner.name` can hold when the owner is a value of a declared object type and the property is `readonly`: the initializers
+ * of that property in every object literal the program types by that declaration, in a typed table of constants. Any owner type that is not
+ * such a declaration, or a literal whose property comes from an unknown source, leaves the read unresolved.
+ */
+function typedPropertyValues(state, node) {
+  const { ts, checker } = state;
+  const owner = checker.getNonNullableType(checker.getTypeAtLocation(node.expression));
+  const owners = owner.isUnion() ? owner.types : [owner];
+  const values = [];
+  for (const type of owners) {
+    const symbol = type.aliasSymbol ?? type.symbol;
+    const literals = symbol ? literalsByType(state).get(symbol) : null;
+    if (!literals?.length || !readonlyDeclaration(ts, symbol, node.name.text)) return [];
+    for (const literal of literals) {
+      const property = ownerProperty(state, literal, node.name.text, new Set(), valuesOf);
+      if (property === null) return [];
+      values.push(...property.values);
+    }
+  }
+  return values;
+}
+
+const isNullish = (ts, node) => node.kind === ts.SyntaxKind.NullKeyword || ts.isIdentifier(node) && node.text === 'undefined';
+
 /** Leaf expressions `expression` may evaluate to. A translator variable and any unresolvable expression is its own leaf. */
 export function valuesOf(state, expression, visited = new Set()) {
   const { ts } = state;
@@ -152,12 +210,20 @@ export function valuesOf(state, expression, visited = new Set()) {
   const orLeaf = values => values.length ? values : [node];
   const narrowed = values => orLeaf(excludesNull(state, node) ? values.filter(value => value.kind !== ts.SyntaxKind.NullKeyword) : values);
   if (ts.isConditionalExpression(node)) return [...valuesOf(state, node.whenTrue, seen), ...valuesOf(state, node.whenFalse, seen)];
+  // `a ?? b` and `a || b` hold either operand.
+  if (ts.isBinaryExpression(node) && [ts.SyntaxKind.QuestionQuestionToken, ts.SyntaxKind.BarBarToken].includes(node.operatorToken.kind))
+    return [...valuesOf(state, node.left, seen), ...valuesOf(state, node.right, seen)];
   if (ts.isCallExpression(node)) return orLeaf(callValues(state, node, seen));
   if (ts.isPropertyAccessExpression(node)) {
     const member = classMemberValue(state, symbolAt(state, node)?.valueDeclaration);
     if (member) return [member];
   }
-  if (ts.isPropertyAccessExpression(node)) return narrowed(resolveAll(state, propertiesOf(state, valuesOf(state, node.expression, seen), node.name.text, seen, valuesOf), seen));
+  if (ts.isPropertyAccessExpression(node)) {
+    // Reading a property of null or undefined throws, so a nullish branch of the owner holds no value of the property.
+    const owners = valuesOf(state, node.expression, seen).filter(owner => !isNullish(ts, owner));
+    const known = resolveAll(state, propertiesOf(state, owners, node.name.text, seen, valuesOf), seen);
+    return narrowed(known.length ? known : resolveAll(state, typedPropertyValues(state, node), seen));
+  }
   if (ts.isElementAccessExpression(node)) return orLeaf(resolveAll(state, tableValues(state, node, seen), seen));
   if (!ts.isIdentifier(node)) return [node];
   const symbol = symbolAt(state, node);

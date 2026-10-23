@@ -14,7 +14,7 @@ const call = async (
     const response = await fetch(url, {
         method,
         headers: { "content-type": "application/json", ...headers },
-        body: body === undefined ? undefined : JSON.stringify(body),
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     })
     return { status: response.status, json: (await response.json()) as Json }
 }

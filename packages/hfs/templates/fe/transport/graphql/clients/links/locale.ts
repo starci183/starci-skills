@@ -1,4 +1,5 @@
 import { SetContextLink } from "@apollo/client/link/context"
+import { contextHeaders } from "./context-headers"
 
 /** The language of the document the reader is on (`<html lang>`, set by the locale layout); undefined outside a browser. */
 const documentLocale = (): string | undefined =>
@@ -9,5 +10,5 @@ export const createAttachLocaleLink = (locale: () => string | undefined = docume
     new SetContextLink((context) => {
         const value = locale()
         if (value === undefined) return {}
-        return { headers: { ...context.headers, "Accept-Language": value } }
+        return { headers: { ...contextHeaders(context), "Accept-Language": value } }
     })

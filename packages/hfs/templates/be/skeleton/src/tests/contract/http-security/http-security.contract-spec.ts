@@ -43,12 +43,12 @@ describe("HTTP security environment contract", () => {
                     HTTP_SECURITY_ALLOWED_ORIGINS: "http://web.example",
                 }),
             ),
-        ).toThrow(expect.objectContaining({ code: "HTTP_SECURITY_REQUEST_INVALID" }))
+        ).toThrow("HTTP_SECURITY_REQUEST_INVALID")
     })
 
     it("rejects an empty allowlist entry after a comma", () => {
         expect(() =>
             parseHttpSecurityConfig(new EnvSource({ HTTP_SECURITY_ALLOWED_ORIGINS: "https://web.example," })),
-        ).toThrow(expect.objectContaining({ code: "HTTP_SECURITY_REQUEST_INVALID" }))
+        ).toThrow("HTTP_SECURITY_REQUEST_INVALID")
     })
 })

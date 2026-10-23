@@ -8,6 +8,9 @@ import { CACHE_OPTIONS, REDIS_FACTORY } from "./cache.decorators"
 import type { CacheOptions } from "./cache.options"
 import type { RedisDriver, RedisFactory } from "./cache.port"
 
+/** Asymmetric matchers read as `unknown`: jest types them `any`, which may not flow into a property or a typed argument. */
+const anyOf = (type: unknown): unknown => expect.any(type)
+
 const options: CacheOptions = { url: new Secret("redis://cache.test:6379"), timeoutMs: 2500 }
 
 const cacheKey = () => {
@@ -87,7 +90,7 @@ describe("RedisCacheClient reads", () => {
 
         await expect(client.get({ key, args: [] })).rejects.toMatchObject({
             code: CacheErrorCode.ReplyUnreadable,
-            cause: expect.any(SyntaxError),
+            cause: anyOf(SyntaxError),
         })
     })
 })

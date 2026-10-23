@@ -108,7 +108,7 @@ checkout. The draft checklist above keeps its existing status.
 - <a id="r273"></a>**R273 HFS_COVERAGE_BELOW:** Supplied back-end lcov evidence must meet the measured per-file coverage policy below, with unmeasured feature, CLI and webhook paths listed separately.
 - <a id="r274"></a>**R274 RT_RULING_STALE_CITE:** A superseded ruling citation must identify its successor in the same paragraph; stale ruling text must not prescribe the former behavior.
 - <a id="r280"></a> **R280 HFS_UNUSED_SYMBOL:** Exported symbols, enum members, queue constants, error codes and catalog keys must have consumers.
-  <a id="r280-ledger"></a>Keys the detector cannot see (built at run time, read through a wrapper it cannot follow) are declared in the side's authored `i18n-dynamic-keys.yaml` (`fe/i18n-dynamic-keys.yaml` for the front end's catalogs, `be/i18n-dynamic-keys.yaml` for the back end's; a side reads only its own file, and a missing file means no ledger). Schema `starci/i18n-dynamic-keys@1`: `namespaces` maps a catalog namespace (the dotted key path before the leaf, as R280 names it, e.g. `hiring` for `hiring.applyWebsite`; `''` for a catalog without namespaces) to entries with exactly one of `key`, `prefix` or `suffix` matched against the leaf, plus a non-empty `reason`; unknown fields are refused. A key an entry matches counts as read; an entry that matches no catalog key, or a malformed ledger, is itself an `HFS_UNUSED_SYMBOL` finding, so the ledger cannot rot.
+  <a id="r280-ledger"></a>The detector reads a catalog key from a translator wherever the checker can name the key: a string literal, a template whose holes are finite, a key typed as a union of string literals (including through the standard library's array callbacks, `rows.filter(...).map((row) => t(row.label))`), a `??` or `||` default, a table of constants read through `readonly` fields of the interface or alias that types it (`mode.label` over every object literal typed `Mode`), and a translator handed through wrappers, hooks and props. Type the key (an `as const` table, a union, a `readonly` field) rather than declaring it; a key the checker cannot name stays dynamic. Keys the detector cannot see (built at run time from data of type `string`, read through a wrapper it cannot follow) are declared in the side's authored `i18n-dynamic-keys.yaml` (`fe/i18n-dynamic-keys.yaml` for the front end's catalogs, `be/i18n-dynamic-keys.yaml` for the back end's; a side reads only its own file, and a missing file means no ledger). Schema `starci/i18n-dynamic-keys@1`: `namespaces` maps a catalog namespace (the dotted key path before the leaf, as R280 names it, e.g. `hiring` for `hiring.applyWebsite`; `''` for a catalog without namespaces) to entries with exactly one of `key`, `prefix` or `suffix` matched against the leaf, plus a non-empty `reason`; unknown fields are refused. A key an entry matches counts as read; an entry that matches no catalog key, or a malformed ledger, is itself an `HFS_UNUSED_SYMBOL` finding, so the ledger cannot rot.
 - <a id="r282"></a> **R282 HFS_ASSET_BUDGET:** `HFS_ASSET_OVERSIZE` refuses a back-end asset above its per-file size budget; `HFS_ASSET_KIND` refuses an unsupported tracked asset kind. Large and user media belong in object storage.
 - <a id="r283"></a> **R283 HFS_APP_LEXICON:** Source and docs must exclude product vocabulary declared in `hfs.json lexicon.removed`.
 - <a id="r284"></a> **R284 BE_LITE_PROOF_LANE_MISSING:** Lite must keep its declared event-bus, queue, webhook, realtime, fenced-job, projection and saga proofs in a runnable integration-spec lane; the existing `BE_PATTERN_SPEC_MISSING` code names a missing scenario. Full retains its existing proof lanes.
@@ -217,9 +217,14 @@ eslint-plugin-sonarjs' Sonar way set with the cognitive complexity limit 15, and
 the core and unicorn rules SonarSource builds on, such as no duplicate import and
 `Set#has`), so `starci app lint` in the op loop reports what the scan would. A
 function takes at most seven parameters; the constructor of an injectable class
-is spared, as the server spares it. A port that reports what the server does not
-on the same source (S1481, S3403, S3782, S3800, S6582) is left to the server: the
-parity sample is NIVO, 0 issues on the server and 0 findings in the lint. The
+is spared, as the server spares it. No Sonar way rule is left to the server: S3403,
+S3782, S3800 and S6582 run at error like the rest, and a port that reports what the
+server does not is fixed in the source it reports. S1481 (an unused local) is the
+compiler's (`noUnusedLocals`, `noUnusedParameters` in every `@starci/tsconfig`
+preset), S7785 (top-level await) runs in the front end only because a back end
+compiles to CommonJS. Both canons also borrow the type-aware typescript-eslint
+rules `no-floating-promises`, `no-misused-promises`, `switch-exhaustiveness-check`
+and the `no-unsafe-*` family at error. The
 dedicated RuleTester specs exercise each published enforcer with passing
 and violating source in both editions; unit and end-to-end source specs retain
 the scan exclusion declared by the rule.

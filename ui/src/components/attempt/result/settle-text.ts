@@ -15,6 +15,39 @@ const nextKindEn: Record<string, string> = { retry: 'Retry this op', advance: 'M
 
 export type SettleView = { lines: string[]; failedChecks: string[]; nextStep: string | null; failureClass: string | null };
 
+function evidenceLines(evidence: Record<string, unknown> | null): string[] {
+  if (!evidence) return [];
+  const { observed, passed, failed } = evidence;
+  if (observed === 0) return [t('No checks were observed by the verdict runner.')];
+  if (typeof observed === 'number' && typeof passed === 'number' && typeof failed === 'number') return [t('The verdict runner cross-checked {observed} checks: {passed} passed, {failed} failed.', { observed, passed, failed })];
+  return [];
+}
+
+function landedLines(landed: Record<string, unknown> | null): string[] {
+  if (!landed) return [];
+  const lines: string[] = [];
+  const missing = list(landed.missing);
+  const dirty = list(landed.dirty);
+  if (missing.length) lines.push(t('Still missing in the repo: {list}.', { list: missing.join(', ') }));
+  if (dirty.length) lines.push(t('Uncommitted files remain: {list}.', { list: dirty.join(', ') }));
+  if (typeof landed.headCheck === 'string') lines.push(landed.headCheck === 'verified' ? t('The reported commit was verified; integration is recorded separately.') : t('Last-commit check: {result}.', { result: landed.headCheck }));
+  return lines;
+}
+
+function parsedNextStep(raw: string | null | undefined): Record<string, unknown> | null {
+  try { return obj(JSON.parse(raw ?? 'null')); } catch { return null; }
+}
+
+function nextStepOf(attempt: AttemptDetailV3, json: Record<string, unknown>): string | null {
+  const next = obj(json.nextStep) ?? parsedNextStep(attempt.settle?.nextStep);
+  if (next) {
+    const kind = typeof next.kind === 'string' ? t(nextKindEn[next.kind] ?? next.kind) : null;
+    const reason = typeof next.reason === 'string' ? next.reason : null;
+    return [kind, reason].filter(Boolean).join(' — ') || null;
+  }
+  return typeof attempt.settle?.nextStep === 'string' && attempt.settle.nextStep ? attempt.settle.nextStep : null;
+}
+
 /** Turn `settle.json` (+ the check rows) into short Vietnamese sentences: what failed, which checks, what happens next. */
 export function settleView(attempt: AttemptDetailV3): SettleView {
   const json = obj(attempt.settle?.json) ?? {};
@@ -22,34 +55,14 @@ export function settleView(attempt: AttemptDetailV3): SettleView {
   const failureRaw = attempt.failureClass ?? attempt.retry.class ?? (typeof json.failureClass === 'string' ? json.failureClass : null);
   const failureClass = attempt.verdict === 'pass' ? null : failureRaw;
   const failedChecks = verificationSummary(attempt).pairs.filter(pair => runtimeObservation(pair.runtime) === 'fail').map(pair => pair.name);
-  const evidence = obj(json.checkEvidence);
   if (typeof json.reason === 'string' && json.reason) lines.push(json.reason);
-  if (evidence) {
-    const observed = evidence.observed; const passed = evidence.passed; const failed = evidence.failed;
-    if (observed === 0) lines.push(t('No checks were observed by the verdict runner.'));
-    else if (typeof observed === 'number' && typeof passed === 'number' && typeof failed === 'number') lines.push(t('The verdict runner cross-checked {observed} checks: {passed} passed, {failed} failed.', { observed, passed, failed }));
-  }
+  lines.push(...evidenceLines(obj(json.checkEvidence)));
   if (failedChecks.length) lines.push(t('Failed checks: {list}.', { list: failedChecks.join(', ') }));
   if (json.claimOverruled === true) lines.push(t('The op self-reported done but runtime verification rejected that claim.'));
-  const landed = obj(json.landed);
-  if (landed) {
-    const missing = list(landed.missing); const dirty = list(landed.dirty);
-    if (missing.length) lines.push(t('Still missing in the repo: {list}.', { list: missing.join(', ') }));
-    if (dirty.length) lines.push(t('Uncommitted files remain: {list}.', { list: dirty.join(', ') }));
-    if (typeof landed.headCheck === 'string') lines.push(landed.headCheck === 'verified' ? t('The reported commit was verified; integration is recorded separately.') : t('Last-commit check: {result}.', { result: landed.headCheck }));
-  }
+  lines.push(...landedLines(obj(json.landed)));
   if (attempt.verdict === 'blocked' && !lines.length) lines.push(t('The recorded verdict is blocked.'));
   const blocker = obj(obj(attempt.report?.json)?.blocker);
   if (attempt.verdict === 'blocked' && typeof blocker?.detail === 'string') lines.push(t('Blocker the op raised: {detail}', { detail: blocker.detail }));
   if (failureClass) lines.unshift(t('Failure class: {text}.', { text: failureClassText(failureClass) }));
-
-  let nextStep: string | null = null;
-  const parsedNext = (() => { try { return obj(JSON.parse(attempt.settle?.nextStep ?? 'null')); } catch { return null; } })();
-  const next = obj(json.nextStep) ?? parsedNext;
-  if (next) {
-    const kind = typeof next.kind === 'string' ? t(nextKindEn[next.kind] ?? next.kind) : null;
-    const reason = typeof next.reason === 'string' ? next.reason : null;
-    nextStep = [kind, reason].filter(Boolean).join(' — ') || null;
-  } else if (typeof attempt.settle?.nextStep === 'string' && attempt.settle.nextStep) nextStep = attempt.settle.nextStep;
-  return { lines, failedChecks, nextStep, failureClass };
+  return { lines, failedChecks, nextStep: nextStepOf(attempt, json), failureClass };
 }

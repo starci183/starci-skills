@@ -67,7 +67,7 @@ const fakeStack = (status: StackStatus): { stack: StackApi; calls: Calls } => {
     return { stack, calls }
 }
 
-const run = async (argv: ReadonlyArray<string>, status: StackStatus, cwd?: string): Promise<{ code: number; out: string; err: string; calls: Calls }> => {
+const run = async (argv: ReadonlyArray<string>, status: StackStatus, cwd?: string | undefined): Promise<{ code: number; out: string; err: string; calls: Calls }> => {
     const { stack, calls } = fakeStack(status)
     let out = ""
     let err = ""

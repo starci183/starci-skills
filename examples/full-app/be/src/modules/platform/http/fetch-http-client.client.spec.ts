@@ -3,6 +3,10 @@ import { mock } from "@starci/jest-preset"
 import { HttpErrorCode } from "./errors/http.error"
 import { FetchHttpClient } from "./fetch-http-client.client"
 
+/** Asymmetric matchers read as `unknown`: jest types them `any`, which may not flow into a property or a typed argument. */
+const anyOf = (type: unknown): unknown => expect.any(type)
+const objectLike = (shape: Record<string, unknown>): unknown => expect.objectContaining(shape)
+
 const build = async (): Promise<FetchHttpClient> => {
     const moduleRef = await Test.createTestingModule({ providers: [FetchHttpClient] }).compile()
     return moduleRef.get(FetchHttpClient)
@@ -35,7 +39,7 @@ describe("FetchHttpClient JSON requests", () => {
             method: "POST",
             headers: { "content-type": "application/json", authorization: "Bearer token" },
             body: JSON.stringify({ orderId: "order-1" }),
-            signal: expect.any(AbortSignal),
+            signal: anyOf(AbortSignal),
         })
     })
 
@@ -49,10 +53,7 @@ describe("FetchHttpClient JSON requests", () => {
             client.request({ method: "GET", url: "https://service.test/health", timeoutMs: 2500 }),
         ).resolves.toEqual({ status: 204, body: undefined })
 
-        expect(fetch).toHaveBeenCalledWith(
-            "https://service.test/health",
-            expect.objectContaining({ headers: {}, body: undefined }),
-        )
+        expect(fetch).toHaveBeenCalledWith("https://service.test/health", objectLike({ headers: {}, body: undefined }))
     })
 })
 
@@ -74,10 +75,10 @@ describe("FetchHttpClient form and byte requests", () => {
 
         expect(send).toHaveBeenCalledWith(
             "https://service.test/token",
-            expect.objectContaining({
+            objectLike({
                 headers: { "content-type": "application/x-www-form-urlencoded" },
                 body: "grant_type=client_credentials&scope=orders+read",
-                signal: expect.any(AbortSignal),
+                signal: anyOf(AbortSignal),
             }),
         )
         expect(send.mock.calls[0]?.[1]?.signal).not.toBe(caller.signal)
@@ -102,7 +103,7 @@ describe("FetchHttpClient form and byte requests", () => {
 
         expect(send).toHaveBeenCalledWith(
             "https://service.test/object",
-            expect.objectContaining({ headers: { "content-type": "application/octet-stream" }, body: bytes }),
+            objectLike({ headers: { "content-type": "application/octet-stream" }, body: bytes }),
         )
     })
 })
@@ -116,7 +117,7 @@ describe("FetchHttpClient failures", () => {
 
         await expect(
             client.request({ method: "GET", url: "https://service.test/orders", timeoutMs: 2500 }),
-        ).rejects.toMatchObject({ code: HttpErrorCode.BodyUnreadable, cause: expect.any(SyntaxError) })
+        ).rejects.toMatchObject({ code: HttpErrorCode.BodyUnreadable, cause: anyOf(SyntaxError) })
     })
 
     it("maps a failure before headers to a network error", async () => {

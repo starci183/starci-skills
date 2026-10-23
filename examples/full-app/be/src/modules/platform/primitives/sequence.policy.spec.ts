@@ -50,7 +50,7 @@ describe("eachInOrder", () => {
             if (item === 2) throw new SequenceError({ code: "STEP_FAILED" })
         })
 
-        await expect(run).rejects.toThrow(expect.objectContaining({ code: "STEP_FAILED" }))
+        await expect(run).rejects.toThrow("STEP_FAILED")
         expect(started).toEqual([1, 2])
     })
 
@@ -61,6 +61,6 @@ describe("eachInOrder", () => {
             throw new SequenceError({ code: "STEP_FAILED" })
         })
 
-        await expect(run).rejects.toThrow(expect.objectContaining({ code: "STEP_FAILED" }))
+        await expect(run).rejects.toThrow("STEP_FAILED")
     })
 })

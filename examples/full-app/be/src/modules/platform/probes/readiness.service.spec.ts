@@ -9,6 +9,10 @@ import type { ProbeCheckerService } from "./probe-checker.service"
 import type { Probe } from "./probes.port"
 import { ReadinessService } from "./readiness.service"
 
+/** Asymmetric matchers read as `unknown`: jest types them `any`, which may not flow into a property or a typed argument. */
+const anyOf = (type: unknown): unknown => expect.any(type)
+const objectLike = (shape: Record<string, unknown>): unknown => expect.objectContaining(shape)
+
 const build = async (empty = false) => {
     const database = mock<Probe>({ name: "database" })
     const cache = mock<Probe>({ name: "cache" })
@@ -38,7 +42,7 @@ describe("ReadinessService", () => {
 
         await expect(service.probeRequired()).rejects.toMatchObject({
             code: ProbesErrorCode.DependencyUnavailable,
-            cause: expect.objectContaining({ code: ProbesErrorCode.DependencyUnavailable }),
+            cause: objectLike({ code: ProbesErrorCode.DependencyUnavailable }),
         })
 
         expect(timer.schedule).not.toHaveBeenCalled()
@@ -68,7 +72,7 @@ describe("ReadinessService", () => {
 
         expect(database.check).toHaveBeenCalledTimes(1)
         expect(checker.check).toHaveBeenCalledTimes(1)
-        expect(timer.schedule).toHaveBeenCalledWith(expect.any(Function), 1000)
+        expect(timer.schedule).toHaveBeenCalledWith(anyOf(Function), 1000)
     })
 })
 
@@ -94,7 +98,7 @@ describe("ReadinessService failures and deadlines", () => {
             cause: new Error("Required dependency readiness timed out"),
         })
 
-        expect(timer.schedule).toHaveBeenCalledWith(expect.any(Function), 1000)
+        expect(timer.schedule).toHaveBeenCalledWith(anyOf(Function), 1000)
         timer.schedule.mock.calls.at(0)?.[0]()
         await expected
         expect(cancel).toHaveBeenCalledTimes(1)

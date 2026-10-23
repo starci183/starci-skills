@@ -2,7 +2,7 @@ import { ArrowRight, Gavel } from 'lucide-react';
 import { Link } from '@heroui/react';
 import type { AttemptDetailV3, AttemptManifest } from '../../../contract';
 import type { Concept } from '../../concept';
-import { statusFromVerdict, statusTone } from '../../status';
+import { statusFromVerdict, statusTone, type Status } from '../../status';
 import { StatusChip } from '../../status-chip';
 import { Advanced } from '../../motion';
 import { Card } from '../frame/card';
@@ -78,89 +78,141 @@ function Assertions({ manifest }: Readonly<{ manifest: AttemptManifest }>) {
   </section>;
 }
 
-/** Independent report, runtime checks, checkpoint and verdict facts for one dispatch. */
-export function ResultCard({ attempt, onShowChecks }: Readonly<{ attempt: AttemptDetailV3; onShowChecks?: () => void }>) {
-  const manifest = manifestOf(attempt);
-  const report = obj(attempt.report?.json);
-  const summary = text(report?.summary) ?? attempt.summary;
-  const hasClaims = report?.claims != null;
+type ClickEvent = { defaultPrevented: boolean; button: number; metaKey: boolean; ctrlKey: boolean; shiftKey: boolean; altKey: boolean; preventDefault: () => void };
+
+const isPlainLeftClick = (event: ClickEvent): boolean => !(event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey);
+
+function reportOutcomeText(attempt: AttemptDetailV3): string {
+  if (attempt.reportOutcome) return t('Self-reported outcome: {outcome}', { outcome: outcomeLabels[attempt.reportOutcome] ?? attempt.reportOutcome });
+  return attempt.reportedAt ? t('Report outcome not recorded') : t('No report yet');
+}
+
+function verdictChipLabel(status: Status, verdict: AttemptDetailV3['verdict']): string {
+  if (status === 'awaiting-owner') return t('Awaiting the owner');
+  if (status === 'rejected') return t('Rejected at dispatch');
+  if (verdict) return verdictLabels[verdict] ?? verdict;
+  return status === 'running' ? t('Settling') : t('Not settled');
+}
+
+function whySourceLabel(source: string | undefined): string {
+  if (source === 'stored') return t('Stored explanation');
+  if (source === 'computed') return t('Explanation computed from current reference data; it is not a stored settlement receipt.');
+  return t('Explanation source not recorded');
+}
+
+function OpReportSection({ attempt, report, summary }: Readonly<{ attempt: AttemptDetailV3; report: Record<string, unknown> | null; summary: string | null }>) {
+  return <section className="min-w-0">
+    <div className="mb-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+      <h3 className="m-0 text-sm font-medium">{t('Op report')}</h3>
+      <span className="text-sm text-muted-foreground">{reportOutcomeText(attempt)}</span>
+    </div>
+    <p className="mb-3 mt-0 text-xs text-muted-foreground">{t('Self-declared by the Op; runtime checks and the recorded verdict are separate.')}</p>
+    {summary ? <p className="m-0 max-w-[80ch] whitespace-pre-line break-words text-sm leading-relaxed">{summary}</p>
+      : <p className="m-0 text-sm text-muted-foreground">{t('No report summary was returned.')}</p>}
+    {report ? <ReportDetails report={report} /> : null}
+    <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+      {attempt.report ? <span>{t('Stored report #{id}', { id: attempt.report.id })}</span> : null}
+      {attempt.reportedAt != null ? <span>{t('Reported at {at}', { at: formatAbsolute(attempt.reportedAt) })}</span> : null}
+    </div>
+    <StoredReport attempt={attempt} />
+  </section>;
+}
+
+function StoredReport({ attempt }: Readonly<{ attempt: AttemptDetailV3 }>) {
+  if (attempt.report?.json != null) return <Advanced className="mt-4" title={t('Read the full stored report')} keepMounted>
+    <TextView text={jsonText(attempt.report.json)} query="" />
+  </Advanced>;
+  if (attempt.reportedAt != null || attempt.report != null) return <p className="mb-0 mt-3 text-xs text-muted-foreground">{t('The reported milestone is recorded, but stored report content was not returned.')}</p>;
+  return null;
+}
+
+function RuntimeChecksSection({ attempt, onShowChecks }: Readonly<{ attempt: AttemptDetailV3; onShowChecks?: () => void }>) {
   const checks = verificationSummary(attempt);
+  const checksHref = `#/a/${encodeURIComponent(attempt.project)}/${attempt.id}?step=checks`;
+  const onClick = onShowChecks ? (event: ClickEvent) => {
+    if (!isPlainLeftClick(event)) return;
+    event.preventDefault(); onShowChecks();
+  } : undefined;
+  return <section className="min-w-0 border-t pt-6">
+    <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+      <h3 className="m-0 text-sm font-medium">{t('Runtime checks')}</h3>
+      <Link href={checksHref} onClick={onClick} className="gap-1 text-sm font-medium">{t('View recorded checks')}<ArrowRight className="size-3.5" aria-hidden="true" /></Link>
+    </div>
+    {checks.runtimeTotal ? <p className="m-0 text-sm leading-relaxed">{t('Runtime check identities: {passed} passed · {failed} failed · {unconfirmed} unconfirmed.', { passed: checks.passed, failed: checks.failed, unconfirmed: checks.unconfirmed })}</p>
+      : <p className="m-0 text-sm text-muted-foreground">{t('No runtime check records were returned for this attempt.')}</p>}
+    {checks.unavailable || checks.skipped ? <p className="mb-0 mt-1 text-xs text-muted-foreground">{t('Unconfirmed includes {unavailable} unavailable and {skipped} skipped checks.', { unavailable: checks.unavailable, skipped: checks.skipped })}</p> : null}
+    <p className="mb-0 mt-2 text-xs text-muted-foreground">{t('Recorded scope: {identities} check identities · {runs} runs · {declared} declaration-only identities.', { identities: checks.total, runs: checks.runs, declared: checks.declaredTotal })}</p>
+  </section>;
+}
+
+function WhyExplanation({ why }: Readonly<{ why: NonNullable<AttemptDetailV3['why']> }>) {
+  return <>
+    <p className="mb-2 mt-0 text-xs text-muted-foreground">{whySourceLabel(why.provenance?.source)}{why.provenance?.at != null ? ` · ${formatAbsolute(why.provenance.at)}` : ''}</p>
+    <WhyBlock why={why} className="mb-4 max-w-[80ch]" />
+  </>;
+}
+
+function SettleReasons({ attempt, settle }: Readonly<{ attempt: AttemptDetailV3; settle: ReturnType<typeof settleView> }>) {
+  if (attempt.settle && settle.lines.length) return <ul className="m-0 flex max-w-[80ch] list-disc flex-col gap-1 pl-5 text-sm">{settle.lines.map((line, i) => <li key={`${i}-${line}`} className="break-words">{line}</li>)}</ul>;
+  return <p className="m-0 text-sm text-muted-foreground">{attempt.verdict ? t('No additional verdict reason was recorded.') : t('No verdict has been recorded for this attempt yet.')}</p>;
+}
+
+function VerdictSection({ attempt }: Readonly<{ attempt: AttemptDetailV3 }>) {
   const verdictStatus = statusFromVerdict(attempt.verdict, attempt.reportedAt != null && attempt.settledAt == null && attempt.endState == null, attempt.ui);
   const settle = settleView(attempt);
   const nextAttempt = attempt.retry.next;
-  const hasDeclarations = manifest != null || hasClaims;
+  return <section id="attempt-step-verdict" className="min-w-0 scroll-mt-24 border-t pt-6" data-tone={statusTone[verdictStatus]}>
+    <div className="mb-2 flex flex-wrap items-center gap-2">
+      <Gavel className="size-4 text-muted-foreground" aria-hidden="true" />
+      <h3 className="m-0 text-sm font-medium">{t('Recorded runtime verdict')}</h3>
+      <StatusChip status={verdictStatus} label={verdictChipLabel(verdictStatus, attempt.verdict)} />
+      {attempt.settledBy ? <span className="text-xs text-muted-foreground">{t('by {actor}', { actor: attempt.settledBy })}</span> : null}
+      {attempt.settledAt != null ? <span className="text-xs text-muted-foreground">{formatAbsolute(attempt.settledAt)}</span> : null}
+    </div>
+    <p className="mb-4 mt-0 text-xs text-muted-foreground">{t('The runtime verdict comes from Attempt settlement. Checkpoint, workflow integration and product reads have separate receipts.')}</p>
+    {attempt.why ? <WhyExplanation why={attempt.why} /> : null}
+    <SettleReasons attempt={attempt} settle={settle} />
+    <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 border-t pt-4 text-sm">
+      <span className="text-muted-foreground">{t('Next step:')}</span>
+      <span className="min-w-0 break-words">{settle.nextStep ?? t('No next step recorded yet.')}</span>
+      {nextAttempt ? <Link href={nextAttempt.href} className="gap-1 font-medium">{t('Next attempt #{id}', { id: nextAttempt.id })}<ArrowRight className="size-3.5" aria-hidden="true" /></Link> : null}
+    </div>
+  </section>;
+}
+
+function DeclarationsSection({ manifest, report }: Readonly<{ manifest: AttemptManifest | null; report: Record<string, unknown> | null }>) {
+  const hasClaims = report?.claims != null;
+  if (manifest == null && !hasClaims) return null;
   const declarationsSummary = [manifest ? t('{n} Op-declared assertions', { n: manifest.assertions.length }) : null, hasClaims ? t('Exact reported claims') : null].filter(Boolean).join(' · ');
-  const checksHref = `#/a/${encodeURIComponent(attempt.project)}/${attempt.id}?step=checks`;
+  return <Advanced summary={declarationsSummary || undefined}>
+    <div className="grid min-w-0 gap-6">
+      {manifest ? <Assertions manifest={manifest} /> : null}
+      {hasClaims ? <section className="min-w-0">
+        <h3 className="m-0 mb-1 text-sm font-medium">{t('Exact reported claims')}</h3>
+        <p className="mb-3 mt-0 text-xs text-muted-foreground">{t('Submitted claims are declarations; they do not establish requirement completion.')}</p>
+        <TextView text={jsonText(report?.claims)} query="" />
+      </section> : null}
+    </div>
+  </Advanced>;
+}
+
+/** Independent report, runtime checks, checkpoint and verdict facts for one dispatch. */
+export function ResultCard({ attempt, onShowChecks }: Readonly<{ attempt: AttemptDetailV3; onShowChecks?: () => void }>) {
+  const report = obj(attempt.report?.json);
+  const summary = text(report?.summary) ?? attempt.summary;
+  const manifestState = attempt.manifestRead?.state;
   return <Card id="attempt-result" concept="C10" title={t('Outcome')} hint={t('Op declarations, runtime checks, checkpoint and verdict')}>
     <div className="grid min-w-0 gap-6">
-      <section className="min-w-0">
-        <div className="mb-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-          <h3 className="m-0 text-sm font-medium">{t('Op report')}</h3>
-          <span className="text-sm text-muted-foreground">{attempt.reportOutcome ? t('Self-reported outcome: {outcome}', { outcome: outcomeLabels[attempt.reportOutcome] ?? attempt.reportOutcome }) : attempt.reportedAt ? t('Report outcome not recorded') : t('No report yet')}</span>
-        </div>
-        <p className="mb-3 mt-0 text-xs text-muted-foreground">{t('Self-declared by the Op; runtime checks and the recorded verdict are separate.')}</p>
-        {summary ? <p className="m-0 max-w-[80ch] whitespace-pre-line break-words text-sm leading-relaxed">{summary}</p>
-          : <p className="m-0 text-sm text-muted-foreground">{t('No report summary was returned.')}</p>}
-        {report ? <ReportDetails report={report} /> : null}
-        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-          {attempt.report ? <span>{t('Stored report #{id}', { id: attempt.report.id })}</span> : null}
-          {attempt.reportedAt != null ? <span>{t('Reported at {at}', { at: formatAbsolute(attempt.reportedAt) })}</span> : null}
-        </div>
-        {attempt.report?.json != null ? <Advanced className="mt-4" title={t('Read the full stored report')} keepMounted>
-          <TextView text={jsonText(attempt.report.json)} query="" />
-        </Advanced> : attempt.reportedAt != null || attempt.report != null ? <p className="mb-0 mt-3 text-xs text-muted-foreground">{t('The reported milestone is recorded, but stored report content was not returned.')}</p> : null}
-      </section>
-
-      <section className="min-w-0 border-t pt-6">
-        <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1">
-          <h3 className="m-0 text-sm font-medium">{t('Runtime checks')}</h3>
-          <Link href={checksHref} onClick={onShowChecks ? event => {
-            if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-            event.preventDefault(); onShowChecks();
-          } : undefined} className="gap-1 text-sm font-medium">{t('View recorded checks')}<ArrowRight className="size-3.5" aria-hidden="true" /></Link>
-        </div>
-        {checks.runtimeTotal ? <p className="m-0 text-sm leading-relaxed">{t('Runtime check identities: {passed} passed · {failed} failed · {unconfirmed} unconfirmed.', { passed: checks.passed, failed: checks.failed, unconfirmed: checks.unconfirmed })}</p>
-          : <p className="m-0 text-sm text-muted-foreground">{t('No runtime check records were returned for this attempt.')}</p>}
-        {checks.unavailable || checks.skipped ? <p className="mb-0 mt-1 text-xs text-muted-foreground">{t('Unconfirmed includes {unavailable} unavailable and {skipped} skipped checks.', { unavailable: checks.unavailable, skipped: checks.skipped })}</p> : null}
-        <p className="mb-0 mt-2 text-xs text-muted-foreground">{t('Recorded scope: {identities} check identities · {runs} runs · {declared} declaration-only identities.', { identities: checks.total, runs: checks.runs, declared: checks.declaredTotal })}</p>
-      </section>
+      <OpReportSection attempt={attempt} report={report} summary={summary} />
+      <RuntimeChecksSection attempt={attempt} onShowChecks={onShowChecks} />
 
       <CheckpointReceipt attempt={attempt} />
 
-      <section id="attempt-step-verdict" className="min-w-0 scroll-mt-24 border-t pt-6" data-tone={statusTone[verdictStatus]}>
-        <div className="mb-2 flex flex-wrap items-center gap-2">
-          <Gavel className="size-4 text-muted-foreground" aria-hidden="true" />
-          <h3 className="m-0 text-sm font-medium">{t('Recorded runtime verdict')}</h3>
-          <StatusChip status={verdictStatus} label={verdictStatus === 'awaiting-owner' ? t('Awaiting the owner') : verdictStatus === 'rejected' ? t('Rejected at dispatch') : attempt.verdict ? (verdictLabels[attempt.verdict] ?? attempt.verdict) : verdictStatus === 'running' ? t('Settling') : t('Not settled')} />
-          {attempt.settledBy ? <span className="text-xs text-muted-foreground">{t('by {actor}', { actor: attempt.settledBy })}</span> : null}
-          {attempt.settledAt != null ? <span className="text-xs text-muted-foreground">{formatAbsolute(attempt.settledAt)}</span> : null}
-        </div>
-        <p className="mb-4 mt-0 text-xs text-muted-foreground">{t('The runtime verdict comes from Attempt settlement. Checkpoint, workflow integration and product reads have separate receipts.')}</p>
-        {attempt.why ? <>
-          <p className="mb-2 mt-0 text-xs text-muted-foreground">{attempt.why.provenance?.source === 'stored' ? t('Stored explanation') : attempt.why.provenance?.source === 'computed' ? t('Explanation computed from current reference data; it is not a stored settlement receipt.') : t('Explanation source not recorded')}{attempt.why.provenance?.at != null ? ` · ${formatAbsolute(attempt.why.provenance.at)}` : ''}</p>
-          <WhyBlock why={attempt.why} className="mb-4 max-w-[80ch]" />
-        </> : null}
-        {attempt.settle && settle.lines.length ? <ul className="m-0 flex max-w-[80ch] list-disc flex-col gap-1 pl-5 text-sm">{settle.lines.map((line, i) => <li key={`${i}-${line}`} className="break-words">{line}</li>)}</ul>
-          : <p className="m-0 text-sm text-muted-foreground">{attempt.verdict ? t('No additional verdict reason was recorded.') : t('No verdict has been recorded for this attempt yet.')}</p>}
-        <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 border-t pt-4 text-sm">
-          <span className="text-muted-foreground">{t('Next step:')}</span>
-          <span className="min-w-0 break-words">{settle.nextStep ?? t('No next step recorded yet.')}</span>
-          {nextAttempt ? <Link href={nextAttempt.href} className="gap-1 font-medium">{t('Next attempt #{id}', { id: nextAttempt.id })}<ArrowRight className="size-3.5" aria-hidden="true" /></Link> : null}
-        </div>
-      </section>
+      <VerdictSection attempt={attempt} />
 
-      {attempt.manifestRead?.state === 'unavailable' || attempt.manifestRead?.state === 'invalid' ? <FeedbackState error onRetry={() => refreshQuery(`/api/attempts/${encodeURIComponent(attempt.project)}/${attempt.id}`)}>{t('The submitted manifest could not be read; its criteria are unknown.')} · {attempt.manifestRead.state}</FeedbackState> : null}
+      {manifestState === 'unavailable' || manifestState === 'invalid' ? <FeedbackState error onRetry={() => refreshQuery(`/api/attempts/${encodeURIComponent(attempt.project)}/${attempt.id}`)}>{t('The submitted manifest could not be read; its criteria are unknown.')} · {manifestState}</FeedbackState> : null}
 
-      {hasDeclarations ? <Advanced summary={declarationsSummary || undefined}>
-        <div className="grid min-w-0 gap-6">
-          {manifest ? <Assertions manifest={manifest} /> : null}
-          {hasClaims ? <section className="min-w-0">
-            <h3 className="m-0 mb-1 text-sm font-medium">{t('Exact reported claims')}</h3>
-            <p className="mb-3 mt-0 text-xs text-muted-foreground">{t('Submitted claims are declarations; they do not establish requirement completion.')}</p>
-            <TextView text={jsonText(report?.claims)} query="" />
-          </section> : null}
-        </div>
-      </Advanced> : null}
+      <DeclarationsSection manifest={manifestOf(attempt)} report={report} />
     </div>
   </Card>;
 }

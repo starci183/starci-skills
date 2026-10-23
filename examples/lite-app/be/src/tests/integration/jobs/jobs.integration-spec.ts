@@ -5,6 +5,9 @@ import { useTestWorld, TestWorldError, TestWorldErrorCode, createJobsProof } fro
 const LEASE_MS = 100
 const world = useTestWorld({ modules: createJobsProof, rollback: true })
 
+/** A resolver that was not captured yet. */
+const noop = (): void => undefined
+
 /** Collaboration proofs use the real claim and runner services and the migrated local Supabase job table. */
 const registerClaimProof = () => {
     it("fenced-job/claim-bumps-token: a live lease blocks a second worker and expiration advances the same row's token", async () => {
@@ -37,11 +40,11 @@ const registerZombieProof = () => {
     it("fenced-job/zombie-fenced-out: stale writes and runner settlement cannot overwrite the successor's progress", async () => {
         const { clock, claims, successorClaims, claim, runner, logger, delivery } = world.modules.build("zombie")
         const attempts: Array<ClaimedJob> = []
-        let release = () => {}
+        let release = noop
         const gate = new Promise<void>((resolve) => {
             release = resolve
         })
-        let started = () => {}
+        let started = noop
         const processing = new Promise<void>((resolve) => {
             started = resolve
         })

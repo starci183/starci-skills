@@ -50,7 +50,7 @@ pins:
     source: packages/stylelint/package.json
     why: 'the front-end stylelint canon: no-class-selector refuses a compound class selector (`div.card`); the brand layer accepts `--font-sans` and `--font-mono`; status-contrast measures the HeroUI soft pairs per theme; brand-layer-shape reads the shared :root,.light,.dark block and the info soft pair; appTokens come from loadAppTokens(import.meta.url) for the managed one-line stylelint.config.mjs.'
   '@starci/tsconfig':
-    version: 2.0.5
+    version: 2.0.6
     group: starci
     install: registry
     side: both
@@ -69,7 +69,7 @@ pins:
     source: packages/jest-preset/package.json
     why: 'the Jest preset of a back end: the world runner runs up to min(--maxWorkers, slots) world files at once, each in its own process bound to one data slot of the test world (STARCI_TEST_WORLD_SLOT), and reads test-world state protocol 2 only: it pairs exactly with @starci/test-world, and any other state file is JEST_PRESET_WORLD_PAIR_MISMATCH. The unit run writes the lcov Sonar and Codecov import (services only); the integration, e2e and contract projects run every spec file in a worker process of its own (world-runner.cjs), so a process-global framework registry (@nestjs/graphql type metadata) never leaks between e2e files; it ships the unit kit (mockEntityManager, fakeTransaction, fakeIds, FakeClock, Outcome matchers) and the recordingOutbox claim side.'
   '@starci/test-world':
-    version: 1.2.2
+    version: 1.2.3
     group: starci
     install: registry
     side: be

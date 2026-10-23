@@ -39,7 +39,8 @@ export function setHashParam(key: string, value: string | null): void {
   const params = new URLSearchParams(at < 0 ? '' : hash.slice(at + 1));
   if (value == null) params.delete(key); else params.set(key, value);
   const query = params.toString();
-  window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}${path}${query ? `?${query}` : ''}`);
+  const suffix = query ? `?${query}` : '';
+  window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}${path}${suffix}`);
 }
 
 export const stepAnchor = (step: AttemptStep) => `attempt-step-${step}`;

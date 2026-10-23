@@ -38,10 +38,11 @@ export function KpiExtras({ summary }: Readonly<{ summary: WorkersSummary | unde
   const tokens = usage.recorded && observed(usage.inputTokens) != null && observed(usage.outputTokens) != null ? usage.inputTokens! + usage.outputTokens! : null;
   const tokensComplete = usage.completeness?.fields.input.complete && usage.completeness?.fields.output.complete;
   const number = (value: number | null | undefined) => observed(value) == null ? '—' : new Intl.NumberFormat('vi-VN').format(value!);
+  const partialNote = tokensComplete ? '' : ` · ${t('recorded part')}`;
   const items = [
     { label: t('settling'), value: number(summary.opsSettling), note: t('Agents have reported and are waiting for the Kernel to settle.') },
     { label: t('planned / queued units'), value: number(summary.unitsQueued), note: t('Recorded planned or queued units in running workflows; this is not the ready frontier.') },
-    tokens != null ? { label: t('Tokens in 24 h'), value: `${compactVi(tokens)}${tokensComplete ? '' : ` · ${t('recorded part')}`}`, note: t('in {input} · out {output} · {cost}', { input: compactVi(usage.inputTokens), output: compactVi(usage.outputTokens), cost: costVi(usage.costUsd) }) }
+    tokens != null ? { label: t('Tokens in 24 h'), value: `${compactVi(tokens)}${partialNote}`, note: t('in {input} · out {output} · {cost}', { input: compactVi(usage.inputTokens), output: compactVi(usage.outputTokens), cost: costVi(usage.costUsd) }) }
       : { label: t('Tokens in 24 h'), value: usage.recorded ? '—' : t('not recorded'), note: t('Project-ledger usage in the last 24 hours.') },
   ];
   return <dl className="grid gap-3 sm:grid-cols-3">{items.map(item => <div key={item.label} className="flex min-w-0 flex-col gap-1 p-3">

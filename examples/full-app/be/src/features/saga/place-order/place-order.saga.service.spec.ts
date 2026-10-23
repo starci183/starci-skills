@@ -7,6 +7,9 @@ import { ReserveOrderCompensation } from "./compensations/reserve-order.compensa
 import { PlaceOrderSagaService } from "./place-order.saga.service"
 import { ReserveOrderStep } from "./steps/reserve-order.saga-step"
 
+/** Asymmetric matchers read as `unknown`: jest types them `any`, which may not flow into a property or a typed argument. */
+const anyOf = (type: unknown): unknown => expect.any(type)
+
 const build = async () => {
     const sagas = mock<SagaService>()
     const compensation = mock<ReserveOrderCompensation>()
@@ -33,7 +36,7 @@ describe("PlaceOrderSagaService", () => {
                 saga: PLACE_ORDER_SAGA,
                 correlationId: "o-1",
                 eventId: "e-1",
-                step: expect.any(ReserveOrderStep),
+                step: anyOf(ReserveOrderStep),
                 compensation,
             })
         })

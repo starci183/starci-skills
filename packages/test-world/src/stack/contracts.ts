@@ -33,11 +33,11 @@ export interface StackImageRequest {
 /** One Postgres connection as the stack provisions it: a database of its own, or a schema (with its own login) of a shared one. */
 export interface PostgresConnectionRequest {
     readonly name: string
-    readonly extensions?: ReadonlyArray<string>
+    readonly extensions?: ReadonlyArray<string> | undefined
     /** The logical database (default: `name`); connections naming one share it. */
-    readonly database?: string
+    readonly database?: string | undefined
     /** The schema of a schema-per-context connection. */
-    readonly schema?: string
+    readonly schema?: string | undefined
 }
 
 /** What one run asks of the stack. */
@@ -51,7 +51,7 @@ export interface AttachRequest {
     /** Postgres: the connections (logical names) to give a database each; `extensions` are created in each database. */
     readonly postgresql?: { readonly connections: ReadonlyArray<PostgresConnectionRequest> }
     /** Keycloak: the realm import file (absolute) and the public client id for the password grant (default: detected in the file). */
-    readonly keycloak?: { readonly realmFile: string; readonly clientId?: string }
+    readonly keycloak?: { readonly realmFile: string; readonly clientId?: string | undefined }
     /** MinIO: logical bucket names to create (each stored as `<namespace.kebab>-<name>`). */
     readonly minio?: { readonly buckets: ReadonlyArray<string> }
     /** Kafka: logical topic names to create (each stored as `<namespace.kebab>.<name>`). */

@@ -13,6 +13,10 @@ import { readEnvelope } from "./event-envelope.policy"
 import { EventRunnerService } from "./event-runner.service"
 import type { EventSubscription, EventTransport, InboundMessage } from "./event-transport.port"
 
+/** Asymmetric matchers read as `unknown`: jest types them `any`, which may not flow into a property or a typed argument. */
+const anyOf = (type: unknown): unknown => expect.any(type)
+const objectLike = (shape: Record<string, unknown>): unknown => expect.objectContaining(shape)
+
 const AT = "2026-02-03T04:05:06.000Z"
 const NOW = new Date(AT).getTime()
 
@@ -169,7 +173,7 @@ describe("EventRunnerService", () => {
             await runner.receive(message({ value: JSON.stringify([1]) }))
 
             expect(handle).not.toHaveBeenCalled()
-            expect(logger.error).toHaveBeenCalledWith(EventBusLogEvent.MessageSkipped, expect.any(SyntaxError), {
+            expect(logger.error).toHaveBeenCalledWith(EventBusLogEvent.MessageSkipped, anyOf(SyntaxError), {
                 topic: "run-1.events.probe",
             })
             expect(logger.warn).toHaveBeenCalledTimes(1)
@@ -269,7 +273,7 @@ describe("EventRunnerService", () => {
             )
 
             expect(transport.wait).toHaveBeenCalledWith(800)
-            expect(handle).toHaveBeenCalledWith(expect.objectContaining({ attempt: 2 }))
+            expect(handle).toHaveBeenCalledWith(objectLike({ attempt: 2 }))
         })
 
         it("does not wait for a retry message whose backoff has passed", async () => {

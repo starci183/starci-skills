@@ -73,10 +73,14 @@ export function throughput(rows: AttemptRow[], since: number, now: number, maxBu
   const first = Math.floor((from + zoneShift) / step) * step - zoneShift;
   const buckets: Bucket[] = [];
   for (let start = first; start <= now && buckets.length < 200; start += step) buckets.push({ start, end: start + step, dispatched: 0, settled: 0 });
-  const at = (t: number) => buckets[Math.floor((t - first) / step)];
+  const bump = (time: number | null | undefined, key: 'dispatched' | 'settled') => {
+    if (time == null || time < since) return;
+    const bucket = buckets[Math.floor((time - first) / step)];
+    if (bucket) bucket[key] += 1;
+  };
   for (const row of rows) {
-    if (row.dispatchedAt != null && row.dispatchedAt >= since) { const b = at(row.dispatchedAt); if (b) b.dispatched += 1; }
-    if (isVerdictSettled(row) && row.settledAt != null && row.settledAt >= since) { const b = at(row.settledAt); if (b) b.settled += 1; }
+    bump(row.dispatchedAt, 'dispatched');
+    if (isVerdictSettled(row)) bump(row.settledAt, 'settled');
   }
   return { step, buckets };
 }

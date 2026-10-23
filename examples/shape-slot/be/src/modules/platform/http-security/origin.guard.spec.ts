@@ -55,8 +55,6 @@ describe("OriginGuard", () => {
     it("refuses a state-changing request from an origin outside the allowlist", async () => {
         const { guard, context } = await build("DELETE", { origin: "https://foreign.test" })
 
-        expect(() => guard.canActivate(context)).toThrow(
-            expect.objectContaining({ code: HttpSecurityErrorCode.OriginRejected }),
-        )
+        expect(() => guard.canActivate(context)).toThrow(HttpSecurityErrorCode.OriginRejected)
     })
 })

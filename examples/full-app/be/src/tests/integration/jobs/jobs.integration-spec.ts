@@ -10,8 +10,14 @@ import { ProbeJobBehavior } from "../../world/probe-job.module"
 import { JOBS_CAPABILITY_MODULES } from "../../world/test-capabilities.options"
 import { useTestWorld } from "../../world/use-test-world"
 
+/** Asymmetric matchers read as `unknown`: jest types them `any`, which may not flow into a property or a typed argument. */
+const objectLike = (shape: Record<string, unknown>): unknown => expect.objectContaining(shape)
+
 /** The ids of the rows and keys this spec arranges: deterministic, so a failing run reproduces. */
 const ids = fakeIds()
+
+const expectFencedOut = (write: () => Promise<void>): Promise<void> =>
+    expect(write()).rejects.toMatchObject({ code: FENCED_OUT })
 
 /** A claim lease short enough that a spec waits it out: one 250 ms poll is enough. */
 const LEASE_MS = 150
@@ -41,8 +47,6 @@ describe("fenced jobs (integration)", () => {
             (observed) => observed >= 2,
         )
     }
-    const expectFencedOut = (write: () => Promise<void>): Promise<void> =>
-        expect(write()).rejects.toMatchObject({ code: FENCED_OUT })
 
     it("fenced-job/claim-bumps-token: a first claim holds token 1, a live claim blocks a second worker, an expired one is taken with a bigger token", () =>
         bumpsClaimToken(world, claim, leaseExpires))
@@ -71,7 +75,7 @@ async function bumpsClaimToken(
     expect(second?.fencingToken).toBe(2)
     expect(second?.jobId).toBe(first?.jobId)
     expect(await readRows(world.db.order, JOB_OF_KEY, [key])).toEqual([
-        expect.objectContaining({ status: "running", fencing_token: "2" }),
+        objectLike({ status: "running", fencing_token: "2" }),
     ])
 }
 
@@ -98,13 +102,13 @@ async function fencesZombie(
     )
     await expectFencedOut(() => claims().complete({ jobId: zombie.jobId, expectedFencingToken: zombie.fencingToken }))
     expect(await readRows(world.db.order, JOB_OF_KEY, [key])).toEqual([
-        expect.objectContaining({ status: "running", current_step: null }),
+        objectLike({ status: "running", current_step: null }),
     ])
 
     await claims().advance({ jobId: owner.jobId, expectedFencingToken: owner.fencingToken, step: "charge" })
     await claims().complete({ jobId: owner.jobId, expectedFencingToken: owner.fencingToken })
     expect(await readRows(world.db.order, JOB_OF_KEY, [key])).toEqual([
-        expect.objectContaining({ status: "done", current_step: "charge" }),
+        objectLike({ status: "done", current_step: "charge" }),
     ])
     expect(await claim(key)).toBeNull()
 }

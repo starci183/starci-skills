@@ -1,43 +1,10 @@
 /*
- * The kit is canon-governed like any StarCi frontend source: this config attaches
- * @starci/eslint-canon-fe with the "single-app" layout, whose `src/**` glob is exactly
- * the tree this package ships. Peer modules (react, next-intl, @starci/grammar) are not
- * resolved during lint - the canon rules are AST rules and never ask the resolver.
+ * The kit is canon-governed like any StarCi frontend source: the plain-source config of
+ * @starci/eslint-canon-fe lints `src/` with types, the React Hooks rules, the Sonar way
+ * rules and every canon rule that needs no HFS slot view, all at error. The config states
+ * no rule, no ignore and no override. The canon is imported from this repository's own
+ * source, and `npm run link-peers` links the lint dependencies it resolves.
  */
-import { starciFeConfig } from "@starci/eslint-canon-fe"
+import { starciPlainSourceConfig } from "../eslint/fe/index.mjs"
 
-import js from "@eslint/js"
-import globals from "globals"
-import tsParser from "@typescript-eslint/parser"
-import { defineConfig } from "eslint/config"
-
-const SRC_GLOBS = ["src/**/*.{ts,tsx}"]
-
-export default defineConfig([
-    {
-        ignores: ["**/node_modules/**", "**/dist/**"],
-    },
-    {
-        files: SRC_GLOBS,
-        plugins: { js },
-        extends: ["js/recommended"],
-        languageOptions: {
-            globals: globals.browser,
-            parser: tsParser,
-            parserOptions: { ecmaFeatures: { jsx: true } },
-        },
-    },
-    {
-        files: SRC_GLOBS,
-        rules: {
-            indent: ["error", 4],
-            quotes: ["error", "double"],
-            semi: ["error", "never"],
-            "linebreak-style": "off",
-            // The JS rule cannot see TS function-type parameters and flags every documented
-            // signature; the TS-aware replacement is not part of the canon plugin set.
-            "no-unused-vars": "off",
-        },
-    },
-    ...starciFeConfig({ layout: "single-app" }),
-])
+export default starciPlainSourceConfig({ root: import.meta.dirname })

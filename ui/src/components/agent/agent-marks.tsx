@@ -12,7 +12,7 @@ export const concept: Concept = 'C6';
 // claude.svg, openai.svg — simple-icons 13.21.0 (CC0-1.0, jsDelivr), downloaded 2026-09-29;
 // devin.png — the 48 px image inside https://devin.ai/favicon.ico, downloaded 2026-09-29.
 // Only the vetted <path d> data is rendered; the SVG text is never injected as HTML.
-const pathsOf = (svg: string) => [...svg.matchAll(/\sd="([^"]+)"/g)].map(match => match[1]);
+const pathsOf = (svg: string) => [...svg.matchAll(/\sd="([^"]+)"/g)].flatMap(match => (match[1] === undefined ? [] : [match[1]]));
 const marks = { claude: pathsOf(claudeSvg), codex: pathsOf(openaiSvg) } as const;
 
 function PathMark({ paths, fill }: { readonly paths: readonly string[]; readonly fill: string }) {
@@ -25,9 +25,10 @@ export function AgentMark({ family, initial = '?' }: { readonly family: AgentFam
     case 'claude': return <PathMark paths={marks.claude} fill="var(--brand-claude)" />;
     case 'codex': return <PathMark paths={marks.codex} fill="var(--foreground)" />;
     case 'devin': return <img src={devinPng} alt="" aria-hidden="true" className="size-full rounded-full object-cover" draggable={false} />;
-    default:
-      return <svg viewBox="0 0 24 24" aria-hidden="true" className="size-full"><text x="12" y="16.5" textAnchor="middle" fontSize="13" fontWeight="700" style={{ fill: 'currentColor' }} fontFamily="var(--font-mono, monospace)">{initial}</text></svg>;
+    case 'unknown':
+      break;
   }
+  return <svg viewBox="0 0 24 24" aria-hidden="true" className="size-full"><text x="12" y="16.5" textAnchor="middle" fontSize="13" fontWeight="700" style={{ fill: 'currentColor' }} fontFamily="var(--font-mono, monospace)">{initial}</text></svg>;
 }
 
 export const familyTint: Record<AgentFamily, { name: string; tone: string }> = {

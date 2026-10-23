@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState, type Ref } from 'react';
 import { ArrowUp, Filter, Radio, RefreshCw, SlidersHorizontal, X } from 'lucide-react';
 import { ToggleButton } from '@heroui/react';
 import { FeedbackState, PageSkeleton, SourceWarning } from '../../components/feedback-state';
@@ -11,7 +11,7 @@ import { NativeSelect, NativeSelectOption } from '../../components/ui/native-sel
 import { Advanced } from '../../components/motion';
 import { LogView } from '../../components/log-view';
 import { kindFamilies } from '../../components/logs/kinds';
-import { useApiQuery, usePagedApiQuery, refreshQuery } from '../../api/query';
+import { useApiQuery, usePagedApiQuery, refreshQuery, type PagedQuerySnapshot } from '../../api/query';
 import { formatAbsolute } from '../../i18n/vi';
 import { t } from '../../i18n/t';
 import { useRoute } from '../../router';
@@ -22,11 +22,11 @@ export const concept: Concept = 'C17';
 
 const inputClass = 'w-full min-w-0';
 const filterFields = ['scope', 'source', 'id', 'project', 'wf', 'job', 'actor', 'controller', 'kind', 'level', 'minLevel', 'q', 'since', 'until'] as const;
+const pad = (number: number) => String(number).padStart(2, '0');
 const asTime = (value: string | null) => {
   if (!value) return '';
   const date = new Date(Number(value));
   if (Number.isNaN(date.getTime())) return '';
-  const pad = (number: number) => String(number).padStart(2, '0');
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 };
 const fromTime = (value: string) => value ? String(new Date(value).getTime()) : '';
@@ -48,12 +48,18 @@ function FilterFields({ filters, onChange, contract }: Readonly<{ filters: URLSe
 }
 
 const chipClass = 'max-w-full min-w-0';
+const chip = (active: boolean) => ({ className: `${chipClass}${active ? ' [&_[data-slot=select-trigger]]:bg-default' : ''}`, size: 'sm' as const, 'data-active': active });
 const ranges = [['900000', 'Last 15 minutes'], ['3600000', 'Last hour'], ['86400000', 'Last 24 hours'], ['604800000', 'Last 7 days']] as const;
+
+function changeRange(onChange: (name: string, value: string) => void, value: string): void {
+  if (value === 'custom') return;
+  onChange('until', '');
+  onChange('since', value ? String(Date.now() - Number(value)) : '');
+}
 
 function FilterBar({ filters, onChange, contract, onMore, activeCount, workflows }: Readonly<{ filters: URLSearchParams; onChange: (name: string, value: string) => void; contract: ContractInfo | null; workflows: Pick<WorkflowRow, 'id' | 'name' | 'project'>[]; onMore: () => void; activeCount: number }>) {
   const level = filters.get('minLevel') === 'warn' ? 'warn+' : filters.get('level') ?? 'all';
   const customRange = filters.has('since') || filters.has('until');
-  const chip = (active: boolean) => ({ className: `${chipClass}${active ? ' [&_[data-slot=select-trigger]]:bg-default' : ''}`, size: 'sm' as const, 'data-active': active });
   const advancedActive = filters.has('wf') || filters.has('actor') || filters.has('kind') || customRange || filters.has('since') || filters.has('until');
   const workflowValue = filters.has('wf') ? JSON.stringify([filters.get('project') ?? '', filters.get('wf')]) : '';
   return <fieldset className="min-w-0 flex flex-col gap-3" aria-label={t('Log filters')}>
@@ -69,11 +75,164 @@ function FilterBar({ filters, onChange, contract, onMore, activeCount, workflows
         <NativeSelect aria-label="Workflow" {...chip(filters.has('wf'))} value={workflowValue} onValueChange={value => onChange('workflowChoice', value)}><NativeSelectOption id="">{t('Workflow: all')}</NativeSelectOption>{workflowValue && !workflows.some((item) => JSON.stringify([item.project, item.id]) === workflowValue) && <NativeSelectOption id={workflowValue}>{filters.get('wf')}</NativeSelectOption>}{workflows.map((item) => <NativeSelectOption key={`${item.project}:${item.id}`} id={JSON.stringify([item.project, item.id])} textValue={`${item.name} · ${item.project}`}>{item.name} · {item.project}</NativeSelectOption>)}</NativeSelect>
         <NativeSelect aria-label="Actor" {...chip(filters.has('actor'))} value={filters.get('actor') ?? ''} onValueChange={value => onChange('actor', value)}><NativeSelectOption id="">{t('Actor: all')}</NativeSelectOption>{contract?.vocab.logActors.map((actor) => <NativeSelectOption key={actor} id={actor}>{t('Actor: {actor}', { actor })}</NativeSelectOption>)}</NativeSelect>
         <NativeSelect aria-label={t('Kind')} {...chip(filters.has('kind'))} value={filters.get('kind') ?? ''} onValueChange={value => onChange('kind', value)}>{kindFamilies.map((item) => <NativeSelectOption key={item.value} id={item.value}>{item.value ? t('Kind: {kind}', { kind: item.label }) : t('Kind: all')}</NativeSelectOption>)}{filters.get('kind') && !kindFamilies.some((item) => item.value === filters.get('kind')) && <NativeSelectOption id={filters.get('kind') ?? ''}>{t('Kind: {kind}', { kind: filters.get('kind') ?? '' })}</NativeSelectOption>}</NativeSelect>
-        <NativeSelect aria-label={t('Time range')} {...chip(customRange)} value={customRange ? 'custom' : ''} onValueChange={value => { if (value === 'custom') return; onChange('until', ''); onChange('since', value ? String(Date.now() - Number(value)) : ''); }}><NativeSelectOption id="">{t('All time')}</NativeSelectOption>{ranges.map(([value, label]) => <NativeSelectOption key={value} id={value}>{t(label)}</NativeSelectOption>)}{customRange && <NativeSelectOption id="custom">{t('Custom range')}</NativeSelectOption>}</NativeSelect>
+        <NativeSelect aria-label={t('Time range')} {...chip(customRange)} value={customRange ? 'custom' : ''} onValueChange={value => changeRange(onChange, value)}><NativeSelectOption id="">{t('All time')}</NativeSelectOption>{ranges.map(([value, label]) => <NativeSelectOption key={value} id={value}>{t(label)}</NativeSelectOption>)}{customRange && <NativeSelectOption id="custom">{t('Custom range')}</NativeSelectOption>}</NativeSelect>
     <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={onMore}><SlidersHorizontal size={14} /> {t('More filters')}</Button>
       </div>
     </Advanced>
   </fieldset>;
+}
+
+type StreamStatus = 'connecting' | 'live' | 'reconnecting';
+type Live = { key: string; streamed: LogRow[]; pending: LogRow[]; fresh: ReadonlySet<string> };
+const emptyLive = (key: string): Live => ({ key, streamed: [], pending: [], fresh: new Set() });
+const liveFor = (prev: Live, key: string): Live => prev.key === key ? prev : emptyLive(key);
+const STREAM_LIMIT = 200;
+
+function parseStreamRow(data: string): LogRow | null {
+  try {
+    const row = JSON.parse(data) as LogRow;
+    return row.key && typeof row.at === 'number' ? row : null;
+  } catch { return null; /* A malformed frame cannot replace a valid row. */ }
+}
+
+/** Live tail: rows streamed after the first page, held back while the reader has scrolled away from the top. */
+function useLogStream(filterKey: string, following: boolean, streamUrl: string, apiUrl: string, base: LogRow[] | null) {
+  const [liveState, setLive] = useState<Live>(() => emptyLive(filterKey));
+  const [status, setStatus] = useState<StreamStatus>('connecting');
+  const pausedRef = useRef(false);
+  const oldestRef = useRef<number | null>(null);
+  const knownRef = useRef<Set<string>>(new Set());
+  const live = useMemo(() => liveFor(liveState, filterKey), [liveState, filterKey]);
+  const rows = useMemo(() => unique([...(base ?? []), ...live.streamed]), [base, live.streamed]);
+
+  useEffect(() => {
+    oldestRef.current = base?.length ? Math.min(...base.map((row) => row.at)) : null;
+    knownRef.current = new Set(rows.map((row) => row.key));
+  }, [base, rows]);
+  useEffect(() => { pausedRef.current = false; }, [filterKey]);
+  useEffect(() => {
+    if (!following) return;
+    let active = true;
+    const stream = new EventSource(streamUrl);
+    const clearFresh = (key: string) => {
+      if (!active) return;
+      setLive((prev) => {
+        const current = liveFor(prev, filterKey);
+        const next = new Set(current.fresh);
+        next.delete(key);
+        return { ...current, fresh: next };
+      });
+    };
+    const accept = (row: LogRow) => {
+      if (knownRef.current.has(row.key) || (oldestRef.current != null && row.at < oldestRef.current)) return;
+      knownRef.current.add(row.key);
+      if (pausedRef.current) {
+        setLive((prev) => { const current = liveFor(prev, filterKey); return { ...current, pending: unique([row, ...current.pending]).slice(0, STREAM_LIMIT) }; });
+        return;
+      }
+      setLive((prev) => {
+        const current = liveFor(prev, filterKey);
+        return { ...current, streamed: unique([row, ...current.streamed]).slice(0, STREAM_LIMIT), fresh: new Set(current.fresh).add(row.key) };
+      });
+      setTimeout(() => clearFresh(row.key), 2000);
+    };
+    stream.onopen = () => { if (active) setStatus('live'); };
+    stream.onerror = () => { if (active) setStatus('reconnecting'); };
+    stream.addEventListener('log', (event) => {
+      const row = active && event instanceof MessageEvent && typeof event.data === 'string' ? parseStreamRow(event.data) : null;
+      if (row) accept(row);
+    });
+    stream.addEventListener('invalidate', () => { if (active) refreshQuery(apiUrl); });
+    return () => { active = false; stream.close(); setStatus('connecting'); };
+  }, [following, streamUrl, apiUrl, filterKey]);
+
+  const flushPending = () => {
+    if (!live.pending.length) return;
+    setLive((prev) => {
+      const current = liveFor(prev, filterKey);
+      if (!current.pending.length) return current;
+      return { key: filterKey, streamed: unique([...current.pending, ...current.streamed]).slice(0, STREAM_LIMIT), pending: [], fresh: new Set(current.pending.map((row) => row.key)) };
+    });
+    setTimeout(() => setLive((prev) => ({ ...prev, fresh: new Set() })), 2000);
+  };
+  const onScroll = (top: number) => {
+    pausedRef.current = top > 40;
+    if (!pausedRef.current) flushPending();
+  };
+  const resume = () => { pausedRef.current = false; flushPending(); };
+  return { rows, pending: live.pending, fresh: live.fresh, status, onScroll, resume };
+}
+
+function applyWorkflowChoice(next: URLSearchParams, value: string): boolean {
+  if (!value) { next.delete('wf'); return true; }
+  try {
+    const parsed: unknown = JSON.parse(value);
+    if (!Array.isArray(parsed)) return false;
+    const project: unknown = parsed[0], wf: unknown = parsed[1];
+    if (typeof project !== 'string' || typeof wf !== 'string') return false;
+    next.set('project', project);
+    next.set('wf', wf);
+    return true;
+  } catch { return false; }
+}
+
+function applyLevelChoice(next: URLSearchParams, value: string): void {
+  next.delete('level');
+  next.delete('minLevel');
+  if (value === 'warn+') next.set('minLevel', 'warn');
+  else if (value !== 'all') next.set('level', value);
+}
+
+/** Updates the filters held in the URL hash; unparsable workflow choices are ignored. */
+function changeFilter(name: string, value: string): void {
+  const next = new URLSearchParams(window.location.hash.split('?')[1] ?? '');
+  if (name === 'clear') for (const field of filterFields) next.delete(field);
+  else if (name === 'workflowChoice') { if (!applyWorkflowChoice(next, value)) return; }
+  else if (name === 'levelChoice') applyLevelChoice(next, value);
+  else if (value) next.set(name, value);
+  else next.delete(name);
+  const search = next.size ? `?${next}` : '';
+  window.location.hash = `#/logs${search}`;
+}
+
+function followLabel(searching: boolean, exactRecord: boolean, following: boolean, status: StreamStatus): string {
+  if (searching) return `${t('Search results')} · ${t('Polling')}`;
+  if (exactRecord) return t('Polling');
+  if (!following) return t('Follow live');
+  return status === 'live' ? t('Following live') : t('Reconnecting');
+}
+
+function followHint(searching: boolean, exactRecord: boolean): string | undefined {
+  if (searching) return t('Follow does not support full-text search; clear the keyword to enable.');
+  return exactRecord ? t('Exact record lookup uses polling.') : undefined;
+}
+
+type FollowState = { searching: boolean; exactRecord: boolean; following: boolean; status: StreamStatus };
+
+function LogsHeader({ activeCount, follow, onFollow, onOpenFilters }: Readonly<{ activeCount: number; follow: FollowState; onFollow: (value: boolean) => void; onOpenFilters: () => void }>) {
+  const { searching, exactRecord, following, status } = follow;
+  return <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs text-muted-foreground">{t('StarCi / observation')}</p><h1 className="mt-1 text-2xl font-semibold tracking-tight">{t('Logs')}</h1><p className="mt-1 text-sm text-muted-foreground">{t('The event stream from the host and project ledgers; filters live in the URL.')}</p></div>
+    <div className="flex gap-2"><Button variant="outline" size="sm" className="md:hidden" onClick={onOpenFilters}><Filter size={15} /> {t('Filters')}{activeCount ? ` (${activeCount})` : ''}</Button><span title={followHint(searching, exactRecord)}><ToggleButton size="sm" isSelected={following} isDisabled={searching || exactRecord} onChange={onFollow}><Radio size={15} /> {followLabel(searching, exactRecord, following, status)}</ToggleButton></span></div></div>;
+}
+
+function LogsSummary({ logs, rowCount, observed }: Readonly<{ logs: PagedQuerySnapshot<LogRow>; rowCount: number; observed: boolean }>) {
+  const sources = [...new Set(logs.meta?.sources.map(source => source.db) ?? [])];
+  return <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground"><div className="flex flex-wrap items-center gap-2"><span>{t('{n} rows loaded', { n: observed ? rowCount : '—' })}</span><span>{sources.length ? sources.map((source) => source === 'machine' ? t('machine') : source).join(' · ') : t('Unknown')}</span></div><div className="flex min-w-0 items-center gap-2"><span>{logs.observedAt !== null ? t('Last successful API read: {at}', { at: formatAbsolute(logs.observedAt) }) : t('No successful API read yet')}</span><Button variant="ghost" size="icon" aria-label={t('Refresh')} onClick={logs.refresh}><RefreshCw size={15} /></Button></div></div>;
+}
+
+type LogListProps = Readonly<{ logs: PagedQuerySnapshot<LogRow>; rows: LogRow[]; observed: boolean; fresh: ReadonlySet<string>; regionRef: Ref<HTMLDivElement>; onRegionScroll: (top: number) => void }>;
+
+function LogList({ logs, rows, observed, fresh, regionRef, onRegionScroll }: LogListProps) {
+  const unreadable = partialSources(logs).length > 0;
+  const showRows = observed && (rows.length > 0 || !logs.error && !unreadable);
+  const refreshFirst = logs.loadMoreErrorCode === 'BAD_CURSOR';
+  return <>
+    {logs.error && <FeedbackState error onRetry={logs.refresh}>{logs.data ? t('The source is failing; keeping the last rows read. ') : t('Could not read the logs. ')}{logs.error}</FeedbackState>}
+    {unreadable ? <SourceWarning>{t('Source out of sync: {list}', { list: partialSources(logs).join(', ') })}</SourceWarning> : null}
+    {!observed && !logs.error ? <PageSkeleton label={t('Reading the logs…')} /> : showRows ? <LogView rows={rows} freshKeys={fresh} regionRef={regionRef} onRegionScroll={onRegionScroll} /> : null}
+    {logs.loadMoreError && <FeedbackState error onRetry={refreshFirst ? logs.refresh : logs.loadMore}>{logs.loadMoreError}{refreshFirst ? ` · ${t('Refresh first page')}` : ''}</FeedbackState>}
+    {logs.next && <Button variant="outline" className="w-full" disabled={logs.loadingMore} onClick={logs.loadMore}>{logs.loadingMore ? t('Loading…') : t('Load more')}</Button>}
+  </>;
 }
 
 export default function LogsPage() {
@@ -82,35 +241,12 @@ export default function LogsPage() {
   const filters = useMemo(() => new URLSearchParams(filterKey), [filterKey]);
   const [filterOpen, setFilterOpen] = useState(false);
   const [follow, setFollow] = useState(true);
-  const [pending, setPending] = useState<LogRow[]>([]);
-  const [fresh, setFresh] = useState<ReadonlySet<string>>(new Set());
-  const pausedRef = useRef(false);
   const regionRef = useRef<HTMLDivElement | null>(null);
-  const oldestRef = useRef<number | null>(null);
-  const knownRef = useRef<Set<string>>(new Set());
   const workflowList = useApiQuery<WorkflowRow[]>('/api/workflows?phase=all&limit=100', { topics: ['workers'], intervalMs: 60_000 });
-  const [streamStatus, setStreamStatus] = useState<'connecting' | 'live' | 'reconnecting'>('connecting');
-  const [streamed, setStreamed] = useState<LogRow[]>([]);
-  const [streamEpoch, setStreamEpoch] = useState(filterKey);
-  const currentFilter = useRef(filterKey);
-  currentFilter.current = filterKey;
   const searching = filters.has('q'), exactRecord = filters.has('id');
   const following = follow && !searching && !exactRecord;
   const contract = useApiQuery<ContractInfo>('/api/contract', { topics: ['system'], intervalMs: 60_000 });
 
-  const change = (name: string, value: string) => {
-    const next = new URLSearchParams(window.location.hash.split('?')[1] ?? '');
-    if (name === 'clear') { for (const field of filterFields) next.delete(field); }
-    else if (name === 'workflowChoice') {
-      if (!value) next.delete('wf');
-      else { try { const [project, wf] = JSON.parse(value) as [string, string]; next.set('project', project); next.set('wf', wf); } catch { return; } }
-    } else if (name === 'levelChoice') {
-      next.delete('level'); next.delete('minLevel');
-      if (value === 'warn+') next.set('minLevel', 'warn');
-      else if (value !== 'all') next.set('level', value);
-    } else if (value) next.set(name, value); else next.delete(name);
-    window.location.hash = `#/logs${next.size ? `?${next}` : ''}`;
-  };
   const requestParams = useMemo(() => {
     const params = new URLSearchParams();
     for (const field of filterFields) {
@@ -128,66 +264,19 @@ export default function LogsPage() {
   }, [requestParams]);
   const streamUrl = `/api/logs/stream?${streamParams}`;
   const logs = usePagedApiQuery<LogRow>(apiUrl, { topics: ['logs'], intervalMs: 30_000, getKey: row => row.key });
+  const stream = useLogStream(filterKey, following, streamUrl, apiUrl, logs.data);
 
-  useEffect(() => { setStreamed([]); setPending([]); setFresh(new Set()); setStreamEpoch(filterKey); pausedRef.current = false; }, [filterKey]);
-  useEffect(() => {
-    if (!following) { setStreamStatus('connecting'); return; }
-    let active = true;
-    const isCurrent = () => active && currentFilter.current === filterKey;
-    const stream = new EventSource(streamUrl);
-    setStreamStatus('connecting');
-    stream.onopen = () => { if (isCurrent()) setStreamStatus('live'); };
-    stream.onerror = () => { if (isCurrent()) setStreamStatus('reconnecting'); };
-    const onLog = (event: MessageEvent<string>) => {
-      if (!isCurrent()) return;
-      try {
-        const row = JSON.parse(event.data) as LogRow;
-        if (!row.key || typeof row.at !== 'number') return;
-        if (knownRef.current.has(row.key) || (oldestRef.current != null && row.at < oldestRef.current)) return;
-        knownRef.current.add(row.key);
-        if (pausedRef.current) { setPending((current) => unique([row, ...current]).slice(0, 200)); return; }
-        setStreamed((current) => unique([row, ...current]).slice(0, 200));
-        setFresh((current) => new Set(current).add(row.key));
-        setTimeout(() => { if (isCurrent()) setFresh((current) => { const next = new Set(current); next.delete(row.key); return next; }); }, 2000);
-      } catch { /* A malformed frame cannot replace a valid row. */ }
-    };
-    stream.addEventListener('log', onLog as EventListener);
-    stream.addEventListener('invalidate', () => { if (isCurrent()) refreshQuery(apiUrl); });
-    return () => { active = false; stream.close(); };
-  }, [following, streamUrl, apiUrl, filterKey]);
-
-  const onRegionScroll = (top: number) => { pausedRef.current = top > 40; if (!pausedRef.current) flushPending(); };
-  const flushPending = () => {
-    if (streamEpoch !== filterKey) return;
-    setPending((current) => {
-      if (!current.length) return current;
-      const keys = current.map((row) => row.key);
-      setStreamed((old) => unique([...current, ...old]).slice(0, 200));
-      setFresh(new Set(keys));
-      setTimeout(() => setFresh(new Set()), 2000);
-      return [];
-    });
-  };
-  const showPending = () => { regionRef.current?.scrollTo({ top: 0, behavior: 'smooth' }); pausedRef.current = false; flushPending(); };
-  const rows = unique([...(logs.data ?? []), ...(streamEpoch === filterKey ? streamed : [])]);
-  oldestRef.current = logs.data?.length ? Math.min(...logs.data.map((row) => row.at)) : null;
-  knownRef.current = new Set(rows.map((row) => row.key));
+  const showPending = () => { regionRef.current?.scrollTo({ top: 0, behavior: 'smooth' }); stream.resume(); };
   const activeCount = filterFields.filter((field) => filters.has(field)).length;
-  const sources = [...new Set(logs.meta?.sources.map(source => source.db) ?? [])];
-  const observed = logs.data !== null || rows.length > 0;
+  const observed = logs.data !== null || stream.rows.length > 0;
   return <ConceptBlock concept="C17" className="flex flex-col gap-6 md:gap-8">
-    <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs text-muted-foreground">{t('StarCi / observation')}</p><h1 className="mt-1 text-2xl font-semibold tracking-tight">{t('Logs')}</h1><p className="mt-1 text-sm text-muted-foreground">{t('The event stream from the host and project ledgers; filters live in the URL.')}</p></div>
-      <div className="flex gap-2"><Button variant="outline" size="sm" className="md:hidden" onClick={() => setFilterOpen(true)}><Filter size={15} /> {t('Filters')}{activeCount ? ` (${activeCount})` : ''}</Button><span title={searching ? t('Follow does not support full-text search; clear the keyword to enable.') : exactRecord ? t('Exact record lookup uses polling.') : undefined}><ToggleButton size="sm" isSelected={following} isDisabled={searching || exactRecord} onChange={setFollow}><Radio size={15} /> {searching ? `${t('Search results')} · ${t('Polling')}` : exactRecord ? t('Polling') : following ? streamStatus === 'live' ? t('Following live') : t('Reconnecting') : t('Follow live')}</ToggleButton></span></div></div>
-    <Card size="sm" className="hidden md:block"><CardContent><FilterBar filters={filters} onChange={change} contract={contract.data} workflows={workflowList.data ?? []} activeCount={activeCount} onMore={() => setFilterOpen(true)} /></CardContent></Card>
+    <LogsHeader activeCount={activeCount} follow={{ searching, exactRecord, following, status: stream.status }} onFollow={setFollow} onOpenFilters={() => setFilterOpen(true)} />
+    <Card size="sm" className="hidden md:block"><CardContent><FilterBar filters={filters} onChange={changeFilter} contract={contract.data} workflows={workflowList.data ?? []} activeCount={activeCount} onMore={() => setFilterOpen(true)} /></CardContent></Card>
     <div className="flex min-w-0 flex-col gap-3">
-      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground"><div className="flex flex-wrap items-center gap-2"><span>{t('{n} rows loaded', { n: observed ? rows.length : '—' })}</span><span>{sources.length ? sources.map((source) => source === 'machine' ? t('machine') : source).join(' · ') : t('Unknown')}</span></div><div className="flex min-w-0 items-center gap-2"><span>{logs.observedAt !== null ? t('Last successful API read: {at}', { at: formatAbsolute(logs.observedAt) }) : t('No successful API read yet')}</span><Button variant="ghost" size="icon" aria-label={t('Refresh')} onClick={logs.refresh}><RefreshCw size={15} /></Button></div></div>
-      {streamEpoch === filterKey && pending.length > 0 && <div className="pointer-events-none sticky top-16 z-20 flex justify-center"><Button size="sm" className="pointer-events-auto rounded-full shadow-md" onClick={showPending}><ArrowUp size={14} /> {t('{n} new rows', { n: pending.length })}</Button></div>}
-      {logs.error && <FeedbackState error onRetry={logs.refresh}>{logs.data ? t('The source is failing; keeping the last rows read. ') : t('Could not read the logs. ')}{logs.error}</FeedbackState>}
-      {partialSources(logs).length ? <SourceWarning>{t('Source out of sync: {list}', { list: partialSources(logs).join(', ') })}</SourceWarning> : null}
-      {!observed && !logs.error ? <PageSkeleton label={t('Reading the logs…')} /> : observed && (rows.length > 0 || !logs.error && !partialSources(logs).length) ? <LogView rows={rows} freshKeys={fresh} regionRef={regionRef} onRegionScroll={onRegionScroll} /> : null}
-      {logs.loadMoreError && <FeedbackState error onRetry={logs.loadMoreErrorCode === 'BAD_CURSOR' ? logs.refresh : logs.loadMore}>{logs.loadMoreError}{logs.loadMoreErrorCode === 'BAD_CURSOR' ? ` · ${t('Refresh first page')}` : ''}</FeedbackState>}
-      {logs.next && <Button variant="outline" className="w-full" disabled={logs.loadingMore} onClick={logs.loadMore}>{logs.loadingMore ? t('Loading…') : t('Load more')}</Button>}
+      <LogsSummary logs={logs} rowCount={stream.rows.length} observed={observed} />
+      {stream.pending.length > 0 && <div className="pointer-events-none sticky top-16 z-20 flex justify-center"><Button size="sm" className="pointer-events-auto rounded-full shadow-md" onClick={showPending}><ArrowUp size={14} /> {t('{n} new rows', { n: stream.pending.length })}</Button></div>}
+      <LogList logs={logs} rows={stream.rows} observed={observed} fresh={stream.fresh} regionRef={regionRef} onRegionScroll={stream.onScroll} />
     </div>
-    <Drawer open={filterOpen} onOpenChange={setFilterOpen} title={t('Log filters')} description={t('The choices are saved in the URL.')}><FilterFields filters={filters} onChange={change} contract={contract.data} /><div className="mt-6 grid grid-cols-2 gap-2"><Button variant="outline" onClick={() => change('clear', '')}>{t('Clear filters')}</Button><Button onClick={() => setFilterOpen(false)}>{t('View results')}</Button></div></Drawer>
+    <Drawer open={filterOpen} onOpenChange={setFilterOpen} title={t('Log filters')} description={t('The choices are saved in the URL.')}><FilterFields filters={filters} onChange={changeFilter} contract={contract.data} /><div className="mt-6 grid grid-cols-2 gap-2"><Button variant="outline" onClick={() => changeFilter('clear', '')}>{t('Clear filters')}</Button><Button onClick={() => setFilterOpen(false)}>{t('View results')}</Button></div></Drawer>
   </ConceptBlock>;
 }

@@ -169,7 +169,7 @@ The managed `sonar-project.properties` carries `sonar.externalIssuesReportPaths`
 reaches Sonar while the job stays failed. There is no `continue-on-error`. CI runs `npm run lint -- --sonar reports/lint.sonar.json` once at the app root, before the scan. The duplicate-block threshold (`ruleParams.<side>.duplicateBlock`) has no Sonar property for TypeScript (SonarJS detects
 clones with its own token rule), so the machine enforces it (R21) and its findings are imported like every other.
 
-The gate is `knowledge/sonar-gate.yaml`, the one declaration: the new-code conditions (coverage 100, duplication, blocker and critical issues, hotspots) and an `overall` part (coverage 100, 0 open issues on the whole code,
+The gate is `knowledge/sonar-gate.yaml`, the one declaration: the new-code conditions (coverage 100, duplication, issues of every severity, hotspots) and an `overall` part (coverage 100, 0 open issues on the whole code,
 every hotspot reviewed, duplicated lines density, cognitive complexity through the S3776 rule). A SonarQube gate condition cannot filter by engine, so the condition counts every
 open issue, imported or native; that is stricter than the three imports alone and is intended. `starci app check` reports `HFS_SONAR_CONFIG` (R11) when the
 properties file is not its render or the stack declaration names another gate. R20 and R21 have their Sonar enforcers as conditions of that file.

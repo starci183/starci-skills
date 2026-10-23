@@ -50,9 +50,7 @@ describe("AuthGuard", () => {
     it("refuses every door that is neither public nor credential-marked", async () => {
         const guard = await build({})
 
-        expect(() => guard.canActivate(contextOf())).toThrow(
-            expect.objectContaining({ code: IdentityErrorCode.Unauthenticated }),
-        )
+        expect(() => guard.canActivate(contextOf())).toThrow(IdentityErrorCode.Unauthenticated)
     })
 
     it("lets a credential door through once the credential principal is set", async () => {
@@ -64,8 +62,6 @@ describe("AuthGuard", () => {
     it("refuses a credential door without a credential principal", async () => {
         const guard = await build({ credential: { kind: "api-key" } })
 
-        expect(() => guard.canActivate(contextOf())).toThrow(
-            expect.objectContaining({ code: IdentityErrorCode.Unauthenticated }),
-        )
+        expect(() => guard.canActivate(contextOf())).toThrow(IdentityErrorCode.Unauthenticated)
     })
 })

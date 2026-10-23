@@ -33,11 +33,11 @@ export interface SubscribeSpec {
     /** `ws://` or `wss://` URL of the GraphQL path. */
     readonly url: string
     readonly query: string
-    readonly variables?: Readonly<Record<string, unknown>>
+    readonly variables?: Readonly<Record<string, unknown>> | undefined
     /** The session the subscription rides on, sent as `connectionParams.authorization`. */
-    readonly bearerToken?: string
+    readonly bearerToken?: string | undefined
     /** How long the connection may take to be acknowledged (default 20000). */
-    readonly timeoutMs?: number
+    readonly timeoutMs?: number | undefined
     /** The label failures name (the operation key or the document). */
     readonly label: string
 }

@@ -108,6 +108,8 @@ function AttemptDetailPage({ project, attemptId, routeStep }: Readonly<{ project
   const terminal = data.terminal;
   const where = data.where;
   const n = (id: string) => nonce[id] ?? 0;
+  const filesSize = data.files.length ? ` · ${formatBytes(totalBytes)}` : '';
+  const filesSummary = `${t('{n} files', { n: data.files.length })}${filesSize}`;
 
   return <div className="mx-auto flex w-full max-w-7xl min-w-0 flex-col gap-6 pb-8">
     {attempt.error ? <FeedbackState error onRetry={() => refreshQuery(baseOf(project, attemptId))}>{t('Refresh failed; showing the last recorded snapshot.')} {attempt.observedAt != null ? t('Last successful API read at {at}', { at: formatAbsolute(attempt.observedAt) }) : null} · {attempt.error}</FeedbackState> : null}
@@ -130,7 +132,7 @@ function AttemptDetailPage({ project, attemptId, routeStep }: Readonly<{ project
         <AdvancedSection id="attempt-input" title={t('Inputs & context')} summary={t('what the kernel hands over, what the op must read')} concept="C8" nonce={n('attempt-input')}><AttemptInputContext attempt={data} info={info.info} /></AdvancedSection>
         <AdvancedSection id="attempt-step-checks" title={t('Verification')} summary={checks.total ? t('{checks} check identities · {runs} recorded runs · runtime confirmed {done}/{total}', { checks: checks.total, runs: checks.runs, done: checks.passed, total: checks.runtimeTotal }) : t('no checks yet')} concept="C9" nonce={n('attempt-step-checks')}><CheckList attempt={data} onOpenFile={openFile} /></AdvancedSection>
         <AdvancedSection id="attempt-where" title={t('Cost & where it ran')} summary={costSummary(data)} concept="C6" nonce={n('attempt-where')}><AttemptWhereCard attempt={data} /></AdvancedSection>
-        <AdvancedSection id="attempt-evidence" title={t('Raw files')} summary={`${t('{n} files', { n: data.files.length })}${data.files.length ? ` · ${formatBytes(totalBytes)}` : ''}`} concept="C8" nonce={n('attempt-evidence')}><EvidenceBrowser files={data.files} selected={fileId} onSelect={selectFile} /></AdvancedSection>
+        <AdvancedSection id="attempt-evidence" title={t('Raw files')} summary={filesSummary} concept="C8" nonce={n('attempt-evidence')}><EvidenceBrowser files={data.files} selected={fileId} onSelect={selectFile} /></AdvancedSection>
         <AdvancedSection id="attempt-step-run" title="Transcript" summary={terminal?.transcript ? `${formatBytes(terminal.transcript.bytes)}${terminal.live ? t(' · open') : ''}` : t('No transcript yet')} concept="C7" nonce={n('attempt-step-run')}><TranscriptSection project={project} attemptId={attemptId} attempt={data} /></AdvancedSection>
         <AdvancedSection id="attempt-step-diff" title="Diff" summary={where.baseSha || where.headSha ? `${where.baseSha?.slice(0, 8) ?? '—'} → ${where.headSha?.slice(0, 8) ?? '—'}` : t('changes the op wrote to the repo')} concept="C11" nonce={n('attempt-step-diff')}><DiffSection project={project} attemptId={attemptId} attempt={data} /></AdvancedSection>
         <AdvancedSection id="attempt-step-land" title={t('Workflow integration (Land)')} summary={data.land ? data.land.result : t('No workflow land record')} concept="C11" nonce={n('attempt-step-land')}><LandSection attempt={data} /></AdvancedSection>

@@ -13,7 +13,7 @@ export interface CliDependencies {
     /** Standard error (default: `process.stderr`). */
     readonly err?: (text: string) => void
     /** The working directory, the default `--cwd` (default: `process.cwd()`). */
-    readonly cwd?: string
+    readonly cwd?: string | undefined
 }
 
 /** The parsed command line. */

@@ -5,8 +5,8 @@ const DEFAULT_TIMEOUT_MS = 20_000
 /** What binds one client: the door's base URL (reserved by the run, never a literal), an optional bearer, the default deadline. */
 export interface HttpClientSpec {
     readonly baseUrl: string
-    readonly bearerToken?: string
-    readonly timeoutMs?: number
+    readonly bearerToken?: string | undefined
+    readonly timeoutMs?: number | undefined
 }
 
 const headersOf = (response: Response): Record<string, string> => {
@@ -49,7 +49,7 @@ export const createHttpClient = (spec: HttpClientSpec): HttpCaller => {
         const response = await fetch(target, {
             method,
             headers,
-            body: payload,
+            ...(payload === undefined ? {} : { body: payload }),
             signal: AbortSignal.timeout(options.timeoutMs ?? spec.timeoutMs ?? DEFAULT_TIMEOUT_MS),
             redirect: "manual",
         })

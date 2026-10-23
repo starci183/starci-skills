@@ -1,6 +1,9 @@
 import { Test } from "@nestjs/testing"
 import { presignS3Get, signS3Request } from "./receipt-storage-signature.policy"
 
+/** Asymmetric matchers read as `unknown`: jest types them `any`, which may not flow into a property or a typed argument. */
+const textMatching = (pattern: RegExp): unknown => expect.stringMatching(pattern)
+
 const AT = new Date("2026-10-01T12:00:00.000Z")
 
 const functions = { presignS3Get, signS3Request }
@@ -28,7 +31,7 @@ describe("signS3Request", () => {
         expect(headers).toEqual({
             "x-amz-date": "20261001T120000Z",
             "x-amz-content-sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
-            authorization: expect.stringMatching(
+            authorization: textMatching(
                 /^AWS4-HMAC-SHA256 Credential=AKID\/20261001\/ap-southeast-1\/s3\/aws4_request, SignedHeaders=host;x-amz-content-sha256;x-amz-date, Signature=[0-9a-f]{64}$/,
             ),
         })

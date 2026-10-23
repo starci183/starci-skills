@@ -28,11 +28,16 @@ const RATE_TIER_KEY = "platform.http-security.rate-tier"
 /** Marks a door with a rate limit tier other than the default. */
 export const RateLimit = (tier: RateTier): ReturnType<typeof SetMetadata> => SetMetadata(RATE_TIER_KEY, tier)
 
+const RATE_TIERS: ReadonlySet<unknown> = new Set(Object.values(RateTier))
+
+const isRateTier = (value: unknown): value is RateTier => RATE_TIERS.has(value)
+
+/** What a decorator stored for the door; reflect-metadata types every read as `any`, so it is read as `unknown` and checked. */
+const metadataOf = (target: object): unknown => Reflect.getMetadata(RATE_TIER_KEY, target)
+
 const tierOf = (context: ExecutionContext): RateTier => {
-    const declared: RateTier | undefined =
-        Reflect.getMetadata(RATE_TIER_KEY, context.getHandler()) ??
-        Reflect.getMetadata(RATE_TIER_KEY, context.getClass())
-    return declared ?? RateTier.Default
+    const declared = metadataOf(context.getHandler()) ?? metadataOf(context.getClass())
+    return isRateTier(declared) ? declared : RateTier.Default
 }
 
 /**

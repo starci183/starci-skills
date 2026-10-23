@@ -135,7 +135,7 @@ export interface PayosWebhookInput {
     readonly reference: string
     readonly transactionDateTime: string
     /** The `data.code`: `00` paid, other codes report a failure. */
-    readonly dataCode?: string
+    readonly dataCode?: string | undefined
     readonly dataDesc?: string
 }
 
@@ -166,7 +166,7 @@ export const payosWebhookBody = (input: PayosWebhookInput, checksumKey: string):
 
 /** The `data` of a `GET /v2/payment-requests/{id}` answer. */
 export const payosGetData = (
-    input: PayosPaymentInput & { readonly createdAt: string; readonly reference?: string; readonly transactionDateTime?: string },
+    input: PayosPaymentInput & { readonly createdAt: string; readonly reference?: string | undefined; readonly transactionDateTime?: string | undefined },
 ): PayosGetData => {
     const paid = input.status === "PAID"
     return {

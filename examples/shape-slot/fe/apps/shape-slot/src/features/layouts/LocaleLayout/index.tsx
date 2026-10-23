@@ -2,7 +2,7 @@ import { hasLocale, NextIntlClientProvider } from "next-intl"
 import { getMessages } from "next-intl/server"
 import { notFound } from "next/navigation"
 import type { ReactNode } from "react"
-import { routing } from "@/modules/i18n"
+import { clientMessages, routing } from "@/modules/i18n"
 
 /** Route input of the locale layout owner. */
 type LocaleLayoutProps = {
@@ -17,15 +17,11 @@ type LocaleLayoutProps = {
 export const LocaleLayout = async (props: LocaleLayoutProps) => {
     const { locale } = await props.params
     if (!hasLocale(routing.locales, locale)) notFound()
-    const messages = await getMessages()
+    const messages = clientMessages(await getMessages(), ["errors", "slot", "sales"])
     return (
         <html lang={locale}>
             <body className="min-h-dvh">
-                <NextIntlClientProvider
-                    messages={{ errors: messages.errors, slot: messages.slot, sales: messages.sales }}
-                >
-                    {props.children}
-                </NextIntlClientProvider>
+                <NextIntlClientProvider messages={messages}>{props.children}</NextIntlClientProvider>
             </body>
         </html>
     )

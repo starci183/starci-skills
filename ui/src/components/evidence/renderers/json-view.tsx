@@ -10,6 +10,10 @@ import { t } from '../../../i18n/t';
 
 type Json = null | boolean | number | string | Json[] | { [k: string]: Json };
 type Parsed = { ok: true; docs: Json[]; jsonl: boolean } | { ok: false; error: string };
+type EntryKey = string | number;
+type Key = EntryKey | null;
+type Entry = [EntryKey, Json];
+type Container = Json[] | { [k: string]: Json };
 type Mode = { m: 'default' | 'all' | 'none'; n: number };
 
 const PAGE = 200;
@@ -27,8 +31,8 @@ function parseJson(text: string): Parsed {
   return { ok: false, error: first };
 }
 
-const isContainer = (v: Json): v is Json[] | { [k: string]: Json } => v !== null && typeof v === 'object';
-const keyPath = (base: string, k: string | number) => typeof k === 'number' ? `${base}[${k}]` : /^[A-Za-z_$][\w$]*$/.test(k) ? `${base}.${k}` : `${base}[${JSON.stringify(k)}]`;
+const isContainer = (v: Json): v is Container => v !== null && typeof v === 'object';
+const keyPath = (base: string, k: EntryKey) => typeof k === 'number' ? `${base}[${k}]` : /^[A-Za-z_$][\w$]*$/.test(k) ? `${base}.${k}` : `${base}[${JSON.stringify(k)}]`;
 
 function Leaf({ v }: Readonly<{ v: Json }>) {
   const [more, setMore] = useState(false);
@@ -56,24 +60,41 @@ function Actions({ value, path }: Readonly<{ value: Json; path: string }>) {
   );
 }
 
-function Node({ k, v, path, depth, mode }: Readonly<{ k: string | number | null; v: Json; path: string; depth: number; mode: Mode }>) {
-  const container = isContainer(v);
+type NodeProps = Readonly<{ k: Key; v: Json; path: string; depth: number; mode: Mode }>;
+
+function KeyLabel({ k }: Readonly<{ k: Key }>) {
+  if (k === null) return null;
+  return <span className={typeof k === 'number' ? 'text-muted-foreground' : 'font-medium text-foreground/80'}>{typeof k === 'number' ? k : `"${k}"`}<span className="text-muted-foreground">: </span></span>;
+}
+
+function LeafNode({ k, v, path }: Readonly<{ k: Key; v: Json; path: string }>) {
+  return (
+    <div className="group/row relative flex items-start gap-1 py-px pl-4">
+      <span className="min-w-0 flex-1 break-words"><KeyLabel k={k} /><Leaf v={v} /></span>
+      <Actions value={v} path={path} />
+    </div>
+  );
+}
+
+const entriesOf = (v: Container): Entry[] => (Array.isArray(v) ? v.map((x, i): [number, Json] => [i, x]) : Object.entries(v));
+
+function ContainerBody({ entries, limit, onMore, path, depth, mode, isArr }: Readonly<{ entries: Entry[]; limit: number; onMore: () => void; path: string; depth: number; mode: Mode; isArr: boolean }>) {
+  return <>
+    {entries.length === 0 ? <div className="py-px pl-4 text-muted-foreground">{isArr ? t('empty array') : t('empty object')}</div> : null}
+    {entries.slice(0, limit).map(([ck, cv]) => <Node key={ck} k={ck} v={cv} path={keyPath(path, ck)} depth={depth + 1} mode={mode} />)}
+    {entries.length > limit ? (
+      <Button type="button" variant="outline" size="xs" className="my-2 ml-4" onClick={onMore}>{t('more {n} ({remaining} left)', { n: Math.min(PAGE, entries.length - limit), remaining: entries.length - limit })}</Button>
+    ) : null}
+    <div className="py-px pl-4 text-muted-foreground">{isArr ? ']' : '}'}</div>
+  </>;
+}
+
+function ContainerNode({ k, v, path, depth, mode }: Readonly<{ k: Key; v: Container; path: string; depth: number; mode: Mode }>) {
   const [open, setOpen] = useState(() => mode.m === 'all' || (mode.m === 'default' && depth < 2));
   const [limit, setLimit] = useState(PAGE);
-  const label = k === null ? null : (
-    <span className={typeof k === 'number' ? 'text-muted-foreground' : 'font-medium text-foreground/80'}>{typeof k === 'number' ? k : `"${k}"`}<span className="text-muted-foreground">: </span></span>
-  );
-  if (!container) {
-    return (
-      <div className="group/row relative flex items-start gap-1 py-px pl-4">
-        <span className="min-w-0 flex-1 break-words">{label}<Leaf v={v} /></span>
-        <Actions value={v} path={path} />
-      </div>
-    );
-  }
   const isArr = Array.isArray(v);
-  const entries: [string | number, Json][] = isArr ? v.map((x, i) => [i, x]) : Object.entries(v);
-  const shown = entries.slice(0, limit);
+  const entries = entriesOf(v);
+  const collapsed = open ? '' : ` ${entries.length} ${isArr ? t('items') : t('keys')} ${isArr ? ']' : '}'}`;
   return (
     <Accordion hideSeparator expandedKeys={open ? [path] : []} onExpandedChange={keys => setOpen(keys.has(path))}>
       <Accordion.Item id={path}>
@@ -81,26 +102,24 @@ function Node({ k, v, path, depth, mode }: Readonly<{ k: string | number | null;
           <Accordion.Heading className="min-w-0 flex-1">
             <Accordion.Trigger className="min-h-9 justify-start gap-1 px-1 py-1 font-mono text-xs pointer-coarse:min-h-11">
               <Accordion.Indicator className="ms-0 size-3.5" />
-              <span className="min-w-0 break-words">{label}<span className="text-muted-foreground">{isArr ? '[' : '{'}{open ? '' : ` ${entries.length} ${isArr ? t('items') : t('keys')} ${isArr ? ']' : '}'}`}</span></span>
+              <span className="min-w-0 break-words"><KeyLabel k={k} /><span className="text-muted-foreground">{isArr ? '[' : '{'}{collapsed}</span></span>
             </Accordion.Trigger>
           </Accordion.Heading>
           <Actions value={v} path={path} />
         </div>
         <Accordion.Panel>
           <Accordion.Body className="ml-2 border-l px-0 pb-0 pl-3 font-mono text-xs text-foreground">
-            {open ? <>
-          {entries.length === 0 ? <div className="py-px pl-4 text-muted-foreground">{isArr ? t('empty array') : t('empty object')}</div> : null}
-          {shown.map(([ck, cv]) => <Node key={ck} k={ck} v={cv} path={keyPath(path, ck)} depth={depth + 1} mode={mode} />)}
-          {entries.length > limit ? (
-            <Button type="button" variant="outline" size="xs" className="my-2 ml-4" onClick={() => setLimit(l => l + PAGE)}>{t('more {n} ({remaining} left)', { n: Math.min(PAGE, entries.length - limit), remaining: entries.length - limit })}</Button>
-          ) : null}
-          <div className="py-px pl-4 text-muted-foreground">{isArr ? ']' : '}'}</div>
-            </> : null}
+            {open ? <ContainerBody entries={entries} limit={limit} onMore={() => setLimit(l => l + PAGE)} path={path} depth={depth} mode={mode} isArr={isArr} /> : null}
           </Accordion.Body>
         </Accordion.Panel>
       </Accordion.Item>
     </Accordion>
   );
+}
+
+function Node({ k, v, path, depth, mode }: NodeProps) {
+  if (!isContainer(v)) return <LeafNode k={k} v={v} path={path} />;
+  return <ContainerNode k={k} v={v} path={path} depth={depth} mode={mode} />;
 }
 
 /** JSON literals are source data, independent of runtime status; invalid input retains the raw text. */
@@ -117,6 +136,7 @@ export function JsonView({ text }: Readonly<{ text: string }>) {
     );
   }
   const single = !parsed.jsonl;
+  const firstDoc = parsed.docs[0];
   return (
     <Frame className="evidence-code-frame">
       <Toolbar right={<span>{parsed.jsonl ? t('JSONL · {n} lines', { n: parsed.docs.length }) : 'JSON'}</span>}>
@@ -130,7 +150,7 @@ export function JsonView({ text }: Readonly<{ text: string }>) {
       {raw ? <TextView text={text} query="" className="rounded-none border-0" /> : (
         <div key={mode.n} className="max-h-[70vh] overflow-auto bg-background p-3 font-mono text-xs leading-5">
           {single
-            ? <Node k={null} v={parsed.docs[0]} path="$" depth={0} mode={mode} />
+            ? (firstDoc === undefined ? null : <Node k={null} v={firstDoc} path="$" depth={0} mode={mode} />)
             : parsed.docs.map((d, i) => <Node key={`${i}-${typeof d}`} k={t('line {n}', { n: i + 1 })} v={d} path={`$[${i}]`} depth={0} mode={mode} />)}
         </div>
       )}
