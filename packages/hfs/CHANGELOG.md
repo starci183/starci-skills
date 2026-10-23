@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.7.27 - 2026-10-23
+- Fixed: the bundled `scripts/lib/managed-json.mjs` passes each slot path to `braceVariants` through an arrow, so `flatMap` never hands it an index (Sonar S7727).
+- Changed: the bundled canon pins select @starci/cli 1.7.27, @starci/eslint-canon-be 3.4.34 and @starci/eslint-canon-fe 8.4.33.
+
 ## 4.7.26 - 2026-10-23
 - Changed: the bundled canon pins select @starci/cli 1.7.26, @starci/eslint-canon-be 3.4.33 and @starci/eslint-canon-fe 8.4.32.
 
