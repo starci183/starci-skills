@@ -19,7 +19,7 @@
     "rxjs": "7.8.2",
     "tslib": "2.8.1",
     "typeorm": "0.3.31",
-    "zod": "4.4.3"
+    "zod": "4.6.7"
   },
   "devDependencies": {
     "@graphql-codegen/cli": "7.4.6",
