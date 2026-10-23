@@ -1,9 +1,9 @@
 // candidate-ci.mjs - the candidate CI of `starci app release push` (OWNER RULING candidate-ci, 2026-10-18: "never again have main receive a release whose CI is
 // red, with the owner confirming afterwards"). The push sends the exact release sha to refs/heads/release/candidate-<version> first (the managed ci.yml triggers on
 // release/candidate-*), waits for the ci.yml run of THAT sha, and moves the default branch and the tag only when it is green:
-//   green     the newest non-cancelled run of the sha concluded success
-//   red       RELEASE_CANDIDATE_CI_RED with the run URL and the failing jobs and steps; nothing reaches the default branch. The candidate ref stays for diagnosis
-//   timeout   RELEASE_CANDIDATE_CI_TIMEOUT: no run started within the grace, or it did not end within the wait
+//   green     the newest non-cancelled run of the sha concluded success and none of its jobs was skipped
+//   red       RELEASE_CANDIDATE_CI_RED (a run or a job that concluded skipped is red, never a pass: owner ruling 2026-10-22, a skip is a loosening) with the run URL and the failing jobs and steps; nothing reaches the default branch. The candidate ref stays for diagnosis
+//   timeout   RELEASE_CANDIDATE_CI_TIMEOUT: no run listed within the grace (a queued run is listed), or it did not end within the wait
 //   unknown   RELEASE_CI_UNKNOWN: GitHub could not be read to the end; a release never proceeds blind
 // Emergency path (documented, owner-only): the owner's `starci release ci-override --sha <sha>` record for this exact sha
 // (<git common dir>/starci-release/<sha>.ci-override.json, schema starci/ci-override@1) lets a red candidate through, and the push says so.
@@ -13,10 +13,11 @@ import path from 'node:path';
 
 const CANDIDATE_PREFIX = 'refs/heads/release/candidate-';
 /** The wait of the candidate run: poll interval, the grace for a run to appear, the wait for it to end (an app's ci.yml jobs time out within 45 minutes). */
-const CANDIDATE_WAIT = Object.freeze({ pollSeconds: 30, graceMinutes: 10, waitMinutes: 90 });
+// A queued run is listed (running): the grace only covers a run GitHub has not created yet, and the wait, counted from the push, bounds grace, queue and run.
+const CANDIDATE_WAIT = Object.freeze({ pollSeconds: 30, graceMinutes: 45, waitMinutes: 150 });
 const FIELDS = 'databaseId,headSha,status,conclusion,url,event,createdAt';
 const SHA = /^[a-f0-9]{40}$/u;
-const PASSING = new Set(['success', 'neutral', 'skipped']);
+const PASSING = new Set(['success', 'neutral']);
 
 /** The candidate ref of the release tag `tag` with the app's tag prefix: refs/heads/release/candidate-<version>. */
 export const candidateRef = (tag, prefix = 'v') => `${CANDIDATE_PREFIX}${String(tag).startsWith(prefix) ? String(tag).slice(prefix.length) : String(tag)}`;
@@ -40,18 +41,27 @@ export function candidateVerdict(rows) {
   return { state: newest.conclusion === 'success' ? 'green' : 'red', run: newest };
 }
 
-/** One read of the ci.yml runs of `sha`: {ok, state, run} or {ok: false}. */
+/** The jobs of a run ([{name, conclusion, steps}]), or null when unreadable. */
+function runJobsOf(ctx, runRow) {
+  if (!/^\d+$/u.test(String(runRow?.databaseId ?? ''))) return null;
+  const reply = jsonOf(run(ctx, 'gh', ['run', 'view', String(runRow.databaseId), '--json', 'jobs']));
+  return Array.isArray(reply?.jobs) ? reply.jobs : null;
+}
+
+/** One read of the ci.yml runs of `sha`: {ok, state, run} or {ok: false}. A green run is read job by job: a skipped job makes it red. */
 function readCandidateRun(ctx, sha) {
   const rows = jsonOf(run(ctx, 'gh', ['run', 'list', '--workflow', 'ci.yml', '--commit', sha, '--limit', '20', '--json', FIELDS]));
   if (!Array.isArray(rows)) return { ok: false };
-  return { ok: true, ...candidateVerdict(rows.filter((row) => !row.headSha || row.headSha === sha)) };
+  const seen = candidateVerdict(rows.filter((row) => !row.headSha || row.headSha === sha));
+  if (seen.state !== 'green') return { ok: true, ...seen };
+  const jobs = runJobsOf(ctx, seen.run);
+  if (!jobs) return { ok: false };
+  return { ok: true, ...seen, state: jobs.some((job) => job.conclusion === 'skipped') ? 'red' : 'green' };
 }
 
 /** The failing jobs and steps of a run: ['job (conclusion): step, step']; [] when unreadable. */
 export function failingJobs(ctx, runRow) {
-  if (!/^\d+$/u.test(String(runRow?.databaseId ?? ''))) return [];
-  const reply = jsonOf(run(ctx, 'gh', ['run', 'view', String(runRow.databaseId), '--json', 'jobs']));
-  return (reply?.jobs ?? []).filter((job) => job.conclusion && !PASSING.has(job.conclusion)).map((job) => {
+  return (runJobsOf(ctx, runRow) ?? []).filter((job) => job.conclusion && !PASSING.has(job.conclusion)).map((job) => {
     const steps = (job.steps ?? []).filter((step) => step.conclusion && !PASSING.has(step.conclusion)).map((step) => step.name);
     return `${job.name} (${job.conclusion})${steps.length ? `: ${steps.join(', ')}` : ''}`;
   });

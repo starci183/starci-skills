@@ -29,6 +29,7 @@ function seam(common) {
   const spawn = (command, args) => {
     calls.push([command, ...args]);
     if (command === 'gh' && args[1] === 'list') return { status: 0, stdout: JSON.stringify([{ databaseId: 7, headSha: HEAD, status: 'completed', conclusion: 'success', url: 'https://example.invalid/runs/7', event: 'push', createdAt: '2026-10-21T00:00:00Z' }]) };
+    if (command === 'gh' && args[1] === 'view') return { status: 0, stdout: JSON.stringify({ jobs: [{ name: 'test', conclusion: 'success', steps: [] }] }) };
     if (command !== 'git') throw new Error(`unexpected ${command} ${args.join(' ')}`);
     if (args[0] === 'rev-parse' && args[1] === 'HEAD') return { status: 0, stdout: HEAD };
     if (args[0] === 'rev-parse' && args[1] === '--git-common-dir') return { status: 0, stdout: common };

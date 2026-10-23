@@ -45,6 +45,24 @@ test('the newest non-cancelled run of the sha decides; no run is pending', () =>
   assert.equal(candidateVerdict([row({ conclusion: 'failure' }), newer]).run.databaseId, 8);
 });
 
+test('a skipped run or a skipped job is red, never a pass', async () => {
+  assert.equal(candidateVerdict([row({ conclusion: 'skipped' })]).state, 'red');
+  const jobs = { jobs: [{ name: 'test', conclusion: 'skipped', steps: [] }, { name: 'lint', conclusion: 'success', steps: [] }] };
+  const judged = await candidateStep(fakeCtx({ reads: [[row()]], jobs }).ctx, { head: HEAD, tag: 'v1.2.3', prefix: 'v', remote: 'origin', wait: WAIT });
+  assert.equal(judged.ok, false);
+  assert.deepEqual(judged.data.failing, ['test (skipped)']);
+  assert.match(judged.lines.at(-1), /^RELEASE_CANDIDATE_CI_RED: .*failing: test \(skipped\)/);
+});
+
+test('a green run whose jobs cannot be read is not green: the wait ends unknown', async () => {
+  const { ctx } = fakeCtx({ reads: [[row()]] });
+  const spawn = ctx.spawn;
+  ctx.spawn = (command, args) => (command === 'gh' && args[1] === 'view' ? { status: 1, stdout: '' } : spawn(command, args));
+  const judged = await candidateStep(ctx, { head: HEAD, tag: 'v1.2.3', prefix: 'v', remote: 'origin', wait: WAIT });
+  assert.equal(judged.ok, false);
+  assert.match(judged.lines.at(-1), /^RELEASE_CI_UNKNOWN/);
+});
+
 test('a green candidate pushes HEAD to the candidate ref first and reports the run', async () => {
   const { ctx, calls } = fakeCtx({ reads: [[], [row({ status: 'in_progress', conclusion: null })], [row()]] });
   const judged = await candidateStep(ctx, { head: HEAD, tag: 'v1.2.3', prefix: 'v', remote: 'origin', wait: WAIT });

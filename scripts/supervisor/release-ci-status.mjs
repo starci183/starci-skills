@@ -17,7 +17,7 @@ import { ciPolicy } from './release-ci-rows.mjs';
 import { jsonReply as json } from '../lib/json-reply.mjs';
 
 const CI_SCHEMA = 'starci/release-ci@1';
-const RED_RUN = new Set(['failure', 'timed_out', 'startup_failure', 'action_required']);
+const RED_RUN = new Set(['failure', 'timed_out', 'startup_failure', 'action_required', 'skipped']);
 const RED_CHECK = new Set(['failure', 'error', 'timed_out', 'action_required']);
 
 /** Why a gh call gave nothing: gh itself missing, or its exit status and the first words of stderr. */
@@ -28,7 +28,8 @@ function failure(what, r) {
 }
 
 /** The state of a check run or a status context in one vocabulary: success | failure | pending. */
-const PASSING = new Set(['success', 'neutral', 'skipped']);
+// A skipped check is red, never a pass (owner ruling 2026-10-22: a skip is a loosening).
+const PASSING = new Set(['success', 'neutral']);
 function checkState(state, conclusion) {
   if (conclusion !== undefined) {
     if (state !== 'completed') return 'pending';

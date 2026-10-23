@@ -5,7 +5,8 @@
 // workflow run of THAT sha (modules/supervisor/release-cut.yaml candidate.workflows) to end:
 //   green      every required workflow has a completed, successful run of the sha and no watched check failed: the cut goes on to the tag and the atomic push
 //   red        RELEASE_CANDIDATE_CI_RED with the run URL and the failing jobs and steps; nothing reaches main. The candidate ref stays for diagnosis
-//   timeout    RELEASE_CANDIDATE_CI_TIMEOUT (no run started within graceMinutes, or a run did not end within waitMinutes); nothing reaches main
+//   timeout    RELEASE_CANDIDATE_CI_TIMEOUT (no run listed within graceMinutes, or a run did not end within waitMinutes); nothing reaches main.
+//              A queued run is a run (state running): only a workflow with no run of the sha at all counts against the grace
 //   unknown    RELEASE_CI_UNKNOWN: GitHub could not be read to the end; a cut never proceeds blind
 // Emergency path (documented, owner-only): a red candidate passes only with the owner's `starci release ci-override --sha <sha>` record for that exact sha
 // (scripts/supervisor/release-ci-override.mjs; the ruling-in-tree part cannot hold for the sha being cut). The cut records that it was used.
@@ -21,8 +22,9 @@ import { readCiOverride } from './release-ci-override.mjs';
 import { sleep as defaultSleep } from '../lib/sleep.mjs';
 import { jsonReply as json } from '../lib/json-reply.mjs';
 
-const RED_RUN = new Set(['failure', 'timed_out', 'startup_failure', 'action_required']);
-const PASSING = new Set(['success', 'neutral', 'skipped']);
+// A skipped run, job or watched check is red, never a pass (owner ruling 2026-10-22: a skip is a loosening): only success and neutral pass.
+const RED_RUN = new Set(['failure', 'timed_out', 'startup_failure', 'action_required', 'skipped']);
+const PASSING = new Set(['success', 'neutral']);
 
 /** The candidate policy of release-cut.yaml: {refPrefix, workflows, statusPatterns, pollSeconds, graceMinutes, waitMinutes}. */
 export const candidatePolicy = () => readModuleJson('modules', 'supervisor', 'release-cut.yaml').candidate;

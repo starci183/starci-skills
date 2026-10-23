@@ -1,0 +1,88 @@
+name: sonar
+
+# The runtime's SonarCloud analysis (project starci-runtime, the root sonar-project.properties) and its quality gate, in a workflow of its own so no run
+# of ci.yml carries a skipped Sonar job (a skipped check is red, owner ruling 2026-10-22). It runs on every push to main, on the push of a release candidate
+# ref release/candidate-<version> and when a person dispatches it, never on a tag, another branch or a pull request (docs/git-governance.md, rule
+# CI_TRIGGERS_RELEASE_ONLY): `starci release cut` waits for this run of the release sha on its candidate ref beside ci.yml and examples.yml
+# (modules/supervisor/release-cut.yaml candidate.workflows), so main and the tag move only when the runtime's Sonar gate is green on that exact sha.
+# SonarCloud names an analysis after the checked-out ref: the candidate run is a branch analysis of release/candidate-<version>, the main run the main
+# analysis; a tag run would open a branch named after the tag, and the tagged commit is the one the candidate and the main push scanned.
+# The runtime is analysed on SonarCloud (https://sonarcloud.io, fixed in this job; the apps and examples use the host's local SonarQube in ext/sonar and
+# never this workflow). It needs secrets.SONAR_TOKEN, vars.SONAR_ORGANIZATION and vars.SONAR_PROJECT_KEY: a missing one fails the job and names it
+# (never a silent pass). The root sonar-project.properties carries sources and exclusions; the organization and the project key come from the variables.
+
+on:
+  push:
+    branches: [main, 'release/candidate-*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sonar-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref == 'refs/heads/main' }}
+
+jobs:
+  sonar:
+    name: runtime sonar
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    permissions:
+      contents: read
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      SONAR_HOST_URL: https://sonarcloud.io
+      SONAR_ORGANIZATION: ${{ vars.SONAR_ORGANIZATION }}
+      SONAR_PROJECT_KEY: ${{ vars.SONAR_PROJECT_KEY }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+
+      # Keep the scanner's dependency and generated Grammar inputs equal to the inputs ci.yml checks.
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Install the eslint canon workspace
+        working-directory: packages
+        run: npm ci --ignore-scripts
+
+      - name: Install @starci/test-world
+        working-directory: packages/test-world
+        run: npm ci --ignore-scripts
+
+      - name: Build @starci/grammar
+        working-directory: packages/grammar
+        run: |
+          npm ci --ignore-scripts
+          npm run build
+
+      # Sonar is required: a missing repository setting fails the job here with the names of what is missing.
+      - name: Sonar settings
+        run: |
+          missing=""
+          [ -z "$SONAR_TOKEN" ] && missing="$missing secrets.SONAR_TOKEN"
+          [ -z "$SONAR_ORGANIZATION" ] && missing="$missing vars.SONAR_ORGANIZATION"
+          [ -z "$SONAR_PROJECT_KEY" ] && missing="$missing vars.SONAR_PROJECT_KEY"
+          if [ -n "$missing" ]; then
+            echo "::error title=Sonar settings missing::the runtime cannot be scanned on SonarCloud; missing repository settings:$missing"
+            exit 1
+          fi
+
+      # SonarCloud analysis of the runtime (full history from the checkout above, for blame and the new-code period). The scan waits for the quality gate
+      # (sonar.qualitygate.wait, up to an hour: SonarCloud queues) and the step fails on a red gate.
+      - name: Sonar scan (SonarCloud) and quality gate
+        uses: SonarSource/sonarqube-scan-action@c7ee0f9df90b7aa20e8dcf9695dcfe2e7da5b4f2 # v7.2.1
+        timeout-minutes: 75
+        with:
+          args: >
+            -Dsonar.organization=${{ env.SONAR_ORGANIZATION }}
+            -Dsonar.projectKey=${{ env.SONAR_PROJECT_KEY }}
+            -Dsonar.qualitygate.wait=true
+            -Dsonar.qualitygate.timeout=3600

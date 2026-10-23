@@ -65,11 +65,12 @@ suite:
 # of that sha. The runtime's ci.yml (check + test) and examples.yml (every example's rendered CI shape) are the release proof on GitHub.
 candidate:
   refPrefix: refs/heads/release/candidate-
-  workflows: [ci, examples]
+  workflows: [ci, examples, sonar]
   # Check names read as part of the verdict (the Sonar quality gate where it reports on the sha).
   statusPatterns: [sonar]
   pollSeconds: 30
-  # A run that has not started after graceMinutes means a workflow does not trigger on the candidate ref: refused, not waited for.
-  graceMinutes: 10
-  # ci.yml's own job timeout is 150 minutes, examples.yml runs beside it.
-  waitMinutes: 170
+  # A workflow with no run of the sha listed after graceMinutes does not trigger on the candidate ref: refused, not waited for. A queued run is listed
+  # (it is running, not pending), so GitHub's queue never turns into this timeout; the grace only covers a run that GitHub has not created yet.
+  graceMinutes: 45
+  # ci.yml's own job timeout is 150 minutes, examples.yml runs beside it; the bound counts from the candidate push, so it holds the grace and a queued start too.
+  waitMinutes: 240
