@@ -16,7 +16,7 @@ export { sealProvisionValues, provisionChildEnvironment, provisionNativeChildEnv
 const METADATA = new Set(['resourceId', 'generationName', 'destinationRef', 'phase', 'code', 'nativeRecordSha256', 'nativeTag', 'ceTaskId']);
 const OUTCOMES = new Set(['applied', 'verified', 'failed', 'unknown', 'partial']);
 const activeLocks = new Set();
-const PROOF = new Set(['analysisId', 'revision', 'ceTaskId', 'issues', 'qualityGate', 'metrics', 'publicKeys', 'privateCount', 'privateValuesVerified', 'logins', 'name', 'type', 'projectKey', 'credentialAccepted', 'custodyWritten', 'valueToNameBindingVerified', 'authentication', 'sessionCleanup', 'jwtExpiryRemaining', 'nativeGateVerified', 'nativeTag', 'nativeRecordSha256', 'nativeGates', 'conditions', 'project']);
+const PROOF = new Set(['analysisId', 'revision', 'ceTaskId', 'issues', 'qualityGate', 'metrics', 'publicKeys', 'privateCount', 'privateValuesVerified', 'logins', 'name', 'type', 'projectKey', 'credentialAccepted', 'custodyWritten', 'valueToNameBindingVerified', 'authentication', 'sessionCleanup', 'jwtExpiryRemaining', 'nativeGateVerified', 'nativeTag', 'nativeRecordSha256', 'nativeGates', 'conditions', 'project', 'newCode']);
 const METRICS = new Set(['coverage', 'line_coverage', 'branch_coverage', 'duplicated_lines_density', 'violations', 'ncloc', 'new_coverage', 'new_violations', 'bugs', 'vulnerabilities', 'code_smells']);
 const failures = new WeakSet();
 const authorityFailures = new WeakSet();
@@ -120,6 +120,8 @@ const PROOF_RULES = Object.freeze({
   // A Sonar quality gate readback: the number of its verified conditions and the project step's own result code.
   conditions: value => Number.isSafeInteger(value) && value >= 0 && value <= 100,
   project: value => typeof value === 'string' && /^sonar-project-[a-z-]{1,64}$/u.test(value),
+  // The New Code definition a project ensure read back: NUMBER_OF_DAYS:<days> or PREVIOUS_VERSION.
+  newCode: value => typeof value === 'string' && /^(?:NUMBER_OF_DAYS:d{1,2}|PREVIOUS_VERSION)$/u.test(value),
   metrics: proofMetrics, publicKeys: proofArray, logins: proofArray,
 });
 

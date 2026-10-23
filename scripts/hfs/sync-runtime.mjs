@@ -55,6 +55,8 @@ const CHECK_ENTRIES = [
   'scripts/lib/failure-code-reads.mjs',
   // Why the provision control verb could not read or accept a prepared operation, proven by src/provision-control-failure.spec.mjs over this copy.
   'scripts/lib/provision-control-failure.mjs',
+  // The New Code definition a Sonar project is ensured with, proven by src/sonar-new-code.spec.mjs over this copy.
+  'scripts/lib/sonar-new-code.mjs',
   // The Sonar gate data and its pure judgments, read by the package specs that render a CI declaration.
   'scripts/gates/sonar-gate.mjs',
   // The .starcistacks services gate (checkStarciStacks), proven by src/hfs-stacks-runtime-shape.spec.mjs over this copy.

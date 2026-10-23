@@ -36,6 +36,12 @@ tracks no sealed secret.
 declares the old key as `previousKey`, and the project keeps its analyses, issues and quality gate. It
 is verified when the new key reads back and the old key no longer does. The display name is the
 server's own and does not change with the key.
+`sonar project ensure` also ensures the project's New Code definition: the target's `resource.newCodePeriod`
+(`{type: NUMBER_OF_DAYS, value: 1-90}` or `{type: PREVIOUS_VERSION}`), else `gate.newCodePeriod` of
+`knowledge/sonar-gate.yaml` for the app's edition. Without one, a SonarQube Cloud project's gate status is
+NONE and the scanner reports the quality gate as not set. SonarQube Cloud keeps it as the project setting
+`sonar.leak.period`; a server or Community Build keeps it through `api/new_code_periods`. The action
+writes it only when the readback differs and is verified only when the readback matches.
 After authority is established, the native custody owner can project its configured AGE material
 privately for the selected application's encrypted member.
 

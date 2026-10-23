@@ -1,6 +1,7 @@
 # Changelog
 
 ## 4.7.28 - 2026-10-23
+- Added: `scripts/lib/sonar-new-code.mjs` joins the bundled runtime copy (the New Code definition `starci sonar project ensure` sets), proven by `src/sonar-new-code.spec.mjs`.
 - Fixed: the bundled gate-loosening detector no longer reads a quoted operand of a printed message as a ban-list row, nor the upkeep of an exception list the check stops reading as enforcement lost (`src/bypass-detector.spec.mjs`).
 - Added: `scripts/lib/provision-control-failure.mjs` joins the bundled runtime copy, proven by `src/provision-control-failure.spec.mjs`.
 - Changed: the bundled canon pins select @starci/cli 1.7.28, @starci/eslint-canon-be 3.4.35 and @starci/eslint-canon-fe 8.4.34.

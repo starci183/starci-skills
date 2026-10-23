@@ -52,6 +52,9 @@ export function manage({target, credentials, request}) {
     deleteCondition: ({id, organization}) => call('POST', '/api/qualitygates/delete_condition', 'admin', {form: {id, organization}}),
     selectGate: ({ref, projectKey, organization}) => call('POST', '/api/qualitygates/select', 'admin', {form: {...ref, projectKey, organization}}),
     projectGate: (projectKey, organization) => call('GET', '/api/qualitygates/get_by_project', 'admin', {params: {project: projectKey, organization}}),
+    // The New Code definition on SonarQube Server and Community Build (SonarQube Cloud keeps it as the setting sonar.leak.period).
+    newCodePeriod: projectKey => call('GET', '/api/new_code_periods/show', 'admin', {params: {project: projectKey}}),
+    setNewCodePeriod: form => call('POST', '/api/new_code_periods/set', 'admin', {form}),
     settingDefinitions: key => call('GET', '/api/settings/list_definitions', 'admin', {params: {component: key}}),
     settings: (key, keys) => call('GET', '/api/settings/values', 'admin', {params: {component: key, keys: keys.join(',')}}),
     setSetting: (key, setting, value) => call('POST', '/api/settings/set', 'admin',

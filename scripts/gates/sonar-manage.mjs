@@ -14,6 +14,7 @@ import {resultCodes, fail, verified, uncertain} from './sonar-managed-results.mj
 import {sonarTokenAction} from './sonar-token-actions.mjs';
 import {projectRekey} from './sonar-project-rekey.mjs';
 import {loadSonarGate, serverConditions} from './sonar-gate.mjs';
+import {declaredNewCodePeriod, newCodeMatches, newCodeProof, newCodeWrite} from '../lib/sonar-new-code.mjs';
 
 const PROVIDERS = new Set(['sonar-server', 'sonar-community', 'sonar-cloud']);
 const TOKEN_TYPES = new Set(['USER_TOKEN', 'PROJECT_ANALYSIS_TOKEN', 'GLOBAL_ANALYSIS_TOKEN']);
@@ -87,7 +88,8 @@ const projectRequest = (resource, args, target) => {
   const previousKey = resource.previousKey;
   if (previousKey !== undefined && (typeof previousKey !== 'string' || !projectPattern.test(previousKey) || previousKey === resource.projectKey))
     throw new Error('Invalid declared previous project key');
-  return {name, visibility, qualityGate: declaredGate(resource, target), previousKey};
+  const newCodePeriod = declaredNewCodePeriod(resource, loadSonarGate({cwd: target.repoRoot}).gate.newCodePeriod);
+  return {name, visibility, qualityGate: declaredGate(resource, target), previousKey, newCodePeriod};
 };
 
 const settingsRequest = (resource, args) => {
@@ -148,7 +150,7 @@ const requestBuilders = {project: projectRequest, settings: settingsRequest, use
 
 export const sonarManagedRequest = (target, verb, args) => {
   const resource = target.resource ?? {};
-  if (!closed(resource, ['projectKey', 'previousKey', 'organization', 'name', 'visibility', 'qualityGate', 'settings', 'localUsers', 'userManagement', 'tokens', 'release']))
+  if (!closed(resource, ['projectKey', 'previousKey', 'organization', 'name', 'visibility', 'qualityGate', 'newCodePeriod', 'settings', 'localUsers', 'userManagement', 'tokens', 'release']))
     throw new Error('Undeclared Sonar resource fields');
   if (verb !== 'user' && (!projectPattern.test(resource.projectKey ?? '') || (args.key !== undefined && args.key !== resource.projectKey)))
     throw new Error('Sonar action requires the exact declared project key');
@@ -183,12 +185,51 @@ const projectMatches = (component, request) => component?.key === request.projec
   && (request.visibility === undefined || component.visibility === request.visibility)
   && (request.organization === undefined || component.organization === request.organization);
 
-async function projectAction(client, request, callbacks, reconcile) {
+/** Ensure the project, its declared quality gate and its New Code definition, in that order; verified only when every part reads back. */
+async function projectAction(client, request, callbacks, reconcile, provider) {
   const ensured = await projectEnsured(client, request, callbacks, reconcile);
-  if (ensured.outcome !== 'verified' || !request.qualityGate) return ensured;
-  const gated = await gateAction(client, request, callbacks, reconcile);
-  return gated.outcome === 'verified' ? {...gated, writeAck: ensured.writeAck || gated.writeAck, proof: {...gated.proof, project: ensured.code}}
-    : {...gated, writeAck: ensured.writeAck || gated.writeAck};
+  if (ensured.outcome !== 'verified') return ensured;
+  let gated = null;
+  if (request.qualityGate) {
+    gated = await gateAction(client, request, callbacks, reconcile);
+    if (gated.outcome !== 'verified') return {...gated, writeAck: ensured.writeAck || gated.writeAck};
+  }
+  const writeAck = ensured.writeAck || Boolean(gated?.writeAck);
+  const period = await newCodeAction(client, request, callbacks, reconcile, provider);
+  if (period.outcome !== 'verified') return {...period, writeAck: writeAck || period.writeAck};
+  const proof = {...(gated?.proof ?? {projectKey: request.projectKey}), project: ensured.code, newCode: period.proof.newCode};
+  return {...(gated ?? ensured), writeAck: writeAck || period.writeAck, proof};
+}
+
+/** The project's New Code definition as the provider reports it: {ok, data} of api/settings/values (Cloud) or api/new_code_periods/show. */
+const newCodeRead = (client, request, provider) => (provider === 'sonar-cloud'
+  ? client.settings(request.projectKey, [newCodeWrite(provider, request.projectKey, request.newCodePeriod).key])
+  : client.newCodePeriod(request.projectKey));
+
+/**
+ * Ensure the declared New Code definition (the target's `newCodePeriod`, else knowledge/sonar-gate.yaml `gate.newCodePeriod`): read it, write it when
+ * it differs (api/settings/set of sonar.leak.period on SonarQube Cloud, api/new_code_periods/set elsewhere), verified only by the readback.
+ */
+async function newCodeAction(client, request, callbacks, reconcile, provider) {
+  const period = request.newCodePeriod, write = newCodeWrite(provider, request.projectKey, period);
+  const before = await newCodeRead(client, request, provider);
+  if (!before.ok && !(write.kind === 'period' && before.status === 404)) return fail('sonar-new-code-read-unavailable');
+  let writeAck = false;
+  if (!before.ok || !newCodeMatches(provider, before.data, period)) {
+    if (reconcile) return uncertain('sonar-new-code-unreconciled');
+    const capabilities = await client.capabilities();
+    const supported = write.kind === 'setting'
+      ? has(capabilities.data, 'api/settings', 'set', ['key', 'component', 'value'], true)
+      : has(capabilities.data, 'api/new_code_periods', 'set', ['project', 'type'], true);
+    if (!capabilities.ok || !supported) return fail('sonar-new-code-api-unsupported');
+    callbacks.checkpoint({phase: 'new-code-write-intent', resourceId: request.projectKey});
+    const answer = write.kind === 'setting' ? await client.setSetting(request.projectKey, write.key, write.value) : await client.setNewCodePeriod(write.form);
+    if (answer.ok) callbacks.acknowledge({phase: 'new-code-write-acknowledged', resourceId: request.projectKey});
+    writeAck = answer.ok;
+  }
+  const after = await newCodeRead(client, request, provider);
+  if (!after.ok || !newCodeMatches(provider, after.data, period)) return uncertain('sonar-new-code-unreconciled', {writeAck});
+  return verified('sonar-new-code-readback', {writeAck, resourceId: request.projectKey, proof: {newCode: newCodeProof(period)}});
 }
 
 async function projectEnsured(client, request, callbacks, reconcile) {
@@ -484,7 +525,7 @@ export async function runSonarManage(ctx) {
 
 const executeAction = async ({verb, action, target, request, callbacks, reconcile, env}) => {
   const client = manage({target, credentials: callbacks.credentials, request: requestJson});
-  if (verb === 'project') return action === 'rekey' ? projectRekey(client, request, callbacks, {reconcile, has}) : projectAction(client, request, callbacks, reconcile);
+  if (verb === 'project') return action === 'rekey' ? projectRekey(client, request, callbacks, {reconcile, has}) : projectAction(client, request, callbacks, reconcile, target.provider);
   if (verb === 'settings') return settingsAction(client, request, callbacks, {write: action === 'set', reconcile});
   if (verb === 'user') return userAction(client, request, callbacks, {action, reconcile});
   if (verb === 'token') return sonarTokenAction(client, target, request, callbacks, {action, reconcile, env, has});

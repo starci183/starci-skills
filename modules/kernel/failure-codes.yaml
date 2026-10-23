@@ -21401,6 +21401,46 @@ sonar-local-users-readback:
   owner: runtime-core
   kind: check-status
 
+sonar-new-code-api-unsupported:
+  title: "The server cannot set a project's New Code definition"
+  title_vi: "Máy chủ không hỗ trợ đặt New Code cho project"
+  meaning_vi: "API khai báo của máy chủ không có api/settings/set (SonarQube Cloud) hoặc api/new_code_periods/set cho project."
+  causes_vi:
+    - "Phiên bản máy chủ không có API này hoặc token thiếu quyền quản trị"
+  nextStep_vi: "Kiểm tra phiên bản máy chủ và token admin của target rồi chạy lại project ensure."
+  owner: runtime-core
+  kind: check-status
+
+sonar-new-code-read-unavailable:
+  title: "The project's New Code definition could not be read"
+  title_vi: "Không đọc được New Code của project"
+  meaning_vi: "Máy chủ không trả về sonar.leak.period (SonarQube Cloud) hoặc api/new_code_periods/show của project."
+  causes_vi:
+    - "Máy chủ không truy cập được hoặc token bị từ chối"
+  nextStep_vi: "Kiểm tra máy chủ và token admin rồi chạy lại."
+  owner: runtime-core
+  kind: check-status
+
+sonar-new-code-readback:
+  title: "The declared New Code definition is in place"
+  title_vi: "New Code khai báo đã đúng"
+  meaning_vi: "Project đọc lại đúng New Code của target, hoặc gate.newCodePeriod của knowledge/sonar-gate.yaml, nên quality gate có trạng thái."
+  causes_vi:
+    - "New Code đọc lại khớp"
+  nextStep_vi: "Giữ nguyên; lần quét tiếp theo được chấm trên New Code này."
+  owner: runtime-core
+  kind: check-status
+
+sonar-new-code-unreconciled:
+  title: "The project's New Code definition does not read back as declared"
+  title_vi: "New Code của project đọc lại không khớp khai báo"
+  meaning_vi: "Sau lệnh ghi (hoặc khi reconcile), New Code của project vẫn khác khai báo; không có lần ghi nào được lặp lại khi reconcile."
+  causes_vi:
+    - "Thiếu quyền quản trị project hoặc máy chủ không nhận giá trị"
+  nextStep_vi: "Kiểm tra quyền và giá trị newCodePeriod rồi chạy lại project ensure."
+  owner: runtime-core
+  kind: check-status
+
 sonar-new-user-password-required:
   title: "Sonar new user password required"
   title_vi: "Cần private password cho Sonar user mới"
