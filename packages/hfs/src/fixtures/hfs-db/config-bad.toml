@@ -9,9 +9,9 @@ jwt_expiry = 86400
 enable_signup = true
 additional_redirect_urls = ["https://evil.example.com"]
 
-[auth.external.github]
-client_id = "literal-client-id"
-secret = "literal-secret"
-
 [auth.external.apple]
 secret = "env(APPLE_SECRET)"
+
+# The github provider's literal secret is appended per run by hfs-database-rules.spec.mjs (a generated value, never a committed one).
+[auth.external.github]
+client_id = "literal-client-id"

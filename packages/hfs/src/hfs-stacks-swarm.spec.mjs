@@ -11,6 +11,7 @@
 // proves: STACKS_UPDATE_POLICY_MISSING@lite STACKS_UPDATE_POLICY_MISSING@full
 // proves: STACKS_REALTIME_SCALED@lite
 import test from 'node:test';
+import { randomBytes } from 'node:crypto';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -124,11 +125,13 @@ for (const edition of ['lite', 'full']) {
 
   test(`STACKS_SECRET_ENV_LITERAL@${edition}: sensitive names, inline credentials and inherited bindings fail`, t => {
     const value = fixture(t, edition);
+    const credential = randomBytes(12).toString('hex');
     const violations = [
       { OPENAI_API_KEY: 'synthetic-fixture-value' }, { SUPABASE_SERVICE_ROLE: 'synthetic-fixture-value' },
-      { DATABASE_URL: 'postgres://fixture:synthetic@db.example.test/app' },
-      { CONNECTION: 'redis://:synthetic@cache.example.test' },
-      { DATABASE_URL_FILE: 'postgres://fixture:synthetic@db.example.test/app' },
+      // The inline credentials are generated for this run, never committed.
+      { DATABASE_URL: `postgres://fixture:${credential}@db.example.test/app` },
+      { CONNECTION: `redis://:${credential}@cache.example.test` },
+      { DATABASE_URL_FILE: `postgres://fixture:${credential}@db.example.test/app` },
       ['API_TOKEN'], { API_TOKEN_FILE: '/tmp/token' },
     ];
     for (const environment of violations) {

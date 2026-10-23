@@ -9,6 +9,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
+import { randomBytes } from 'node:crypto';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -541,7 +542,8 @@ test('DB_CONFIG_POLICY: the clean config fixture is clean', async () => {
 });
 
 test('DB_CONFIG_POLICY: literal credentials are refused anywhere in the file; env(NAME) is the form', async () => {
-  const findings = only(await configOf(fixture('config-bad.toml')), CONFIG);
+  // The literal secret is generated for this run and appended to the fixture's last section, [auth.external.github].
+  const findings = only(await configOf(`${fixture('config-bad.toml')}secret = "${randomBytes(12).toString('hex')}"\n`), CONFIG);
   const keys = findings.filter((f) => f.message.includes('literal credential')).map((f) => f.key);
   assert.deepEqual(keys.sort((left, right) => left.localeCompare(right, 'en')), ['auth.external.github.client_id', 'auth.external.github.secret']);
   assert.ok(findings.some((f) => f.message.includes('jwt_expiry')), 'jwt_expiry over 3600');
