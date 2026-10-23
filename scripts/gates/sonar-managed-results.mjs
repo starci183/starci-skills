@@ -26,3 +26,21 @@ export const resultCodes = new Set([
 export const fail = (code, extra = {}) => ({outcome: 'failed', code, writeAck: false, publicReadback: false, consumerVerified: false, ...extra});
 export const verified = (code, extra = {}) => ({outcome: 'verified', code, writeAck: false, publicReadback: true, consumerVerified: false, ...extra});
 export const uncertain = (code, extra = {}) => fail(code, {outcome: 'unknown', ...extra});
+
+/**
+ * The non-secret cause of a refused Sonar action: the refusal's code (provision-target-unknown, sonar-host-credential-unavailable)
+ * or one of this module's own declaration sentences, never a provider body, a path or a value. Null when neither applies.
+ */
+const refusalDetail = error => {
+  if (typeof error?.code === 'string' && /^[a-z][a-z0-9-]{0,63}$/u.test(error.code)) return error.code;
+  const message = typeof error?.message === 'string' ? error.message : '';
+  return /^[A-Z][A-Za-z ,'-]{0,119}$/u.test(message) ? message : null;
+};
+
+/** The public result of a refused Sonar action, with its non-secret detail when one applies. */
+export const refusedAction = error => {
+  const detail = refusalDetail(error);
+  const named = detail ? ' (' + detail + ')' : '';
+  return {code: 2, data: {ok: false, code: 'sonar-managed-execution-failed', ...(detail ? {detail} : {})},
+    text: `Sonar action refused${named}; check the declared target, action scope and private credential references.`};
+};

@@ -10,11 +10,12 @@ import {log as gitLog} from '../api/git/log.mjs';
 import {statusQuery} from '../api/git/status-query.mjs';
 import {findInOrder} from '../lib/in-order.mjs';
 import {emailAddress} from '../lib/email-address.mjs';
-import {resultCodes, fail, verified, uncertain} from './sonar-managed-results.mjs';
+import {resultCodes, fail, verified, uncertain, refusedAction} from './sonar-managed-results.mjs';
 import {sonarTokenAction} from './sonar-token-actions.mjs';
 import {projectRekey} from './sonar-project-rekey.mjs';
 import {loadSonarGate, serverConditions} from './sonar-gate.mjs';
-import {declaredNewCodePeriod, newCodeMatches, newCodeProof, newCodeWrite} from '../lib/sonar-new-code.mjs';
+import {declaredNewCodePeriod} from '../lib/sonar-new-code.mjs';
+import {newCodeAction} from './sonar-new-code-action.mjs';
 
 const PROVIDERS = new Set(['sonar-server', 'sonar-community', 'sonar-cloud']);
 const TOKEN_TYPES = new Set(['USER_TOKEN', 'PROJECT_ANALYSIS_TOKEN', 'GLOBAL_ANALYSIS_TOKEN']);
@@ -38,24 +39,6 @@ const research = Object.freeze({readAt: '2026-10-19', sources: [
   'The supported user-create APIs also reactivate inactive logins; explicit create-or-reactivate authority is required.',
   'Token values cannot be retrieved after generation; unknown effects require reconciliation.'],
 verification: 'Fixture behavior and native scaffold qualification precede separately authorized live provider and consumer proof.'});
-
-/**
- * The non-secret cause of a refused Sonar action: the refusal's code (provision-target-unknown, sonar-host-credential-unavailable)
- * or one of this module's own declaration sentences, never a provider body, a path or a value. Null when neither applies.
- */
-const refusalDetail = error => {
-  if (typeof error?.code === 'string' && /^[a-z][a-z0-9-]{0,63}$/u.test(error.code)) return error.code;
-  const message = typeof error?.message === 'string' ? error.message : '';
-  return /^[A-Z][A-Za-z ,'-]{0,119}$/u.test(message) ? message : null;
-};
-
-/** The public result of a refused Sonar action, with its non-secret detail when one applies. */
-const refusedAction = error => {
-  const detail = refusalDetail(error);
-  const named = detail ? ' (' + detail + ')' : '';
-  return {code: 2, data: {ok: false, code: 'sonar-managed-execution-failed', ...(detail ? {detail} : {})},
-    text: `Sonar action refused${named}; check the declared target, action scope and private credential references.`};
-};
 
 const selectedRows = (rows, field, selected) => {
   if (!Array.isArray(rows) || !rows.length || rows.length > 100 || rows.some(row => !row || typeof row !== 'object')
@@ -195,41 +178,10 @@ async function projectAction(client, request, callbacks, reconcile, provider) {
     if (gated.outcome !== 'verified') return {...gated, writeAck: ensured.writeAck || gated.writeAck};
   }
   const writeAck = ensured.writeAck || Boolean(gated?.writeAck);
-  const period = await newCodeAction(client, request, callbacks, reconcile, provider);
+  const period = await newCodeAction(client, request, callbacks, {reconcile, provider, has});
   if (period.outcome !== 'verified') return {...period, writeAck: writeAck || period.writeAck};
   const proof = {...(gated?.proof ?? {projectKey: request.projectKey}), project: ensured.code, newCode: period.proof.newCode};
   return {...(gated ?? ensured), writeAck: writeAck || period.writeAck, proof};
-}
-
-/** The project's New Code definition as the provider reports it: {ok, data} of api/settings/values (Cloud) or api/new_code_periods/show. */
-const newCodeRead = (client, request, provider) => (provider === 'sonar-cloud'
-  ? client.settings(request.projectKey, [newCodeWrite(provider, request.projectKey, request.newCodePeriod).key])
-  : client.newCodePeriod(request.projectKey));
-
-/**
- * Ensure the declared New Code definition (the target's `newCodePeriod`, else knowledge/sonar-gate.yaml `gate.newCodePeriod`): read it, write it when
- * it differs (api/settings/set of sonar.leak.period on SonarQube Cloud, api/new_code_periods/set elsewhere), verified only by the readback.
- */
-async function newCodeAction(client, request, callbacks, reconcile, provider) {
-  const period = request.newCodePeriod, write = newCodeWrite(provider, request.projectKey, period);
-  const before = await newCodeRead(client, request, provider);
-  if (!before.ok && !(write.kind === 'period' && before.status === 404)) return fail('sonar-new-code-read-unavailable');
-  let writeAck = false;
-  if (!before.ok || !newCodeMatches(provider, before.data, period)) {
-    if (reconcile) return uncertain('sonar-new-code-unreconciled');
-    const capabilities = await client.capabilities();
-    const supported = write.kind === 'setting'
-      ? has(capabilities.data, 'api/settings', 'set', ['key', 'component', 'value'], true)
-      : has(capabilities.data, 'api/new_code_periods', 'set', ['project', 'type'], true);
-    if (!capabilities.ok || !supported) return fail('sonar-new-code-api-unsupported');
-    callbacks.checkpoint({phase: 'new-code-write-intent', resourceId: request.projectKey});
-    const answer = write.kind === 'setting' ? await client.setSetting(request.projectKey, write.key, write.value) : await client.setNewCodePeriod(write.form);
-    if (answer.ok) callbacks.acknowledge({phase: 'new-code-write-acknowledged', resourceId: request.projectKey});
-    writeAck = answer.ok;
-  }
-  const after = await newCodeRead(client, request, provider);
-  if (!after.ok || !newCodeMatches(provider, after.data, period)) return uncertain('sonar-new-code-unreconciled', {writeAck});
-  return verified('sonar-new-code-readback', {writeAck, resourceId: request.projectKey, proof: {newCode: newCodeProof(period)}});
 }
 
 async function projectEnsured(client, request, callbacks, reconcile) {
