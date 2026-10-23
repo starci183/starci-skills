@@ -232,7 +232,7 @@ jobs:
           fi
       - name: Sonar scan
         if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/v') }}
-        uses: SonarSource/sonarqube-scan-action@c7ee0f9df90b7aa20e8dcf9695dcfe2e7da5b4f2 # v7.2.1
+        uses: SonarSource/sonarqube-scan-action@d209202bc7d53ff1cc128f7f907dac145c9d6ae9 # v8.3.0
         with:
           projectBaseDir: ${{ env.APP_DIR }}
           args: -Dsonar.organization=${{ env.SONAR_ORGANIZATION }} -Dsonar.projectKey=${{ env.SONAR_ORGANIZATION }}_starci-example-${{ matrix.app }}
