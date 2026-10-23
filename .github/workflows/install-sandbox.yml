@@ -48,7 +48,7 @@ jobs:
       - name: Verify the inventory
         run: npm run starci --silent -- gate runtime-artifact --pack "$RUNNER_TEMP/npm-pack.json" --dir "$RUNNER_TEMP/pack" --out "$RUNNER_TEMP/out"
 
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: install-sandbox-tarball
           path: ${{ runner.temp }}/pack/${{ steps.pack.outputs.tarball }}
