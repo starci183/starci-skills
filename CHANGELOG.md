@@ -6,11 +6,14 @@ until every S* row in `docs/goal.md` holds with fresh evidence, then `1.0.0` fre
 
 ## [Unreleased]
 
+## [1.0.0-alpha.28] — 2026-10-23
+
 ### Added
 - No bypass lands unnoticed. The gate-loosening detector (`modules/kernel/gate-loosening.yaml`, `scripts/lib/gate-loosening.mjs`, `scripts/lib/check-code-loosening.mjs`) now also watches the code of the checks: the check scripts and rule modules, the canon templates, the lint, stylelint, jest and tsconfig packages, CI workflows and hook templates (`checkCode`). A bypass marker added there (`scripts/lib/bypass-markers.mjs`: any inline disable, a type-check escape, a Sonar or coverage ignore, a skipped or focused test, `|| true`, `continue-on-error`, `set +e`, `HUSKY=0`, `--no-verify`, `--passWithNoTests`), fewer enforcement lines than before, a ban-list row removed from a check script, an exemption widened and a lowered coverage floor are loosenings and always red, rename-aware. `knowledge/hfs/ci-standard.yaml` and `knowledge/sonar-gate.yaml` are gate files. What the runtime may do (`modules/host/`, e.g. the Orca verbs, and the host-boundary check) is a capability, never a gate: changing it is no finding.
 - R303 `HFS_BYPASS_MARKER`: `starci app check` refuses the same markers in a product repository (a front end included, which has no specs), and `starci app hygiene` reads them from the index.
 
 ### Changed
+- Candidate package pins select HFS 4.7.27, CLI 1.7.27, jest preset 2.3.5, test-world 1.2.3, tsconfig 2.0.7, prettier config 1.0.4, back-end canon 3.4.34 and front-end canon 8.4.33.
 - The managed `.husky/pre-commit` runs `starci app sync --check` and ends the hook on every failing step; the stylelint step no longer lets a failure pass.
 - No exception list (owner ruling 2026-10-22, a loosening is always red): `modules/kernel/allowlist.yaml` keeps no `json-exceptions`, `not-codes` or `dead-script-entries`. The json-exceptions check admits a JSON file by a declared tool format (`scripts/lib/json-formats.mjs`) or as managed canon; the failure-codes check recognises reads, comments, enum members and env names by rule (`scripts/lib/failure-code-reads.mjs`) and catalogues the labels the runtime really emits (kinds `event-kind`, `outcome-reason`, `classification`); the dead-scripts check has no list (`starci route model` is a verb, `check-example-derived` a self-check, four unread scripts are deleted).
 - The rule catalog has no `specNa`, `exampleNa` or unreachable witness (170 + 108 markers): about 100 deleted runtime specs that proved bundled checkers are package specs again; only a rule whose enforcers all run inside the runtime (kinds `runtime`, `work-validate`) needs no package spec.
