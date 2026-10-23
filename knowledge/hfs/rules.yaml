@@ -1781,6 +1781,7 @@ rules:
     gates: ["pre-commit","settle","land","ci"]
     proves:
       - {path: packages/eslint/be/be-r89-source-form-coverage.spec.mjs, editions: [lite, full]}
+      - {path: packages/hfs/src/be-r89-source-suffix.spec.mjs, editions: [lite, full], codes: [BE_SOURCE_FORM]}
     exemplifiedBy:
       - {path: packages/hfs/templates/be/patterns/api/graphql.input.ts.tpl, editions: [lite, full]}
       - {path: packages/eslint/be/be-r89-source-form-coverage.spec.mjs, editions: [lite, full]}
