@@ -9,6 +9,9 @@
 //   spec-deleted       a spec file deleted in a change that also changes product code
 //   assertion-weakened a spec that loses more assertions than it gains in a change that also changes product code
 //   spec-skipped       a skip marker added to a spec in a change that also changes product code
+//   bypass-added, check-weakened, scope-widened (and check-removed over code): the code of a check is a gate too. A check script, rule module,
+//                      canon template, lint package, workflow or hook (modules/kernel/gate-loosening.yaml checkCode) that gains a bypass marker,
+//                      loses enforcement lines or ban-list rows, or gains an exemption is judged by scripts/lib/check-code-loosening.mjs
 // A change that renames paths (a git rename, `git diff -M`) may MOVE the entries that name them: a removed line and an added line of the
 // same file that are equal once every renamed prefix of the removed line is rewritten to its new name are one entry moved, not a check
 // removed and an exception added (renamedPrefixesOf, movedLinesOf). A moved entry that also changes in any other way (a widened glob, an
@@ -18,21 +21,36 @@
 // Only what a release shipped can be loosened (loosensReleased): a check, a spec or an assertion added after the release and folded
 // away before the next one never was a gate of a release.
 import { byCodeUnit } from './list.mjs';
+import { checkCodeFindings, isCheckCode } from './check-code-loosening.mjs';
 
 const LIST_ITEM = /^\s*-\s+\S/;
 const NUMBER_LINE = /^\s*(?:-\s+)?([A-Za-z][\w.-]*):\s*(-?\d+(?:\.\d+)?)\s*(?:#.*)?$/;
+/** A line of a JSON or JavaScript config as the YAML number line above reads it: no quotes around the key, no trailing comma or line comment. */
+function plainNumberLine(line) {
+  const comment = line.indexOf('//');
+  const code = (comment < 0 ? line : line.slice(0, comment)).trimEnd();
+  return (code.endsWith(',') ? code.slice(0, -1) : code).replace(/^(\s*(?:-\s+)?)["']([^"']+)["']:/, '$1$2:');
+}
 
-/** The files of a unified diff: [{file, deleted, added[], removed[]}] (changed lines without their marker). */
+/**
+ * The files of a unified diff: [{file, deleted, added[], removed[], under}] (changed lines without their marker). `under` maps an added line to the
+ * hunk headers it was added under (git prints the nearest line above the hunk that starts a word, so the key a YAML list item sits in).
+ */
 export function parseDiff(text) {
   const files = [];
   let current = null;
+  let section = '';
   for (const line of String(text ?? '').split(/\r?\n/)) {
     const header = /^diff --git a\/(.+?) b\/(.+)$/.exec(line);
-    if (header) { current = { file: header[2], deleted: false, added: [], removed: [] }; files.push(current); continue; }
+    if (header) { current = { file: header[2], deleted: false, added: [], removed: [], under: new Map() }; files.push(current); continue; }
     if (!current) continue;
-    if (line.startsWith('deleted file mode')) current.deleted = true;
-    else if (line.startsWith('+') && !line.startsWith('+++')) current.added.push(line.slice(1));
-    else if (line.startsWith('-') && !line.startsWith('---')) current.removed.push(line.slice(1));
+    const hunk = /^@@ .*? @@ ?(.*)$/.exec(line);
+    if (hunk) section = hunk[1];
+    else if (line.startsWith('deleted file mode')) current.deleted = true;
+    else if (line.startsWith('+') && !line.startsWith('+++')) {
+      current.added.push(line.slice(1));
+      current.under.set(line.slice(1), [...(current.under.get(line.slice(1)) ?? []), section]);
+    } else if (line.startsWith('-') && !line.startsWith('---')) current.removed.push(line.slice(1));
   }
   return files;
 }
@@ -163,7 +181,7 @@ function checksRemoved(entry) {
   });
 }
 
-const numbersOf = (lines) => lines.map((line) => NUMBER_LINE.exec(line)).filter(Boolean).map((match) => ({ key: match[1], value: Number(match[2]) }));
+const numbersOf = (lines) => lines.map((line) => NUMBER_LINE.exec(plainNumberLine(line))).filter(Boolean).map((match) => ({ key: match[1], value: Number(match[2]) }));
 
 /** The thresholds of a gate file moved the loose way. */
 function thresholdsLowered(entry, rules) {
@@ -198,6 +216,12 @@ function specFindings(entry, files, rules) {
 
 const changesProduct = (files, rules) => files.some((entry) => !isSpec(entry.file, rules) && rules.productPrefixes.some((prefix) => entry.file.startsWith(prefix)));
 
+/** The findings of one file that is a gate file (its lists and numbers) or the code of a check (its numbers; its bypasses are checkCodeFindings'). */
+function gateFindings(entry, rules) {
+  if (rules.gateFiles.includes(entry.file)) return [...checksRemoved(entry), ...thresholdsLowered(entry, rules)];
+  return isCheckCode(entry.file, rules) ? thresholdsLowered(entry, rules) : [];
+}
+
 /**
  * Every loosening of the change `diffText`, sorted: [{id, kind, file, detail}]. `rules` is modules/kernel/gate-loosening.yaml; `renamed`
  * is the change's renamed prefixes (renamedPrefixesOf), whose moved entries are no loosening.
@@ -206,10 +230,10 @@ export function looseningsOf(diffText, rules, { renamed = [] } = {}) {
   const files = parseDiff(diffText).map((entry) => movedLinesOf(entry, renamed));
   const product = changesProduct(files, rules);
   const found = files.flatMap((entry) => [
-    ...(rules.gateFiles.includes(entry.file) ? [...checksRemoved(entry), ...thresholdsLowered(entry, rules)] : []),
+    ...gateFindings(entry, rules),
     ...(rules.allowlistFiles.includes(entry.file) ? entry.added.filter((value) => LIST_ITEM.test(value)).map((value) => ({ kind: 'allowlist-added', file: entry.file, detail: clip(trimmed(value)) })) : []),
     ...(product && isSpec(entry.file, rules) ? specFindings(entry, files, rules) : []),
-  ]);
+  ]).concat(checkCodeFindings(files, rules));
   return found.map((finding) => ({ ...finding, id: `${finding.kind}:${finding.file}:${finding.detail}` })).sort((a, b) => byCodeUnit(a.id, b.id));
 }
 
@@ -233,6 +257,7 @@ const shownDetail = (detail) => (detail.endsWith('…') ? detail.slice(0, -1) : 
 /**
  * Whether `finding` loosens the state released at `base`, read through `read(rev, file)` (text, or null when the revision holds no such
  * file); `rules` gives the assertion markers. A finding stays only when
+ *   bypass-added        the added line is still in the file at HEAD (a bypass folded away before the next release never shipped)
  *   check-removed       the removed list item is an item of that gate file at the release commit
  *   spec-deleted        the spec exists at the release commit
  *   spec-skipped        the spec exists at the release commit
@@ -240,6 +265,8 @@ const shownDetail = (detail) => (detail.endsWith('…') ? detail.slice(0, -1) : 
  * (every other kind loosens whenever its file existed at the release).
  */
 export function loosensReleased(finding, { base, read, rules }) {
+  // A bypass is judged by whether it still stands: one added and folded away before the next release never shipped.
+  if (finding.kind === 'bypass-added') return String(read('HEAD', finding.file) ?? '').split('\n').some((line) => line.trim() === finding.text);
   const before = read(base, finding.file);
   if (before === null) return false;
   if (finding.kind === 'check-removed') return before.split('\n').some((line) => line.trim().startsWith(shownDetail(finding.detail)));

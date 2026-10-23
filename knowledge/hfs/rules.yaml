@@ -5003,3 +5003,19 @@ rules:
     exampleNa: "owner:mcp-tools-snapshot-no-example (2026-10-21): no example app serves an MCP server; the package spec judges a passing and a violating catalog"
     specNa: "owner:no-runtime-specs (2026-10-17): the enforcer is runtime code with no spec of its own; the @starci/hfs package spec packages/hfs/src/mcp-tools-snapshot.spec.mjs runs it from the bundled copy"
     witness: {status: unreachable, reason: "owner:no-runtime-specs (2026-10-17): the runtime has no spec fixtures; the package spec proves the rule", date: "2026-10-21"}
+  - id: R303
+    code: "HFS_BYPASS_MARKER"
+    law: "A product repository holds no bypass of a check (owner ruling loosening-always-red): no inline disable of any tool (eslint, stylelint, tslint, prettier, biome), no ts-ignore, ts-expect-error or ts-nocheck directive, no Sonar exclusion comment, no istanbul, c8 or v8 coverage ignore, no skipped, focused or todo test or skip option, and no failure swallowed in a hook, script or workflow (`|| true`, `continue-on-error`, `set +e`, `HUSKY=0`, `--no-verify`, `fail_ci_if_error: false`). A front end has no specs, but its source is still judged for the inline disables. `starci app check` reads the tracked tree and `starci app hygiene` (the managed pre-commit hook) the staged files from the index, so the bypass fails at the commit."
+    kinds: [check]
+    gates: [pre-commit, land, ci]
+    failureCodes: ["HFS_BYPASS_MARKER"]
+    enforcers:
+      - {kind: hfs, id: bypass-markers, at: scripts/hfs/rules/bypass-markers.mjs}
+      - {kind: hfs, id: bypass-guard, at: packages/hfs/sync/hygiene.mjs}
+    editions: [lite, full]
+    docs:
+      - {path: docs/hfs-authored-file-boundaries.md#r303, editions: [lite, full]}
+    templateNa: "A bypass is prohibited, so no template scaffolds one."
+    exampleNa: "owner:no-runtime-specs (2026-10-17): the rule forbids text, so no example app can exhibit it; the package spec packages/hfs/src/bypass-detector.spec.mjs judges a clean and a violating tree"
+    specNa: "owner:no-runtime-specs (2026-10-17): the enforcer is runtime code with no spec of its own; the @starci/hfs package spec packages/hfs/src/bypass-detector.spec.mjs runs it from the bundled copy"
+    witness: {status: unreachable, reason: "owner:no-runtime-specs (2026-10-17): the runtime has no spec fixtures; the package spec proves the rule", date: "2026-10-22"}

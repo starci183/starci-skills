@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+- Added: R303 `HFS_BYPASS_MARKER` in `starci app check` and the bypass guard of `starci app hygiene` (staged files read from the index): an inline disable of any tool, a type-check escape, a Sonar or coverage ignore, a skipped or focused test and a failure swallowed in a hook or workflow are refused in a product repository, the front end included.
+- Changed: the managed `.husky/pre-commit` runs `starci app sync --check` and ends the hook when any step fails; the stylelint step can no longer be skipped by a failing run.
+
 ## 4.7.26 - 2026-10-23
 - Changed: the bundled canon pins select @starci/cli 1.7.26, @starci/eslint-canon-be 3.4.33 and @starci/eslint-canon-fe 8.4.32.
 

@@ -32,6 +32,7 @@
 //   BE_SPEC_PLACEMENT             (R102, rules/spec-placement.mjs) a spec or test file outside the four test layers, scripts/ and tools/ included
 //   HFS_REPO_LOCAL_CHECK          (R103, rules/repo-local-checks.mjs) a local eslint rule or plugin, a `check-*` script, a relative import in eslint.config
 //   HFS_LINT_SUPPRESSION_FILE     (R104, rules/lint-suppression.mjs) an eslint suppressions file, script or option
+//   HFS_BYPASS_MARKER             (R303, rules/bypass-markers.mjs) an inline disable, type-check escape, skipped test or swallowed failure
 //   HFS_PROOF_COMMAND_FILE_MISSING (R105, rules/proof-commands.mjs) a .starciwork proof command that runs a file the repository does not hold
 //   HFS_PEER_INTEGRATION_MISSING  (R111, rules/peer-integrations.mjs) the app root package.json lacks the runtime peer a driver integration needs
 //   BE_INTEGRATION_SPEC_MISSING   (R112, rules/integration-specs.mjs) an integration with no integration spec that registers its module, maps its refusals and drives an outage
@@ -77,6 +78,7 @@ import { mcpToolsSnapshotFindings } from './rules/mcp-tools.mjs';
 import { appRootFindings } from './rules/app-root.mjs';
 import { frontendFindings } from './rules/frontend-tree.mjs';
 import { lintSuppressionFindings } from './rules/lint-suppression.mjs';
+import { bypassMarkerFindings } from './rules/bypass-markers.mjs';
 import { repoLocalCheckFindings } from './rules/repo-local-checks.mjs';
 import { supabaseSecretFindings } from './rules/supabase-secrets.mjs';
 import { untrackedSecretFindings } from './rules/secrets.mjs';
@@ -105,7 +107,7 @@ export const CHECK_CODES = Object.freeze([
   'HFS_SLOT_REQUIRED_MISSING', 'HFS_MIN_INSTANCES', 'HFS_CANON_PIN_DRIFT', 'HFS_SIZE_SOFT_BACKLOG', 'BE_SOURCE_FORM',
   'HFS_MANAGED_FILE_DRIFT', 'HFS_TOOL_CONFIG_LOCAL', 'HFS_RULE_OFF_WITHOUT_REPLACEMENT', 'HFS_TS_STRICT',
   'HFS_PLAINTEXT_SECRET', 'HFS_STACKS_SHAPE', 'HFS_CI_MISSING_CANON', 'HFS_DEP_VERSION_SKEW', 'HFS_CONTRACT_SNAPSHOT_DRIFT', 'HFS_MCP_TOOLS_SNAPSHOT',
-  'BE_TEST_TOPOLOGY', 'BE_SPEC_PLACEMENT', 'HFS_REPO_LOCAL_CHECK', 'HFS_LINT_SUPPRESSION_FILE', 'HFS_PROOF_COMMAND_FILE_MISSING', 'HFS_PEER_INTEGRATION_MISSING', 'BE_INTEGRATION_SPEC_MISSING', 'FE_GRAPHQL_CONTRACT', 'FE_NO_TESTS', 'HFS_MONO_WORKSPACES', 'HFS_MONO_FE_WORKSPACE', 'HFS_MONO_NEST_PROJECTS', 'HFS_MONO_WORKSPACE_DEP', 'BE_CLI_REQUIRED', 'FE_WIRE_GENERATED', 'FE_I18N_PLACEMENT', 'FE_I18N_CATALOG', 'HFS_SERVICE_PLACEMENT', 'HFS_IMAGE_UNPINNED', 'HFS_SERVICE_STACK_DECLARATION', 'HFS_EVENT_CONTRACT', 'BE_ASYNC_SPEC_MISSING', 'BE_SAGA_STEP_COMPENSATION', 'BE_SAGA_STATE_VERSIONED', 'BE_SAGA_EVENT_CONTRACT', 'BE_SAGA_CONSUMER_DEDUPE', 'BE_EVENT_CLASS_CONTRACT', 'BE_PATTERN_SPEC_MISSING', 'BE_CONTRACT_BREAKING', 'BE_KIND_DECLARATION', 'BE_KIND_EMPTY', 'HFS_DOCKER_BUILD_CONTEXT', 'HFS_DOCKER_STAGES', 'HFS_DOCKER_ENTRY', 'HFS_DOCKER_BASE_PIN', 'HFS_DOCKER_SECRETS', 'BE_SAGA_E2E_MISSING',
+  'BE_TEST_TOPOLOGY', 'BE_SPEC_PLACEMENT', 'HFS_REPO_LOCAL_CHECK', 'HFS_LINT_SUPPRESSION_FILE', 'HFS_BYPASS_MARKER', 'HFS_PROOF_COMMAND_FILE_MISSING', 'HFS_PEER_INTEGRATION_MISSING', 'BE_INTEGRATION_SPEC_MISSING', 'FE_GRAPHQL_CONTRACT', 'FE_NO_TESTS', 'HFS_MONO_WORKSPACES', 'HFS_MONO_FE_WORKSPACE', 'HFS_MONO_NEST_PROJECTS', 'HFS_MONO_WORKSPACE_DEP', 'BE_CLI_REQUIRED', 'FE_WIRE_GENERATED', 'FE_I18N_PLACEMENT', 'FE_I18N_CATALOG', 'HFS_SERVICE_PLACEMENT', 'HFS_IMAGE_UNPINNED', 'HFS_SERVICE_STACK_DECLARATION', 'HFS_EVENT_CONTRACT', 'BE_ASYNC_SPEC_MISSING', 'BE_SAGA_STEP_COMPENSATION', 'BE_SAGA_STATE_VERSIONED', 'BE_SAGA_EVENT_CONTRACT', 'BE_SAGA_CONSUMER_DEDUPE', 'BE_EVENT_CLASS_CONTRACT', 'BE_PATTERN_SPEC_MISSING', 'BE_CONTRACT_BREAKING', 'BE_KIND_DECLARATION', 'BE_KIND_EMPTY', 'HFS_DOCKER_BUILD_CONTEXT', 'HFS_DOCKER_STAGES', 'HFS_DOCKER_ENTRY', 'HFS_DOCKER_BASE_PIN', 'HFS_DOCKER_SECRETS', 'BE_SAGA_E2E_MISSING',
   'FE_STACK_FORBIDDEN', 'HFS_EDITION_FORBIDDEN_PRESENT', 'HFS_LITE_SECRET_CUSTODY', 'HFS_STARCIWORK_LITE_FORBIDDEN',
   'DB_MIGRATION_SHAPE', 'DB_RLS_REQUIRED', 'DB_DYNAMIC_DDL', 'DB_POLICY_SHAPE', 'DB_DEFINER_SAFE', 'DB_STORAGE_POLICY', 'DB_CONFIG_POLICY', 'DB_TYPES_DRIFT',
   'HFS_DOCKER_HEALTHCHECK_FAKE', 'DB_BE_ONLY_ACCESS', 'DB_REALTIME_UNLISTED', 'DB_APP_ROLE', 'DB_FORCE_RLS_DEFAULT',
@@ -213,6 +215,7 @@ function contentRuleFindings({ repoRoot, repo, resolver, files, all, scoped, pin
     ...feStackFindings({ repoRoot, files: files.filter((file) => inScope(file)), repo, manifest }),
     ...repoLocalCheckFindings({ repoRoot, files }),
     ...lintSuppressionFindings({ repoRoot, files }),
+    ...bypassMarkerFindings({ repoRoot, files: files.filter((file) => inScope(file)) }),
     ...a15Findings({ repoRoot, files, all, repo, resolver, manifest, isRoot, appSide, inScope }),
   ];
   findings.push(...trackedStacksGateFindings({ repoRoot, files, all, repo, resolver, manifest, isRoot, inScope, existingFindings: findings }));
