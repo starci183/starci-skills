@@ -183,6 +183,11 @@ export function bundledPresets() {
 
 /** Where the be unit run writes the lcov report (jest `coverageDirectory` coverage under be/, reporter lcov), from the app root. */
 const LCOV_REPORT = 'be/coverage/lcov.info';
+/**
+ * The message catalogs Sonar's copy-paste detection leaves out (owner ruling 2026-10-22): a catalog holds one block per language
+ * with the same keys, which CPD reads as duplicated code. They are still sources: linted, analysed and held to every other rule.
+ */
+export const SONAR_CPD_EXCLUSIONS = Object.freeze(['**/messages/*.messages.ts', '**/messages/*.json']);
 
 const SOURCE_FILE = /\.[cm]?ts$/;
 const SOURCE_SKIPPED = new Set(['node_modules', 'dist', 'coverage']);
@@ -347,6 +352,7 @@ export function variables(app, scope, presets, sonarKey, manifest = loadSlotMani
     sonarExclusions: [presets?.sonarExclusions, '**/.next/**', '**/node_modules/**', ...(lite ? ['supabase/types/**'] : [])].filter(Boolean).join(','),
     sonarSources: ['be/apps', 'be/src', 'fe/apps', ...(packages ? ['fe/packages'] : [])].join(','),
     lcovReport: LCOV_REPORT,
+    cpdExclusions: SONAR_CPD_EXCLUSIONS.join(','),
     ...ciWorkflowCommands(source, LCOV_REPORT, source.qualityDeclared === false ? undefined : source.quality, { app }),
     // The coverage scope is the same in both editions: lite measures exactly what full measures (ruling:R212/case-1, amended by ruling:R212/case-4).
     jestCoverage: scope === 'be' ? jestCoverageSource(jestCoverage(manifest, providers)) : '',

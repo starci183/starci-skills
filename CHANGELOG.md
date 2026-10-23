@@ -9,7 +9,8 @@ until every S* row in `docs/goal.md` holds with fresh evidence, then `1.0.0` fre
 ## [1.0.0-alpha.26] — 2026-10-22
 
 ### Changed
-- Candidate package pins select HFS 4.7.21, CLI 1.7.21, jest preset 2.3.4, tsconfig 2.0.5, back-end canon 3.4.29 and front-end canon 8.4.28; the CLI's runtime installer selects 1.0.0-alpha.26.
+- Candidate package pins select HFS 4.7.23, CLI 1.7.23, jest preset 2.3.4, tsconfig 2.0.5, back-end canon 3.4.30 and front-end canon 8.4.29; the CLI's runtime installer selects 1.0.0-alpha.26.
+- Rendered `sonar-project.properties` leaves the message catalogs (`**/messages/*.messages.ts`, `**/messages/*.json`) out of Sonar copy-paste detection only (`sonar.cpd.exclusions`, owner ruling 2026-10-22): a catalog repeats its keys once per language. The three examples carry the line.
 
 ### Added
 - `starci runtime check --only export-used` also reports `RT_IMPORT_UNBOUND`: a runtime module that imports or re-exports a name a relative module of the tree does not export, which Node refuses at link time. Dropping an export can no longer leave an importer behind.
@@ -35,6 +36,8 @@ until every S* row in `docs/goal.md` holds with fresh evidence, then `1.0.0` fre
 - Every provider operation plan failed with a bare `provider-operation-failed` (for example `starci sonar project ensure` on a fresh ledger): the journal stored its public plan blob with the redaction claim `public-provision-record`, which `blobs.redaction` does not admit (`v1`, `binary` or NULL), so `INSERT OR IGNORE` dropped the row and the plan's foreign key failed. Public provision records now carry the NULL claim; a blob row the ledger does not keep refuses with `provision-journal-blob-refused`; an unclassified failure adds a `detail` naming its error code or class (never its message), and a refused Sonar action names its refusal code.
 - The examples declared the SonarCloud organization as `starci183` (the GitHub owner): their `SONAR_ORGANIZATION` CI variable value and README quality-gate badges now name `starcidapride`, the organization the repository variable holds and the examples workflow scans under.
 - The stacks gate no longer crashes on a declaration with an `operations` block: its schema walker resolved only local `#/` references, so the block's `$ref` to `provision-operation.schema.yaml` failed with a TypeError. The block is validated with the composed schema the provision target owner uses (`scripts/lib/provision-operation-schema.mjs`, one home for both readers), and any other cross-file reference is a finding instead of a crash.
+- `@starci/hfs` 4.7.21 shipped its runtime copy without `modules/schemas/provision-operation.schema.yaml` (the composition read it through a `skillRoot` join, which the copy generator does not follow), so `starci app check` and `starci app lint` failed with ENOENT in every installed app with an `operations` block; 4.7.22 reads both schemas through `new URL(..., import.meta.url)` and carries them.
+- The lite-app and shape-slot examples' `identity.messages.ts` and `http-security.messages.ts` are prettier-formatted, as their skeleton templates already were (HFS_FORMAT, which the shape-slot SonarCloud dashboard counted as 2 code smells).
 
 ## [1.0.0-alpha.25] — 2026-10-21
 

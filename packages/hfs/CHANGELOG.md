@@ -1,5 +1,11 @@
 # Changelog
 
+## 4.7.23 - 2026-10-22
+- Changed: the rendered `sonar-project.properties` leaves the message catalogs (`**/messages/*.messages.ts`, `**/messages/*.json`) out of Sonar's copy-paste detection (`sonar.cpd.exclusions`, owner ruling 2026-10-22). A catalog repeats its keys once per language, which CPD read as duplicated code (35% new duplicated lines on NIVO v0.3.1 once prettier formatted the catalogs); they stay sources, so lint, analysis and every other rule still hold them. Spec: `src/sonar-cpd-messages.spec.mjs`.
+
+## 4.7.22 - 2026-10-22
+- Fixed: the bundled runtime carries `modules/schemas/provision-operation.schema.yaml`; 4.7.21 left it out, so `starci app check` and `starci app lint` failed with ENOENT in every app whose stack declaration has an `operations` block. The composition reads both schemas through `new URL(..., import.meta.url)`, the form the runtime copy follows. Spec: `src/provision-operation-schema-bundle.spec.mjs`.
+
 ## 4.7.21 - 2026-10-22
 - Changed: the bundled `scripts/lib/gate-loosening.mjs` has no approval route (owner ruling loosening-always-red, 2026-10-22): `approved` and `approvalIdOf` are gone, `looseningStep` is the land gate's always-red step whose only way out is restoring the gate, and the pure released-state judgement `loosensReleased` moved here from the runtime's check library. Spec: `src/gate-loosening.spec.mjs`.
 - Added: the bundled runtime copy of `scripts/lib/gate-loosening.mjs`, which judges whether one change loosens a gate. It is rename-aware: an allowlist or rule entry that only moves with a git rename of the paths it names (the removed line, with every renamed prefix rewritten, equals an added line) is no loosening, while an entry that also widens, or one added beside the move, still is. Spec: `src/gate-loosening.spec.mjs`.
