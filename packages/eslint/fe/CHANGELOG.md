@@ -1,5 +1,8 @@
 # Changelog
 
+## 8.4.31 - 2026-10-23
+- Changed: the bundled canon pins select @starci/hfs 4.7.25 and @starci/cli 1.7.25.
+
 ## 8.4.30 - 2026-10-23
 - Changed: the bundled canon pins select @starci/hfs 4.7.24 and @starci/cli 1.7.24.
 - Added: the type-aware rules the back end already borrowed, at error: `@typescript-eslint/no-floating-promises`, `no-misused-promises`, `switch-exhaustiveness-check` and the `no-unsafe-assignment`, `-member-access`, `-call`, `-return`, `-argument` family.

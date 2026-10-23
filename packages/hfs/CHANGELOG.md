@@ -1,5 +1,10 @@
 # Changelog
 
+## 4.7.25 - 2026-10-23
+- Fixed: with fe packages, the managed `lint` and `lint:fix` scripts build them first (`turbo run build --filter=./fe/packages/*`, turbo.json already declares lint dependsOn ^build): the typed front-end canon of @starci/eslint-canon-fe 8.4.30 read a fresh full scaffold's i18n package as unresolved types (`no-unsafe-*`), so `starci app lint` was red on a new app.
+- Fixed: the skeleton specs cover the express-adapter guard of the edge security and the GraphQL error mapper without locations or path, so a fresh scaffold's unit run holds per-file 100; the skeleton templates and the Supabase auth partial are prettier-formatted (`HFS_FORMAT` was red on a fresh lite scaffold).
+- Changed: the bundled canon pins select @starci/cli 1.7.25, @starci/eslint-canon-be 3.4.32 and @starci/eslint-canon-fe 8.4.31.
+
 ## 4.7.24 - 2026-10-23
 - Fixed: `starci app release push` counts no skipped conclusion as passing (owner ruling 2026-10-22: a skip is a loosening): a green candidate run with a skipped job is red, and the failing-jobs report lists skipped jobs and steps. The candidate grace is 45 minutes and the bounded wait 150 minutes from the push; a queued run is listed, so GitHub's queue never counts against the grace. Specs: `src/candidate-ci.spec.mjs`.
 - Fixed: the local release gate always runs `db-stop` once `db-start` ran (`teardownOf`): a red database row no longer leaves the lite app's local Supabase running. Specs: `src/no-loosening-ci.spec.mjs`.

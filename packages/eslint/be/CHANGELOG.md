@@ -1,5 +1,8 @@
 # Changelog
 
+## 3.4.32 - 2026-10-23
+- Changed: the bundled canon pins select @starci/hfs 4.7.25 and @starci/cli 1.7.25.
+
 ## 3.4.31 - 2026-10-23
 - Changed: the `spec-no-skip` rule text says nothing skips, the contract layer included: a missing sandbox is a failing test of `sandbox.describe` from `@starci/test-world` 1.2.3.
 - Changed: the bundled canon pins select @starci/hfs 4.7.24 and @starci/cli 1.7.24.
