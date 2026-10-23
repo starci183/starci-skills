@@ -5011,6 +5011,7 @@ rules:
     failureCodes: ["HFS_BYPASS_MARKER"]
     enforcers:
       - {kind: hfs, id: bypass-markers, at: scripts/hfs/rules/bypass-markers.mjs}
+      - {kind: hfs, id: bypass-guard, at: packages/hfs/sync/hygiene.mjs}
     editions: [lite, full]
     docs:
       - {path: docs/hfs-authored-file-boundaries.md#r303, editions: [lite, full]}
