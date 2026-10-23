@@ -36,7 +36,6 @@ jobs:
   lint:
     timeout-minutes: {{timeoutLint}}
     runs-on: ubuntu-latest
-{{sonarEnv}}
     strategy:
       fail-fast: false
       matrix:
@@ -57,9 +56,9 @@ jobs:
 {{> app/ci-workflows/install-steps.yml}}
 {{> app/ci-workflows/jest-cache.yml}}
       # A shard (STARCI_COVERAGE_SHARD=1, the jest preset) measures only the files its specs load, without the per-file threshold, and writes istanbul
-      # JSON; the coverage job merges the shards by source location and proves 100 per file on the merged report. A small suite may leave a shard empty.
+      # JSON; the coverage job merges the shards by source location and proves 100 per file on the merged report. The shard count never exceeds what the unit specs fill.
       - name: unit
-        run: npm test -- --ci --forceExit --cacheDirectory .jest-cache --shard=${{ matrix.shard }}/{{testShardTotal}} --passWithNoTests --coverageThreshold={}
+        run: npm test -- --ci --forceExit --cacheDirectory .jest-cache --shard=${{ matrix.shard }}/{{testShardTotal}}
         env:
           STARCI_COVERAGE_SHARD: "1"
 {{> app/ci-workflows/jest-cache-save.yml}}

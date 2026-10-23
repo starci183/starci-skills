@@ -6,6 +6,9 @@ until every S* row in `docs/goal.md` holds with fresh evidence, then `1.0.0` fre
 
 ## [Unreleased]
 
+### Changed
+- CI canon, no loosening (owner ruling 2026-10-22: a loosening is red). The managed `ci.yml` of every app and example has no `continue-on-error`, no `fail_ci_if_error: false`, no coverage-upload skip step, no availability probe, no `--passWithNoTests` and no `--coverageThreshold={}` (the jest preset owns shard mode; the shard count is capped at what the unit specs fill, so a shard is never empty); Sonar has no token gate, its job refuses a missing token with a failing step, and an unreachable host is a red release row. `services.sonar.optional` and `services.codecov.optional` are gone from the declaration, the schema and the templates (`wiring: required`); the managed `test:affected` script (nothing read it) is gone and the managed `pre-push` hook has no `|| true`. The local release gate runs every row of the managed CI regardless of `release.requireCi` (format, typecheck, builds, lint, db lint, test with the coverage threshold, the lite database-types rows, the full app's test world, and Sonar whenever it is declared) and has no skipped row. The runtime workflows: Sonar fails on a missing setting, integration, e2e and the browser journey of `examples.yml` run in every run instead of by dispatch. CI standard item `optional-providers` became `required-providers`; `CI_UPLOAD_NOT_SILENT` also refuses `continue-on-error` and a secret-gated Sonar step; `EXAMPLES_CI_STACK_LAYER_AUTOMATIC` now refuses a stack layer gated on `workflow_dispatch`.
+
 ## [1.0.0-alpha.26] — 2026-10-22
 
 ### Changed

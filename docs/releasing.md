@@ -93,7 +93,7 @@ The latest run on main no longer gates a cut: a red main (alpha.21's) needs no o
 
 The runtime has no specs of its own (owner ruling `no-runtime-specs`, 2026-10-17), so it measures no coverage: Codecov carries only the example flags, and the root `codecov.yml` has no runtime flag. The scope SonarCloud analyses is ONE list, `scripts/hfs/runtime-coverage-scope.mjs`, derived from the runtime slot manifest; it renders the root `sonar-project.properties` (sources and exclusions, no lcov path, no organization or key), and `starci runtime check --only examples-ci -- --write` renders it and the check refuses drift.
 
-In `.github/workflows/ci.yml` the runs of the branch main (a main push, a dispatch of main) scan the runtime on SonarCloud (`https://sonarcloud.io`, fixed in that job) with the full git history, wait for the quality gate (up to an hour) and fail the job on a red gate; a tag run does not scan, since SonarCloud would open a branch named after the tag and the tagged commit is the one the main push scanned. The scan runs only where all three repository settings exist; otherwise the job prints a "Sonar skipped" notice naming each missing one.
+In `.github/workflows/ci.yml` the runs of the branch main (a main push, a dispatch of main) scan the runtime on SonarCloud (`https://sonarcloud.io`, fixed in that job) with the full git history, wait for the quality gate (up to an hour) and fail the job on a red gate; a tag run does not scan, since SonarCloud would open a branch named after the tag and the tagged commit is the one the main push scanned. The scan needs all three repository settings: a missing one fails the job with an error naming it.
 
 The runtime goes to SonarCloud; apps and examples go to the host's local SonarQube in `ext/sonar`. The owner configures once: the Codecov app and OIDC for the repository (for the example uploads), and the repository settings `secrets.SONAR_TOKEN` (a SonarCloud token), `vars.SONAR_ORGANIZATION` (the organization key) and `vars.SONAR_PROJECT_KEY` (the project key, normally `<organization>_<repository>`); on SonarCloud the repository is imported with Automatic Analysis turned off, since the analysis comes from CI.
 
@@ -130,5 +130,6 @@ Never publish unrelated dirty changes, silently retag a stable release as a pre-
 In lite and full, `CI_UPLOAD_NOT_SILENT` refuses a Codecov upload without
 `use_oidc: true`, job or workflow `permissions: id-token: write`, and
 `fail_ci_if_error: true`. Remove `continue-on-error: true` and any upload condition
-that reads a secret or `CODECOV_TOKEN`. These requirements apply to root, example
-and managed template workflows so missing credentials cannot silently skip an upload.
+that reads a secret or `CODECOV_TOKEN`. A Sonar step (`SonarSource/*`) has no condition that reads a secret or
+`SONAR_TOKEN` either, and no step or job of any workflow sets `continue-on-error`. These requirements apply to root, example
+and managed template workflows so missing credentials cannot silently skip an upload or a scan.

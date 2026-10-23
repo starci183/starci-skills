@@ -13,7 +13,7 @@ schema: starci/application-stacks@1
 ci:
   github: {repository: starci183/starci-skills, defaultBranch: main, workflow: examples.yml}
   secrets:
-    - {name: SONAR_TOKEN, scope: repository, purpose: Optional example SonarCloud analysis token, optional: true}
+    - {name: SONAR_TOKEN, scope: repository, purpose: example SonarCloud analysis token}
     - {name: SOPS_AGE_KEY, scope: environment, environment: production, purpose: Optional demonstration database deployment identity; no real deploy, optional: true}
     - {name: VPS_SSH_KEY, scope: environment, environment: production, purpose: Optional demonstration SSH deploy key; no real deploy, optional: true}
     - {name: VPS_KNOWN_HOSTS, scope: environment, environment: production, purpose: Optional demonstration SSH host verification; no real deploy, optional: true}
@@ -213,7 +213,7 @@ services:
     runtimeSecrets: [SONAR_TOKEN]
     ci:
       workflow: .github/workflows/examples.yml
-      wiring: optional-follow-up
+      wiring: required
       token: SONAR_TOKEN
       hostVar: SONAR_HOST_URL
       organizationVar: SONAR_ORGANIZATION
@@ -234,7 +234,7 @@ services:
     target: 100
     components: auto
     required: true
-    ci: {wiring: optional-follow-up, workflow: .github/workflows/examples.yml}
+    ci: {wiring: required, workflow: .github/workflows/examples.yml}
     ownerAction: none
   dependabot:
     provider: github
@@ -262,5 +262,5 @@ services:
     auth: github-token
     projects:
       - {repository: lite-app, key: lite-app}
-    ci: {wiring: optional-follow-up}
+    ci: {wiring: required}
     ownerAction: none

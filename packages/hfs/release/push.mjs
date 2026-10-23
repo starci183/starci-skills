@@ -19,7 +19,7 @@ function readRecord(file) {
 }
 
 const greenRecord = (record, head, tag) => record?.head === head && record?.tag === tag
-  && Array.isArray(record.gates) && record.gates.length > 0 && record.gates.every((gate) => gate?.pass === true || (gate?.name === 'sonar' && gate?.skipped === true));
+  && Array.isArray(record.gates) && record.gates.length > 0 && record.gates.every((gate) => gate?.pass === true);
 
 /** The release gate as the hook reads it: the annotated tag on HEAD whose L4 record names head and tag. Returns { tag } or { reason }. */
 function gateState(ctx, head, prefix) {

@@ -30,7 +30,7 @@ const publicFile = (file, bound) => {
 function nativeConfiguration(target, request) {
   const doc = parseYaml(publicFile(target.declaration.path, 2 * 1024 * 1024).toString('utf8'));
   const quality = qualityServices(doc).sonar;
-  if (quality?.optional !== false || quality.provider !== 'sonarqube'
+  if (!quality || quality.provider !== 'sonarqube'
       || quality.host?.replace(/\/$/, '') !== target.origin || quality.projectKey !== request.projectKey
       || !/^SONAR_(?:[A-Z0-9_]*_)?TOKEN$/.test(quality.token)
       || (quality.organization && quality.organization !== request.organization)
@@ -62,8 +62,8 @@ function nativeRecord(target, request) {
     const rows = record.gates, tag = record.tag;
     if (record.schema !== 'starci-app-l4-record/1' || record.producedBy !== 'starci app release gate'
         || record.head !== request.revision || typeof tag !== 'string' || !/^[A-Za-z0-9._/-]{1,128}$/.test(tag)
-        || !Array.isArray(rows) || !rows.length || rows.some(row => row.pass !== true && row.skipped !== true)
-        || rows.filter(row => row.name === 'sonar' && row.pass === true && row.skipped !== true).length !== 1) return null;
+        || !Array.isArray(rows) || !rows.length || rows.some(row => row.pass !== true)
+        || rows.filter(row => row.name === 'sonar' && row.pass === true).length !== 1) return null;
     const type = catFile(['-t', `refs/tags/${tag}`], {cwd: target.repoRoot});
     if (type.status !== 0 || String(type.stdout).trim() !== 'tag'
         || revParse(target.repoRoot, `refs/tags/${tag}`) !== request.revision) return null;

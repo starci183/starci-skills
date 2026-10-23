@@ -15197,22 +15197,22 @@ EXAMPLES_CI_HARDCODED:
   kind: check-finding
 
 EXAMPLES_CI_STACK_LAYER_AUTOMATIC:
-  title: "Integration or e2e runs automatically"
-  title_vi: "Integration hoặc e2e chạy tự động"
-  meaning_vi: "Một bước chạy `test:integration`, `test:e2e` hoặc `test:contract` (khởi động stack docker) không được giới hạn ở `workflow_dispatch`; theo quyết định của chủ dự án, e2e chỉ chạy thủ công."
+  title: "Integration or e2e is gated on a manual dispatch"
+  title_vi: "Integration hoặc e2e bị chặn bởi điều kiện chạy thủ công"
+  meaning_vi: "Một bước chạy `test:integration`, `test:e2e` hoặc `test:contract` (khởi động stack docker) hoặc job chứa nó bị giới hạn ở `workflow_dispatch`; các lớp này phải chạy trong mọi lượt chạy, không chỉ khi có người bấm."
   causes_vi:
-    - "Bước thiếu điều kiện `if: github.event_name == 'workflow_dispatch' ...`"
-  nextStep_vi: "Thêm điều kiện `github.event_name == 'workflow_dispatch'` (và input `layers`) cho bước đó."
+    - "Bước hoặc job có điều kiện `if` đọc `workflow_dispatch`"
+  nextStep_vi: "Bỏ điều kiện `workflow_dispatch` (và input `layers`) khỏi bước hoặc job đó để nó chạy trong mọi lượt chạy."
   owner: runtime-core
   kind: check-finding
 
 EXAMPLES_CI_NO_MANUAL_TRIGGER:
   title: "The examples workflow has no manual trigger"
   title_vi: "Workflow ví dụ thiếu trigger thủ công"
-  meaning_vi: "Workflow ví dụ không có `workflow_dispatch`, nên các lớp integration và e2e không thể chạy thủ công."
+  meaning_vi: "Workflow ví dụ không có `workflow_dispatch`, nên không thể chạy lại cùng bằng chứng theo yêu cầu."
   causes_vi:
-    - "Khối `on` thiếu `workflow_dispatch` với input `layers`"
-  nextStep_vi: "Thêm `workflow_dispatch` với input `layers` (integration, e2e hoặc cả hai) vào workflow."
+    - "Khối `on` thiếu `workflow_dispatch`"
+  nextStep_vi: "Thêm `workflow_dispatch` vào khối `on` của workflow."
   owner: runtime-core
   kind: check-finding
 

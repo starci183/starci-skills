@@ -182,18 +182,17 @@ k8s:
   reason: Lite production uses Docker Swarm with managed Supabase backing; Kubernetes belongs to a future full-edition deployment.
 ci:
   secrets:
-    - {name: SONAR_TOKEN, scope: repository, purpose: Sonar analysis token provisioned for this app, optional: true}
+    - {name: SONAR_TOKEN, scope: repository, purpose: Sonar analysis token provisioned for this app}
     - {name: SOPS_AGE_KEY, scope: environment, environment: production, purpose: Decrypt app members during deployment, optional: true}
     - {name: VPS_SSH_KEY, scope: environment, environment: production, purpose: Deployment SSH key, optional: true}
     - {name: VPS_KNOWN_HOSTS, scope: environment, environment: production, purpose: Pinned deployment SSH host keys, optional: true}
   vars:
-    - {name: SONAR_HOST_URL, scope: repository, value: "https://sonar.{{project}}.example.invalid", purpose: Documentation endpoint to replace with this app's public Sonar host, optional: true}
+    - {name: SONAR_HOST_URL, scope: repository, value: "https://sonar.{{project}}.example.invalid", purpose: Documentation endpoint to replace with this app's public Sonar host}
     - {name: VPS_HOST, scope: environment, environment: production, value: 203.0.113.10, purpose: Documentation deployment address to replace before use, optional: true}
     - {name: VPS_USER, scope: environment, environment: production, value: deploy, purpose: Documentation deployment user to replace before use, optional: true}
 services:
   sonar:
     provider: sonarqube
-    optional: true
     mode: local
     qualityGate: {{sonarGate}}
     host: {local: http://127.0.0.1:9000, public: "https://sonar.{{project}}.example.invalid"}
@@ -205,7 +204,7 @@ services:
     auth: token
     credentials: []
     projects: [{repository: "{{project}}", key: "{{project}}"}]
-    ci: {wiring: optional-follow-up, workflow: .github/workflows/ci.yml, token: SONAR_TOKEN, hostVar: SONAR_HOST_URL}
+    ci: {wiring: required, workflow: .github/workflows/ci.yml, token: SONAR_TOKEN, hostVar: SONAR_HOST_URL}
     ownerAction:
       needed: Provision this app's Sonar host and project, then set SONAR_TOKEN with starci app ci secret set and sync SONAR_HOST_URL.
       reason: A fresh app declares its quality service without fabricating credentials or a successful analysis.
@@ -217,7 +216,7 @@ services:
     target: 100
     components: auto
     required: true
-    ci: {wiring: optional-follow-up, workflow: .github/workflows/ci.yml}
+    ci: {wiring: required, workflow: .github/workflows/ci.yml}
     ownerAction: none
   dependabot:
     provider: github
@@ -244,5 +243,5 @@ services:
     host: {public: https://ghcr.io}
     auth: github-token
     projects: [{repository: "{{project}}", key: "{{project}}"}]
-    ci: {wiring: optional-follow-up}
+    ci: {wiring: required}
     ownerAction: none

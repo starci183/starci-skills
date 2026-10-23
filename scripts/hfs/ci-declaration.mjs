@@ -42,13 +42,13 @@ export function qualityServices(doc, { example = false } = {}) {
   const dependabot = services.dependabot ?? {}, audit = services.audit ?? {};
   return {
     sonar: !sonar || sonar.mode === 'disabled' ? null : {
-      provider: sonar.provider, mode: sonar.mode, optional: sonar.optional ?? sonar.provider === 'sonarqube', host: sonar.host?.public || sonar.host?.local || null,
+      provider: sonar.provider, mode: sonar.mode, host: sonar.host?.public || sonar.host?.local || null,
       organization: sonar.organization ?? null,
       organizationVar: sonar.ci?.organizationVar ?? (sonar.provider === 'sonarcloud' && (example || list(sonar.runtimeSecrets).length > 0) && !list(sonar.credentials).length ? 'SONAR_ORGANIZATION' : null), projectKey: sonar.projects?.[0]?.key ?? null,
       qualityGate: sonar.qualityGate ?? (example ? 'starci-quality-lite' : 'starci-quality'), wiring: sonar.ci?.wiring ?? 'required',
       token: sonar.ci?.token || nameOf(sonar.ci?.secrets?.[0]) || 'SONAR_TOKEN', hostVar: sonar.ci?.hostVar || 'SONAR_HOST_URL',
     },
-    codecov: { optional: codecov.optional ?? false, enabled: codecov.mode !== 'disabled', auth: codecov.auth ?? 'oidc', token: codecov.ci?.token ?? null,
+    codecov: { enabled: codecov.mode !== 'disabled', auth: codecov.auth ?? 'oidc', token: codecov.ci?.token ?? null,
       flag: codecov.flag ?? null, target: codecov.target ?? 100, components: codecov.components ?? 'auto', required: codecov.required ?? true, wiring: codecov.ci?.wiring ?? 'required' },
     dependabot: { ecosystems: [...(dependabot.ecosystems ?? ['npm', 'github-actions', 'docker'])],
       schedule: { interval: 'weekly', ...dependabot.schedule }, groups: { minorPatch: 'grouped', major: 'per-package', ...dependabot.groups },

@@ -151,9 +151,6 @@ $defs:
       target: {type: number, minimum: 0, maximum: 100}
       components: {enum: [auto]}
       required: {type: boolean}
-      optional:
-        description: Skip an unreachable quality provider with a notice; SonarQube defaults true, SonarCloud and Codecov false.
-        type: boolean
       badgeToken:
         description: >-
           codecov and sonar only: a read-only, public-safe badge token (Codecov graphing token, Sonar project badge token)

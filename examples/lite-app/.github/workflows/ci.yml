@@ -59,8 +59,6 @@ jobs:
   lint:
     timeout-minutes: 30
     runs-on: ubuntu-latest
-    env:
-      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
     strategy:
       fail-fast: false
       matrix:
@@ -106,18 +104,12 @@ jobs:
             base="$BEFORE"
           fi
           echo "STARCI_BASE_REF=$base" >> "$GITHUB_ENV"
-      - name: lint
-        if: env.SONAR_TOKEN == ''
-        run: node node_modules/@starci/hfs/runtime/scripts/hfs/example-secrets.mjs --run . -- npm run lint -- --side ${{ matrix.side }}
-        env:
-          NODE_OPTIONS: --max-old-space-size=6144
       - name: lint with Sonar import
-        if: env.SONAR_TOKEN != ''
         run: node node_modules/@starci/hfs/runtime/scripts/hfs/example-secrets.mjs --run . -- npm run lint -- --side ${{ matrix.side }} --sonar reports/lint.${{ matrix.side }}.sonar.json
         env:
           NODE_OPTIONS: --max-old-space-size=6144
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        if: always() && env.SONAR_TOKEN != '' && hashFiles(format('reports/lint.{0}.sonar.json', matrix.side)) != ''
+        if: always() && hashFiles(format('reports/lint.{0}.sonar.json', matrix.side)) != ''
         with:
           name: sonar-lint-${{ matrix.side }}
           path: reports/lint.${{ matrix.side }}.sonar.json
@@ -163,9 +155,9 @@ jobs:
             ${{ runner.os }}-node22-jest-${{ hashFiles('package-lock.json') }}-shard${{ matrix.shard }}-
             ${{ runner.os }}-node22-jest-${{ hashFiles('package-lock.json') }}-
       # A shard (STARCI_COVERAGE_SHARD=1, the jest preset) measures only the files its specs load, without the per-file threshold, and writes istanbul
-      # JSON; the coverage job merges the shards by source location and proves 100 per file on the merged report. A small suite may leave a shard empty.
+      # JSON; the coverage job merges the shards by source location and proves 100 per file on the merged report. The shard count never exceeds what the unit specs fill.
       - name: unit
-        run: npm test -- --ci --forceExit --cacheDirectory .jest-cache --shard=${{ matrix.shard }}/6 --passWithNoTests --coverageThreshold={}
+        run: npm test -- --ci --forceExit --cacheDirectory .jest-cache --shard=${{ matrix.shard }}/6
         env:
           STARCI_COVERAGE_SHARD: "1"
       - name: Jest cache save
@@ -228,14 +220,9 @@ jobs:
         with:
           name: coverage-lcov
           path: be/coverage/lcov.info
-      - name: coverage upload skipped
-        if: ${{ !cancelled() && hashFiles('be/coverage/lcov.info') == '' }}
-        run: |
-          echo "::notice::codecov upload skipped: no coverage file at be/coverage/lcov.info (the test step failed or produced none)"
-          exit 0
       - name: coverage upload
         uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5.5.5
-        if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/v') && hashFiles('be/coverage/lcov.info') != '' }}
+        if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/v') }}
         with:
           use_oidc: true
           files: be/coverage/lcov.info
@@ -324,19 +311,23 @@ jobs:
             ${{ runner.os }}-node22-build-
       - run: npm ci --ignore-scripts
         if: steps.deps.outputs.cache-hit != 'true'
+      - name: Sonar token
+        if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/v') }}
+        run: |
+          if [ -z "$SONAR_TOKEN" ]; then echo "::error::SONAR_TOKEN is not set: Sonar is required, so a missing token fails this job (secret SONAR_TOKEN)"; exit 1; fi
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
-        if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/v') && env.SONAR_TOKEN != '' }}
+        if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/v') }}
         with:
           name: coverage-lcov
           path: be/coverage
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
-        if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/v') && env.SONAR_TOKEN != '' }}
+        if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/v') }}
         with:
           pattern: sonar-lint-*
           path: reports
           merge-multiple: true
       - name: merge Sonar lint reports
-        if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/v') && env.SONAR_TOKEN != '' }}
+        if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/v') }}
         run: |
           node --input-type=module <<'NODE'
           import fs from 'node:fs';
@@ -348,9 +339,9 @@ jobs:
           fs.writeFileSync('reports/lint.sonar.json', JSON.stringify({ rules, issues }, null, 2) + '\n');
           NODE
       - uses: SonarSource/sonarqube-scan-action@c7ee0f9df90b7aa20e8dcf9695dcfe2e7da5b4f2 # v7.2.1
-        if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/v') && env.SONAR_TOKEN != '' }}
+        if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/v') }}
       - uses: SonarSource/sonarqube-quality-gate-action@7a5fffe8e523c40e0c740b6bc2712ab503e52efa # v1.2.1
-        if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/v') && env.SONAR_TOKEN != '' }}
+        if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/v') }}
         timeout-minutes: 10
 
   db-types:
