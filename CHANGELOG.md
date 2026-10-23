@@ -20,6 +20,8 @@ until every S* row in `docs/goal.md` holds with fresh evidence, then `1.0.0` fre
 - Owner rulings removed or amended: `ambient-id-test-world-exemption` (BE_AMBIENT_ID has no test-world exemption), `quality-services-optional`, `alpha20-ci-override-owner-only`, `ci-override-574bfcaca06c` (the verb `starci release ci-override` and its record are gone; a red candidate CI never passes).
 
 ### Fixed
+- The check-code detector read lane F's own removal of the exception lists as a loosening: a quoted operand of a printed message (`'
+'` after a `... +` line) counted as a ban-list row, and the upkeep of the dead-script list (`RT_DEAD_ENTRY`) counted as enforcement lost although the check no longer reads any list. `parseDiff` now marks the removed operands of a string concatenation, and a check whose change removes its import of `scripts/lib/allowlist.mjs` loses only the lines that name that list; every other removed row or enforcement line still counts. R303 `HFS_BYPASS_MARKER` names its spec (`// proves:` in `src/bypass-detector.spec.mjs`).
 - `starci provision operation plan|status|accept` no longer hides every failure behind `provision-control-unavailable`: a plan blob the ledger names but this runtime's blob store does not hold (an operation prepared by a lane runtime, read by the published CLI) is `provision-plan-blob-missing`, naming the blob and the operation, and any other failure names its stage (`ledger`, `plan`, `target`, `accept`) and the error's identifier (`scripts/lib/provision-control-failure.mjs`).
 
 ## [1.0.0-alpha.27] — 2026-10-23

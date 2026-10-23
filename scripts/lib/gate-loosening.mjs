@@ -32,25 +32,42 @@ function plainNumberLine(line) {
   return (code.endsWith(',') ? code.slice(0, -1) : code).replace(/^(\s*(?:-\s+)?)["']([^"']+)["']:/, '$1$2:');
 }
 
+const concatenates = (line) => typeof line === 'string' && line.trimEnd().endsWith('+');
+
+/** Records one changed line of `current`; returns the removed text (the next line's `above`), or null. */
+function recordLine(current, line, section, above) {
+  if (line.startsWith('deleted file mode')) { current.deleted = true; return null; }
+  if (line.startsWith('+') && !line.startsWith('+++')) {
+    const text = line.slice(1);
+    current.added.push(text);
+    current.under.set(text, [...(current.under.get(text) ?? []), section]);
+    return null;
+  }
+  if (!line.startsWith('-') || line.startsWith('---')) return null;
+  const text = line.slice(1);
+  current.removed.push(text);
+  if (concatenates(above) || concatenates(text)) current.operands.add(text);
+  return text;
+}
+
 /**
  * The files of a unified diff: [{file, deleted, added[], removed[], under}] (changed lines without their marker). `under` maps an added line to the
  * hunk headers it was added under (git prints the nearest line above the hunk that starts a word, so the key a YAML list item sits in).
+ * `operands` holds the removed lines that are an operand of a string concatenation: a line that ends in `+`, or one whose removed line just
+ * above it in the same hunk ends in `+` (a message being printed, never a row of a ban list).
  */
 export function parseDiff(text) {
   const files = [];
   let current = null;
   let section = '';
+  let above = null;
   for (const line of String(text ?? '').split(/\r?\n/)) {
     const header = /^diff --git a\/(.+?) b\/(.+)$/.exec(line);
-    if (header) { current = { file: header[2], deleted: false, added: [], removed: [], under: new Map() }; files.push(current); continue; }
+    if (header) { current = { file: header[2], deleted: false, added: [], removed: [], operands: new Set(), under: new Map() }; files.push(current); above = null; continue; }
     if (!current) continue;
     const hunk = /^@@ .*? @@ ?(.*)$/.exec(line);
-    if (hunk) section = hunk[1];
-    else if (line.startsWith('deleted file mode')) current.deleted = true;
-    else if (line.startsWith('+') && !line.startsWith('+++')) {
-      current.added.push(line.slice(1));
-      current.under.set(line.slice(1), [...(current.under.get(line.slice(1)) ?? []), section]);
-    } else if (line.startsWith('-') && !line.startsWith('---')) current.removed.push(line.slice(1));
+    if (hunk) { section = hunk[1]; above = null; continue; }
+    above = recordLine(current, line, section, above);
   }
   return files;
 }

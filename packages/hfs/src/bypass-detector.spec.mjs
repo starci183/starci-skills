@@ -1,3 +1,5 @@
+// proves: HFS_BYPASS_MARKER@lite
+// proves: HFS_BYPASS_MARKER@full
 // No bypass lands unnoticed (owner ruling loosening-always-red). Two readers share one marker table (scripts/lib/bypass-markers.mjs):
 //   - the runtime detector (scripts/lib/gate-loosening.mjs + scripts/lib/check-code-loosening.mjs) judges the diff of a change to the code of
 //     a check: the check scripts, the canon templates, the lint packages, workflows and hooks;
@@ -70,6 +72,24 @@ test('a ban list loses an entry: a gate-file item, a pattern-table row, a quoted
   assert.deepEqual(kindsOf({ 'scripts/checks/check-ban-list.mjs': { removed: ["  'terminal create',"] } }), ['check-removed scripts/checks/check-ban-list.mjs']);
   assert.deepEqual(kindsOf({ 'scripts/checks/a.mjs': { removed: [row] }, 'scripts/checks/b.mjs': { added: [row] } }), [], 'a row moved to another file stays');
   assert.deepEqual(kindsOf({ 'scripts/checks/gone.mjs': { removed: [row], deleted: true } }), [], 'a deleted script is judged by its registration, not here');
+});
+
+test('a quoted operand of a printed message is no ban-list row; the same literal on its own still is', () => {
+  const message = ["    process.stderr.write(", "      `Allowlist path missing (${n}):\\n` +", "        missing.map((p) => `  ${p}`).join('\\n') +", "        '\\n'", "    );"];
+  assert.deepEqual(kindsOf({ 'scripts/checks/check-json.mjs': { removed: message } }), []);
+  assert.deepEqual(kindsOf({ 'scripts/checks/check-json.mjs': { removed: ["      `; ${n} skipped).\\n` +"] } }), [], 'an operand that ends in +');
+  assert.deepEqual(kindsOf({ 'scripts/checks/check-json.mjs': { removed: ["  'terminal create',"] } }), ['check-removed scripts/checks/check-json.mjs']);
+  assert.deepEqual(parseDiff(diffOf({ 'a.mjs': { removed: ['x +', "'y'", "'z'"] } }))[0].operands, new Set(['x +', "'y'"]));
+});
+
+test('a check that stops reading the exception list loses only the upkeep of that list; any other enforcement removed still weakens it', () => {
+  const importLine = "import { ALLOWLIST_FILE, allowlistSection } from '../lib/allowlist.mjs';";
+  const upkeep = "    if (!scripts.includes(entry)) findings.push({ code: 'RT_DEAD_ENTRY', path: entry, message: `${ALLOWLIST_FILE} lists ${entry}` });";
+  const real = "  findings.push({ code: 'RT_DEAD_SCRIPT', path: rel, message: 'dead' });";
+  assert.deepEqual(kindsOf({ 'scripts/checks/check-dead.mjs': { removed: [importLine, upkeep] } }), []);
+  assert.deepEqual(kindsOf({ 'scripts/checks/check-dead.mjs': { removed: [upkeep] } }), ['check-weakened scripts/checks/check-dead.mjs'], 'the list is still read');
+  assert.deepEqual(kindsOf({ 'scripts/checks/check-dead.mjs': { removed: [importLine, upkeep], added: [importLine.replace('allowlistSection', 'x')] } }), ['check-weakened scripts/checks/check-dead.mjs'], 'the import stays');
+  assert.deepEqual(kindsOf({ 'scripts/checks/check-dead.mjs': { removed: [importLine, upkeep, real] } }), ['check-weakened scripts/checks/check-dead.mjs']);
 });
 
 test('a check that loses enforcement lines in a change is weakened; one that gains as many is not', () => {

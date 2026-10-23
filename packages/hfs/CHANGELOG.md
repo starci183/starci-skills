@@ -1,6 +1,7 @@
 # Changelog
 
 ## 4.7.28 - 2026-10-23
+- Fixed: the bundled gate-loosening detector no longer reads a quoted operand of a printed message as a ban-list row, nor the upkeep of an exception list the check stops reading as enforcement lost (`src/bypass-detector.spec.mjs`).
 - Added: `scripts/lib/provision-control-failure.mjs` joins the bundled runtime copy, proven by `src/provision-control-failure.spec.mjs`.
 - Changed: the bundled canon pins select @starci/cli 1.7.28, @starci/eslint-canon-be 3.4.35 and @starci/eslint-canon-fe 8.4.34.
 - Changed: no check keeps a list of exceptions. The JSON a tool requires is declared once by format (`scripts/lib/json-formats.mjs`, bundled), the failure-code scanner no longer counts a literal the code only reads (`scripts/lib/failure-code-reads.mjs`, bundled), and a rule is proven by a package spec unless every enforcer it has runs only inside the runtime (`RUNTIME_ONLY_ENFORCERS`); the catalog keys `specNa`, `exampleNa` and the unreachable witness are gone.

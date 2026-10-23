@@ -4,7 +4,8 @@
 // that moves keeps its text, so it is paired off against its removal anywhere in the change). The kinds it reports:
 //   bypass-added     a bypass marker added to a file of checkCode (scripts/lib/bypass-markers.mjs)
 //   check-weakened   the change removes more enforcement lines from the files of checkCode than it adds back to them
-//   check-removed    a pattern-table row or quoted list entry removed from a check script and added nowhere in the change
+//   check-removed    a pattern-table row or quoted list entry removed from a check script and added nowhere in the change (a quoted
+//                    operand of a string concatenation, the text of a message, is no row)
 //   scope-widened    an exemption added: an ignore / exclude / exclusion key gaining an entry, a line more in an ignore file, an item added
 //                    under codecov.yml `ignore:`, or skipLibCheck turned on
 // A deleted file is not counted for check-weakened or check-removed: a registered check is judged by its entry in a gate file
@@ -61,7 +62,8 @@ function bypassesAdded(entry, unmoved) {
 
 function entriesRemoved(entry, addedBack) {
   if (entry.deleted || !CODE_NAME.test(entry.file)) return [];
-  return entry.removed.filter((line) => LIST_ENTRY.test(line) && !COMMENT_LINE.test(line)).flatMap((line) => {
+  const operand = (line) => entry.operands?.has(line) === true;
+  return entry.removed.filter((line) => LIST_ENTRY.test(line) && !COMMENT_LINE.test(line) && !operand(line)).flatMap((line) => {
     const left = addedBack.get(trimmed(line)) ?? 0;
     if (left > 0) { addedBack.set(trimmed(line), left - 1); return []; }
     return [{ kind: 'check-removed', file: entry.file, detail: clip(trimmed(line)) }];
@@ -92,16 +94,30 @@ function scopesWidened(entry, unmoved) {
   });
 }
 
+/** An import of the runtime's one exception list (scripts/lib/allowlist.mjs). */
+const ALLOWLIST_IMPORT = /\bfrom\s+['"][./]*(?:scripts\/)?lib\/allowlist\.mjs['"]/;
+const NAMES_ALLOWLIST = /allowlist/i;
+
+/**
+ * The removed lines of `entry` that count as enforcement lost. A check that stops reading the exception list (the change removes its import of
+ * scripts/lib/allowlist.mjs and adds none back) loses the enforcement that policed that list's own entries (a stale entry, an entry code now
+ * reads): those lines name the list, and with the list gone they police nothing. Every other removed enforcement line counts.
+ */
+function enforcementRemoved(entry) {
+  const dropsList = entry.removed.some((line) => ALLOWLIST_IMPORT.test(line)) && !entry.added.some((line) => ALLOWLIST_IMPORT.test(line));
+  return dropsList ? entry.removed.filter((line) => !NAMES_ALLOWLIST.test(line)) : entry.removed;
+}
+
 /** Every finding the check files of the change `files` (parseDiff entries) add under `rules` (modules/kernel/gate-loosening.yaml): [{kind, file, detail}]. */
 export function checkCodeFindings(files, rules) {
   const watched = files.filter((entry) => isCheckCode(entry.file, rules));
   const unmoved = unmovedOf(watched);
   const alive = watched.filter((entry) => !entry.deleted);
-  const fewerInChange = enforcementCount(alive.flatMap((entry) => entry.removed)) - enforcementCount(alive.flatMap((entry) => entry.added));
+  const fewerInChange = enforcementCount(alive.flatMap(enforcementRemoved)) - enforcementCount(alive.flatMap((entry) => entry.added));
   const addedBack = countOf(watched.flatMap((entry) => entry.added));
   return watched.flatMap((entry) => {
     const own = unmoved.get(entry);
-    const fewer = enforcementCount(entry.removed) - enforcementCount(entry.added);
+    const fewer = enforcementCount(enforcementRemoved(entry)) - enforcementCount(entry.added);
     return [
       ...bypassesAdded(entry, own),
       ...entriesRemoved(entry, addedBack),
