@@ -6,6 +6,20 @@ until every S* row in `docs/goal.md` holds with fresh evidence, then `1.0.0` fre
 
 ## [Unreleased]
 
+## [1.0.0-alpha.29] — 2026-10-24
+
+### Changed
+- Candidate package pins select HFS 4.7.29, CLI 1.7.29, jest preset 2.3.5, test-world 1.2.3, tsconfig 2.0.7, prettier config 1.0.4, back-end canon 3.4.37 and front-end canon 8.4.36.
+- zod is pinned at 4.6.7 in `knowledge/hfs/canon-pins.yaml`, the templates (the scaffold reads the pin, including the root `overrides`) and the three examples: 4.4.3 carried the high advisory GHSA-mrhx-c7xc-m3w5 (fixed in 4.6.6), so the `npm audit --audit-level=high` row of every product's release gate was red. The example lockfiles also resolve body-parser 2.4.0 (GHSA-27r3-jxmh-p828) and handlebars 4.7.10 within their declared ranges; `npm audit` of each example and of a fresh full scaffold reports 0 vulnerabilities.
+
+### Added
+- A new full app ships a real test world (`packages/hfs/scaffold/test-world.mjs`, `packages/hfs/templates/be/test-world/`): the `@starci/test-world` declaration under `be/src/tests/world/` (the dev stack's Postgres per connection, the api apps, the cli app's migration runner as the migrate step, a platform base for modules worlds), an integration spec of readiness over the real database (ready, refused while the database is cut, ready again) and one e2e spec per api app booted over the migrated database and called over HTTP, beside the contract spec of the be skeleton. The release gate's `test:integration`, `test:e2e` and `test:contract` rows of a freshly scaffolded full app run real specs instead of failing with no project; the scaffold e2e runs the three layers of the scaffold over the real warm stack.
+- `starci app upgrade [--plan]` on a full app without `be/src/tests/world/global-setup.ts` adds that test world and the test devDependencies it lacks at canon pins; a world file that exists and differs refuses `HFS_UPGRADE_FILE_CONFLICT` and nothing is overwritten. A lite app still upgrades with `--edition full`.
+- `starci git commit --body-file <file>` (or `-` for stdin) carries a multi-line body, and the verb hands the whole message to git on stdin (`git commit -F -`), never as an argument (`e2e/git-commit-body.e2e.spec.mjs`).
+
+### Fixed
+- `starci git commit` lost every line after the first of a multi-line `--body` passed through a command-shell launcher (the Windows `starci.cmd` shim ends an argument at its first newline); a multi-line body now travels in a file or on stdin.
+
 ## [1.0.0-alpha.28] — 2026-10-23
 
 ### Added

@@ -282,6 +282,7 @@ _starci() {
         git:commit:--scope) return 0;;
         git:commit:--summary) return 0;;
         git:commit:--body) return 0;;
+        git:commit:--body-file) return 0;;
         git:commit:--paths) return 0;;
         git:commit:--lane) return 0;;
         git:commit:--co-author) return 0;;
@@ -1172,7 +1173,7 @@ _starci() {
         gate:test-world) COMPREPLY=( $(compgen -W "--root --project --tests --out --json --cwd --quiet --help --edition" -- "$cur") );;
         gate:unit) COMPREPLY=( $(compgen -W "--root --out --json --cwd --quiet --help --edition" -- "$cur") );;
         git:backup) COMPREPLY=( $(compgen -W "--remote --branches --dry-run --json --cwd --quiet --help --edition" -- "$cur") );;
-        git:commit) COMPREPLY=( $(compgen -W "--type --scope --summary --body --paths --lane --co-author --dry-run --json --cwd --quiet --help --edition" -- "$cur") );;
+        git:commit) COMPREPLY=( $(compgen -W "--type --scope --summary --body --body-file --paths --lane --co-author --dry-run --json --cwd --quiet --help --edition" -- "$cur") );;
         git:land) COMPREPLY=( $(compgen -W "--dry-run --lane --kernel-note --json --cwd --quiet --help --edition" -- "$cur") );;
         git:sync) COMPREPLY=( $(compgen -W "--main-ref --dry-run --abort-on-conflict --json --cwd --quiet --help --edition" -- "$cur") );;
         guard:command) COMPREPLY=( $(compgen -W "--json --cwd --quiet --help --edition" -- "$cur") );;

@@ -1,5 +1,8 @@
 # Changelog
 
+## 8.4.36 - 2026-10-24
+- Changed: the bundled canon pins select zod 4.6.7, @starci/hfs 4.7.29 and @starci/cli 1.7.29.
+
 ## 8.4.35 - 2026-10-23
 - Changed: the bundled slot manifest names the specs that moved into this package; 8.4.34 was published with the old spec paths and is superseded.
 

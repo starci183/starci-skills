@@ -1,5 +1,10 @@
 # Changelog
 
+## 4.7.29 - 2026-10-24
+- Added: a new full app ships its test world (`scaffold/test-world.mjs`, `templates/be/test-world/`): the `@starci/test-world` declaration under `be/src/tests/world/`, an integration spec of readiness over the real database and one e2e spec per api app, so the integration, e2e and contract rows of the release gate run real specs.
+- Added: `starci app upgrade [--plan]` on a full app without `be/src/tests/world/global-setup.ts` adds that world and the test devDependencies it lacks at canon pins, never overwriting a file (`HFS_UPGRADE_FILE_CONFLICT`); proven by `src/main.spec.mjs`.
+- Changed: the bundled canon pins select zod 4.6.7 (GHSA-mrhx-c7xc-m3w5 is fixed in 4.6.6), @starci/cli 1.7.29, @starci/eslint-canon-be 3.4.37 and @starci/eslint-canon-fe 8.4.36.
+
 ## 4.7.28 - 2026-10-23
 - Added: `scripts/lib/sonar-new-code.mjs` joins the bundled runtime copy (the New Code definition `starci sonar project ensure` sets), proven by `src/sonar-new-code.spec.mjs`.
 - Fixed: the bundled gate-loosening detector no longer reads a quoted operand of a printed message as a ban-list row, nor the upkeep of an exception list the check stops reading as enforcement lost (`src/bypass-detector.spec.mjs`).

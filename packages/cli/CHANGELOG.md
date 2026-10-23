@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.7.29 - 2026-10-24
+- Fixed: `starci runtime install` fetches runtime 1.0.0-alpha.29.
+- Changed: pins @starci/hfs 4.7.29.
+- Added: `starci git commit --body-file <file|->`, the multi-line body a command-shell launcher cannot carry as an argument.
+- Changed: `starci app upgrade` also completes a full app with the test world it lacks; `--edition full` is needed only for a lite app.
+
 ## 1.7.28 - 2026-10-23
 - Fixed: `starci runtime install` fetches runtime 1.0.0-alpha.28.
 - Changed: pins @starci/hfs 4.7.28.

@@ -668,18 +668,24 @@ starci app sync --write
 
 ### starci app upgrade
 
-upgrade a lite app to the full edition (--edition full); a full app is already current
+upgrade a lite app to full (--edition full), or add the test world a full app lacks
 
 | flag | type | |
 | --- | --- | --- |
 | `--plan` | boolean |  |
 
-exit: 0 already full; 2 refusal or bad usage
+Conventions:
+
+- a full app without be/src/tests/world/global-setup.ts gets the test world of a new full app and the test devDependencies it lacks
+- a world file that exists and differs refuses HFS_UPGRADE_FILE_CONFLICT; nothing is overwritten
+
+exit: 0 upgraded, completed, or the full app is already complete; 2 refusal or bad usage
 
 json: none
 
 ```sh
 starci app upgrade
+starci app upgrade --plan
 starci app upgrade --edition full --plan
 ```
 
@@ -1352,6 +1358,7 @@ commit staged work with the message convention and trailers
 | `--scope` | string |  |
 | `--summary` | string | required |
 | `--body` | string |  |
+| `--body-file` | string |  |
 | `--paths` | list |  |
 | `--lane` | string |  |
 | `--co-author` | string |  |
@@ -1366,6 +1373,7 @@ Conventions:
 - subjects use `type(scope): summary`; types are feat, fix, refactor, test, docs, chore, land and release
 - keep one logical change in each commit and pass explicit paths instead of staging unrelated work
 - hooks run the L0 checks; never bypass them and never amend a pushed or landed commit
+- a multi-line body goes through --body-file (a file, or - for stdin): a command-shell launcher such as the Windows cmd shim ends an argument at its first newline
 
 exit: 0 committed or the dry run is valid; 1 nothing to commit or Git failed; 2 invalid message, path or branch policy
 
@@ -1374,6 +1382,7 @@ json: starci/git-commit@1
 ```sh
 starci git commit --type fix --scope cli --summary "handle an empty index"
 starci git commit --type docs --summary "explain backup refs" --paths docs/git-governance.md --dry-run
+starci git commit --type fix --summary "keep the body" --body-file -
 ```
 
 ### starci git land
