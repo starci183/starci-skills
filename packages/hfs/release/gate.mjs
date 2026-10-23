@@ -48,11 +48,14 @@ const scriptGate = (script) => ({
   env: {},
 });
 
-/** The lite database-types rows of the managed CI, in its order: start Supabase, apply the migrations, regenerate the types, require them committed, stop. */
+/**
+ * The lite database-types rows of the managed CI, in its order: start Supabase, apply the migrations, regenerate the types, require them committed, stop.
+ * The stop is the teardown of the start (`teardownOf`): it runs whenever the start ran, also after a red row, so a failed database row never leaves Supabase running.
+ */
 function dbTypesGates(scripts) {
   if (!DB_TYPES_SCRIPTS.every((script) => typeof scripts?.[script] === 'string')) return [];
   const [start, reset, types, stop] = DB_TYPES_SCRIPTS.map(scriptGate);
-  return [start, reset, types, DB_TYPES_COMMITTED, stop];
+  return [start, reset, types, DB_TYPES_COMMITTED, { ...stop, teardownOf: start.name }];
 }
 
 /** Default gates run app-check, the enabled audit, then every managed script present in the app and the database-types rows, Sonar following when it is declared. */
@@ -349,7 +352,8 @@ function planLines(config, facts, dir, recordPath) {
   const out = [`L4 record      ${recordPath}`, `logs           ${dir}`, '', 'gates (every gate must pass, in this order):'];
   for (const gate of config.gates) {
     const summary = gate.summary ? ` (summary: ${gate.summary})` : '';
-    out.push(`  ${gate.name.padEnd(17)} ${gate.command.join(' ')}${summary}`);
+    const teardown = gate.teardownOf ? ` (teardown of ${gate.teardownOf}: runs whenever it ran)` : '';
+    out.push(`  ${gate.name.padEnd(17)} ${gate.command.join(' ')}${summary}${teardown}`);
   }
   out.push(`then: write ${path.basename(recordPath)} and \`git tag -a ${facts.chosen.tag}\` on ${facts.head.slice(0, 10)}; push it with \`starci app release push\`.`);
   return out;
@@ -373,12 +377,15 @@ function writeRecord(ctx, { head, tag, results, recordPath, requireCi }) {
   fs.writeFileSync(recordPath, `${JSON.stringify(record, null, 2)}\n`);
 }
 
-/** Gates run sequentially because each failure prevents subsequent commands and record creation. */
+/**
+ * Gates run sequentially because each failure prevents subsequent commands and record creation. A teardown row (`teardownOf`) is the exception: it runs
+ * whenever the row it tears down ran, red or green, so a red row never leaves a started service behind; its own verdict counts like any row's.
+ */
 async function runAll(ctx, config, options) {
   fs.mkdirSync(options.dir, { recursive: true });
   return config.gates.reduce(async (pending, gate) => {
     const results = await pending;
-    if (results.some((result) => !result.pass)) return results;
+    if (results.some((result) => !result.pass) && !(gate.teardownOf && results.some((result) => result.name === gate.teardownOf))) return results;
     return [...results, await runAvailableGate(ctx, gate, options)];
   }, Promise.resolve([]));
 }
