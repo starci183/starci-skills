@@ -1,5 +1,8 @@
 # Changelog
 
+## 3.4.36 - 2026-10-23
+- Changed: the bundled rule catalog and slot manifest name the specs that moved into this package (they drive its rules and fixtures and now pass from its own clean install); 3.4.35 was published with the old spec paths and is superseded.
+
 ## 3.4.35 - 2026-10-23
 - Changed: `BE_AMBIENT_ID` has no exemption for the test world (owner ruling 2026-10-22: a loosening is always red); the world asks the injected `Ids` port like everything else.
 - Changed: the bundled canon pins select @starci/hfs 4.7.28 and @starci/cli 1.7.28.
