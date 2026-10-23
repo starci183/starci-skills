@@ -31,7 +31,7 @@ export function managedTemplatesOf(manifest, appRel) {
 function managedFilesOf(manifest) {
   return (manifest?.slots ?? []).flatMap((slot) => {
     const groups = [...new Set([slot.managedBy, slot.liteManagedBy].filter((group) => typeof group === 'string'))];
-    const paths = [slot.path, slot.lite?.path].filter((value) => typeof value === 'string').flatMap(braceVariants).filter(literal);
+    const paths = [slot.path, slot.lite?.path].filter((value) => typeof value === 'string').flatMap((value) => braceVariants(value)).filter(literal);
     return (slot.profiles ?? []).flatMap((scope) => paths.flatMap((file) => groups.flatMap((group) =>
       [scope, 'common'].map((dir) => ({ scope, file, name: `${dir}/${group}/${undotted(file)}` })))));
   });
