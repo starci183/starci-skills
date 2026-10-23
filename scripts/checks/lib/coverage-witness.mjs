@@ -195,10 +195,8 @@ export async function runCoverageWitnesses({ root, catalog, manifest, files }, d
   const findings = [];
   await eachInOrder(catalog.rules ?? [], async (rule) => {
     if (rule.witness === undefined) return;
-    if (rule.witness?.status === 'unreachable' && typeof rule.witness.reason === 'string' && rule.witness.reason.trim()
-      && /^\d{4}-\d{2}-\d{2}$/.test(rule.witness.date ?? '')) return;
     if (!Array.isArray(rule.witness) || !rule.witness.length) {
-      findings.push(finding(rule, undefined, 0, 'witness must contain mutations or a dated unreachable reason'));
+      findings.push(finding(rule, undefined, 0, 'witness must contain mutations or a witnessing fixture or spec'));
       return;
     }
     await eachInOrder(rule.witness, async (witness, index) => {

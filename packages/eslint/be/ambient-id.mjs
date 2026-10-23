@@ -7,12 +7,11 @@
  *     `ulid` packages. Business code asks `ids.next()`; a spec provides `fakeIds()`, so an id is exactly what the spec said
  *     and a failing run reproduces.
  *
- * The owner that may mint ids is asked of the slot view (`platform` tier, capability `ids`), as the clock is, and the test
- * world (slot `be.tests.world`) is exempt like it is from the clock: it is the composition root of tests and names real
- * resources. Specs are NOT exempt. The generators are found by the module they are imported from, never by a local name,
+ * The owner that may mint ids is asked of the slot view (`platform` tier, capability `ids`), as the clock is. Nothing else is
+ * exempt: not a spec, and not the test world (slot `be.tests.world`), which asks the same `Ids` port. The generators are found by the module they are imported from, never by a local name,
  * so `import { randomUUID as newId } from "node:crypto"` is the same reference.
  */
-import { hfsOf, inTestWorld } from "./lib/hfs.mjs"
+import { hfsOf } from "./lib/hfs.mjs"
 import { isOwnedBy } from "./lib/ports.mjs"
 
 /** Modules of Node's crypto: `randomUUID` of them mints an id. */
@@ -54,7 +53,7 @@ export const noAmbientId = {
     create(context) {
         const hfs = hfsOf(context)
         const filename = context.filename || context.getFilename()
-        if (isOwnedBy(hfs, filename, "platform", "ids") || inTestWorld(hfs, filename)) return {}
+        if (isOwnedBy(hfs, filename, "platform", "ids")) return {}
         return {
             ImportDeclaration(node) {
                 const source = node.source.value

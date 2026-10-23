@@ -118,13 +118,6 @@ calls:
     flags: [limit, cursor]
     receipt: [result.runs]
     note: Newest Run first, one page per call; result.nextCursor, when present, is the --cursor of the next older page.
-  task-list:
-    command: orchestration task-list
-    kind: read
-    flags: [run, status, brief]
-    required: [run]
-    receipt: [result.tasks]
-    note: A Run-scoped listing needs no sender terminal; without --run Orca refuses no_active_sender_terminal.
   task-update:
     command: orchestration task-update
     kind: mutation
@@ -382,16 +375,6 @@ calls:
     note: Metadata write without retry-request support; it is naturally idempotent, so an unknown result is re-read with worktree-show.
     flags: [worktree, parent-worktree, display-name, workspace-status, no-parent]
     required: [worktree]
-    receipt: [result]
-  project-setup-delete:
-    command: project setup-delete
-    kind: mutation
-    replay: none
-    note: |-
-      Removes a project host setup; a repo-backed setup's id is the repo id that repo add answered, and deleting it removes
-      the repository registration (Orca has no repo rm).
-    flags: [setup]
-    required: [setup]
     receipt: [result]
   worktree-show:
     command: worktree show

@@ -28,8 +28,7 @@ conventions:
   - "No run within the grace, or no end within the wait, refuses RELEASE_CANDIDATE_CI_TIMEOUT."
   - "A red candidate keeps its ref for diagnosis; after a cut the candidate ref is left on the remote, naming the released sha."
   - "Only on green is the annotated tag created and main plus the tag pushed atomically; the release record logs the candidate verdict."
-  - "Emergency path, owner-only: starci release ci-override --sha <HEAD> --reason <text> lets a red candidate through."
-  - "The release record logs its use."
+  - "There is no override: a red candidate never passes."
 examples:
   - starci release cut
   - starci release cut --plan --tag v1.0.0-alpha.9

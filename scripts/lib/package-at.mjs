@@ -14,7 +14,7 @@ export const packageAt = (dir, name) => {
 const RUNTIME_STARCI_BIN = path.join(skillRoot, 'packages', 'cli', 'bin', 'starci.mjs');
 
 /** The `starci` bin of the @starci/cli that `dir` installs (a product runs its own pinned CLI), else this runtime's own. */
-export function starciBin(dir) {
+function starciBin(dir) {
   const packageFile = packageAt(dir, '@starci/cli');
   if (packageFile) {
     try {

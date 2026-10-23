@@ -25,7 +25,7 @@ starci runtime verify --base <ref>
 
 `starci runtime verify` joins the runtime check, the package clean-test of the packages the change touches and the scaffold e2e on one commit, one receipt; the runtime has no specs of its own (owner ruling `no-runtime-specs`). The release cut runs every package suite and the scaffold e2e again.
 
-Review source changes and test failures. Do not weaken validators to produce a green release. Knowledge is authored as YAML under `knowledge/` and read directly; see [knowledge YAML](knowledge-yaml.md). The runtime bundles its YAML dependency in `engine/yaml.mjs`; retain its license notice (`engine/yaml-license.json`, THIRD_PARTY_NOTICES.md) when deliberately changing that dependency.
+Review source changes and test failures. Do not weaken validators to produce a green release. Knowledge is authored as YAML under `knowledge/` and read directly; see [knowledge YAML](knowledge-yaml.md). The runtime bundles its YAML dependency in `engine/yaml.mjs`; retain its license notice (`engine/yaml-license.yaml`, THIRD_PARTY_NOTICES.md) when deliberately changing that dependency.
 
 ## Example apps: CI and the local Sonar dashboard
 
@@ -85,9 +85,9 @@ OWNER RULING `candidate-ci` (2026-10-18, `modules/kernel/owner-rulings.yaml`): "
 - Green: the annotated tag is created (only now, so a red candidate leaves no tag and the same version can be cut again on the fix) and main and the tag move in the one atomic push. The release record logs the candidate verdict, and the CI record of the sha is written green.
 - Red: `RELEASE_CANDIDATE_CI_RED` names the run URLs and every failing job and step; nothing reaches main. The candidate ref stays for diagnosis; the next cut of the same version force-moves only the candidate ref, never main.
 - No run listed within `graceMinutes` (a workflow that does not trigger on `release/candidate-*`; a queued run is listed, so GitHub's queue never counts against the grace), or no end within `waitMinutes`: `RELEASE_CANDIDATE_CI_TIMEOUT`. GitHub unreadable to the end: `RELEASE_CI_UNKNOWN`. Nothing reaches main.
-- Emergency path, owner-only: `starci release ci-override --sha <sha> --reason <text>` (a terminal, the first 12 sha characters typed) writes the sha-bound record that lets a red candidate through; the release record logs its use. Agents never write it.
+- There is no override: a red candidate never passes; fix, commit and cut again.
 
-The latest run on main no longer gates a cut: a red main (alpha.21's) needs no override before the next release, whose own candidate run decides. After a successful cut the candidate ref is left on the remote, naming the released sha. Apps follow the same flow through `starci app release push --execute` (`packages/hfs/release/candidate-ci.mjs`: the managed `ci.yml` triggers on `release/candidate-*`, and `starci app release gate` no longer reads the default-branch CI).
+The latest run on main no longer gates a cut: a red main (alpha.21's) blocks nothing before the next release, whose own candidate run decides. After a successful cut the candidate ref is left on the remote, naming the released sha. Apps follow the same flow through `starci app release push --execute` (`packages/hfs/release/candidate-ci.mjs`: the managed `ci.yml` triggers on `release/candidate-*`, and `starci app release gate` no longer reads the default-branch CI).
 
 ## The runtime itself: Sonar, no coverage
 

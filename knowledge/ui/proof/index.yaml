@@ -60,7 +60,7 @@ topics:
     decides: Whether a person with a task actually finished it on the running product
     rules: UX-1 to UX-12 (read by `uat.verify`)
   - title: Calibration
-    path: calibration/calibration.json
+    path: calibration/calibration.yaml
     decides: "The scale a scored lens is proved on: three anchor sheets
       (`calibration/anchor-low.html`, `anchor-mid.html`, `anchor-high.html`),
       each with the `taste` and `ux` band it is expected to land in and the

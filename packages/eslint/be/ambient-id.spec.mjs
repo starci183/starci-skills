@@ -20,14 +20,12 @@ const LOOKALIKE = at("src/modules/platform/idsworks/ids.service.ts")
 for (const edition of ["lite", "full"]) {
     const declaration = { ...appDeclaration("be", BE_DECLARATION), edition }
     const tester = ruleTester({ root: TYPED_ROOT, hfs: hfsFromDeclaration(declaration, TYPED_ROOT) })
-    test(`${edition} accepts owned and injected ids and rejects ambient id sources outside platform/ids and the test world, in specs too`, () => {
+    test(`${edition} accepts owned and injected ids and rejects ambient id sources outside platform/ids, in specs and the test world too`, () => {
         tester.run("no-ambient-id", noAmbientId, {
             valid: [
                 // the one owner that mints ids, asked of the slot view
                 { filename: IDS, code: "import { randomUUID } from 'node:crypto'\nexport const next = () => randomUUID()" },
                 { filename: IDS_SPEC, code: "import { randomUUID } from 'crypto'\nexport const sample = randomUUID()" },
-                // the test world is the composition root of tests
-                { filename: at("src/tests/world/kit/names.ts"), code: "import { randomUUID } from 'node:crypto'\nexport const run = randomUUID()" },
                 // business code asks the port; a spec provides fakeIds
                 { filename: SERVICE, code: "export const id = this.ids.next()" },
                 { filename: SPEC, code: "import { fakeIds } from '@starci/jest-preset'\nexport const ids = fakeIds(['a', 'b'])" },
@@ -38,6 +36,8 @@ for (const edition of ["lite", "full"]) {
                 { filename: SERVICE, code: "const randomUUID = () => 'fixed'\nexport const id = randomUUID()" },
             ],
             invalid: [
+                // the test world is not exempt: it asks the injected Ids port
+                { filename: at("src/tests/world/kit/names.ts"), code: "import { randomUUID } from 'node:crypto'\nexport const run = randomUUID()", errors: [{ messageId: "id" }] },
                 { filename: SERVICE, code: "import { randomUUID } from 'node:crypto'\nexport const id = randomUUID()", errors: [{ messageId: "id" }] },
                 { filename: SERVICE, code: "import { randomUUID as newId } from 'crypto'\nexport const id = newId()", errors: [{ messageId: "id" }] },
                 { filename: SERVICE, code: "import * as nodeCrypto from 'node:crypto'\nexport const id = nodeCrypto.randomUUID()", errors: [{ messageId: "id" }] },

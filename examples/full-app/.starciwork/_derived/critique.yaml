@@ -27,7 +27,7 @@ findings:
       - ui.checkout.shop-browse
       - ui.checkout.stock-refused
     because: A breaking change to br.checkout.place-order sends 19 other record(s) back to todo, would
-      stale 11 evidence file(s), and touches 13 code path(s) (be/src/features/api/checkout,
+      stale 10 evidence file(s), and touches 13 code path(s) (be/src/features/api/checkout,
       be/src/features/api/identity, be/src/modules/domain/account, be/src/modules/domain/cart,
       be/src/modules/domain/catalog, be/src/modules/domain/identity, be/src/modules/domain/order,
       be/src/modules/domain/payment, be/src/modules/integrations/identity-api,
@@ -53,7 +53,7 @@ findings:
       - uat.identity.sign-in
       - ui.identity.sign-in
     because: A breaking change to br.identity.sign-in sends 13 other record(s) back to todo, would stale
-      9 evidence file(s), and touches 14 code path(s) (be/src/features/api/checkout,
+      8 evidence file(s), and touches 14 code path(s) (be/src/features/api/checkout,
       be/src/features/api/identity, be/src/modules/domain/account, be/src/modules/domain/cart,
       be/src/modules/domain/catalog, be/src/modules/domain/identity, be/src/modules/domain/order,
       be/src/modules/domain/payment, be/src/modules/domain/session,
@@ -206,22 +206,6 @@ findings:
     because: sds.checkout.order-flow's evidence is stale with no staleSince at all - a bare digest
       mismatch with nothing recorded about why, even where the record's own staleReason prose
       describes a real revision (bulk-edit-after-capture territory either way).
-  - id: stale-evidence-bulk-edit:uat.checkout.place-order
-    kind: stale-evidence-bulk-edit
-    severity: warn
-    records:
-      - uat.checkout.place-order
-    because: uat.checkout.place-order's evidence is stale with no staleSince at all - a bare digest
-      mismatch with nothing recorded about why, even where the record's own staleReason prose
-      describes a real revision (bulk-edit-after-capture territory either way).
-  - id: stale-evidence-bulk-edit:uat.identity.sign-in
-    kind: stale-evidence-bulk-edit
-    severity: warn
-    records:
-      - uat.identity.sign-in
-    because: uat.identity.sign-in's evidence is stale with no staleSince at all - a bare digest mismatch
-      with nothing recorded about why, even where the record's own staleReason prose describes a
-      real revision (bulk-edit-after-capture territory either way).
   - id: stale-evidence-bulk-edit:ui.checkout.cart
     kind: stale-evidence-bulk-edit
     severity: warn

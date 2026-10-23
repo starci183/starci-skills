@@ -59,8 +59,8 @@ _starci() {
       orca) _values 'verbs' 'terminal-read[read an Orca terminal screen and staged draft]' 'terminal-send[send text or Enter to an Orca terminal]' ;;
       provision) _values 'verbs' 'operation[inspect a prepared operation or bind its exact digest to trusted owner acceptance]' ;;
       reconciler) _values 'verbs' 'once[run one reconcile pass of the controllers in memory, shadow unless --apply]' 'reopen[put a quarantined service or seat back to declared with a clean restart history]' 'restart[stop the reconciler engine and ensure a new leader]' 'start[ensure the reconciler engine has a healthy leader]' 'status[print reconciler leader, queue, mode and violation status]' 'stop[stop the current reconciler engine leader]' 'up[bring the host services and seats up, or check them read-only, and print the checklist]' ;;
-      release) _values 'verbs' 'app-installs[verify a scaffolded app against fresh registry installs]' 'check[run the one read-only release readiness gate]' 'ci-override[the owner accepts a red candidate CI for one SHA (emergency path) and records who and why]' 'ci-status[the verdict of the GitHub ci workflow, Codecov and Sonar for a release; red is recorded for Debug]' 'clean-test[test published packages from fresh isolated installs]' 'cut[cut the release, the only way the runtime'\''s remote main and a release tag move]' 'images[build, run, health-check and tear down the shipped application images]' 'notes[print or write the release notes of a tag, its CHANGELOG section]' 'proof[build the release proof attached before publish or deploy effects]' 'publish[plan or perform the owner-run package publication sequence]' 'scaffold-e2e[run the scaffold end-to-end proof (full and lite scaffolds installed, built and run for real)]' 'sync-runtime[refresh or check package runtime copies and optionally prepare grammar]' ;;
-      route) _values 'verbs' 'op[resolve the operation that serves a structured routing request]' ;;
+      release) _values 'verbs' 'app-installs[verify a scaffolded app against fresh registry installs]' 'check[run the one read-only release readiness gate]' 'ci-status[the verdict of the GitHub ci workflow, Codecov and Sonar for a release; red is recorded for Debug]' 'clean-test[test published packages from fresh isolated installs]' 'cut[cut the release, the only way the runtime'\''s remote main and a release tag move]' 'images[build, run, health-check and tear down the shipped application images]' 'notes[print or write the release notes of a tag, its CHANGELOG section]' 'proof[build the release proof attached before publish or deploy effects]' 'publish[plan or perform the owner-run package publication sequence]' 'scaffold-e2e[run the scaffold end-to-end proof (full and lite scaffolds installed, built and run for real)]' 'sync-runtime[refresh or check package runtime copies and optionally prepare grammar]' ;;
+      route) _values 'verbs' 'model[resolve which tier members may take a workload from the declarative model-selection rules]' 'op[resolve the operation that serves a structured routing request]' ;;
       runtime) _values 'verbs' 'architecture[check one repository against the runtime architecture rules]' 'artefacts[judge or migrate the artefacts the runtime installs outside its tree]' 'benchmark-snapshot[append one model-pool snapshot file under benchmark/snapshots]' 'check[judge the runtime tree — node --check, the runtime HFS check, the retained self-checks]' 'deploy[carry a checked runtime revision onto the running host and verify the engine on it]' 'derived-fields[regenerate or check the derived fields of the knowledge pattern files]' 'doctor[verify installed payload, public entry custody and local runtime capabilities]' 'example-secrets[run a command in a disposable copy of an example with freshly generated sealed members]' 'gen-catalog[write or check the generated CLI catalog outputs, docs and shell completions]' 'gen-ops[regenerate or check the generated operation registry]' 'housekeeping[inspect or apply the host housekeeping sweeps]' 'import-held-secret[move one sealed member of the old tracked custody from git history into secret.env]' 'install[install the StarCi runtime — fetch the pinned package, then init or update <cwd>/.claude]' 'ledger-hygiene[report orphan ledgers]' 'link[point the per-user StarCi launcher at a live runtime checkout]' 'machine-db[inspect or maintain the host machine database]' 'owner-claims-audit[audit owner-decision claims and owner-gates in runtime ledgers]' 'readme-blocks[regenerate or check the generated blocks of knowledge/hfs/README.md]' 'revision-scope[show what a deploy of the runtime tree asks of each role between two revisions]' 'status[the runtime'\''s version, tree root and manifest drift — a read-only summary]' 'update[bring an installed .claude tree to this package'\''s payload version]' 'validate[read-only Work record/tree validation — structure, consistency, artifacts, schemas]' 'verify[verify a commit - the check, package clean-test and scaffold e2e on one commit, one receipt]' 'version[print the runtime package version]' ;;
       smoke) _values 'verbs' 'scaffold[scaffold and prove one full or lite app in an isolated scratch directory]' ;;
       sonar) _values 'verbs' 'analysis[run native analysis with the selected target'\''s analysis credential]' 'browse[read declared Sonar project evidence through the selected Browse credential]' 'project[ensure a declared Sonar project, or move it to its declared key, through its provider adapter]' 'release[run the native application release gate with declared Sonar analysis and Browse roles]' 'settings[read or set declared Sonar settings with private credential references]' 'token[ensure, rotate or revoke a declared Sonar token without exposing its value]' 'user[inspect a local Sonar user or explicitly create or reactivate it]' ;;
@@ -714,9 +714,6 @@ _starci() {
     'reconciler:up:--wait') return 0 ;;
     'reconciler:up:--set-profile') _values 'values' 'operational' 'observe'; return 0 ;;
     'release:check:--only') return 0 ;;
-    'release:ci-override:--sha') return 0 ;;
-    'release:ci-override:--reason') return 0 ;;
-    'release:ci-override:--repo') return 0 ;;
     'release:ci-status:--repo') return 0 ;;
     'release:ci-status:--tag') return 0 ;;
     'release:clean-test:--changed') return 0 ;;
@@ -742,6 +739,16 @@ _starci() {
     'release:publish:--pre-land-ref') return 0 ;;
     'release:publish:--expect-sha') return 0 ;;
     'release:publish:--examples') return 0 ;;
+    'route:model:--kind') return 0 ;;
+    'route:model:--role') _values 'values' 'implement' 'verify' 'decide' 'plan' 'write'; return 0 ;;
+    'route:model:--domain') return 0 ;;
+    'route:model:--risk') _values 'values' 'low' 'medium' 'high' 'critical'; return 0 ;;
+    'route:model:--floor') _values 'values' 'probation' 'standard' 'high' 'critical'; return 0 ;;
+    'route:model:--tools') return 0 ;;
+    'route:model:--context-tokens') return 0 ;;
+    'route:model:--difficulty') _values 'values' 'easy' 'medium' 'hard' 'insane'; return 0 ;;
+    'route:model:--repo') return 0 ;;
+    'route:model:--models-dir') return 0 ;;
     'route:op:--kind') return 0 ;;
     'route:op:--node-kind') return 0 ;;
     'route:op:--phase') return 0 ;;
@@ -1283,7 +1290,6 @@ _starci() {
     'reconciler:up') _values 'flags' '--check' '--services' '--brief' '--wait' '--no-build' '--retire-stale-ledgers' '--set-profile' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'release:app-installs') _values 'flags' '--keep' '--source' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'release:check') _values 'flags' '--final' '--only' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
-    'release:ci-override') _values 'flags' '--sha' '--reason' '--repo' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'release:ci-status') _values 'flags' '--repo' '--tag' '--wait' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'release:clean-test') _values 'flags' '--changed' '--base' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'release:cut') _values 'flags' '--repo' '--remote' '--branch' '--plan' '--tag' '--rows' '--no-reuse' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
@@ -1293,6 +1299,7 @@ _starci() {
     'release:publish') _values 'flags' '--plan' '--publish' '--runtime-package' '--npm-user' '--poll-minutes' '--pre-land-ref' '--expect-sha' '--examples' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'release:scaffold-e2e') _values 'flags' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'release:sync-runtime') _values 'flags' '--check' '--prepare-grammar' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
+    'route:model') _values 'flags' '--kind' '--role' '--domain' '--risk' '--floor' '--tools' '--context-tokens' '--external' '--unapproved' '--no-review' '--no-checks' '--difficulty' '--plan' '--repo' '--models-dir' '--verbose' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'route:op') _values 'flags' '--kind' '--node-kind' '--phase' '--intent' '--ops-dir' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'runtime:architecture') _values 'flags' '--base' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'runtime:artefacts') _values 'flags' '--migrate' '--json' '--cwd' '--quiet' '--help' '--edition' ;;

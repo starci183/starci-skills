@@ -133,8 +133,9 @@ is the one that goes stale. Eight principles, each held by a check that `npm run
    environment variable once in its owner, a model, tier, price and pool once in `modules/models/registry.yaml`
    (`RT_CODE_UNCATALOGUED`, `RT_CODE_STALE`, `RT_CODE_MALFORMED`, `RT_CODE_SOLE_EMITTER`, `RT_ENV_UNCATALOGUED`,
    `RT_ENV_READ_OUTSIDE_OWNER`, `RT_TEST_ENV_IN_PRODUCTION`, `RT_ENV_STALE_ENTRY`).
-6. **One allowlist and one shared schema fragment.** Every exception lives in `modules/kernel/allowlist.yaml` with its
-   reason and only shrinks; a field shared by several schemas or ops is declared once and referenced
+6. **No exception list and one shared schema fragment.** A check keeps no list of files or literals it lets through: a JSON file
+   is admitted by the format a tool requires (`scripts/lib/json-formats.mjs`), a literal is a code or it is not, a script has a reader or
+   it is deleted; `modules/kernel/allowlist.yaml` keeps only the reserved `export-used` and `sonar-rules` sections and only shrinks; a field shared by several schemas or ops is declared once and referenced
    (`RT_ALLOWLIST_SPRAWL`, `RT_SCHEMA_NOT_SHARED`, `RT_OP_FIELD_NOT_COMMON`).
 7. **The runtime names no product and no example.** Runtime source is generic; a path it cites exists
    (`RT_EXAMPLE_COUPLING`, `RT_PRODUCT_NAME_IN_SOURCE`, `RT_HOST_PATH_IN_TEMPLATE`, `RT_CITED_PATH_MISSING`).

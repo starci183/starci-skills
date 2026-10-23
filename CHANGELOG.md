@@ -12,6 +12,9 @@ until every S* row in `docs/goal.md` holds with fresh evidence, then `1.0.0` fre
 
 ### Changed
 - The managed `.husky/pre-commit` runs `starci app sync --check` and ends the hook on every failing step; the stylelint step no longer lets a failure pass.
+- No exception list (owner ruling 2026-10-22, a loosening is always red): `modules/kernel/allowlist.yaml` keeps no `json-exceptions`, `not-codes` or `dead-script-entries`. The json-exceptions check admits a JSON file by a declared tool format (`scripts/lib/json-formats.mjs`) or as managed canon; the failure-codes check recognises reads, comments, enum members and env names by rule (`scripts/lib/failure-code-reads.mjs`) and catalogues the labels the runtime really emits (kinds `event-kind`, `outcome-reason`, `classification`); the dead-scripts check has no list (`starci route model` is a verb, `check-example-derived` a self-check, four unread scripts are deleted).
+- The rule catalog has no `specNa`, `exampleNa` or unreachable witness (170 + 108 markers): about 100 deleted runtime specs that proved bundled checkers are package specs again; only a rule whose enforcers all run inside the runtime (kinds `runtime`, `work-validate`) needs no package spec.
+- Owner rulings removed or amended: `ambient-id-test-world-exemption` (BE_AMBIENT_ID has no test-world exemption), `quality-services-optional`, `alpha20-ci-override-owner-only`, `ci-override-574bfcaca06c` (the verb `starci release ci-override` and its record are gone; a red candidate CI never passes).
 
 ## [1.0.0-alpha.27] — 2026-10-23
 

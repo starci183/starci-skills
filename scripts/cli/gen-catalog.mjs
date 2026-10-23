@@ -113,7 +113,7 @@ const renderCompletions = (cat) => {
 _starci() {
     local cur prev group verb
     COMPREPLY=()
-    cur="${'$'}{COMP_WORDS[COMP_CWORD]}"
+    cur="${'$'}{COMP_WORDS[$COMP_CWORD]}"
     prev=""
     if [ "$COMP_CWORD" -gt 0 ]; then prev="${'$'}{COMP_WORDS[COMP_CWORD-1]}"; fi
     group="${'$'}{COMP_WORDS[1]}"

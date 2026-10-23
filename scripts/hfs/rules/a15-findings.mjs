@@ -49,7 +49,7 @@ export const A15_CODES = [
   // codes-end
 ];
 
-const FINDERS = [
+export const FINDERS = [
   // finders-begin
   feBuildArgsFindings,
   workflowContextsFindings,

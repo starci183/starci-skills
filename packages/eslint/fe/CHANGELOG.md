@@ -1,5 +1,8 @@
 # Changelog
 
+## Unreleased
+- Changed: the bundled canon pins select @starci/hfs 4.7.22 and @starci/cli 1.7.22; the bundled rule catalog drops the per-rule markers `specNa`, `exampleNa` and the unreachable witness.
+
 ## 8.4.32 - 2026-10-23
 - Changed: the bundled canon pins select @starci/hfs 4.7.26 and @starci/cli 1.7.26.
 

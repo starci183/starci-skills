@@ -181,7 +181,7 @@ function shellNavigationFindings(tree, nodes, node, locale, at, out) {
     if (typeof item?.route === 'string' && !resolveNavRoute(nodes, item.route, tree.app?.localeParam ?? null)) out.push(finding('suspect', 'NAV_ROUTE_MISSING', at, `${node.id} nav item ${item.key} navigates to ${item.route}, which no page of the tree answers`));
   }
   for (const item of list(node.layout.nav?.findings)) {
-    if (item.code === 'ROUTE_NOT_IN_NAV' || item.code === 'NAV_REGISTRY_UNREAD') out.push(finding('suspect', item.code, at, `${node.id}: ${item.detail}`));
+    if (item.code === 'ROUTE_NOT_IN_NAV') out.push(finding('suspect', item.code, at, `${node.id}: ${item.detail}`));
     else if (item.code === 'NAV_ROUTE_NULL') out.push(finding('info', item.code, at, `${node.id}: ${item.detail}`));
   }
 }

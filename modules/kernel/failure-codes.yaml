@@ -3318,17 +3318,6 @@ INTEGRATION_ENDPOINT_REMOTE:
   owner: owner
   kind: check-finding
 
-INVALID_INPUT:
-  title: "Scanner input is invalid"
-  title_vi: "Đầu vào của bộ quét không hợp lệ"
-  meaning_vi: "Bộ quét Work nhận được tham số sai kiểu hoặc thiếu, ví dụ hàm đo lại không phải là hàm."
-  causes_vi:
-    - "Gọi công cụ sai cách"
-    - "Thiếu tham số bắt buộc"
-  nextStep_vi: "Bộ quét dừng với lỗi đầu vào; người gọi phải sửa lời gọi rồi chạy lại."
-  owner: runtime-core
-  kind: input-invalid
-
 KERNEL_ORCA_CHECK:
   title: "Kernel read of the Orca mailbox refused"
   title_vi: "Kernel không được tự đọc hộp thư Orca"
@@ -3614,17 +3603,6 @@ NAV_LABEL_MISSING:
     - "Thêm mục mới mà chưa thêm chuỗi vào tệp dịch"
     - "Khóa dịch bị gõ sai"
   nextStep_vi: "Bộ kiểm cây layout ghi nhận; op triển khai giao diện phải bổ sung nhãn vào các tệp dịch."
-  owner: op-retry
-  kind: check-finding
-
-NAV_REGISTRY_UNREAD:
-  title: "Navigation registry cannot be read"
-  title_vi: "Không đọc được danh sách điều hướng"
-  meaning_vi: "Bộ kiểm không đọc được nơi khai báo các mục điều hướng của app nên không đối chiếu được."
-  causes_vi:
-    - "Tệp khai báo điều hướng bị dời hoặc đổi tên"
-    - "Tệp có lỗi cú pháp"
-  nextStep_vi: "Chỉ là nghi ngờ, chưa chặn; op triển khai giao diện nên kiểm tra và sửa nơi khai báo điều hướng."
   owner: op-retry
   kind: check-finding
 
@@ -4698,16 +4676,6 @@ RIGHTS_OP_OUTSIDE_OWNED:
   owner: op-retry
   kind: verb-refusal
 
-RIGHTS_OWNER_ONLY:
-  title: "Action requires an interactive owner"
-  title_vi: "Tác vụ chỉ dành cho chủ sở hữu tương tác"
-  meaning_vi: "Lệnh miễn trừ CI được gọi bởi agent, vai trò đã ràng buộc hoặc terminal không tương tác."
-  causes_vi:
-    - "Không xác minh được người gọi là chủ sở hữu tại terminal tương tác."
-  nextStep_vi: "Chủ sở hữu kiểm tra SHA và lý do rồi tự chạy release ci-override trong terminal tương tác; agent không được chạy lệnh này."
-  owner: owner
-  kind: verb-refusal
-
 RIGHTS_OP_CONTROL_PLANE:
   title: "Op control-plane verb refused"
   title_vi: "Từ chối op gọi động từ của mặt phẳng điều khiển"
@@ -4836,19 +4804,6 @@ RT_DEAD_SCRIPT:
   nextStep_vi: "Người giám sát xóa script cùng test của nó, hoặc nối nó vào nơi thật sự dùng, qua một lane đã land."
   owner: supervisor
   kind: check-finding
-
-RT_DEAD_ENTRY:
-  title: "Stale dead-scripts entry"
-  title_vi: "Mục khai báo CLI đã lỗi thời"
-  meaning_vi: "Mục dead-script-entries của modules/kernel/allowlist.yaml nêu một script đã bị xóa hoặc đã có mã đọc tới, nên mục này không còn cần."
-  causes_vi:
-    - "Script đã bị xóa nhưng mục khai báo còn lại"
-    - "Script đã được nối vào mã nên không còn là CLI độc lập"
-  nextStep_vi: "Người giám sát xóa dòng đó khỏi mục dead-script-entries của modules/kernel/allowlist.yaml qua một lane đã land."
-  owner: supervisor
-  kind: runtime-fault
-  surfacedBy: caller
-  surfacedAt: scripts/checks/check-dead-scripts.mjs
 
 HFS_SOURCE_NOT_ENGLISH:
   title: "Runtime source is not English"
@@ -15808,43 +15763,13 @@ CI_TRIGGERS_RELEASE_ONLY:
   owner: supervisor
   kind: check-finding
 
-RELEASE_CI_OVERRIDE_CONFIRM:
-  title: "Owner did not confirm CI override SHA"
-  title_vi: "Chủ sở hữu chưa xác nhận SHA miễn trừ"
-  meaning_vi: "Xác nhận tương tác không khớp tiền tố SHA yêu cầu."
-  causes_vi:
-    - "Xác nhận tương tác không khớp tiền tố SHA yêu cầu."
-  nextStep_vi: "Chủ sở hữu kiểm tra commit và xác nhận đúng SHA trong terminal tương tác."
-  owner: owner
-  kind: verb-refusal
-
-RELEASE_CI_OVERRIDE_USAGE:
-  title: "Invalid release CI override request"
-  title_vi: "Yêu cầu miễn trừ CI không hợp lệ"
-  meaning_vi: "SHA hoặc lý do miễn trừ thiếu hay sai cú pháp."
-  causes_vi:
-    - "SHA hoặc lý do miễn trừ thiếu hay sai cú pháp."
-  nextStep_vi: "Chủ sở hữu chạy release ci-override với SHA đầy đủ và lý do không rỗng."
-  owner: owner
-  kind: verb-refusal
-
-RELEASE_CI_OVERRIDE_WRITE:
-  title: "CI override record could not be written"
-  title_vi: "Không ghi được bản miễn trừ CI"
-  meaning_vi: "Không thể ghi an toàn bản ghi miễn trừ hoặc owner-rulings."
-  causes_vi:
-    - "Không thể ghi an toàn bản ghi miễn trừ hoặc owner-rulings."
-  nextStep_vi: "Kiểm tra quyền ghi và khóa phát hành; chủ sở hữu chạy lại và kiểm tra bản ghi danh tính, lý do."
-  owner: owner
-  kind: verb-refusal
-
 RELEASE_CANDIDATE_CI_RED:
   title: "Candidate CI of the release sha is red"
   title_vi: "CI ứng viên của SHA phát hành bị đỏ"
   meaning_vi: "Lần chạy CI trên nhánh release/candidate-<phiên bản> của đúng SHA phát hành có job thất bại; main và tag không được đẩy."
   causes_vi:
     - "Lần chạy CI trên nhánh release/candidate-<phiên bản> của đúng SHA phát hành có job thất bại; main và tag không được đẩy."
-  nextStep_vi: "Đọc các job và bước thất bại được nêu tên, sửa, commit và cut lại (chỉ nhánh ứng viên được ghi đè, không bao giờ main); lối khẩn cấp duy nhất là bản ghi ci-override của chủ sở hữu cho đúng SHA."
+  nextStep_vi: "Đọc các job và bước thất bại được nêu tên, sửa, commit và cut lại (chỉ nhánh ứng viên được ghi đè, không bao giờ main); không có lối đi nào bỏ qua một CI đỏ."
   owner: op-retry
   kind: verb-refusal
 
@@ -22295,3 +22220,658 @@ sonar-managed-execution-failed:
   nextStep_vi: "Kiểm public operation receipt/status và effect history trước mọi retry; sửa metadata hoặc native prerequisite cần thiết mà không mở credential hoặc in payload nội bộ."
   owner: runtime-core
   kind: runtime-fault
+
+# Labels the runtime emits that are not failures: ledger event kinds, classifications and the reasons of benign outcomes.
+# They are catalogued because the failure-code scanner counts every such literal an op, verb or controller can emit.
+
+artifacts-indexed:
+  title: "Job artifacts indexed"
+  title_vi: "Đã lập chỉ mục artifact của job"
+  meaning_vi: "Ledger ghi nhận các artifact của job đã được lập chỉ mục vào kho nội dung."
+  causes_vi:
+    - "Job vừa nộp báo cáo kèm artifact"
+  nextStep_vi: "Không cần xử lý; đây là mốc tiến độ bình thường."
+  owner: runtime-core
+  kind: event-kind
+
+ask-answered:
+  title: "Owner answered an ask"
+  title_vi: "Chủ dự án đã trả lời câu hỏi"
+  meaning_vi: "Ledger ghi nhận câu hỏi ask gửi chủ dự án đã có câu trả lời."
+  causes_vi:
+    - "Chủ dự án trả lời qua kênh ask"
+  nextStep_vi: "Không cần xử lý; công việc bị giữ vì câu hỏi này được thả ra ở vòng kế tiếp."
+  owner: runtime-core
+  kind: event-kind
+
+business-decision:
+  title: "Ask kind: business decision"
+  title_vi: "Loại câu hỏi: quyết định kinh doanh"
+  meaning_vi: "Nhãn phân loại câu hỏi ask cần chủ dự án quyết định về hướng kinh doanh."
+  causes_vi:
+    - "Op gặp lựa chọn nằm ngoài phạm vi kỹ thuật"
+  nextStep_vi: "Chủ dự án trả lời câu hỏi; không phải lỗi."
+  owner: runtime-core
+  kind: classification
+
+canon-wire:
+  title: "Follow-on job for canon wiring"
+  title_vi: "Job nối tiếp nối dây canon"
+  meaning_vi: "Lý do tạo job nối tiếp: canon của sản phẩm cần được nối dây lại sau một thay đổi."
+  causes_vi:
+    - "Thay đổi chạm vào nơi canon được nối"
+  nextStep_vi: "Không cần xử lý; job nối tiếp tự chạy."
+  owner: runtime-core
+  kind: outcome-reason
+
+checks-recorded:
+  title: "Check results recorded"
+  title_vi: "Đã ghi kết quả kiểm tra"
+  meaning_vi: "Ledger ghi nhận kết quả các bước kiểm tra của một attempt đã được lưu."
+  causes_vi:
+    - "Op vừa chạy xong các bước check"
+  nextStep_vi: "Không cần xử lý; đây là mốc tiến độ bình thường."
+  owner: runtime-core
+  kind: event-kind
+
+crash-loop:
+  title: "Service in a crash loop"
+  title_vi: "Dịch vụ lặp vòng sập"
+  meaning_vi: "Lớp thông báo khẩn: một dịch vụ khởi động rồi sập liên tục."
+  causes_vi:
+    - "Dịch vụ lỗi ngay khi khởi động hoặc thiếu điều kiện chạy"
+  nextStep_vi: "Xem log của dịch vụ, sửa nguyên nhân sập rồi cho khởi động lại; reconciler không tự thử vô hạn."
+  owner: runtime-core
+  kind: classification
+
+deferred-settle:
+  title: "Wait: settle deferred"
+  title_vi: "Chờ: settle bị hoãn"
+  meaning_vi: "Loại chờ của một job trong hàng: việc settle bị hoãn tới khi đủ điều kiện."
+  causes_vi:
+    - "Điều kiện settle chưa đủ"
+  nextStep_vi: "Không cần xử lý; job chạy tiếp khi điều kiện đủ."
+  owner: runtime-core
+  kind: classification
+
+define-goal:
+  title: "Workflow created from a goal definition"
+  title_vi: "Workflow tạo từ định nghĩa mục tiêu"
+  meaning_vi: "Lý do tạo workflow: chủ dự án vừa định nghĩa mục tiêu mới."
+  causes_vi:
+    - "Mục tiêu mới được nộp qua quy trình định nghĩa mục tiêu"
+  nextStep_vi: "Không cần xử lý; đây là lý do bình thường của một workflow mới."
+  owner: runtime-core
+  kind: outcome-reason
+
+directory-gone:
+  title: "Worktree directory already gone"
+  title_vi: "Thư mục worktree đã biến mất"
+  meaning_vi: "Dọn dẹp thấy dòng đăng ký worktree mà thư mục thật đã không còn nên chỉ gỡ đăng ký."
+  causes_vi:
+    - "Thư mục bị xóa tay hoặc bởi lần dọn trước"
+  nextStep_vi: "Không cần xử lý; dòng đăng ký được gỡ."
+  owner: runtime-core
+  kind: outcome-reason
+
+dispatch-reconciled:
+  title: "Dispatch reconciled"
+  title_vi: "Đã đối soát lần điều phối"
+  meaning_vi: "Ledger ghi nhận một lần điều phối đã được đối soát về trạng thái đúng sau khi gián đoạn."
+  causes_vi:
+    - "Kernel hoặc worker bị gián đoạn giữa chừng"
+  nextStep_vi: "Không cần xử lý; kiểm tra effectState của sự kiện nếu cần."
+  owner: runtime-core
+  kind: event-kind
+
+dispatch-rejected:
+  title: "Dispatch rejected"
+  title_vi: "Lần điều phối bị từ chối"
+  meaning_vi: "Ledger ghi nhận một lần điều phối bị từ chối và job không bắt đầu."
+  causes_vi:
+    - "Hợp đồng điều phối, quota hoặc điều kiện của worker không thỏa"
+  nextStep_vi: "Đọc detail của sự kiện, sửa điều kiện bị từ chối rồi điều phối lại."
+  owner: runtime-core
+  kind: event-kind
+
+draw-review:
+  title: "Ask class: draw review"
+  title_vi: "Lớp câu hỏi: duyệt bản vẽ"
+  meaning_vi: "Lớp câu hỏi ask về bản vẽ giao diện, bị loại khỏi tự chấp nhận."
+  causes_vi:
+    - "Op giao diện cần chủ dự án duyệt thiết kế"
+  nextStep_vi: "Chủ dự án xem và trả lời; không tự chấp nhận."
+  owner: runtime-core
+  kind: classification
+
+duplicate-session:
+  title: "Duplicate agent session closed"
+  title_vi: "Đã đóng phiên agent trùng"
+  meaning_vi: "Kế hoạch dọn terminal đóng một phiên agent trùng với phiên khác cùng việc."
+  causes_vi:
+    - "Hai terminal cùng giữ một phiên agent"
+  nextStep_vi: "Không cần xử lý; phiên còn lại tiếp tục."
+  owner: runtime-core
+  kind: outcome-reason
+
+finished-early:
+  title: "Draw loop stopped early"
+  title_vi: "Vòng vẽ dừng sớm"
+  meaning_vi: "Vòng vẽ dừng trước số vòng tối đa vì không còn góp ý cần sửa."
+  causes_vi:
+    - "Các lượt duyệt không còn phát hiện mới"
+  nextStep_vi: "Không cần xử lý; đây là kết thúc bình thường."
+  owner: runtime-core
+  kind: outcome-reason
+
+first-run:
+  title: "Schedule due for the first time"
+  title_vi: "Lịch tới hạn lần đầu"
+  meaning_vi: "Lý do một lịch được claim: nó chưa từng chạy nên tới hạn ngay."
+  causes_vi:
+    - "Lịch mới được tạo"
+  nextStep_vi: "Không cần xử lý; lịch chạy rồi ghi lần chạy."
+  owner: runtime-core
+  kind: outcome-reason
+
+follow-up:
+  title: "Peer message kind: follow-up"
+  title_vi: "Loại tin giữa các seat: theo dõi"
+  meaning_vi: "Nhãn loại tin nhắn giữa các seat: tin theo dõi một việc đã gửi trước đó."
+  causes_vi:
+    - "Seat gửi lại để nhắc việc đang chờ"
+  nextStep_vi: "Seat nhận đọc và trả lời; không phải lỗi."
+  owner: runtime-core
+  kind: classification
+
+goal-defined:
+  title: "Goal defined"
+  title_vi: "Mục tiêu đã được định nghĩa"
+  meaning_vi: "Ledger ghi nhận mục tiêu của workflow đã được định nghĩa xong."
+  causes_vi:
+    - "Quy trình định nghĩa mục tiêu hoàn tất"
+  nextStep_vi: "Không cần xử lý; đây là mốc tiến độ bình thường."
+  owner: runtime-core
+  kind: event-kind
+
+heads-up:
+  title: "Peer message kind: heads-up"
+  title_vi: "Loại tin giữa các seat: báo trước"
+  meaning_vi: "Nhãn loại tin nhắn giữa các seat: tin báo trước một việc sắp xảy ra."
+  causes_vi:
+    - "Seat báo cho seat khác biết trước"
+  nextStep_vi: "Seat nhận đọc; không cần trả lời."
+  owner: runtime-core
+  kind: classification
+
+impact-check:
+  title: "Next action: impact check"
+  title_vi: "Bước tiếp theo: kiểm tra tác động"
+  meaning_vi: "Nhãn bước tiếp theo trên đồ thị: chạy kiểm tra tác động của thay đổi."
+  causes_vi:
+    - "Thay đổi cần được đo phạm vi ảnh hưởng"
+  nextStep_vi: "Không cần xử lý; Kernel điều phối bước này."
+  owner: runtime-core
+  kind: classification
+
+incident-auto-resolved:
+  title: "Incident resolved automatically"
+  title_vi: "Sự cố tự được giải quyết"
+  meaning_vi: "Ledger ghi nhận một sự cố đóng lại vì điều kiện gây ra nó không còn."
+  causes_vi:
+    - "Điều kiện lỗi đã hết"
+  nextStep_vi: "Không cần xử lý; xem lịch sử sự cố nếu muốn biết nguyên nhân."
+  owner: runtime-core
+  kind: event-kind
+
+incident-raised:
+  title: "Incident raised"
+  title_vi: "Sự cố được mở"
+  meaning_vi: "Ledger ghi nhận một sự cố mới được mở."
+  causes_vi:
+    - "Bộ kiểm hoặc reconciler phát hiện điều kiện bất thường"
+  nextStep_vi: "Đọc nội dung sự cố và xử lý theo hướng dẫn kèm theo."
+  owner: runtime-core
+  kind: event-kind
+
+incident-resolved:
+  title: "Incident resolved"
+  title_vi: "Sự cố đã được giải quyết"
+  meaning_vi: "Ledger ghi nhận một sự cố đã đóng."
+  causes_vi:
+    - "Nguyên nhân đã được sửa hoặc workflow kết thúc"
+  nextStep_vi: "Không cần xử lý."
+  owner: runtime-core
+  kind: event-kind
+
+irreversible-confirmation:
+  title: "Ask kind: irreversible confirmation"
+  title_vi: "Loại câu hỏi: xác nhận không thể hoàn tác"
+  meaning_vi: "Nhãn phân loại câu hỏi ask xin xác nhận trước một hành động không thể hoàn tác."
+  causes_vi:
+    - "Op sắp thực hiện thao tác mất dữ liệu hoặc không đảo ngược được"
+  nextStep_vi: "Chủ dự án xác nhận hoặc từ chối; không bao giờ tự chấp nhận."
+  owner: runtime-core
+  kind: classification
+
+job-dropped:
+  title: "Job dropped"
+  title_vi: "Job bị bỏ"
+  meaning_vi: "Ledger ghi nhận một job bị bỏ khỏi hàng mà không chạy."
+  causes_vi:
+    - "Job không còn cần thiết hoặc bị thay thế"
+  nextStep_vi: "Không cần xử lý; kiểm tra lý do trong sự kiện nếu bất ngờ."
+  owner: runtime-core
+  kind: event-kind
+
+job-enqueued:
+  title: "Job enqueued"
+  title_vi: "Job vào hàng"
+  meaning_vi: "Ledger ghi nhận một job mới vào hàng chờ chạy."
+  causes_vi:
+    - "Kernel hoặc controller xếp job mới"
+  nextStep_vi: "Không cần xử lý; đây là mốc tiến độ bình thường."
+  owner: runtime-core
+  kind: event-kind
+
+land-scratch:
+  title: "Worktree kind: land scratch"
+  title_vi: "Loại worktree: nháp land"
+  meaning_vi: "Loại worktree tạm dùng để thử land một nhánh."
+  causes_vi:
+    - "Quy trình land cần một cây tạm"
+  nextStep_vi: "Không cần xử lý; cây tạm được dọn sau khi land."
+  owner: runtime-core
+  kind: classification
+
+layout-tree:
+  title: "Foundation kind: layout tree"
+  title_vi: "Loại nền: cây layout"
+  meaning_vi: "Loại nền tảng dùng chung: cây layout của ứng dụng."
+  causes_vi:
+    - "Workflow khai báo nền cây layout"
+  nextStep_vi: "Không cần xử lý; đây là nhãn phân loại."
+  owner: runtime-core
+  kind: classification
+
+live-worker-reconciled:
+  title: "Live worker reconciled"
+  title_vi: "Đã đối soát worker còn sống"
+  meaning_vi: "Ledger ghi nhận một worker còn sống được gắn lại với lần điều phối của nó."
+  causes_vi:
+    - "Kernel hoặc controller khởi động lại khi worker vẫn chạy"
+  nextStep_vi: "Không cần xử lý; worker tiếp tục."
+  owner: runtime-core
+  kind: event-kind
+
+no-open-circuit:
+  title: "No open circuit to recover"
+  title_vi: "Không có mạch hở cần phục hồi"
+  meaning_vi: "Lần phục hồi nhà cung cấp không làm gì vì không mạch nào đang hở."
+  causes_vi:
+    - "Nhà cung cấp đã khỏe"
+  nextStep_vi: "Không cần xử lý."
+  owner: runtime-core
+  kind: outcome-reason
+
+no-quota-probe:
+  title: "Provider has no quota probe"
+  title_vi: "Nhà cung cấp không có phép dò hạn mức"
+  meaning_vi: "Kiểm tra sức khỏe nhà cung cấp bỏ qua dò hạn mức vì nhà cung cấp không khai báo cách dò."
+  causes_vi:
+    - "Nhà cung cấp không có API hạn mức"
+  nextStep_vi: "Không cần xử lý."
+  owner: runtime-core
+  kind: outcome-reason
+
+no-starci-marker:
+  title: "Terminal has no StarCi marker"
+  title_vi: "Terminal không có dấu StarCi"
+  meaning_vi: "Dọn trùng terminal giữ lại terminal vì nó không mang dấu của phiên agent StarCi."
+  causes_vi:
+    - "Terminal do người dùng mở"
+  nextStep_vi: "Không cần xử lý; terminal được giữ nguyên."
+  owner: runtime-core
+  kind: outcome-reason
+
+not-a-file:
+  title: "Archive skipped a non-file"
+  title_vi: "Lưu trữ bỏ qua mục không phải tệp"
+  meaning_vi: "Lưu trữ phiên bỏ qua một đường dẫn vì nó không phải tệp thường."
+  causes_vi:
+    - "Đường dẫn là thư mục hoặc liên kết"
+  nextStep_vi: "Không cần xử lý."
+  owner: runtime-core
+  kind: outcome-reason
+
+nothing-open:
+  title: "Nothing open to ring"
+  title_vi: "Không có gì đang mở để rung chuông"
+  meaning_vi: "Chuông gọi chủ dự án không rung vì không có quyết định nào đang mở."
+  causes_vi:
+    - "Hàng chờ quyết định trống"
+  nextStep_vi: "Không cần xử lý."
+  owner: runtime-core
+  kind: outcome-reason
+
+one-off:
+  title: "Note class: one-off"
+  title_vi: "Lớp ghi chú: một lần"
+  meaning_vi: "Lớp ghi chú góp ý chỉ áp dụng cho một sản phẩm, không rút thành quy tắc."
+  causes_vi:
+    - "Góp ý đặc thù của một lần vẽ"
+  nextStep_vi: "Không cần xử lý; không đưa vào canon."
+  owner: runtime-core
+  kind: classification
+
+op-dispatched:
+  title: "Op dispatched"
+  title_vi: "Op đã được điều phối"
+  meaning_vi: "Ledger ghi nhận một op đã được giao cho worker."
+  causes_vi:
+    - "Kernel điều phối job"
+  nextStep_vi: "Không cần xử lý; đây là mốc tiến độ bình thường."
+  owner: runtime-core
+  kind: event-kind
+
+op-settled:
+  title: "Op settled"
+  title_vi: "Op đã được settle"
+  meaning_vi: "Ledger ghi nhận API đã settle kết quả của một op từ bằng chứng."
+  causes_vi:
+    - "Op nộp báo cáo và các bước kiểm tra xong"
+  nextStep_vi: "Không cần xử lý; đây là mốc tiến độ bình thường."
+  owner: runtime-core
+  kind: event-kind
+
+op-worker-nudged:
+  title: "Op worker nudged"
+  title_vi: "Worker của op được nhắc"
+  meaning_vi: "Ledger ghi nhận worker của một op được nhắc tiếp tục vì im lặng quá lâu."
+  causes_vi:
+    - "Worker không phát tín hiệu trong khoảng chờ"
+  nextStep_vi: "Không cần xử lý; theo dõi nếu worker vẫn im."
+  owner: runtime-core
+  kind: event-kind
+
+owner-restart:
+  title: "Planned start: owner restart"
+  title_vi: "Khởi động có kế hoạch: chủ dự án khởi động lại"
+  meaning_vi: "Lý do khởi động của engine: chủ dự án chủ động khởi động lại."
+  causes_vi:
+    - "Chủ dự án chạy lệnh khởi động lại"
+  nextStep_vi: "Không cần xử lý."
+  owner: runtime-core
+  kind: outcome-reason
+
+phase-transition:
+  title: "Workflow phase transition"
+  title_vi: "Workflow đổi pha"
+  meaning_vi: "Ledger ghi nhận workflow chuyển pha."
+  causes_vi:
+    - "Kernel hoặc chủ dự án đổi pha"
+  nextStep_vi: "Không cần xử lý."
+  owner: runtime-core
+  kind: event-kind
+
+plan-derived:
+  title: "Plan derived"
+  title_vi: "Đã suy ra kế hoạch"
+  meaning_vi: "Ledger ghi nhận kế hoạch của workflow đã được suy ra."
+  causes_vi:
+    - "Kernel lập kế hoạch từ mục tiêu"
+  nextStep_vi: "Không cần xử lý."
+  owner: runtime-core
+  kind: event-kind
+
+planned-restart:
+  title: "Planned start: planned restart"
+  title_vi: "Khởi động có kế hoạch: khởi động lại theo kế hoạch"
+  meaning_vi: "Lý do khởi động của engine: một lần khởi động lại đã được lên kế hoạch."
+  causes_vi:
+    - "Bảo trì hoặc nạp lại có chủ đích"
+  nextStep_vi: "Không cần xử lý."
+  owner: runtime-core
+  kind: outcome-reason
+
+product-direction:
+  title: "Note class: product direction"
+  title_vi: "Lớp ghi chú: hướng sản phẩm"
+  meaning_vi: "Lớp ghi chú góp ý về hướng sản phẩm."
+  causes_vi:
+    - "Góp ý thuộc quyết định sản phẩm"
+  nextStep_vi: "Chủ dự án xem xét; không phải lỗi."
+  owner: runtime-core
+  kind: classification
+
+push-scratch:
+  title: "Worktree kind: push scratch"
+  title_vi: "Loại worktree: nháp push"
+  meaning_vi: "Loại worktree tạm dùng để chuẩn bị push một nhánh."
+  causes_vi:
+    - "Quy trình push cần một cây tạm"
+  nextStep_vi: "Không cần xử lý; cây tạm được dọn sau khi push."
+  owner: runtime-core
+  kind: classification
+
+queued-ready:
+  title: "Wait: queued and ready"
+  title_vi: "Chờ: đã vào hàng và sẵn sàng"
+  meaning_vi: "Loại chờ trong số liệu op: job đã sẵn sàng và đang chờ tới lượt."
+  causes_vi:
+    - "Hàng chờ đang đầy"
+  nextStep_vi: "Không cần xử lý."
+  owner: runtime-core
+  kind: classification
+
+rate-limited:
+  title: "Ring skipped by rate limit"
+  title_vi: "Chuông bị bỏ qua do giới hạn tần suất"
+  meaning_vi: "Chuông gọi chủ dự án không rung vì lần rung trước còn quá gần."
+  causes_vi:
+    - "Khoảng cách tối thiểu giữa hai lần rung chưa tới"
+  nextStep_vi: "Không cần xử lý; lần sau sẽ rung nếu còn cần."
+  owner: runtime-core
+  kind: outcome-reason
+
+reload-handover:
+  title: "Planned exit: reload handover"
+  title_vi: "Thoát có kế hoạch: bàn giao khi nạp lại"
+  meaning_vi: "Lý do thoát của engine: engine cũ bàn giao cho engine mới khi nạp lại."
+  causes_vi:
+    - "Chủ dự án hoặc hệ thống nạp lại runtime"
+  nextStep_vi: "Không cần xử lý."
+  owner: runtime-core
+  kind: outcome-reason
+
+report-consumed:
+  title: "Report consumed"
+  title_vi: "Báo cáo đã được xử lý"
+  meaning_vi: "Ledger ghi nhận báo cáo của một op đã được Kernel đọc."
+  causes_vi:
+    - "Kernel nhận báo cáo"
+  nextStep_vi: "Không cần xử lý."
+  owner: runtime-core
+  kind: event-kind
+
+report-filed:
+  title: "Report filed"
+  title_vi: "Báo cáo đã được nộp"
+  meaning_vi: "Ledger ghi nhận một op đã nộp báo cáo."
+  causes_vi:
+    - "Op hoàn tất và nộp kết quả"
+  nextStep_vi: "Không cần xử lý."
+  owner: runtime-core
+  kind: event-kind
+
+retry-cap:
+  title: "Wait: retry cap reached"
+  title_vi: "Chờ: đạt giới hạn thử lại"
+  meaning_vi: "Loại chờ của job: số lần thử lại đã chạm giới hạn nên job dừng chờ quyết định."
+  causes_vi:
+    - "Job thất bại nhiều lần liên tiếp"
+  nextStep_vi: "Xem lý do thất bại gần nhất rồi quyết định sửa hay bỏ job."
+  owner: runtime-core
+  kind: classification
+
+root-verify:
+  title: "Follow-on job for root verification"
+  title_vi: "Job nối tiếp xác minh gốc"
+  meaning_vi: "Lý do tạo job nối tiếp: xác minh lại gốc sau một thay đổi."
+  causes_vi:
+    - "Thay đổi chạm vào đường dẫn gốc"
+  nextStep_vi: "Không cần xử lý; job nối tiếp tự chạy."
+  owner: runtime-core
+  kind: outcome-reason
+
+run-created:
+  title: "Run created"
+  title_vi: "Đã tạo lần chạy"
+  meaning_vi: "Ledger ghi nhận một lần chạy mới của workflow đã được tạo."
+  causes_vi:
+    - "Workflow bắt đầu một lần chạy"
+  nextStep_vi: "Không cần xử lý."
+  owner: runtime-core
+  kind: event-kind
+
+self-reload:
+  title: "Planned start: self reload"
+  title_vi: "Khởi động có kế hoạch: tự nạp lại"
+  meaning_vi: "Lý do khởi động của engine: runtime tự nạp lại phiên bản mới."
+  causes_vi:
+    - "Runtime phát hiện bản mới"
+  nextStep_vi: "Không cần xử lý."
+  owner: runtime-core
+  kind: outcome-reason
+
+sessions-db-owned:
+  title: "Session home owned by the agent database"
+  title_vi: "Thư mục phiên do cơ sở dữ liệu agent giữ"
+  meaning_vi: "Lưu trữ phiên bỏ qua vì phiên của agent này nằm trong cơ sở dữ liệu của chính agent."
+  causes_vi:
+    - "Agent giữ phiên trong cơ sở dữ liệu riêng"
+  nextStep_vi: "Không cần xử lý."
+  owner: runtime-core
+  kind: outcome-reason
+
+shared-system:
+  title: "Deferred class: shared system"
+  title_vi: "Lớp hoãn: hệ thống dùng chung"
+  meaning_vi: "Lớp việc bị hoãn chờ chủ dự án vì chạm vào hệ thống dùng chung."
+  causes_vi:
+    - "Thao tác ảnh hưởng tới hệ thống nhiều người dùng"
+  nextStep_vi: "Chủ dự án quyết định có cho chạy hay không."
+  owner: runtime-core
+  kind: classification
+
+starci-agent-session:
+  title: "StarCi agent session terminal"
+  title_vi: "Terminal của phiên agent StarCi"
+  meaning_vi: "Dọn trùng terminal đóng terminal vì nó mang dấu của một phiên agent StarCi đã có phiên khác."
+  causes_vi:
+    - "Terminal trùng phiên"
+  nextStep_vi: "Không cần xử lý."
+  owner: runtime-core
+  kind: outcome-reason
+
+supervisor-gate:
+  title: "Next action: supervisor gate"
+  title_vi: "Bước tiếp theo: cổng supervisor"
+  meaning_vi: "Nhãn bước tiếp theo: workflow chờ cổng của supervisor."
+  causes_vi:
+    - "Quyết định thuộc supervisor"
+  nextStep_vi: "Supervisor xử lý cổng; không phải lỗi."
+  owner: runtime-core
+  kind: classification
+
+supervisor-staging:
+  title: "Worktree kind: supervisor staging"
+  title_vi: "Loại worktree: dàn dựng của supervisor"
+  meaning_vi: "Loại worktree mà supervisor dùng để dàn dựng thay đổi."
+  causes_vi:
+    - "Supervisor chuẩn bị một thay đổi"
+  nextStep_vi: "Không cần xử lý."
+  owner: runtime-core
+  kind: classification
+
+test-env-unrooted:
+  title: "Test environment has no session root"
+  title_vi: "Môi trường thử không có gốc phiên"
+  meaning_vi: "Việc thả phiên bỏ qua vì môi trường đang chạy thử không có thư mục gốc phiên."
+  causes_vi:
+    - "Spec chạy với môi trường rỗng"
+  nextStep_vi: "Không cần xử lý."
+  owner: runtime-core
+  kind: outcome-reason
+
+time-budget:
+  title: "Worktree cleanup stopped at its time budget"
+  title_vi: "Dọn worktree dừng vì hết ngân sách thời gian"
+  meaning_vi: "Một lượt dọn worktree dừng vì hết thời gian cho phép và sẽ tiếp tục ở lượt sau."
+  causes_vi:
+    - "Có quá nhiều worktree cần dọn trong một lượt"
+  nextStep_vi: "Không cần xử lý; lượt sau tiếp tục."
+  owner: runtime-core
+  kind: outcome-reason
+
+workflow-ended:
+  title: "Incident closed because the workflow ended"
+  title_vi: "Sự cố đóng vì workflow đã kết thúc"
+  meaning_vi: "Lý do đóng sự cố: workflow chứa nó đã kết thúc."
+  causes_vi:
+    - "Workflow hoàn tất hoặc được lưu trữ"
+  nextStep_vi: "Không cần xử lý."
+  owner: runtime-core
+  kind: outcome-reason
+
+workflow-finished:
+  title: "Phase changed because the workflow finished"
+  title_vi: "Đổi pha vì workflow đã xong"
+  meaning_vi: "Lý do đổi pha: workflow hoàn tất thành công."
+  causes_vi:
+    - "Mọi op đã settle xanh"
+  nextStep_vi: "Không cần xử lý."
+  owner: runtime-core
+  kind: outcome-reason
+
+# Info and fault codes the scanner counted that had no entry yet.
+
+BYTE_CENSUS:
+  title: "Artifact byte census"
+  title_vi: "Thống kê byte của artifact"
+  meaning_vi: "Bộ kiểm artifact báo thông tin về số đường dẫn đã mở, số hash đã so và số tệp đã đọc."
+  causes_vi:
+    - "Mọi lần chạy bộ kiểm artifact đều báo dòng thống kê này"
+  nextStep_vi: "Không cần xử lý; đây là dòng thông tin, dùng để biết bộ kiểm đã đọc những gì."
+  owner: op-retry
+  kind: check-finding
+
+PHASE_REASON:
+  title: "Workflow phase reason recorded"
+  title_vi: "Lý do pha của workflow đã ghi"
+  meaning_vi: "Tiến độ hiển thị lý do chủ dự án hoặc Kernel đã ghi khi đưa workflow sang pha không chạy."
+  causes_vi:
+    - "Workflow đang paused, queued, awaiting-approval hoặc stopped và có ghi chú lý do"
+  nextStep_vi: "Đọc lý do ghi kèm trong tiến độ; xử lý theo nội dung lý do."
+  owner: runtime-core
+  kind: runtime-fault
+
+MISSING_CHAR:
+  title: "YAML is missing a required character"
+  title_vi: "YAML thiếu một ký tự bắt buộc"
+  meaning_vi: "Trình đọc YAML phát hiện thiếu ký tự bắt buộc, ví dụ dấu đóng."
+  causes_vi:
+    - "Tệp YAML bị cắt dở hoặc thiếu dấu ngoặc, dấu nháy"
+  nextStep_vi: "Mở tệp tại vị trí báo lỗi, thêm ký tự còn thiếu rồi chạy lại."
+  owner: op-retry
+  kind: input-invalid
+
+UNEXPECTED_TOKEN:
+  title: "YAML has an unexpected token"
+  title_vi: "YAML có ký tự không mong đợi"
+  meaning_vi: "Trình đọc YAML gặp một ký tự hoặc cấu trúc không hợp lệ tại vị trí đó."
+  causes_vi:
+    - "Tệp YAML sai cú pháp hoặc lẫn ký tự lạ"
+  nextStep_vi: "Mở tệp tại vị trí báo lỗi, sửa cú pháp rồi chạy lại."
+  owner: op-retry
+  kind: input-invalid

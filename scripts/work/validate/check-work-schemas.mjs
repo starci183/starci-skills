@@ -111,6 +111,6 @@ export function checkWorkSchemas(root, refused, info = [], { workRoot = root } =
     const shown = path.relative(workRoot, file).split(path.sep).join('/') || rel;
     validateNamedRecord(family, record, shown, loaded, refused, counts);
   }
-  info.push(`${root}: strict schema validation compiled ${counts.schemaChecked} record(s) against their named schemas; ${counts.schemaRejected} rejected [STRICT_MODE]`);
+  info.push(`${root}: strict schema validation compiled ${counts.schemaChecked} record(s) against their named schemas; ${counts.schemaRejected} rejected`);
   return counts;
 }

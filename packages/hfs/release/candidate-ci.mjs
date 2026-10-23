@@ -5,11 +5,8 @@
 //   red       RELEASE_CANDIDATE_CI_RED (a run or a job that concluded skipped is red, never a pass: owner ruling 2026-10-22, a skip is a loosening) with the run URL and the failing jobs and steps; nothing reaches the default branch. The candidate ref stays for diagnosis
 //   timeout   RELEASE_CANDIDATE_CI_TIMEOUT: no run listed within the grace (a queued run is listed), or it did not end within the wait
 //   unknown   RELEASE_CI_UNKNOWN: GitHub could not be read to the end; a release never proceeds blind
-// Emergency path (documented, owner-only): the owner's `starci release ci-override --sha <sha>` record for this exact sha
-// (<git common dir>/starci-release/<sha>.ci-override.json, schema starci/ci-override@1) lets a red candidate through, and the push says so.
+// There is no override: a red candidate never passes (owner ruling 2026-10-22: a loosening is always red).
 // Every process goes through ctx.spawn (git, gh); the wait through ctx.sleep and ctx.now.
-import fs from 'node:fs';
-import path from 'node:path';
 
 const CANDIDATE_PREFIX = 'refs/heads/release/candidate-';
 /** The wait of the candidate run: poll interval, the grace for a run to appear, the wait for it to end (an app's ci.yml jobs time out within 45 minutes). */
@@ -67,19 +64,6 @@ export function failingJobs(ctx, runRow) {
   });
 }
 
-/** Only a complete starci/ci-override@1 record for this exact commit can excuse a red candidate. */
-export function overrideOf(ctx, sha) {
-  if (!SHA.test(String(sha))) return null;
-  const common = run(ctx, 'git', ['rev-parse', '--git-common-dir']);
-  if (common.error || common.status !== 0 || !String(common.stdout ?? '').trim()) return null;
-  const file = path.join(path.resolve(ctx.cwd, String(common.stdout).trim()), 'starci-release', `${sha}.ci-override.json`);
-  try {
-    const record = JSON.parse(fs.readFileSync(file, 'utf8'));
-    if (record.schema !== 'starci/ci-override@1' || record.sha !== sha || typeof record.reason !== 'string' || !record.reason.trim() || typeof record.by !== 'string' || !record.by.trim() || typeof record.at !== 'string' || !Number.isFinite(Date.parse(record.at))) return null;
-    return record;
-  } catch { return null; }
-}
-
 /** Poll the candidate run of `sha` until green or red, or the grace (no run) or the wait passes: {state: green|red|timeout|unstarted|unknown, run}. */
 export async function waitForCandidate(ctx, sha, wait = CANDIDATE_WAIT) {
   const started = ctx.now();
@@ -96,8 +80,8 @@ export async function waitForCandidate(ctx, sha, wait = CANDIDATE_WAIT) {
 }
 
 /**
- * The candidate step of the push: push HEAD to the candidate ref (through the pre-push hook), wait for its CI. {ok, lines, data: {ref, state, run, failing, override}}.
- * ok only on green, or on red under the owner's override record for this exact sha.
+ * The candidate step of the push: push HEAD to the candidate ref (through the pre-push hook), wait for its CI. {ok, lines, data: {ref, state, run, failing}}.
+ * ok only on green.
  */
 export async function candidateStep(ctx, { head, tag, prefix, remote, wait = CANDIDATE_WAIT }) {
   const ref = candidateRef(tag, prefix);
@@ -110,9 +94,7 @@ export async function candidateStep(ctx, { head, tag, prefix, remote, wait = CAN
   if (seen.state === 'green') return { ok: true, lines: [...lines, `candidate CI   green${url}`], data: { ref, state: 'green', run: seen.run } };
   if (seen.state === 'red') {
     const failing = failingJobs(ctx, seen.run);
-    const record = overrideOf(ctx, head);
     const detail = failing.length ? failing.join('; ') : 'the failing jobs could not be read';
-    if (record) return { ok: true, lines: [...lines, `candidate CI   RED${url}; failing: ${detail}`, `RELEASE_CANDIDATE_CI_RED overridden by the owner (${record.by}): ${record.reason}`], data: { ref, state: 'red', run: seen.run, failing, override: { by: record.by, reason: record.reason, at: record.at } } };
     return { ok: false, lines: [...lines, `RELEASE_CANDIDATE_CI_RED: the ci.yml run of ${head.slice(0, 10)} on ${ref} is red${url}; failing: ${detail}. Nothing reached the default branch; the candidate ref stays for diagnosis`], data: { ref, state: 'red', run: seen.run, failing } };
   }
   if (seen.state === 'unstarted') return { ok: false, lines: [...lines, `RELEASE_CANDIDATE_CI_TIMEOUT: no ci.yml run started for ${head.slice(0, 10)} on ${ref} within ${wait.graceMinutes} minutes (does .github/workflows/ci.yml trigger on release/candidate-*? run starci app sync)`], data: { ref, state: 'unstarted' } };

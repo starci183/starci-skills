@@ -463,7 +463,6 @@ $defs:
           - NAV_ROUTE_NULL
           - NAV_LABEL_MISSING
           - ROUTE_NOT_IN_NAV
-          - NAV_REGISTRY_UNREAD
       detail:
         $ref: "#/$defs/prose"
   layout:

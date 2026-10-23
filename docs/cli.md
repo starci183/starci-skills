@@ -505,7 +505,7 @@ Conventions:
 - requireCi true: push --execute sends HEAD to refs/heads/release/candidate-<version> first and waits for its ci.yml run
 - green moves the branch and the tag in one atomic push; red refuses RELEASE_CANDIDATE_CI_RED naming the failing jobs
 - no run, or no end in time, refuses RELEASE_CANDIDATE_CI_TIMEOUT; unreadable GitHub refuses RELEASE_CI_UNKNOWN; nothing reaches the branch
-- only the owner's starci release ci-override --sha <sha> --reason <text> record lets a red candidate through; there is no --no-ci-check flag
+- a red candidate never passes: there is no override and no --no-ci-check flag
 - gate refuses a dirty tree, HEAD other than --source, a moved HEAD and a tree dirtied by the gates; record and tag only when all gates are green
 - a gate with summary jest is red on failed tests and on a coverage threshold miss even when the process exits 0
 - push needs the annotated tag and L4 record of HEAD, runs git push --dry-run --atomic first and never uses --no-verify
@@ -3417,39 +3417,6 @@ starci release check --final --json
 starci release check --only publish-plan,canon-pins
 ```
 
-### starci release ci-override
-
-the owner accepts a red candidate CI for one SHA (emergency path) and records who and why
-
-| flag | type | |
-| --- | --- | --- |
-| `--sha` | string |  |
-| `--reason` | string |  |
-| `--repo` | string |  |
-
-Conventions:
-
-- OWNER RULING candidate-ci (2026-10-18): a release reaches main only when the candidate CI of its own sha is green;
-- this verb is the one documented EMERGENCY path for a red candidate.
-- The override is owner-only, records who and why, and agents cannot run it (OWNER RULING alpha20-ci-override-owner-only).
-- Every bound role is refused by the command guard and by this script. The owner must use a terminal and type the first 12 SHA characters exactly.
-- Writes <git-common-dir>/starci-release/<sha>.ci-override.json, schema starci/ci-override@1,
-- with sha, reason, by (git user.name and OS user), at, and runUrl (empty if GitHub is unavailable).
-- release cut and app release push read that record for the exact candidate sha only; the release record logs its use.
-- For the runtime it also appends ci-override-<sha12> under rulings in modules/kernel/owner-rulings.yaml as the audit trail.
-- App repositories receive only the record.
-- An override applies only to its exact SHA. It never permits a release whose CI is unknown or timed out.
-- Existing ruling IDs with another reason refuse.
-
-exit: 0 the override record and runtime owner ruling were written; 2 RIGHTS_OWNER_ONLY (a bound role or non-TTY stdin), bad usage, confirmation mismatch, or write failure
-
-json: none
-
-```sh
-starci release ci-override --sha 0123456789abcdef0123456789abcdef01234567 --reason "Owner accepts this CI failure for the release"
-starci release ci-override --repo ../my-app --sha 0123456789abcdef0123456789abcdef01234567 --reason "Owner accepts the failed run"
-```
-
 ### starci release ci-status
 
 the verdict of the GitHub ci workflow, Codecov and Sonar for a release; red is recorded for Debug
@@ -3519,8 +3486,7 @@ Conventions:
 - No run within the grace, or no end within the wait, refuses RELEASE_CANDIDATE_CI_TIMEOUT.
 - A red candidate keeps its ref for diagnosis; after a cut the candidate ref is left on the remote, naming the released sha.
 - Only on green is the annotated tag created and main plus the tag pushed atomically; the release record logs the candidate verdict.
-- Emergency path, owner-only: starci release ci-override --sha <HEAD> --reason <text> lets a red candidate through.
-- The release record logs its use.
+- There is no override: a red candidate never passes.
 
 exit: 0 the candidate CI of the release sha was green, then main plus its tag were pushed atomically, or --plan found nothing missing; 1 refused (RELEASE_CANDIDATE_CI_RED, RELEASE_CANDIDATE_CI_TIMEOUT, RELEASE_CI_UNKNOWN, dirty tree, no or wrong tag, release notes incomplete, version not moved past the remote main, suite red, main moved, secret scan) and nothing was pushed; 2 bad usage
 
@@ -3701,6 +3667,37 @@ starci release sync-runtime --prepare-grammar
 ## starci route
 
 resolve runtime operations from structured routing inputs
+
+### starci route model
+
+resolve which tier members may take a workload from the declarative model-selection rules
+
+| flag | type | |
+| --- | --- | --- |
+| `--kind` | string |  |
+| `--role` | enum implement|verify|decide|plan|write |  |
+| `--domain` | string |  |
+| `--risk` | enum low|medium|high|critical |  |
+| `--floor` | enum probation|standard|high|critical |  |
+| `--tools` | list |  |
+| `--context-tokens` | string |  |
+| `--external` | boolean |  |
+| `--unapproved` | boolean |  |
+| `--no-review` | boolean |  |
+| `--no-checks` | boolean |  |
+| `--difficulty` | enum easy|medium|hard|insane |  |
+| `--plan` | boolean |  |
+| `--repo` | string |  |
+| `--models-dir` | string |  |
+| `--verbose` | boolean |  |
+
+exit: 0 a member is picked; 1 no eligible model; 2 bad usage
+
+json: flag
+
+```sh
+starci route model --kind interface.draw --plan --json
+```
 
 ### starci route op
 

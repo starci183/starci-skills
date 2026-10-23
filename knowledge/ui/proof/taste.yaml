@@ -359,7 +359,7 @@ rules:
       - id: case-9
         when: The lens is scored
         observe: |-
-          The same auditor scored the three anchor sheets of [the calibration set](calibration/calibration.json) in the same round, and each anchor landed inside its `taste` band within the tolerance that file publishes; the evidence record carries the three anchor scores beside the surface's. An anchor that drifts further, or a lens scored with no anchors, is void, because a score taken on a scale nobody proved cannot be compared with another sheet's or with an earlier round's
+          The same auditor scored the three anchor sheets of [the calibration set](calibration/calibration.yaml) in the same round, and each anchor landed inside its `taste` band within the tolerance that file publishes; the evidence record carries the three anchor scores beside the surface's. An anchor that drifts further, or a lens scored with no anchors, is void, because a score taken on a scale nobody proved cannot be compared with another sheet's or with an earlier round's
     notes:
       - |-
         The scored set is `TASTE-1` to `TASTE-12`; this rule is the arithmetic and is not itself scored. The

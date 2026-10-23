@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+- Added: the verb `starci route model` (the model-selection preview, flags `--context-tokens` and `--models-dir` in kebab case).
+- Removed: the verb `starci release ci-override`; a red candidate CI never passes.
+
 ## 1.7.26 - 2026-10-23
 - Fixed: `starci runtime install` fetches runtime 1.0.0-alpha.27 (1.7.24 and 1.7.25 still named 1.0.0-alpha.26).
 - Changed: pins @starci/hfs 4.7.26.

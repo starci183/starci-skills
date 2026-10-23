@@ -49,6 +49,14 @@ const CHECK_ENTRIES = [
   'scripts/lib/gate-loosening.mjs',
   // Which JSON files are managed canon (a slot-declared template or its render), proven by src/managed-json.spec.mjs over this copy.
   'scripts/lib/managed-json.mjs',
+  // Which JSON files a tool fixes the format of (the declared formats of the json-exceptions check), proven by src/json-formats.spec.mjs over this copy.
+  'scripts/lib/json-formats.mjs',
+  // Which UPPER_SNAKE literals of a script are read values and not emitted failure codes (the failure-codes check), proven by src/failure-code-reads.spec.mjs over this copy.
+  'scripts/lib/failure-code-reads.mjs',
+  // The Sonar gate data and its pure judgments, read by the package specs that render a CI declaration.
+  'scripts/gates/sonar-gate.mjs',
+  // The .starcistacks services gate (checkStarciStacks), proven by src/hfs-stacks-runtime-shape.spec.mjs over this copy.
+  'scripts/gates/starcistacks.mjs',
 ];
 /** Static imports and `new URL(<relative>.yaml, import.meta.url)` reads (the framework-pinned knowledge file) are followed. */
 const IMPORT_SPEC = /(?:\bfrom\s+|\bimport\s*\(\s*|\bimport\s+)['"](\.[^'"]+)['"]/g;

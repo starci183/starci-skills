@@ -1,0 +1,20 @@
+// A recorded fixture of the hfs-stack-tooling spec: plain data, exported as the default.
+export default {
+  "schema": "starci/stack-tooling-fixture@1",
+  "description": "An app that calls the canon verbs: a workflow that only runs starci app stack deploy, a runbook with out-of-scope docker commands and a commented-out line. All text is synthetic.",
+  "files": {
+    "hfs.json": {
+      "hfs": 3,
+      "kind": "app",
+      "project": "shop"
+    },
+    "package.json": {
+      "name": "shop",
+      "scripts": {
+        "deploy": "starci app stack deploy --env production"
+      }
+    },
+    "deploy/runbook.sh": "#!/usr/bin/env bash\n# docker stack deploy is done by the canon verb\ndocker stack ps shop\ndocker compose up -d\ndocker logs shop_api\n",
+    ".github/workflows/release.yml": "name: release\non: workflow_dispatch\njobs:\n  ship:\n    runs-on: ubuntu-latest\n    steps:\n      - run: starci app stack deploy --env production --execute\n"
+  }
+};

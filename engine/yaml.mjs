@@ -4,7 +4,7 @@
 // rather than importing node_modules; yaml is a devDependency and a direct import breaks that
 // install. tests/engine/yaml-vendored-parity.spec.mjs proves the vendored parseYaml/stringifyYaml behave
 // exactly like yaml@2.9.0 with these options for every tracked *.yaml/*.yml file (parsed values
-// deep-equal, stringify output byte-identical). License: engine/yaml-license.json.
+// deep-equal, stringify output byte-identical). License: engine/yaml-license.yaml.
 // Rebuild only when deliberately upgrading yaml. The entry source is:
 //   import * as YAML from 'yaml';
 //   export function parseYaml(source) {

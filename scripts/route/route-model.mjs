@@ -6,12 +6,12 @@
 // kernel-function step for the kernel's own calls, or refusal) decide which of them are eligible, and the common picker
 // (scripts/lib/tier-pick.mjs) orders them.
 //
-// Internal entry: spawned by scripts/goal/define-goal.mjs; not invoked directly.
+// Entry: the verb `starci route model` (modules/cli/commands/route/model.yaml).
 // Args: --kind <kind>
 //       [--role <implement|verify|decide|plan|write>]   (default: kinds.yaml role)
 //       [--domain <d>] [--risk <low|medium|high|critical>]
 //       [--floor <probation|standard|high|critical>]
-//       [--tools <t>[,<t>...]] [--contextTokens <n>]
+//       [--tools <t>[,<t>...]] [--context-tokens <n>]
 //       [--external]            workload has external effects (probation forbidden)
 //       [--unapproved]          workflow not approved (probation forbidden)
 //       [--no-review]           no fresh independent review planned
@@ -24,7 +24,7 @@
 //                               ANNOTATED, not fatal
 //       [--repo <path>]         kernel-function kinds also read that repository
 //                               ledger's provider-health circuit (open → unavailable)
-//       [--json] [--modelsDir <dir>] [--verbose]
+//       [--json] [--models-dir <dir>] [--verbose]
 //       --help prints this argument description
 //
 // Prints: picked member (+model for the role), the rule that fired, the pick record

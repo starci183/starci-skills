@@ -1,0 +1,27 @@
+group: route
+verb: model
+owner: runtime
+summary: resolve which tier members may take a workload from the declarative model-selection rules
+impl: {script: scripts/route/route-model.mjs}
+flags:
+  - {name: kind, type: string, summary: operation kind the workload runs}
+  - {name: role, type: enum, enum: [implement, verify, decide, plan, write], summary: "role of the workload (default is the role of the kind in kinds.yaml)"}
+  - {name: domain, type: string, summary: domain of the workload}
+  - {name: risk, type: enum, enum: [low, medium, high, critical], summary: risk of the workload}
+  - {name: floor, type: enum, enum: [probation, standard, high, critical], summary: lowest qualification a pick may carry}
+  - {name: tools, type: list, summary: "tool the workload needs; comma list or repeatable"}
+  - {name: context-tokens, type: string, summary: context size in tokens the workload needs}
+  - {name: external, type: boolean, summary: the workload has external effects and probation is forbidden}
+  - {name: unapproved, type: boolean, summary: the workflow is not approved and probation is forbidden}
+  - {name: no-review, type: boolean, summary: no fresh independent review is planned}
+  - {name: no-checks, type: boolean, summary: the op declares no machine checks}
+  - {name: difficulty, type: enum, enum: [easy, medium, hard, insane], summary: "measured difficulty (default medium, required with --plan)"}
+  - {name: plan, type: boolean, summary: "what-if view that walks the tier chain and annotates missing or stale qualification evidence instead of refusing"}
+  - {name: repo, type: string, summary: repository whose ledger provider-health circuit marks a model unavailable}
+  - {name: models-dir, type: string, summary: "models directory (default is modules/models)"}
+  - {name: verbose, type: boolean, summary: print the per-candidate rejection reasons}
+exit: {"0": a member is picked, "1": no eligible model, "2": bad usage}
+json: flag
+examples:
+  - starci route model --kind interface.draw --plan --json
+editions: [full]

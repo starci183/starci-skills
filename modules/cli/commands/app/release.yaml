@@ -29,7 +29,7 @@ conventions:
   - "requireCi true: push --execute sends HEAD to refs/heads/release/candidate-<version> first and waits for its ci.yml run"
   - "green moves the branch and the tag in one atomic push; red refuses RELEASE_CANDIDATE_CI_RED naming the failing jobs"
   - "no run, or no end in time, refuses RELEASE_CANDIDATE_CI_TIMEOUT; unreadable GitHub refuses RELEASE_CI_UNKNOWN; nothing reaches the branch"
-  - "only the owner's starci release ci-override --sha <sha> --reason <text> record lets a red candidate through; there is no --no-ci-check flag"
+  - "a red candidate never passes: there is no override and no --no-ci-check flag"
   - "gate refuses a dirty tree, HEAD other than --source, a moved HEAD and a tree dirtied by the gates; record and tag only when all gates are green"
   - "a gate with summary jest is red on failed tests and on a coverage threshold miss even when the process exits 0"
   - "push needs the annotated tag and L4 record of HEAD, runs git push --dry-run --atomic first and never uses --no-verify"

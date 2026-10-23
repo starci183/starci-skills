@@ -22,7 +22,7 @@ const I18N_CATALOG = 'FE_I18N_CATALOG';
 export const DEFAULT_LOCALE = 'vi';
 const ROUTE_FILE = /\/(?:page|layout|template|loading|error|not-found)\.[jt]sx?$/;
 const LOCALE = /^[a-z]{2,3}(?:-[A-Za-z0-9]+)*$/;
-const WIRE_SCHEMA_STAMP = '.schema-sha256';
+export const WIRE_SCHEMA_STAMP = '.schema-sha256';
 
 /** Every leaf key of a parsed catalog as a dotted path. */
 function catalogKeys(value, prefix = '') {
@@ -32,7 +32,7 @@ function catalogKeys(value, prefix = '') {
 }
 
 /** Digest protocol for codegen: sorted app-relative schema path, NUL, LF-normalized source, NUL. */
-function wireSchemaDigest(repoRoot, snapshots) {
+export function wireSchemaDigest(repoRoot, snapshots) {
   const hash = createHash('sha256');
   for (const snapshot of [...snapshots].sort(byCodeUnit)) {
     let source;

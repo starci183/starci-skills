@@ -1,6 +1,10 @@
 # Changelog
 
 ## Unreleased
+- Changed: no check keeps a list of exceptions. The JSON a tool requires is declared once by format (`scripts/lib/json-formats.mjs`, bundled), the failure-code scanner no longer counts a literal the code only reads (`scripts/lib/failure-code-reads.mjs`, bundled), and a rule is proven by a package spec unless every enforcer it has runs only inside the runtime (`RUNTIME_ONLY_ENFORCERS`); the catalog keys `specNa`, `exampleNa` and the unreachable witness are gone.
+- Added: the specs of the deleted runtime tests that prove bundled checkers, restored as package specs (`src/*.spec.mjs`, helpers in `src/helpers`, fixtures in `src/fixtures`), and fresh specs for R296-R301, the tree codes of R01/R03, R112 and R216.
+- Changed: `scripts/gates/sonar-gate.mjs` and `scripts/gates/starcistacks.mjs` joined the bundled runtime copy, and a few exports the specs read are exported again.
+- Changed: a red candidate CI never passes: `packages/hfs/release/candidate-ci.mjs` has no ci-override record any more (owner ruling 2026-10-22, a loosening is always red).
 - Added: R303 `HFS_BYPASS_MARKER` in `starci app check` and the bypass guard of `starci app hygiene` (staged files read from the index): an inline disable of any tool, a type-check escape, a Sonar or coverage ignore, a skipped or focused test and a failure swallowed in a hook or workflow are refused in a product repository, the front end included.
 - Changed: the managed `.husky/pre-commit` runs `starci app sync --check` and ends the hook when any step fails; the stylelint step can no longer be skipped by a failing run.
 

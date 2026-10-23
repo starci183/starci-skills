@@ -8,17 +8,15 @@
 //   timeout    RELEASE_CANDIDATE_CI_TIMEOUT (no run listed within graceMinutes, or a run did not end within waitMinutes); nothing reaches main.
 //              A queued run is a run (state running): only a workflow with no run of the sha at all counts against the grace
 //   unknown    RELEASE_CI_UNKNOWN: GitHub could not be read to the end; a cut never proceeds blind
-// Emergency path (documented, owner-only): a red candidate passes only with the owner's `starci release ci-override --sha <sha>` record for that exact sha
-// (scripts/supervisor/release-ci-override.mjs; the ruling-in-tree part cannot hold for the sha being cut). The cut records that it was used.
+// There is no override: a red candidate never passes (owner ruling 2026-10-22: a loosening is always red). Fix, commit, cut again.
 // A re-cut of the same unreleased version force-moves the candidate ref only (never main); after a successful cut the candidate ref is left on the remote
 // (it names the released sha; the next version's cut uses its own ref).
-// Seams (deps): push, readRuns, readJobs, readChecks, override, sleep, now.
+// Seams (deps): push, readRuns, readJobs, readChecks, sleep, now.
 import { push as gitPush } from '../api/git/push.mjs';
 import { workflowRuns } from '../api/gh/workflow-runs.mjs';
 import { runJobs } from '../api/gh/run-jobs.mjs';
 import { commitChecks } from '../api/gh/commit-checks.mjs';
 import { readModuleJson } from '../../engine/runtime-root.mjs';
-import { readCiOverride } from './release-ci-override.mjs';
 import { sleep as defaultSleep } from '../lib/sleep.mjs';
 import { jsonReply as json } from '../lib/json-reply.mjs';
 
@@ -117,7 +115,7 @@ const runLine = (w) => [w.workflow, w.state, w.run?.url].filter(Boolean).join(' 
 
 /**
  * The candidate step: push `head` to the candidate ref of `tag` on `remote` (through `pushTarget`, the lifted push url when the remote is parked), wait for its CI.
- * Returns {ok, verdict, why, ref, workflows, failing, override}: ok true only on green, or red under the owner's override record for this exact sha.
+ * Returns {ok, verdict, why, ref, workflows, failing}: ok true only on green.
  */
 export async function candidateCi({ repo, remote, pushTarget = null, head, tag, deps = {} }) {
   const policy = deps.policy ?? candidatePolicy();
@@ -132,10 +130,7 @@ export async function candidateCi({ repo, remote, pushTarget = null, head, tag, 
     const redRuns = workflows.filter((w) => w.state === 'red');
     const failing = redRuns.flatMap((w) => failingJobs({ cwd: repo, run: w.run, deps }).map((line) => `${w.workflow}: ${line}`));
     const checks = (seen.checks ?? []).filter((c) => c.state === 'failure').map((c) => `check ${c.name} failed`);
-    const override = (deps.override ?? ((sha) => readCiOverride({ repo, sha })))(head);
     const detail = [...failing, ...checks].join('; ') || 'the failing jobs could not be read';
-    if (override) return { ok: true, verdict: 'candidate-red-overridden', ref, workflows, failing, override: { by: override.by, reason: override.reason, at: override.at },
-      why: `RELEASE_CANDIDATE_CI_RED overridden by the owner (${override.by}: ${override.reason}) for ${head.slice(0, 9)}: ${runs}; failing: ${detail}` };
     return { ok: false, verdict: 'RELEASE_CANDIDATE_CI_RED', ref, workflows, failing,
       why: `RELEASE_CANDIDATE_CI_RED: CI of the candidate ${head.slice(0, 9)} on ${ref} is red (${runs}); failing: ${detail}. Nothing reached main; the candidate ref stays for diagnosis. Fix, commit, and cut again (the candidate ref is force-moved, main never)` };
   }

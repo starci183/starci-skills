@@ -187,10 +187,9 @@ derived from the machine's rule id lists). After changing any of those files, `k
 `knowledge/hfs/canon-pins.yaml`, `knowledge/patterns/fe/folder.yaml` or the catalog entries of those codes, run `starci release sync-runtime`;
 `starci release sync-runtime --check` fails on a stale copy. Bump `version` here and in the pin when the behaviour changes.
 
-The examples gate `starci runtime check --only example-architecture` runs `starci app lint` of this CLI at the root of every `examples/*`
+The examples workflow (`.github/workflows/examples.yml`) runs `starci app lint` of this CLI at the root of every `examples/*`
 app with an `hfs.json` (each `examples/<app>` root) and fails on any finding or any tool that could not run;
-`starci app check` alone would miss the machine's source rules, which the canons judge. It is heavy: run it once, by hand, after `npm ci`
-in each app.
+`starci app check` alone would miss the machine's source rules, which the canons judge.
 
 ## Serving knowledge to other packages
 
