@@ -127,7 +127,7 @@ export function installInto(app, installs) {
   }
   for (const [name, folder] of Object.entries(STARCI_PACKAGES)) {
     const source = path.join(RUNTIME, 'packages', ...folder.split('/'));
-    fs.cpSync(source, path.join(modules, ...name.split('/')), { recursive: true, filter: (file) => !/(?:[\\/](node_modules|fixtures)([\\/]|$))|(?:\.test\.mjs$)/.test(path.relative(source, file)) });
+    fs.cpSync(source, path.join(modules, ...name.split('/')), { recursive: true, filter: (file) => !/(?:(?:^|[\\/])node_modules(?:[\\/]|$))|(?:[\\/]fixtures(?:[\\/]|$))|(?:\.test\.mjs$)/.test(path.relative(source, file)) });
   }
   for (const install of installs) {
     for (const name of packagesOf(install)) {

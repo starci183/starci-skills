@@ -33,7 +33,8 @@ export const WORK_DIR = '/opt/starci-parity/checkout';
 const SPEC_SUITE = /^npm (?:run )?test(?::[\w:-]+)?(?: -- .*)?$/;
 /** A step that calls a toolchain the GitHub runner image carries and the node image does not (the Go that builds a pinned release): provisioning for a step the container leaves out. */
 const RUNNER_TOOLCHAIN = /^[ \t]*go[ \t]/m;
-const BROWSER = /playwright install|test:a11y|test:browser/;
+/** A browser run: the Playwright install, the journeys and the compose stack a journey runs against (`browser/stack.mjs`); the container has no docker daemon, the candidate CI runs the browser job. */
+const BROWSER = /playwright install|test:a11y|test:browser|browser\/stack\.mjs/;
 
 /** The workflows of `repo` as parsed documents: [{file, doc}] (the root .github/workflows/*.yml, sorted by name). */
 function readWorkflows(repo) {
