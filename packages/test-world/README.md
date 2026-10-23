@@ -74,7 +74,7 @@ const world = useTestWorld({ apps: ["todo", "worker"] })   // or { todo: true },
 | `world.signedInPerson(label)`, `world.registerPerson(label)`, `world.signIn(email, pw)`, `world.actAs(person, app?)`, `world.scratchDir(name)` | through the doors `identity` declares. |
 | `world.commandBus`, `world.queryBus`, `world.resolve(token)`, `world.context` | `{ modules }` mode; `resolve` (and `scope.resolve`) takes any Nest token: a class, or the string or symbol a provider is bound to. |
 | `world.interruptDatabase(fn, connection?)` | `infra.postgresql.during(fn)`, or `infra.postgresql.connection(name).during(fn)` with a connection. |
-| `useSandbox({ provider, keys, module, client })` | contract layer: the real client against a provider sandbox; the library reads the keys and skips when absent. |
+| `useSandbox({ provider, keys, module, client })` | contract layer: the real client against a provider sandbox; the library reads the keys and the contract spec fails, naming them, when one is absent. |
 
 
 GraphQL subscriptions: `world.apps.<name>.api.as(token).subscribe(operation, { variables })` opens a graphql-ws subscription (the caller's bearer goes in `connectionParams.authorization`) and resolves once the server acknowledged it; trigger the push afterwards, `await sub.next()` for the next frame, `sub.frames()` to prove nothing arrived, `await sub.close()` to release it.

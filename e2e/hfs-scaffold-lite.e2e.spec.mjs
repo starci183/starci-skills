@@ -32,10 +32,10 @@ const APP_NAME = 'litedemo';
 /** What sync loads from the installed @starci/jest-preset (both editions install it): the Sonar exclusions the app's lint renders too. */
 const PRESETS = { sonarExclusions: createRequire(import.meta.url)('../packages/jest-preset/index.cjs').sonarExclusions() };
 
-/** The one prerequisite that may skip: Docker answering. A busy port never skips; it fails (below). */
+/** The prerequisite of the proof: Docker answering. An unanswered `docker info` fails the test, and so does a busy port (below). */
 const dockerProbe = spawnSync('docker', ['info'], { encoding: 'utf8', windowsHide: true, timeout: 60_000 });
 const dockerFailure = String(dockerProbe.stderr ?? dockerProbe.stdout ?? '').trim().split(/\r?\n/)[0];
-const skipReason = dockerProbe.status === 0 ? false
+const dockerUnavailable = dockerProbe.status === 0 ? false
   : `docker is unavailable: ${dockerProbe.error?.message ?? dockerFailure ?? 'docker info failed'}`;
 
 const portBusy = (port) => new Promise((resolve) => {
@@ -85,7 +85,8 @@ function assertScaffoldTestLanes(app) {
   }
 }
 
-test('hfs lite scaffold end to end: clean app, builds, isolated Supabase data, type drift and full-upgrade view', { skip: skipReason, timeout: 1_800_000 }, async (t) => {
+test('hfs lite scaffold end to end: clean app, builds, isolated Supabase data, type drift and full-upgrade view', { timeout: 1_800_000 }, async (t) => {
+  assert.equal(dockerUnavailable, false, String(dockerUnavailable));
   // The installed SQL parser extracts one Bun-built native binding at the isolated temp root, and the app's `npm test` leaves jest's
   // default cache (`<temp>/jest`, and `<temp>/jest_rt` for its runtime cache) there. Both are process infrastructure, not app fixtures, but this spec owns the installed commands
   // that create them and therefore removes them before the leak guard.

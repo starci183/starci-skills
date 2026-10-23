@@ -9,6 +9,7 @@ import { join } from "node:path"
 import { INFRA_SERVICES } from "../config/types"
 import type { InfraName } from "../config/types"
 import { TestWorldErrorCode, worldError } from "../errors"
+import { lazyRequire } from "../lazy"
 import { ensureContainer } from "./containers"
 import type { AttachRequest, ClusterApi, Namespace, ProxiedEndpoint, RunInfra, StackApi, StackContainerStatus, StackImageRequest, StackStatus } from "./contracts"
 import { Docker } from "./docker"
@@ -97,8 +98,7 @@ interface ListedContainer {
 const isInfraName = (value: string): value is InfraName => (INFRA_SERVICES as ReadonlyArray<string>).includes(value)
 
 const loadCluster = async (): Promise<ClusterApi> => {
-    const specifier = "./cluster"
-    const loaded = require(specifier) as { readonly clusterApi: ClusterApi }
+    const loaded = lazyRequire<{ readonly clusterApi: ClusterApi }>("./stack/cluster")
     return loaded.clusterApi
 }
 

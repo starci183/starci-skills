@@ -26,5 +26,8 @@
   },
   "scripts": {
     "test": "node --test \"*.spec.mjs\""
+  },
+  "devDependencies": {
+    "prettier": "3.9.6"
   }
 }

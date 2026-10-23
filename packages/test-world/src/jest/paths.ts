@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, statSync } from "node:fs"
 import { dirname, isAbsolute, join, resolve } from "node:path"
+import { lazyRequire } from "../lazy"
 
 /** The path aliases of a project, resolved the way TypeScript resolves them. */
 export interface ResolvedTsPaths {
@@ -123,8 +124,7 @@ export const registerTsPaths = (root: string): (() => void) => {
     const resolved = resolveTsPaths(file)
     if (resolved === null) return () => undefined
     try {
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
-        const tsconfigPaths = require("tsconfig-paths") as typeof import("tsconfig-paths")
+        const tsconfigPaths = lazyRequire<typeof import("tsconfig-paths")>("tsconfig-paths")
         return tsconfigPaths.register({ baseUrl: resolved.baseUrl, paths: { ...resolved.paths } as Record<string, Array<string>>, addMatchAll: false })
     } catch {
         // tsconfig-paths is a peer dependency; a repository with no aliases does not need it

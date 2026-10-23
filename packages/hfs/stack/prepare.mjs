@@ -8,7 +8,7 @@ import { approvalMissing, refusal } from './errors.mjs';
 import { installAge } from './age-install.mjs';
 import { describeClash, edgeCollisions } from './edge-alias.mjs';
 import { checkLiveRestore, fixLiveRestore } from './live-restore.mjs';
-import { remoteDocker, shellQuote, withRunner } from './remote.mjs';
+import { releasePointerScript, remoteDocker, shellQuote, withRunner } from './remote.mjs';
 
 const MIN_FREE_GB = 10;
 const ADDRESS = /^[0-9a-zA-Z.:-]+$/u;
@@ -220,11 +220,18 @@ function managedCount(run, kind, stack) {
   return splitLines(remoteDocker(run, [kind, 'ls', '--filter', `label=${stack}.managed=true`, '-q']).stdout).length;
 }
 
-function checkPointers(run, report, config) {
+/** The release pointers (`current`, `previous`) of the stack's releases directory: {current, previous} (null for an absent link); an unreadable pointer is reported bad, never read as absent. */
+export function checkPointers(run, report, config) {
   const base = shellQuote(releasesBase(config));
   const pointers = {};
   for (const pointer of ['current', 'previous']) {
-    const value = run(`cd ${base} 2>/dev/null && [ -L ${pointer} ] && basename "$(readlink ${pointer})" || true`).stdout.trim();
+    const answer = run(releasePointerScript(base, pointer));
+    if (answer.status !== 0) {
+      report.bad(`release ${pointer} could not be read: ${firstLine(answer.stderr)}`);
+      pointers[pointer] = null;
+      continue;
+    }
+    const value = answer.stdout.trim();
     pointers[pointer] = value === '' ? null : value;
     if (value === '') report.ok(`release ${pointer}: none`);
     else if (RELEASE_ID.test(value)) report.ok(`release ${pointer}: ${value}`);

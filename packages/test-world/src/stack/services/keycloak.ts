@@ -40,12 +40,11 @@ export const namespacedId = (kebab: string, id: string): string => {
     return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-5${hex.slice(13, 16)}-${((Number.parseInt(hex.slice(16, 17), 16) & 0x3) | 0x8).toString(16)}${hex.slice(17, 20)}-${hex.slice(20, 32)}`
 }
 
-/** A copy of `value` without its own `id`. */
-const withoutId = (value: unknown): unknown => {
-    if (!isRecord(value)) return value
-    const { id: _dropped, ...rest } = value
-    return rest
-}
+/** A copy of the object `value` without its own `id`. */
+const withoutIdOf = (value: Readonly<Record<string, unknown>>): Record<string, unknown> => Object.fromEntries(Object.entries(value).filter(([key]) => key !== "id"))
+
+/** `value` without its own `id` when it is an object, else itself. */
+const withoutId = (value: unknown): unknown => (isRecord(value) ? withoutIdOf(value) : value)
 
 /** Groups and their sub-groups without ids. */
 const groupsWithoutIds = (groups: unknown): unknown =>
@@ -85,7 +84,7 @@ export const prepareRealm = (json: string, kebab: string, file: string, secret: 
         throw worldError(TestWorldErrorCode.ConfigInvalid, `the keycloak realm file ${file} has no "realm" name`)
     }
     const stored = `${kebab}-${parsed.realm}`
-    const { id: _dropped, ...rest } = parsed
+    const rest = withoutIdOf(parsed)
     const clients = Array.isArray(parsed.clients) ? parsed.clients.filter(isRecord) : []
     const passwordClient = clients.find((client) => client.directAccessGrantsEnabled === true && typeof client.clientId === "string")
     const users = Array.isArray(parsed.users) ? parsed.users.filter(isRecord) : []

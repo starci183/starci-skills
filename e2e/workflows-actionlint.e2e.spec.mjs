@@ -46,9 +46,10 @@ function removeToolTemp() {
 }
 
 const docker = spawnSync('docker', ['info'], { encoding: 'utf8', windowsHide: true, timeout: 60_000 });
-const skip = docker.status === 0 ? false : 'docker is unavailable (scaffold-e2e requires it; a skip is red there)';
+const dockerUnavailable = docker.status === 0 ? false : 'docker is unavailable (the scaffold e2e requires it)';
 
-test('actionlint finds nothing in the example, runtime and freshly scaffolded workflows', { skip, timeout: 900_000 }, (t) => {
+test('actionlint finds nothing in the example, runtime and freshly scaffolded workflows', { timeout: 900_000 }, (t) => {
+  assert.equal(dockerUnavailable, false, String(dockerUnavailable));
   t.after(removeToolTemp);
   const image = actionlintImage();
   const own = [

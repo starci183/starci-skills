@@ -18,6 +18,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { main } from '../packages/hfs/src/main.mjs';
+import { runScaffoldE2e } from '../scripts/gates/scaffold-e2e.mjs';
 import { scaffoldApp } from '../packages/hfs/scaffold/app.mjs';
 import { jestCoverageSource } from '../packages/hfs/sync/index.mjs';
 import { coverageScope, jestCoverage, sonarCoverageExclusions } from '../scripts/hfs/coverage-scope.mjs';
@@ -45,18 +46,9 @@ const BOOT_DEPENDENCIES = Object.freeze(['tsc-alias', '@nestjs/platform-express'
 const UNIT_DEPENDENCIES = Object.freeze(['jest', 'ts-jest', 'tslib', ...VALIDATION_DEPENDENCIES]);
 const installs = runtimeInstalls({ required: [...LINT_DEPENDENCIES, ...BOOT_DEPENDENCIES, ...UNIT_DEPENDENCIES] });
 const missing = missingFrom(installs);
-const skipReason = missing.length ? `no install holds ${missing.join(', ')}; set STARCI_APP_INSTALLS to an app's node_modules` : false;
-// A skip must never pass silently. Locally it prints one SKIPPED line. The release verification and CI set
-// STARCI_REQUIRE_APP_INSTALLS=1 (scripts/gates/release-app-installs.mjs provides fresh registry installs), and then a
-// missing install fails the test instead of skipping it.
-export const REQUIRE_APP_INSTALLS = process.env.STARCI_REQUIRE_APP_INSTALLS === '1';
-function gate(name, reason) {
-  if (!reason) return { skip: false, required: null };
-  if (REQUIRE_APP_INSTALLS) return { skip: false, required: `REQUIRED (STARCI_REQUIRE_APP_INSTALLS=1) but ${reason}` };
-  console.log(`SKIPPED: no installs - ${name}: ${reason}`);
-  return { skip: reason, required: null };
-}
-const lintGate = gate('scaffold lint', skipReason);
+const missingInstalls = missing.length ? `no install holds ${missing.join(', ')}; set STARCI_APP_INSTALLS to an app's node_modules` : false;
+// An install the proof needs is a prerequisite, never an option: a test whose install is missing FAILS naming it, on a developer
+// machine as in CI (scripts/gates/release-app-installs.mjs provides fresh registry installs). Nothing here skips.
 
 test('fixture installs prefer physical resolution of required framework peers over package count', (t) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-install-coherence-'));
@@ -189,7 +181,7 @@ function buildPackages(app) {
   }
 }
 
-const bootGate = gate('scaffold api boot', skipReason || (missingFrom(installs, BOOT_DEPENDENCIES).length ? `no install holds ${missingFrom(installs, BOOT_DEPENDENCIES).join(', ')}; set STARCI_APP_INSTALLS to an app's node_modules` : false));
+const bootMissing = missingInstalls || (missingFrom(installs, BOOT_DEPENDENCIES).length ? `no install holds ${missingFrom(installs, BOOT_DEPENDENCIES).join(', ')}; set STARCI_APP_INSTALLS to an app's node_modules` : false);
 
 function assertValidationPeers(app) {
   const common = fs.realpathSync(path.join(app, 'node_modules', '@nestjs', 'common', 'package.json'));
@@ -395,8 +387,8 @@ test('a scaffolded app has one Dockerfile per app, the managed .dockerignore and
   for (const secret of ['.starcistacks', '**/.env', '.secrets', 'node_modules']) assert.ok(ignore.includes(secret), `.dockerignore excludes ${secret}`);
 });
 
-test('starci app scaffold writes the app shape and starci app lint finds nothing, each side judged by its own canon', { skip: lintGate.skip, timeout: 600_000 }, async (t) => {
-  if (lintGate.required) assert.fail(lintGate.required);
+test('starci app scaffold writes the app shape and starci app lint finds nothing, each side judged by its own canon', { timeout: 600_000 }, async (t) => {
+  assert.equal(missingInstalls, false, `scaffold lint needs an app install: ${missingInstalls}`);
   const into = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-scaffold-app-'));
   const app = path.join(into, 'demo');
   let links = [];
@@ -572,8 +564,8 @@ function fakePostgres() {
   });
 }
 
-test('the scaffolded be core api builds with build:be and boots with start:core from the linked installs, then stops', { skip: bootGate.skip, timeout: 600_000 }, async (t) => {
-  if (bootGate.required) assert.fail(bootGate.required);
+test('the scaffolded be core api builds with build:be and boots with start:core from the linked installs, then stops', { timeout: 600_000 }, async (t) => {
+  assert.equal(bootMissing, false, `scaffold api boot needs an app install: ${bootMissing}`);
   const into = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-scaffold-boot-'));
   const app = path.join(into, 'demo');
   let links = [];
@@ -610,10 +602,10 @@ test('the scaffolded be core api builds with build:be and boots with start:core 
   await boot.exited;
 });
 
-const unitGate = gate('scaffold be unit run', missingFrom(installs, [...LINT_DEPENDENCIES, ...UNIT_DEPENDENCIES]).length ? `no install holds ${missingFrom(installs, [...LINT_DEPENDENCIES, ...UNIT_DEPENDENCIES]).join(', ')}; set STARCI_APP_INSTALLS to an app's node_modules` : false);
+const unitMissing = missingFrom(installs, [...LINT_DEPENDENCIES, ...UNIT_DEPENDENCIES]).length ? `no install holds ${missingFrom(installs, [...LINT_DEPENDENCIES, ...UNIT_DEPENDENCIES]).join(', ')}; set STARCI_APP_INSTALLS to an app's node_modules` : false;
 
-test('the scaffolded be unit run (the test script) writes the lcov Sonar and Codecov import, naming the logic files of be/src/modules only', { skip: unitGate.skip, timeout: 600_000 }, async (t) => {
-  if (unitGate.required) assert.fail(unitGate.required);
+test('the scaffolded be unit run (the test script) writes the lcov Sonar and Codecov import, naming the logic files of be/src/modules only', { timeout: 600_000 }, async (t) => {
+  assert.equal(unitMissing, false, `scaffold be unit run needs an app install: ${unitMissing}`);
   const into = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-scaffold-unit-'));
   const app = path.join(into, 'demo');
   let links = [];
@@ -640,13 +632,13 @@ test('the scaffolded be unit run (the test script) writes the lcov Sonar and Cod
 
 /** What the fe build loads besides the lint set: the server-only marker the i18n package's server modules import. */
 const FE_BUILD_DEPENDENCIES = Object.freeze(['server-only']);
-const feBuildGate = gate('scaffold fe build', missingFrom(installs, [...LINT_DEPENDENCIES, ...FE_BUILD_DEPENDENCIES]).length ? `no install holds ${missingFrom(installs, [...LINT_DEPENDENCIES, ...FE_BUILD_DEPENDENCIES]).join(', ')}; set STARCI_APP_INSTALLS to an app's node_modules` : false);
+const feBuildMissing = missingFrom(installs, [...LINT_DEPENDENCIES, ...FE_BUILD_DEPENDENCIES]).length ? `no install holds ${missingFrom(installs, [...LINT_DEPENDENCIES, ...FE_BUILD_DEPENDENCIES]).join(', ')}; set STARCI_APP_INSTALLS to an app's node_modules` : false;
 
 /** The environment `next build` runs in: the one managed build env (scripts/gates/build-env.mjs). */
 const buildEnv = () => nextBuildEnv();
 
-test('the scaffolded fe builds with the root build:fe script: next-intl finds its request config from the directory the build runs in', { skip: feBuildGate.skip, timeout: 900_000 }, async (t) => {
-  if (feBuildGate.required) assert.fail(feBuildGate.required);
+test('the scaffolded fe builds with the root build:fe script: next-intl finds its request config from the directory the build runs in', { timeout: 900_000 }, async (t) => {
+  assert.equal(feBuildMissing, false, `scaffold fe build needs an app install: ${feBuildMissing}`);
   // The app sits inside the runtime checkout: the borrowed install links packages from the runtime and its examples, and Turbopack
   // compiles only what lies under its workspace root, so the spec widens that root (below) to the checkout that holds every link target.
   const into = fs.mkdtempSync(path.join(RUNTIME, '.tmp-hfs-fe-build-'));
@@ -679,4 +671,51 @@ test('the scaffolded fe builds with the root build:fe script: next-intl finds it
     built += 1;
   }
   assert.ok(built >= 1, 'build:fe built at least one app');
+});
+
+// -- the prerequisites of the scaffold e2e are red when missing, never a pass -----------------------------------------------------
+// Every scaffold test FAILS on a missing prerequisite (Docker answering, an app install) instead of skipping, and the gate that runs them
+// (`starci release scaffold-e2e`, the proof of `starci release check`) is red for a skipped or todo test as well, so no way of leaving a test
+// unrun is green. The gate runs here over a fake node process that writes the TAP report a real run would, so the verdict itself is proven.
+
+/** A scaffold-e2e run whose node process exits `status` after writing a TAP report with `counts`. */
+function verdictOf(counts, status = 0) {
+  const runNode = (args) => {
+    const destination = args.find((arg) => arg.startsWith('--test-reporter-destination=') && arg.endsWith('.tap'));
+    const file = destination.slice('--test-reporter-destination='.length);
+    const report = ['tests', 'pass', 'fail', 'cancelled', 'skipped', 'todo'].map((key) => `# ${key} ${counts[key] ?? 0}`).join('\n');
+    fs.writeFileSync(file, `TAP version 13\n${report}\n`);
+    return { status, stdout: '', stderr: '' };
+  };
+  return runScaffoldE2e({ root: RUNTIME, env: {}, deps: { prepare: () => ({ ok: true, lines: [] }), progress: () => undefined, runNode } });
+}
+
+test('a run in which every scaffold test passed is green', () => {
+  const run = verdictOf({ tests: 4, pass: 4 });
+  assert.equal(run.ok, true);
+  assert.equal(run.line, 'scaffold-e2e: 4 of 4 passed, 0 failed, 0 skipped');
+});
+
+test('a skipped scaffold test (Docker or an app install that did not answer) makes the run red', () => {
+  const run = verdictOf({ tests: 4, pass: 3, skipped: 1 });
+  assert.equal(run.ok, false);
+  assert.equal(run.skipped, 1);
+  assert.equal(run.line, 'scaffold-e2e: 3 of 4 passed, 0 failed, 1 skipped');
+});
+
+test('a todo test, a failed test, a cancelled test and a run with no test are red', () => {
+  assert.equal(verdictOf({ tests: 4, pass: 3, todo: 1 }).ok, false);
+  assert.equal(verdictOf({ tests: 4, pass: 3, fail: 1 }, 1).ok, false);
+  assert.equal(verdictOf({ tests: 4, pass: 3, cancelled: 1 }, 1).ok, false);
+  assert.equal(verdictOf({ tests: 0, pass: 0 }).ok, false);
+});
+
+test('no scaffold e2e file skips: a prerequisite that is missing fails its test', () => {
+  const directive = /\bskip\s*[:(]|\.skip\b|\bt\.skip\b|\bonly\s*:|\.todo\b|\btodo\s*:/;
+  const files = fs.readdirSync(import.meta.dirname).filter((name) => name.endsWith('.spec.mjs') && name !== path.basename(import.meta.filename));
+  assert.ok(files.includes('hfs-scaffold-app.e2e.spec.mjs'), 'the scan reaches the scaffold specs');
+  for (const name of files) {
+    const hits = fs.readFileSync(path.join(import.meta.dirname, name), 'utf8').split(/\r?\n/).filter((line) => directive.test(line) && !/^\s*(\/\/|\*)/.test(line) && !/never a skip|skips nothing/.test(line));
+    assert.deepEqual(hits, [], `${name} writes a skip`);
+  }
 });

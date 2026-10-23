@@ -9,6 +9,10 @@ import path from 'node:path';
 
 const require = createRequire(import.meta.url);
 const preset = require('./index.cjs');
+/** TS2345 (an argument the parameter does not accept), TS2322 (a value the type does not accept) and TS2339 (a property the type does not have). */
+const EXPECTED_ARGUMENT_CODE = 2345;
+const EXPECTED_NOT_ASSIGNABLE_CODE = 2322;
+const EXPECTED_MISSING_MEMBER_CODE = 2339;
 // The @types folder that holds the jest types this package's own install resolves (a devDependency), never a path above it.
 const jestTypeRoot = () => path.dirname(path.dirname(require.resolve('@types/jest/package.json')));
 
@@ -299,6 +303,12 @@ test('a coverage glob with no file in the repository gets no threshold key (jest
   }
 });
 
+test('no project sets a test timeout: a unit spec runs under the jest default and a world spec sets its own through useTestWorld', () => {
+  const config = preset.starciJestConfig(OPTIONS);
+  assert.equal(config.testTimeout, undefined);
+  for (const project of config.projects) assert.equal(project.testTimeout, undefined, `${project.displayName} keeps the jest default`);
+});
+
 test('the unit run writes the lcov Sonar imports, keeps the text summary, and renders no coverage exclusion', () => {
   assert.equal(preset.sonarCoverageExclusions, undefined);
   assert.equal(preset.sonarExclusions(), '**/*.spec.ts,**/*.e2e-spec.ts,**/dist/**,**/coverage/**');
@@ -310,24 +320,51 @@ test('the unit run writes the lcov Sonar imports, keeps the text summary, and re
   assert.equal(preset.COVERAGE_SOURCES, undefined);
 });
 
-test('the mock<T>() types replace `as unknown as`: typed jest.Mock members, assignable to T, wrong stubs rejected', async () => {
-  const fs = await import('node:fs');
-  const os = await import('node:os');
-  const path = await import('node:path');
+/**
+ * Compiles `fixtures` (names of fixture files beside this spec, each written to the scratch folder as `<name>.ts`) with
+ * the declaration files in `declarations`, as an app's strict tsc would. Answers the diagnostics as `{ file, line, code }`
+ * so a spec can assert an error from the compiler output itself: no directive in a fixture hides one.
+ */
+const compileFixtures = async ({ declarations, fixtures, stubs = {} }) => {
   const ts = require('typescript');
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-mock-types-'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-types-'));
   try {
-    fs.copyFileSync(path.join(import.meta.dirname, 'mock.d.ts'), path.join(dir, 'mock.d.ts'));
-    fs.writeFileSync(path.join(dir, 'probe.ts'), fs.readFileSync(new URL('probe-mock.fixture', import.meta.url), 'utf8'));
-    const program = ts.createProgram([path.join(dir, 'probe.ts')], {
-      strict: true, noEmit: true, skipLibCheck: true, types: ['jest'], typeRoots: [jestTypeRoot()],
+    for (const file of declarations) fs.copyFileSync(path.join(import.meta.dirname, file), path.join(dir, file));
+    for (const [module, fixture] of Object.entries(stubs)) {
+      fs.mkdirSync(path.join(dir, 'node_modules', module), { recursive: true });
+      fs.writeFileSync(path.join(dir, 'node_modules', module, 'index.d.ts'), fs.readFileSync(new URL(fixture, import.meta.url), 'utf8'));
+    }
+    const roots = fixtures.map((name) => {
+      const target = path.join(dir, `${name}.ts`);
+      fs.writeFileSync(target, fs.readFileSync(new URL(`${name}.fixture`, import.meta.url), 'utf8'));
+      return target;
+    });
+    const program = ts.createProgram(roots, {
+      strict: true, noEmit: true, types: ['jest'], typeRoots: [jestTypeRoot()],
       module: ts.ModuleKind.NodeNext, moduleResolution: ts.ModuleResolutionKind.NodeNext, target: ts.ScriptTarget.ES2022,
     });
-    const problems = ts.getPreEmitDiagnostics(program).map((d) => ts.flattenDiagnosticMessageText(d.messageText, '\n'));
-    assert.deepEqual(problems, []);
+    return ts.getPreEmitDiagnostics(program).map((d) => ({
+      file: d.file === undefined ? null : path.basename(d.file.fileName, '.ts'),
+      line: d.file === undefined ? null : d.file.getLineAndCharacterOfPosition(d.start).line + 1,
+      code: d.code,
+      text: ts.flattenDiagnosticMessageText(d.messageText, '\n'),
+    }));
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
+};
+
+test('the mock<T>() types replace `as unknown as`: typed jest.Mock members, assignable to T', async () => {
+  const problems = await compileFixtures({ declarations: ['mock.d.ts'], fixtures: ['probe-mock'] });
+  assert.deepEqual(problems, []);
+});
+
+test('the mock<T>() types reject a stub of the wrong shape and a member the interface does not have, as the compiler reports them', async () => {
+  const problems = await compileFixtures({ declarations: ['mock.d.ts'], fixtures: ['probe-mock-rejected'] });
+  assert.deepEqual(problems.map(({ file, line, code }) => ({ file, line, code })), [
+    { file: 'probe-mock-rejected', line: 4, code: EXPECTED_ARGUMENT_CODE },
+    { file: 'probe-mock-rejected', line: 5, code: EXPECTED_MISSING_MEMBER_CODE },
+  ]);
 });
 
 const { FakeClock } = require('./clock.cjs');
@@ -621,25 +658,21 @@ test('the index exports the whole kit and the package.json declares typeorm as a
   }
 });
 
+const KIT_DECLARATIONS = ['mock.d.ts', 'entity-manager.d.ts', 'ids.d.ts', 'matchers.d.ts', 'clock.d.ts'];
+
 test('the kit types: mockEntityManager() is assignable to EntityManager with no cast, stubs are typed, the matchers and ids type-check', async () => {
-  const os = await import('node:os');
-  const path = await import('node:path');
-  const ts = require('typescript');
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-kit-types-'));
-  try {
-    for (const file of ['mock.d.ts', 'entity-manager.d.ts', 'ids.d.ts', 'matchers.d.ts', 'clock.d.ts']) fs.copyFileSync(path.join(import.meta.dirname, file), path.join(dir, file));
-    fs.mkdirSync(path.join(dir, 'node_modules', 'typeorm'), { recursive: true });
-    fs.writeFileSync(path.join(dir, 'node_modules', 'typeorm', 'index.d.ts'), fs.readFileSync(new URL('typeorm-stub.fixture', import.meta.url), 'utf8'));
-    fs.writeFileSync(path.join(dir, 'probe.ts'), fs.readFileSync(new URL('probe-kit.fixture', import.meta.url), 'utf8'));
-    const program = ts.createProgram([path.join(dir, 'probe.ts')], {
-      strict: true, noEmit: true, skipLibCheck: true, types: ['jest'], typeRoots: [jestTypeRoot()],
-      module: ts.ModuleKind.NodeNext, moduleResolution: ts.ModuleResolutionKind.NodeNext, target: ts.ScriptTarget.ES2022,
-    });
-    const problems = ts.getPreEmitDiagnostics(program).map((d) => ts.flattenDiagnosticMessageText(d.messageText, '\n'));
-    assert.deepEqual(problems, []);
-  } finally {
-    fs.rmSync(dir, { recursive: true, force: true });
-  }
+  const problems = await compileFixtures({ declarations: KIT_DECLARATIONS, fixtures: ['probe-kit'], stubs: { typeorm: 'typeorm-stub.fixture' } });
+  assert.deepEqual(problems, []);
+});
+
+test('the kit types reject a result of the wrong type, a method the double cannot stub, a stub without the entity class and a member EntityManager does not have, as the compiler reports them', async () => {
+  const problems = await compileFixtures({ declarations: KIT_DECLARATIONS, fixtures: ['probe-kit-rejected'], stubs: { typeorm: 'typeorm-stub.fixture' } });
+  assert.deepEqual(problems.map(({ file, line, code }) => ({ file, line, code })), [
+    { file: 'probe-kit-rejected', line: 4, code: EXPECTED_NOT_ASSIGNABLE_CODE },
+    { file: 'probe-kit-rejected', line: 5, code: EXPECTED_NOT_ASSIGNABLE_CODE },
+    { file: 'probe-kit-rejected', line: 6, code: EXPECTED_NOT_ASSIGNABLE_CODE },
+    { file: 'probe-kit-rejected', line: 7, code: EXPECTED_MISSING_MEMBER_CODE },
+  ]);
 });
 
 // -- e2e isolation: a real jest run of the preset's e2e project ----------------------------------------------------------
@@ -860,4 +893,13 @@ __metadata("design:paramtypes", [Math.random() ? Object : String])
   const sourceOriginal = ts.transpileModule(sourceCall, options);
   const sourceTransformed = ts.transpileModule(sourceCall, { ...options, transformers: { after: [transformer.factory({ configSet: { compilerModule: ts } })] } });
   assert.equal(sourceTransformed.sourceMapText, sourceOriginal.sourceMapText, 'source metadata calls keep every mapping');
+});
+
+test('no file the package ships or compiles as a fixture carries an inline suppression: a type probe asserts its error from the compiler output', () => {
+  const directive = new RegExp(['@ts-(expect-error|ignore|nocheck)', 'eslint-disable', '(c8|v8|istanbul) ignore', 'NOSONAR'].join('|'));
+  const files = fs.readdirSync(import.meta.dirname, { withFileTypes: true })
+    .filter((entry) => entry.isFile() && !entry.name.endsWith('.spec.mjs') && entry.name !== 'package-lock.json')
+    .map((entry) => entry.name);
+  assert.ok(files.includes('probe-kit.fixture') && files.includes('unit-metadata.generated.cjs'), 'the scan reaches the fixtures and the generated anchor');
+  for (const name of files) assert.doesNotMatch(fs.readFileSync(new URL(name, import.meta.url), 'utf8'), directive, `${name} suppresses nothing`);
 });

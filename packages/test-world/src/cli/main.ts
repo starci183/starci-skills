@@ -1,5 +1,6 @@
 /** The implementation of `starci app stack`: `up`, `down` and `status` of the shared warm stack. */
 import { TestWorldErrorCode, worldError } from "../errors"
+import { lazyRequire } from "../lazy"
 import { matchesKind, readStackDefinition } from "../config/stack-file"
 import { INFRA_SERVICES, type InfraName } from "../config/types"
 import type { StackApi, StackImageRequest, StackStatus } from "../stack/contracts"
@@ -135,10 +136,10 @@ export const imagesFromDefinition = (root: string, stackDir: string, wanted: Rea
     return requests
 }
 
-const STACK_MODULE = "../stack"
+const STACK_MODULE = "./stack"
 
 /** Loads the real stack lazily, so the CLI parses, prints usage and runs against an injected stack without docker code. */
-const loadStack = (): Promise<StackApi> => Promise.resolve().then(() => (require(STACK_MODULE) as { readonly stack: StackApi }).stack)
+const loadStack = (): Promise<StackApi> => Promise.resolve().then(() => lazyRequire<{ readonly stack: StackApi }>(STACK_MODULE).stack)
 
 /** Runs the command; answers the process exit code. */
 export const main = async (argv: ReadonlyArray<string>, dependencies: CliDependencies = {}): Promise<number> => {

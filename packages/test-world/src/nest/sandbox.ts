@@ -2,7 +2,8 @@
  * The contract layer helper: builds the REAL integration client against a provider SANDBOX, so a contract spec can check that
  * the fake at the network edge still behaves like the provider. Sandbox coordinates come only from the process environment
  * under the keys the spec names (never committed, never printed); the library, not the spec, reads them, and when any
- * required key is absent the described body is skipped by the library, so a plain checkout stays green without credentials.
+ * required key is absent the described body does not run and the library registers a FAILING test that names the missing
+ * keys: a run without the sandbox credentials is red, never a silent pass.
  */
 import { Module } from "@nestjs/common"
 import type { DynamicModule, INestApplicationContext, Type } from "@nestjs/common"
@@ -19,7 +20,7 @@ export interface ModuleRegistration {
 
 /** What builds one real client. */
 export interface SandboxSpec<T> {
-    /** The provider name, for the skip message. */
+    /** The provider name, for the missing-keys message. */
     readonly provider: string
     /** The environment keys the sandbox needs; every one must be declared for the body to run. */
     readonly keys: ReadonlyArray<string>
@@ -49,7 +50,7 @@ export interface SandboxAnswer {
 export interface SandboxHandle<T> {
     /** True when every required key is declared. */
     readonly available: boolean
-    /** `describe` when the sandbox is configured, `describe.skip` (naming the missing keys) when it is not; the client is built for the body. */
+    /** `describe` with the client built for the body when the sandbox is configured; when it is not, a `describe` whose one test fails naming the missing keys. */
     describe(name: string, body: () => void): void
     /** The real client, valid inside the described body. */
     client(): T
@@ -106,8 +107,15 @@ export const createSandbox = <T>(spec: SandboxSpec<T>, base: () => ReadonlyArray
             return { status: response.status, body: readJson(await response.text()) }
         },
         describe: (name, body) => {
-            const run = missing.length === 0 ? describe : describe.skip
-            run(missing.length === 0 ? name : `${name} (skipped: ${spec.provider} sandbox keys not declared: ${missing.join(", ")})`, () => {
+            if (missing.length > 0) {
+                describe(name, () => {
+                    it(`needs the ${spec.provider} sandbox keys: ${missing.join(", ")}`, () => {
+                        throw worldError(TestWorldErrorCode.NotDeclared, `the ${spec.provider} sandbox keys are not declared in the environment: ${missing.join(", ")}`)
+                    })
+                })
+                return
+            }
+            describe(name, () => {
                 beforeAll(async () => {
                     context = await NestFactory.createApplicationContext(SandboxRoot.register(base(), spec.module(values, { isGlobal: true })), { logger: ["error"] })
                 }, BOOT_TIMEOUT_MS)

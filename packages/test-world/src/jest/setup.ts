@@ -25,6 +25,7 @@ import { readStackDefinition, resolveInfraImages, resolveSiblingImages } from ".
 import type { AnyTestWorldConfig, InfraName, PostgresStack } from "../config/types"
 import { validateDeclaration } from "../config/validate"
 import { TestWorldErrorCode, worldError } from "../errors"
+import { lazyRequire } from "../lazy"
 import { FakesHost } from "../fakes/framework/host"
 import { buildWiring, RUN_DIRECTORY, secretOf } from "../nest/wiring"
 import type { AttachRequest, Namespace, RunInfra } from "../stack/contracts"
@@ -184,7 +185,7 @@ export const disposeSlot = async (slot: SlotHandles): Promise<ReadonlyArray<unkn
     await attempt(() => slot.fakes.close())
     await attempt(() => removeSiblings(slot.siblings))
     await attempt(async () => {
-        const { stack } = require("../stack") as typeof import("../stack")
+        const { stack } = lazyRequire<typeof import("../stack")>("./stack")
         await stack.detach({ namespace: context.namespace, runId: context.runId, infra: context.infra })
     })
     await attempt(() => {
@@ -201,7 +202,7 @@ const setupSlot = async (plan: SlotPlan, slot: number): Promise<SlotHandles> => 
     const runDirectory = mkdtempSync(join(tmpdir(), `starci-tw-${runId}-`))
     mkdirSync(runDirectory, { recursive: true })
     const fakes = new FakesHost(config.fakes ?? {}, { runId, secret: (label) => secretOf(plan.secretSeed, label), now: () => new Date() })
-    const { stack } = require("../stack") as typeof import("../stack")
+    const { stack } = lazyRequire<typeof import("../stack")>("./stack")
     let infra: RunInfra | null = null
     let siblings: ReadonlyArray<StartedSibling> = []
     try {

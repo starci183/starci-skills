@@ -8,6 +8,7 @@ import path from 'node:path';
 import { firstLine, lines as splitLines } from './context.mjs';
 import { isReleaseId } from './digest.mjs';
 import { failure, refusal } from './errors.mjs';
+import { releaseListScript, releasePointerScript } from './remote.mjs';
 
 const BASE = /^\/[A-Za-z0-9._/-]+$/u;
 const FILES = ['stack.yaml', 'release.json'];
@@ -45,7 +46,7 @@ export function createReleaseStore(config, ssh) {
   }
 
   async function pointer(name) {
-    const out = await run(`cd "${base}" 2>/dev/null && [ -L ${name} ] && basename "$(readlink ${name})" || true`);
+    const out = await run(releasePointerScript(`"${base}"`, name));
     const id = out.trim();
     return isReleaseId(id) ? id : '';
   }
@@ -80,8 +81,7 @@ export function createReleaseStore(config, ssh) {
     },
     /** The stored releases, newest first: [{ id, current, previous }]. */
     async list() {
-      const pointerScript = (name) => `if [ -L "${base}/${name}" ]; then basename "$(readlink "${base}/${name}")"; else printf '\\n'; fi`;
-      const response = await run(`${pointerScript('current')}; ${pointerScript('previous')}; cd "${base}/releases" 2>/dev/null && ls -1t || true`);
+      const response = await run(`${releasePointerScript(`"${base}"`, 'current')}; ${releasePointerScript(`"${base}"`, 'previous')}; ${releaseListScript(`"${base}"`)}`);
       const [current, previous, ...entries] = response.split('\n');
       const now = isReleaseId(current) ? current : '';
       const before = isReleaseId(previous) ? previous : '';

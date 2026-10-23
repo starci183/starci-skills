@@ -105,7 +105,8 @@ test("an INSERT or DELETE fault owns exactly its generated ordinary trigger/func
 
 test("foreign slot/database/schema metadata and arbitrary SQL inputs are refused before a client is opened", () => {
     const pg = postgres()
-    const run = context.infra.postgresql!
+    const run = context.infra.postgresql
+    assert.ok(run !== undefined, "the context carries a postgresql stack")
     const altered: Array<RunContext> = [
         { ...context, namespace: { ...namespace, snake: "foreign" } },
         { ...context, slot: 2 },

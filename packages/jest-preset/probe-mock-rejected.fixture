@@ -1,0 +1,5 @@
+import { mock } from "./mock"
+interface Repo { find(id: string): Promise<{ id: string } | null>; readonly name: string }
+const repo = mock<Repo>()
+repo.find.mockResolvedValue(1)
+repo.missing

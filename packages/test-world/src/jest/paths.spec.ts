@@ -4,6 +4,7 @@ import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 import { describe, test } from "node:test"
 import * as ts from "typescript"
+import { lazyRequire } from "../lazy"
 import { registerTsPaths, resolveTsPaths, stripJsonc } from "./paths"
 
 /** A fresh fixture directory (real path, so the comparisons with TypeScript never differ by a symlink). */
@@ -98,8 +99,7 @@ describe("tsconfig paths resolution", () => {
 
         const unregister = registerTsPaths(join(app, "be"))
         try {
-            // eslint-disable-next-line @typescript-eslint/no-require-imports
-            const loaded = require(join(app, "be", "src", "tests", "world", "declaration.js")) as { readonly probe: string }
+            const loaded = lazyRequire<{ readonly probe: string }>(join(app, "be", "src", "tests", "world", "declaration.js"))
             assert.equal(loaded.probe, "resolved")
         } finally {
             unregister()

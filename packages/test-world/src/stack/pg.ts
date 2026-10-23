@@ -1,3 +1,5 @@
+import { lazyRequire } from "../lazy"
+
 /** The slice of a `pg` client the stack uses; `pg` is a peer dependency loaded lazily, so tests inject a scripted one. */
 export interface PgClient {
     connect(): Promise<void>
@@ -24,9 +26,8 @@ interface PgModule {
 
 /** The real {@link PgConnect}: the `pg` peer dependency, required on first use. */
 export const realPgConnect: PgConnect = (config) => {
-    const loaded: unknown = require("pg")
-    const module = loaded as PgModule
-    return new module.Client({ ...config, connectionTimeoutMillis: 5000 })
+    const pg = lazyRequire<PgModule>("pg")
+    return new pg.Client({ ...config, connectionTimeoutMillis: 5000 })
 }
 
 /** Connects, runs `work`, and always ends the client. */

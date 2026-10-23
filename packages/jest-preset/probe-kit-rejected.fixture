@@ -1,0 +1,7 @@
+import { mockEntityManager } from "./entity-manager"
+class Order { id = "" }
+const em = mockEntityManager()
+mockEntityManager({ findOne: [Order, 5] })
+mockEntityManager({ missing: [Order, 1] })
+mockEntityManager({ count: 3 })
+em.missing

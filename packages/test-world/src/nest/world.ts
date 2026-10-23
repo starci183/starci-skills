@@ -36,6 +36,7 @@ import { freePorts } from "./ports"
 import { redisSize } from "./redis-probe"
 import { buildWiring, RUN_DIRECTORY } from "./wiring"
 import { WorldLock } from "./world-lock"
+import { lazyRequire } from "../lazy"
 import type { AppHandle, DatabaseOutageHandle, InfraHandle, KeycloakInfraHandle, ModulesWorldSpec, PostgresInfraHandle, PostgresWriteFault, PostgresWriteOperation, ProviderToken, RedisInfraHandle, ServiceHandle, SignedInPerson, WaitForOptions, WorldBucket, WorldInfra, WorldKeycloak, WorldRequestScope, WorldSpec } from "./world-types"
 
 const DEFAULT_WAIT_MS = 30_000
@@ -69,6 +70,9 @@ class TestModulesRoot {
 }
 
 const notDeclared = (what: string) => worldError(TestWorldErrorCode.NotDeclared, `${what} was not declared in useTestWorld / test-world.config.ts`)
+
+/** A declared entity is a class; typeorm takes it as a constructor. */
+const isEntityClass = (entity: unknown): entity is new (...args: never[]) => unknown => typeof entity === "function"
 
 const isModulesSpec = (spec: WorldSpec): spec is ModulesWorldSpec => "modules" in spec
 
@@ -529,8 +533,7 @@ export class World {
     async withRequest<T>(request: Readonly<Record<string, unknown>>, work: (scope: WorldRequestScope) => Promise<T>): Promise<T> {
         const root = this.context
         // @nestjs/cqrs is the repository's own dependency; the library never imports it statically.
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
-        const { AsyncContext } = require("@nestjs/cqrs") as { AsyncContext: new () => { id: unknown } }
+        const { AsyncContext } = lazyRequire<{ AsyncContext: new () => { id: unknown } }>("@nestjs/cqrs")
         const scoped = new AsyncContext()
         Object.assign(scoped, request)
         const registrar = root as unknown as { registerRequestByContextId(request: object, contextId: unknown): void }
@@ -619,8 +622,7 @@ export class World {
     private bus(name: "CommandBus" | "QueryBus"): { execute(command: object): Promise<unknown> } {
         const root = this.context
         // @nestjs/cqrs is the repository's own dependency; the library never imports it statically.
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
-        const cqrs = require("@nestjs/cqrs") as Record<string, Type<{ execute(command: object): Promise<unknown> }>>
+        const cqrs = lazyRequire<Record<string, Type<{ execute(command: object): Promise<unknown> }>>>("@nestjs/cqrs")
         const token = cqrs[name]
         if (token === undefined) throw worldError(TestWorldErrorCode.NotDeclared, `@nestjs/cqrs does not export ${name}`)
         return root.get(token, { strict: false })
@@ -640,7 +642,7 @@ export class World {
             await this.dependencies.resetRun(context)
             return
         }
-        const { stack } = require("../stack") as typeof import("../stack")
+        const { stack } = lazyRequire<typeof import("../stack")>("./stack")
         await stack.reset({ namespace: context.namespace, infra: context.infra, keepTables: context.keepTables })
         const response = await fetch(`${context.fakes.controlUrl}/reset`, { method: "POST", signal: AbortSignal.timeout(30_000) })
         if (response.status !== 200) throw worldError(TestWorldErrorCode.FakeControlFailed, `resetting the fakes answered ${response.status}`)
@@ -666,7 +668,7 @@ export class World {
                 type: "postgres",
                 name: connection.name,
                 url: wiredDb.url,
-                entities: [...(connection.entities ?? [])] as Array<Function>,
+                entities: (connection.entities ?? []).filter(isEntityClass),
                 synchronize: false,
             })
             await dataSource.initialize()

@@ -6,6 +6,7 @@
 import { join } from "node:path"
 import { rememberedDeclaration } from "../config/registry"
 import { TestWorldErrorCode, worldError } from "../errors"
+import { lazyRequire } from "../lazy"
 import { registerTsPaths } from "./paths"
 import { setupWorld } from "./setup"
 import type { SetupHandles } from "./setup"
@@ -25,8 +26,7 @@ export default async function globalSetup(globalConfig?: { readonly maxWorkers?:
     registerTsPaths(root)
     const file = join(root, "src", "tests", "world", "test-world.config.ts")
     try {
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
-        require(file)
+        lazyRequire(file)
     } catch (cause) {
         throw worldError(TestWorldErrorCode.ConfigInvalid, `${file} could not be loaded: ${cause instanceof Error ? cause.message : String(cause)}`, cause)
     }

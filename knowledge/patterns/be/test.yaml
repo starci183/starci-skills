@@ -50,7 +50,7 @@ rules:
       Integration is `be/src/tests/integration/<capability>/*.integration-spec.ts` (capability modules on the real infrastructure,
       no HTTP door of ours, through `useTestWorld({ modules })`; real peer apps the client calls join as `apps`; every integration
       of `src/modules/integrations/<provider>/` has one, R112). E2E is `be/src/tests/e2e/<area>/*.e2e-spec.ts` (through
-      `useTestWorld({ apps })`). Contract is `be/src/tests/contract/<provider>/*.contract-spec.ts` (provider sandboxes, skipped
+      `useTestWorld({ apps })`). Contract is `be/src/tests/contract/<provider>/*.contract-spec.ts` (provider sandboxes, failing
       without sandbox config). `be/src/tests/world/` is the only test infrastructure (`global-setup.ts`, `global-teardown.ts`,
       `use-test-world.ts`, `fakes/<provider>/` network-edge fakes of external SaaS with `failNext`, `replayWebhook`, `delay`,
       and `test-world.config.ts`, the declaration of the test-world library, `export const { useTestWorld, useSandbox } = defineTestWorld({ stack, stacks, fakes, ... })`); every service of the
