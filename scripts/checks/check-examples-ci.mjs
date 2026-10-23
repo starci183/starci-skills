@@ -67,7 +67,7 @@ export function exampleApps(root = ROOT) {
 }
 
 /** The example apps with a browser journey (hfs.json `browser: true`), sorted by name. */
-export function exampleBrowserApps(root = ROOT) {
+function exampleBrowserApps(root = ROOT) {
   return discoverBrowserExampleApps(root);
 }
 
