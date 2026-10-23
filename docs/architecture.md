@@ -467,8 +467,8 @@ over every `.mjs` of `engine/`, `scripts/`, `modules/` and `bin/`; the runtime H
 the cited-path scan over live prose; then every retained self-check of
 `ruleParams.runtime.selfChecks`, in order; its last line says it ran no test (`tests NOT run (starci runtime verify)`). Every source file is read with the TypeScript AST
 (`scripts/hfs/runtime-rules/source-ast.mjs`); no text is grepped. The one allowlist is
-`modules/kernel/allowlist.yaml` (`starci/allowlist@1`): every exception a check keeps is a named,
-shrink-only section of it, and `scripts/checks/check-one-allowlist.mjs` refuses a second one
+`modules/kernel/allowlist.yaml` (`starci/allowlist@1`): the reserved `export-used` and `sonar-rules` sections, both shrink-only and empty,
+are all it holds (a JSON file is admitted by a declared tool format, a script by its reader), and `scripts/checks/check-one-allowlist.mjs` refuses a second one
 (`RT_ALLOWLIST_SPRAWL`).
 
 <a id="r01"></a>

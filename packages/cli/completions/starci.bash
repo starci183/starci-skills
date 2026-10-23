@@ -30,7 +30,7 @@ _starci() {
         orca) COMPREPLY=( $(compgen -W "terminal-read terminal-send" -- "$cur") );;
         provision) COMPREPLY=( $(compgen -W "operation" -- "$cur") );;
         reconciler) COMPREPLY=( $(compgen -W "once reopen restart start status stop up" -- "$cur") );;
-        release) COMPREPLY=( $(compgen -W "app-installs check ci-override ci-status clean-test cut images notes proof publish scaffold-e2e sync-runtime" -- "$cur") );;
+        release) COMPREPLY=( $(compgen -W "app-installs check ci-status clean-test cut images notes proof publish scaffold-e2e sync-runtime" -- "$cur") );;
         route) COMPREPLY=( $(compgen -W "model op" -- "$cur") );;
         runtime) COMPREPLY=( $(compgen -W "architecture artefacts benchmark-snapshot check deploy derived-fields doctor example-secrets gen-catalog gen-ops housekeeping import-held-secret install ledger-hygiene link machine-db owner-claims-audit readme-blocks revision-scope status update validate verify version" -- "$cur") );;
         smoke) COMPREPLY=( $(compgen -W "scaffold" -- "$cur") );;
@@ -685,9 +685,6 @@ _starci() {
         reconciler:up:--wait) return 0;;
         reconciler:up:--set-profile) COMPREPLY=( $(compgen -W "operational observe" -- "$cur") ); return 0;;
         release:check:--only) return 0;;
-        release:ci-override:--sha) return 0;;
-        release:ci-override:--reason) return 0;;
-        release:ci-override:--repo) return 0;;
         release:ci-status:--repo) return 0;;
         release:ci-status:--tag) return 0;;
         release:clean-test:--changed) return 0;;
@@ -1264,7 +1261,6 @@ _starci() {
         reconciler:up) COMPREPLY=( $(compgen -W "--check --services --brief --wait --no-build --retire-stale-ledgers --set-profile --json --cwd --quiet --help --edition" -- "$cur") );;
         release:app-installs) COMPREPLY=( $(compgen -W "--keep --source --json --cwd --quiet --help --edition" -- "$cur") );;
         release:check) COMPREPLY=( $(compgen -W "--final --only --json --cwd --quiet --help --edition" -- "$cur") );;
-        release:ci-override) COMPREPLY=( $(compgen -W "--sha --reason --repo --json --cwd --quiet --help --edition" -- "$cur") );;
         release:ci-status) COMPREPLY=( $(compgen -W "--repo --tag --wait --json --cwd --quiet --help --edition" -- "$cur") );;
         release:clean-test) COMPREPLY=( $(compgen -W "--changed --base --json --cwd --quiet --help --edition" -- "$cur") );;
         release:cut) COMPREPLY=( $(compgen -W "--repo --remote --branch --plan --tag --rows --no-reuse --json --cwd --quiet --help --edition" -- "$cur") );;

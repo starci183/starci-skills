@@ -1,0 +1,22 @@
+# supabase/config.toml clean to L08: credentials only as env(NAME), auth declared to match the fixture hfs.json.
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "storage", "graphql_public"]
+
+[auth]
+enabled = true
+site_url = "http://localhost:3000"
+additional_redirect_urls = ["https://demo.example.com/auth/callback"]
+jwt_expiry = 3600
+enable_signup = false
+jwt_secret = "env(SUPABASE_JWT_SECRET)"
+
+[auth.email]
+enable_signup = false
+
+[auth.external.github]
+enabled = true
+client_id = "env(GH_CLIENT_ID)"
+secret = "env(GH_SECRET)"
+redirect_uri = "http://localhost:54321/auth/v1/callback"

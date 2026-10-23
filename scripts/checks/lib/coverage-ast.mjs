@@ -20,10 +20,14 @@ export function astNodes(node) {
   return out;
 }
 
+/** A published package carries a byte copy of runtime files under runtime/ (sync-runtime.mjs); an import of the copy is an import of its original. */
+const BUNDLED_COPY = /^packages\/(?:hfs|eslint\/(?:be|fe))\/runtime\//;
+
 export function sourcePath(files, file, source) {
   if (typeof source !== 'string' || !source.startsWith('.')) return null;
   const base = path.posix.normalize(path.posix.join(path.posix.dirname(file), source));
-  return [base, `${base}.mjs`, `${base}/index.mjs`].find((candidate) => files.has(candidate)) ?? null;
+  const candidates = [base, `${base}.mjs`, `${base}/index.mjs`];
+  return [...candidates, ...candidates.map((candidate) => candidate.replace(BUNDLED_COPY, ''))].find((candidate) => files.has(candidate)) ?? null;
 }
 
 function importsOf(tree, file, files) {

@@ -169,7 +169,7 @@ rows:
     roles: {critic: admission, op: admission, kernel: reread}
   - id: engine-assets
     why: "files of the engine package and script data files: loaded by the long-lived process or by a command; the heavier action holds"
-    paths: ["engine/**/*.sql", "engine/**/*.json", "scripts/**/*.txt", "scripts/**/*.json", "scripts/**/*.yaml"]
+    paths: ["engine/**/*.sql", "engine/**/*.json", "engine/**/*.yaml", "scripts/**/*.txt", "scripts/**/*.json", "scripts/**/*.yaml"]
     roles: {engine: restart}
   - id: engine-data
     why: "tables the engine loads at start"

@@ -84,7 +84,7 @@ export const MANIFEST_KINDS = [APP_KIND, RUNTIME_KIND];
 export const manifestKind = (m) => (isPlainObject(m) && m.kind !== undefined ? m.kind : APP_KIND);
 const strList = (v) => stringList(v);
 
-const APP_SLOT_KEYS = ['id', 'profiles', 'path', 'presence', 'tracked', 'tier', 'tests', 'owner', 'appKind', 'minInstances', 'requiredWhen', 'requiredInstances', 'requires', 'pattern', 'trigger', 'allows', 'forbids', 'layers', 'kinds', 'roles', 'composedBy', 'budget', 'managedBy', 'liteManagedBy', 'rules', 'goesTo', 'why', 'since', 'perConnection', 'parent', 'editions', 'editionWhy', 'litePresence', 'lite', 'provider', 'coverage', 'entries', 'outcomeHome', 'templateNa', 'exampleNa', 'exemplifiedBy'];
+const APP_SLOT_KEYS = ['id', 'profiles', 'path', 'presence', 'tracked', 'tier', 'tests', 'owner', 'appKind', 'minInstances', 'requiredWhen', 'requiredInstances', 'requires', 'pattern', 'trigger', 'allows', 'forbids', 'layers', 'kinds', 'roles', 'composedBy', 'budget', 'managedBy', 'liteManagedBy', 'rules', 'goesTo', 'why', 'since', 'perConnection', 'parent', 'editions', 'editionWhy', 'litePresence', 'lite', 'provider', 'coverage', 'entries', 'outcomeHome', 'templateNa', 'exemplifiedBy'];
 /** The fields a slot's `lite` overlay may hold: the same keys it would carry in the slot body, resolved under edition lite. */
 const LITE_OVERLAY_KEYS = ['path', 'requires', 'allows', 'forbids', 'minInstances', 'requiredInstances', 'why'];
 /** A runtime slot has no app kind, side composition, layer or managed template; it may name the generator of a generated copy. */
@@ -218,8 +218,6 @@ function slotCoverageEvidenceProblems(slot, at) {
   const bad = [];
   if (slot.templateNa !== undefined && !(typeof slot.templateNa === 'string' && slot.templateNa.trim()))
     bad.push(`${at}: templateNa must be non-empty text`);
-  if (slot.exampleNa !== undefined && !(typeof slot.exampleNa === 'string' && slot.exampleNa.trim()))
-    bad.push(`${at}: exampleNa must be non-empty text`);
   if (slot.exemplifiedBy === undefined) return bad;
   const refs = slot.exemplifiedBy;
   const valid = Array.isArray(refs) && refs.length > 0 && refs.every(slotEvidenceRefValid)

@@ -55,7 +55,7 @@ export function formatCoverageReport(report) {
 }
 
 /** Standalone coordinator entry point: exit 0 proof passed, 2 proof or invocation refused. */
-function coverageFromMain(argv, { cwd = invocationDir(), stdout = (text) => process.stdout.write(text), stderr = (text) => process.stderr.write(text), run = coverageFrom } = {}) {
+export function coverageFromMain(argv, { cwd = invocationDir(), stdout = (text) => process.stdout.write(text), stderr = (text) => process.stderr.write(text), run = coverageFrom } = {}) {
   try {
     const opts = parse(argv);
     const report = run({ repoRoot: path.resolve(cwd, opts.cwd ?? '.'), coverageFrom: opts.coverageFrom });

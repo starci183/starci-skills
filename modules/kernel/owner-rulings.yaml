@@ -425,13 +425,6 @@ rulings:
     ruling: Every drawing set covers desktop and mobile in the light theme for each drawn state; dark-theme drawings are optional.
     supersedes: []
     enforcedBy: [scripts/work/ui/shell-conformance.mjs]
-  - id: ambient-id-test-world-exemption
-    date: '2026-10-16'
-    source: knowledge/hfs/rulings.yaml ambient-id-test-world-exemption; packages/eslint/be/ambient-id.mjs
-    ruling: The test world (slot be.tests.world) keeps its exemption from BE_AMBIENT_ID, like the clock rule, because it is the composition root of tests and names real resources; the catalog law of R142 is amended to say so. Owner words "Theo y tro" (alpha.18 single release, relayed by main, a17 PROPOSALS section D).
-    supersedes: []
-    enforcedBy: [packages/eslint/be/ambient-id.mjs]
-
   - id: module-definition-everywhere
     date: '2026-10-15'
     source: knowledge/hfs/rulings.yaml module-definition-everywhere; knowledge/patterns/be/folder.yaml BE-FOLDER-3
@@ -483,7 +476,7 @@ rulings:
   - id: no-runtime-specs
     date: '2026-10-17'
     source: "the owner (thay) in chat, relayed by the main coordinator to the a19 drop-runtime-specs lead"
-    ruling: "The owner's words: \"Tests in packages/ and examples/ stay; the .claude runtime's own specs are removed entirely; delete codecov. Real tests (package clean-test + scaffold e2e) decide.\" Amended the same day: codecov stays for packages/ and examples/ (the example flags, the hfs template codecov.yml, the example uploads); only the runtime coverage goes (the runtime flag and the runtime lcov chain). Added the same day: no runtime tests in .claude contributions - a spec that exercises the runtime's own code (scripts/, modules/, the kernel, supervisor and work graph, checks, gates, CLI internals) outside packages/ and examples/ is refused; the scaffold e2e (e2e/) is the one exception. Recorded as: tests/ deleted; starci runtime verify, git land, runtime deploy, the release cut and release check prove a commit by the runtime check, the package clean-test and the scaffold e2e; a rule whose spec proof was a runtime spec carries specNa citing this ruling; RT_SPEC_PLACEMENT refuses a runtime test."
+    ruling: "The owner's words: \"Tests in packages/ and examples/ stay; the .claude runtime's own specs are removed entirely; delete codecov. Real tests (package clean-test + scaffold e2e) decide.\" Amended the same day: codecov stays for packages/ and examples/ (the example flags, the hfs template codecov.yml, the example uploads); only the runtime coverage goes (the runtime flag and the runtime lcov chain). Added the same day: no runtime tests in .claude contributions - a spec that exercises the runtime's own code (scripts/, modules/, the kernel, supervisor and work graph, checks, gates, CLI internals) outside packages/ and examples/ is refused; the scaffold e2e (e2e/) is the one exception. Recorded as: tests/ deleted; starci runtime verify, git land, runtime deploy, the release cut and release check prove a commit by the runtime check, the package clean-test and the scaffold e2e; a rule judged only inside the runtime (enforcer kinds runtime and work-validate, RUNTIME_ONLY_ENFORCERS) needs no package spec and no example app, and a rule whose checker is a library bundled in a package is proven by a package spec (amended 2026-10-22 by loosening-always-red: the per-rule specNa and exampleNa markers are gone); RT_SPEC_PLACEMENT refuses a runtime test."
     supersedes: []
     enforcedBy: [scripts/hfs/runtime-rules/test-layout.mjs, scripts/reconciler/runtime-verify.mjs, scripts/gates/runtime-tests.mjs, scripts/gates/scaffold-e2e.mjs, scripts/checks/lib/coverage-rules.mjs, scripts/guards/release-definition.mjs]
   - id: alpha20-secrets-by-consumer
@@ -492,27 +485,6 @@ rulings:
     ruling: "Owner words: \"Ok chot update .claude alpha.20 va examples va nivo lun\". The five consumer classes are app secrets in sealed .enc members, app public config in the manifest, CI secrets in GitHub secrets, CI public config in GitHub vars, and Dependabot secrets in its own store. The services block renders Sonar, Codecov, Dependabot and audit configuration. Runtime examples use SonarCloud and Codecov cloud; private apps use their own Sonar host (NIVO: sonar.starci.org). CI quality includes audit in the release gate, skipping Codecov without coverage, parallel fast/test/build jobs with a dependent Sonar job, lockfile caches, immutable SHA pins, and cut/app gate refusal on red main CI with an owner-only override recording who and why. Remove the alpha.19 bootstrap and add encrypted outside-repository DB dump plus explicitly armed linked reset with backup and auth/storage choices."
     supersedes: []
     enforcedBy: [scripts/hfs/ci-declaration.mjs, scripts/hfs/rules/ci-custody.mjs, packages/hfs/ci/cli.mjs, packages/hfs/sync/quality-services.mjs, packages/hfs/sync/ci-commands.mjs, packages/hfs/release/gate.mjs, scripts/supervisor/release-cut-plan.mjs, scripts/supervisor/verify-receipt.mjs, packages/hfs/db/dump.mjs, packages/hfs/db/reset.mjs]
-  - id: alpha20-ci-override-owner-only
-    date: '2026-10-17'
-    source: "the owner (thay) in chat to the main coordinator, relayed to the a20 lead"
-    ruling: "release ci-override is owner-only: record who/why in owner-rulings, and the verb must not be runnable by agents"
-    supersedes: []
-    enforcedBy: [scripts/supervisor/release-ci-override.mjs, scripts/supervisor/release-ci-override-cli.mjs, modules/kernel/command-policy.yaml]
-
-  - id: ci-override-574bfcaca06c
-    date: '2026-10-17'
-    source: "the owner at the terminal (starci release ci-override)"
-    ruling: "alpha.14 CI red (2h22m, old suite and OOM); alpha.20 replaces it and fixes CI"
-    supersedes: []
-    enforcedBy: [scripts/supervisor/release-cut.mjs]
-
-  - id: quality-services-optional
-    date: '2026-10-17'
-    source: "the owner in chat to main, relayed to the a20 lead"
-    ruling: >-
-      sonar and codecov each get an `optional` setting in services (default true for self-hosted sonar). When optional and the provider is not reachable, the CI step SKIPS with a clear notice instead of failing. Sonar: probe <host>/api/system/status == UP with a short timeout before the scan and quality-gate steps. Codecov: skip when the upload endpoint or OIDC token is unavailable (fail_ci_if_error false when optional), plus the existing skip-without-lcov. When optional: false, keep it strict. The same applies to the app release gate's --sonar. Render it for the examples and skeletons too.
-    supersedes: []
-    enforcedBy: [packages/hfs/sync/ci-commands.mjs, packages/hfs/release/gate.mjs]
 
   - id: candidate-ci
     date: '2026-10-18'
@@ -522,7 +494,7 @@ rulings:
       `app release push` (apps) first push the exact release sha to a candidate ref (refs/heads/release/candidate-<version>, allowed by the pre-push policy),
       wait for the full GitHub CI on THAT sha to be green (polling via gh, with a timeout), and only then move main and the tag atomically to the same sha.
       Red or timeout means nothing reaches main; report the failing jobs. The "latest main CI red" refusal becomes: is the candidate CI for this sha green.
-      ci-override stays only as a documented emergency path (a sha-bound owner record, never written by agents, logged in the release record). The rendered
+      There is no override of a red candidate (amended by loosening-always-red, 2026-10-22: the emergency ci-override verb and its record are removed). The rendered
       app ci.yml triggers on the candidate branch pattern. alpha.22 itself is released through the candidate flow. Main's rulings (2026-10-18): the alpha.21
       ci-override step is dropped (the alpha.22 cut is judged by its own candidate CI); the app gate's default-branch CI refusal is dropped; a red candidate
       keeps its ref for diagnosis, a re-cut of the same version force-moves only the candidate ref, never main; after a cut the candidate ref is left, documented.
@@ -587,7 +559,7 @@ rulings:
   - id: release-require-ci-per-project
     date: '2026-10-21'
     source: "the owner in chat, relayed by the lead (the owner's words in Vietnamese: leave CI, check locally and push; add a require-CI option per project; make require CI false by default and false for NIVO and starci-next; the StarCi runtime itself has no require-CI setting)"
-    ruling: "An app's application-stacks.yaml release.requireCi (true or false, default false) decides whether starci app release push waits for the candidate CI of the release sha. With false the push still needs the annotated release tag and the green L4 record of the local release gate, still runs git push --dry-run --atomic first through the pre-push hook, then pushes the default branch and the tag atomically; the L4 record and the push output state that CI was not required by release.requireCi=false. With true the candidate CI path and starci release ci-override keep their meaning. NIVO, starci-next, the example apps and the scaffold inherit false. The StarCi runtime release (starci release cut and its candidate CI) is not affected and has no such setting."
+    ruling: "An app's application-stacks.yaml release.requireCi (true or false, default false) decides whether starci app release push waits for the candidate CI of the release sha. With false the push still needs the annotated release tag and the green L4 record of the local release gate, still runs git push --dry-run --atomic first through the pre-push hook, then pushes the default branch and the tag atomically; the L4 record and the push output state that CI was not required by release.requireCi=false. With true the candidate CI path keeps its meaning. NIVO, starci-next, the example apps and the scaffold inherit false. The StarCi runtime release (starci release cut and its candidate CI) is not affected and has no such setting."
     supersedes: []
     enforcedBy: [packages/hfs/release/gate.mjs, packages/hfs/release/push.mjs]
 

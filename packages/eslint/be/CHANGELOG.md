@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.4.30 - 2026-10-23
+- Changed: `BE_AMBIENT_ID` has no exemption for the test world (owner ruling 2026-10-22: a loosening is always red); the world asks the injected `Ids` port like everything else.
+- Changed: the bundled canon pins select @starci/hfs 4.7.22 and @starci/cli 1.7.22.
+
 ## 3.4.29 - 2026-10-22
 - Changed: the bundled canon pins select @starci/hfs 4.7.21 and @starci/cli 1.7.21.
 

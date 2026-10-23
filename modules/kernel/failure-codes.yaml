@@ -4676,16 +4676,6 @@ RIGHTS_OP_OUTSIDE_OWNED:
   owner: op-retry
   kind: verb-refusal
 
-RIGHTS_OWNER_ONLY:
-  title: "Action requires an interactive owner"
-  title_vi: "Tác vụ chỉ dành cho chủ sở hữu tương tác"
-  meaning_vi: "Lệnh miễn trừ CI được gọi bởi agent, vai trò đã ràng buộc hoặc terminal không tương tác."
-  causes_vi:
-    - "Không xác minh được người gọi là chủ sở hữu tại terminal tương tác."
-  nextStep_vi: "Chủ sở hữu kiểm tra SHA và lý do rồi tự chạy release ci-override trong terminal tương tác; agent không được chạy lệnh này."
-  owner: owner
-  kind: verb-refusal
-
 RIGHTS_OP_CONTROL_PLANE:
   title: "Op control-plane verb refused"
   title_vi: "Từ chối op gọi động từ của mặt phẳng điều khiển"
@@ -15763,43 +15753,13 @@ CI_TRIGGERS_RELEASE_ONLY:
   owner: supervisor
   kind: check-finding
 
-RELEASE_CI_OVERRIDE_CONFIRM:
-  title: "Owner did not confirm CI override SHA"
-  title_vi: "Chủ sở hữu chưa xác nhận SHA miễn trừ"
-  meaning_vi: "Xác nhận tương tác không khớp tiền tố SHA yêu cầu."
-  causes_vi:
-    - "Xác nhận tương tác không khớp tiền tố SHA yêu cầu."
-  nextStep_vi: "Chủ sở hữu kiểm tra commit và xác nhận đúng SHA trong terminal tương tác."
-  owner: owner
-  kind: verb-refusal
-
-RELEASE_CI_OVERRIDE_USAGE:
-  title: "Invalid release CI override request"
-  title_vi: "Yêu cầu miễn trừ CI không hợp lệ"
-  meaning_vi: "SHA hoặc lý do miễn trừ thiếu hay sai cú pháp."
-  causes_vi:
-    - "SHA hoặc lý do miễn trừ thiếu hay sai cú pháp."
-  nextStep_vi: "Chủ sở hữu chạy release ci-override với SHA đầy đủ và lý do không rỗng."
-  owner: owner
-  kind: verb-refusal
-
-RELEASE_CI_OVERRIDE_WRITE:
-  title: "CI override record could not be written"
-  title_vi: "Không ghi được bản miễn trừ CI"
-  meaning_vi: "Không thể ghi an toàn bản ghi miễn trừ hoặc owner-rulings."
-  causes_vi:
-    - "Không thể ghi an toàn bản ghi miễn trừ hoặc owner-rulings."
-  nextStep_vi: "Kiểm tra quyền ghi và khóa phát hành; chủ sở hữu chạy lại và kiểm tra bản ghi danh tính, lý do."
-  owner: owner
-  kind: verb-refusal
-
 RELEASE_CANDIDATE_CI_RED:
   title: "Candidate CI of the release sha is red"
   title_vi: "CI ứng viên của SHA phát hành bị đỏ"
   meaning_vi: "Lần chạy CI trên nhánh release/candidate-<phiên bản> của đúng SHA phát hành có job thất bại; main và tag không được đẩy."
   causes_vi:
     - "Lần chạy CI trên nhánh release/candidate-<phiên bản> của đúng SHA phát hành có job thất bại; main và tag không được đẩy."
-  nextStep_vi: "Đọc các job và bước thất bại được nêu tên, sửa, commit và cut lại (chỉ nhánh ứng viên được ghi đè, không bao giờ main); lối khẩn cấp duy nhất là bản ghi ci-override của chủ sở hữu cho đúng SHA."
+  nextStep_vi: "Đọc các job và bước thất bại được nêu tên, sửa, commit và cut lại (chỉ nhánh ứng viên được ghi đè, không bao giờ main); không có lối đi nào bỏ qua một CI đỏ."
   owner: op-retry
   kind: verb-refusal
 

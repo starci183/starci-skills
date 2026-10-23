@@ -69,8 +69,10 @@ TARGET_MISSING:
 UPPER_SNAKE literal, a `[CODE]` token in a message, a kebab literal in a `code:` / `reason:` / `rejected:` / `failureKind:` /
 `signal:` position, the last argument of `refuse(...)`, `hand('...')`, constant `*_REASONS|CODES|KINDS|CLASSES` lists) and
 refuses an emitted code with no entry, an entry no code emits, a malformed entry, an owner outside the set, an
-`other-op:<op>` naming an op that does not exist. A literal that only looks like a code (an env var name, a constant)
-goes to the `not-codes` section of `modules/kernel/allowlist.yaml` with the reason.
+`other-op:<op>` naming an op that does not exist. A literal the code only reads (compared, queried, tested for membership), names in a comment, declares as an enum member,
+uses as a `type:` discriminator or reads as an env var name is not an emitted code (`scripts/lib/failure-code-reads.mjs`); a label the code really
+emits (a ledger event kind, a classification, the reason of a benign outcome) is catalogued with the kind `event-kind`, `classification` or
+`outcome-reason`. There is no list of exceptions.
 
 ## Answers for the UI session
 

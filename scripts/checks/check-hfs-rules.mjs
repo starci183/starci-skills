@@ -20,7 +20,7 @@
 //                                                                                             HFS_RULE_UNCATALOGUED
 //   - an existing enforcer without a proof: an eslint rule whose law test file has no `.run("<id>"` block with both
 //     `valid:` and `invalid:` cases, or a machine / hfs enforcer none of whose codes is named by two `test(` blocks of
-//     one package or e2e spec (a violating and a passing tree), unless the rule's specNa cites owner:no-runtime-specs   HFS_RULE_UNTESTED
+//     one package or e2e spec (a violating and a passing tree), unless the enforcer runs only inside the runtime (RUNTIME_ONLY_ENFORCERS)   HFS_RULE_UNTESTED
 //   - a failure code with no entry in modules/kernel/failure-codes.yaml, or an entry lacking a Vietnamese
 //     title_vi, meaning_vi or nextStep_vi                                                     HFS_RULE_CODE_UNCATALOGUED
 //   - one obligation, one rule system (RED20): an `HFS_*`, `BE_*`, `FE_*` or `ARCH_*` code that a knowledge file
@@ -44,6 +44,7 @@ import { INFRASTRUCTURE_CODES } from '../hfs/infrastructure-codes.mjs';
 import { HfsSlotsError, loadRuleCatalog, loadSlotManifest } from '../hfs/slots.mjs';
 import { enforcerJudgedInEdition, judgedInEdition } from '../hfs/edition-slots.mjs';
 import { EDITIONS } from '../hfs/manifest-shape.mjs';
+import { RUNTIME_ONLY_ENFORCERS } from '../hfs/rule-catalog.mjs';
 import { ARCHITECTURE_RULE_IDS, ERROR_RULE_IDS } from '../hfs/architecture/index.mjs';
 import { isMain } from '../lib/is-main.mjs'; import { walkFiles } from '../lib/walk.mjs';
 import { hasSecondLanguage } from '../lib/language.mjs';
@@ -294,7 +295,7 @@ const testedFindings = (rule, tests, add) => {
       if (!stylelintProven(tests.stylelint ?? [], e.id)) add('HFS_RULE_UNTESTED', rule.id, `${e.kind}:${e.id} has no packages/stylelint/*.spec.mjs that lints it (lintRule("${e.id}") with a test asserting no warning and a test asserting one`, `${e.kind}:${e.id}`);
     } else if (LINT_FAMILY.includes(e.kind)) {
       if (!lintProven(tests[e.kind], e.id)) add('HFS_RULE_UNTESTED', rule.id, `${e.kind}:${e.id} has no RuleTester run with both valid and invalid cases in packages/eslint/${e.kind.slice(7)}/*.spec.mjs`, `${e.kind}:${e.id}`);
-    } else if (CHECK_FAMILY.includes(e.kind) && !rule.specNa && !rule.failureCodes.some((code) => specProven(tests.specs, code))) {
+    } else if (CHECK_FAMILY.includes(e.kind) && !RUNTIME_ONLY_ENFORCERS.includes(e.kind) && !rule.failureCodes.some((code) => specProven(tests.specs, code))) {
       add('HFS_RULE_UNTESTED', rule.id, `${e.kind}:${e.id} has no package or e2e spec naming one of ${rule.failureCodes.join(', ')} in a violating and a passing test`, `${e.kind}:${e.id}`);
     }
   }

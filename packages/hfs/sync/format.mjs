@@ -13,7 +13,7 @@ const IGNORE_FILE = '.prettierignore';
 const LOCKFILES = new Set(['package-lock.json']);
 
 /** The repository's own prettier, or a SyncError when it is not installed. */
-function loadPrettier(repoRoot) {
+export function loadPrettier(repoRoot) {
   const require = createRequire(path.join(repoRoot, 'package.json'));
   try {
     return require('prettier');

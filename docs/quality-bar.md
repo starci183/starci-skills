@@ -246,8 +246,6 @@ In lite and full, `BE_TEST_TOPOLOGY` enforces back-end test topology: colocated 
 ### Ambient identifier ownership
 
 In lite and full, R142 reports `BE_AMBIENT_ID` for ambient identifier sources
-outside `platform/ids`, including ordinary specs. The test world
-(slot `be.tests.world`) remains exempt as the composition root that names real
-test resources, under owner ruling `ambient-id-test-world-exemption`.
-Application code asks the injected `Ids` port through `ids.next()`; ordinary
+outside `platform/ids`, including ordinary specs and the test world
+(slot `be.tests.world`). Application code asks the injected `Ids` port through `ids.next()`; ordinary
 specs supply deterministic identifiers through `fakeIds()`.

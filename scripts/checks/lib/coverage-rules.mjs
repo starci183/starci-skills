@@ -2,6 +2,7 @@
 import { braceVariants } from '../../lib/glob.mjs';
 import { compileVariant } from '../../hfs/slot-match.mjs';
 import { EDITIONS } from '../../hfs/manifest-shape.mjs';
+import { RUNTIME_ONLY_ENFORCERS } from '../../hfs/rule-catalog.mjs';
 import { enforcerJudgedInEdition, judgedInEdition } from '../../hfs/edition-slots.mjs';
 import { codesInEdition, evidenceFiles, evidenceInEdition, evidencePath, exampleEvidence, managedTemplates, slotViews, templateEvidence } from './coverage-inventory.mjs';
 import { coverageGateFindings } from './coverage-gates.mjs';
@@ -42,8 +43,12 @@ function specProves(text, code, edition, fixtures) {
   return passing && titles.some((title) => NEGATIVE_TITLE.test(title));
 }
 
-/** Whether the rule's `specNa` (or `exampleNa`) waives that leg: a reason that cites an owner ruling (owner:no-runtime-specs: the runtime has no specs of its own). */
-const legWaived = (context, rule, key) => typeof rule[key] === 'string' && rule[key].trim().length > 0 && hasRulingReference(rule[key], context);
+/** Whether every enforcer the rule has runs only inside the runtime (RUNTIME_ONLY_ENFORCERS): no package holds a spec of it and no example app is judged by it. */
+const runtimeJudged = (rule) => {
+  const enforcers = (rule.enforcers ?? []).filter((enforcer) => enforcer.status !== 'planned' && !enforcer.planned);
+  return enforcers.length > 0 && enforcers.every((enforcer) => RUNTIME_ONLY_ENFORCERS.includes(enforcer.kind));
+};
+
 
 function proofExists(context, rule, code, edition) {
   return refsIn(rule.proves, edition).some((ref) => (!ref.codes || ref.codes.includes(code))
@@ -62,8 +67,7 @@ function docExists(context, ref, code) {
 }
 
 function validWitness(context, rule, edition) {
-  if (rule.witness?.status === 'unreachable') return typeof rule.witness.reason === 'string' && rule.witness.reason.trim()
-    && /^\d{4}-\d{2}-\d{2}$/.test(rule.witness.date ?? '');
+  if (runtimeJudged(rule)) return true;
   return (Array.isArray(rule.witness) ? rule.witness : []).some((witness) => {
     if (witness.path) return fixtureEvidence(context, witness, edition, codesInEdition(rule, edition));
     return witness.edition === edition
@@ -93,18 +97,18 @@ function ruleEvidence(context, rule, edition, templates) {
   if (!enforcers.length) add('RT_COVERAGE_NO_ENFORCER', 'no existing enforcer runs in this edition');
   const codes = codesInEdition(rule, edition);
   for (const code of codes) {
-    if (!proofExists(context, rule, code, edition) && !legWaived(context, rule, 'specNa')) add('RT_COVERAGE_NO_SPEC', `${code} has no named spec with a // proves: ${code}@${edition} header`);
+    if (!proofExists(context, rule, code, edition) && !runtimeJudged(rule)) add('RT_COVERAGE_NO_SPEC', `${code} has no named spec with a // proves: ${code}@${edition} header`);
     if (!refsIn(rule.docs, edition).some((ref) => docExists(context, ref, code))) add('RT_COVERAGE_NO_DOC', `${code} has no existing documentation reference that explains it`);
     out.push(...coverageProofFindings(context, rule, code, edition).map((item) => ({...item, code: 'RT_COVERAGE_PROOF_VACUOUS'})),
       ...coverageRoutingFindings(context, rule, code, edition).map((item) => ({...item, code: 'RT_COVERAGE_CODE_UNROUTED'})));
   }
-  if (!validWitness(context, rule, edition)) add('RT_COVERAGE_NO_WITNESS', 'no mutation witness or dated unreachable reason is declared');
+  if (!validWitness(context, rule, edition)) add('RT_COVERAGE_NO_WITNESS', 'no mutation witness or witnessing fixture or spec is declared');
   const owned = relatedSlots(rule, slotViews(context.manifest, edition));
   const hasTemplate = refsIn(rule.exemplifiedBy, edition).some((ref) => templateEvidence(context.files, ref).length)
     || owned.some(({ slot }) => templates.templates.get(slot.id)?.length);
   const templateNa = typeof rule.templateNa === 'string' && rule.templateNa.trim().length > 0;
   if (!hasTemplate && !templateNa) add('RT_COVERAGE_NO_TEMPLATE', 'no existing template, managed slot template or templateNa reason covers this edition');
-  if (!legWaived(context, rule, 'exampleNa') && !refsIn(rule.exemplifiedBy, edition).some((ref) => exampleEvidence(context, ref, edition).length
+  if (!runtimeJudged(rule) && !refsIn(rule.exemplifiedBy, edition).some((ref) => exampleEvidence(context, ref, edition).length
     || fixtureEvidence(context, ref, edition, codes))) add('RT_COVERAGE_NO_EXAMPLE', 'no existing example or dedicated fixture is named for this edition');
   out.push(...coverageGateFindings(context, rule, edition));
   return out;
@@ -145,9 +149,24 @@ function slotTemplateWaived(slot) {
     || slot.scaffold === 'none' && typeof slot.reason === 'string' && slot.reason.trim();
 }
 
+/**
+ * A dedicated fixture of a slot: a package spec the slot's `exemplifiedBy` names for the edition, whose text names the edition and holds a path
+ * literal the slot owns (in the profile's scope), so the spec builds a tree with a file in that slot.
+ */
+function slotFixture(context, slot, profile, edition) {
+  const scope = profile === 'app' ? '' : `${profile}/`;
+  const owned = braceVariants(slot.path).map((variant) => compileVariant(slot, variant).regex);
+  return refsIn(slot.exemplifiedBy, edition).some((ref) => evidenceFiles(context.files, ref).some((file) => {
+    if (!file.endsWith('.spec.mjs')) return false;
+    const text = String(context.files.get(file));
+    if (!text.split(/[^A-Za-z]+/).includes(edition)) return false;
+    return [...text.matchAll(/(['"`])([^'"`\n]{2,200})\1/g)].some((match) => owned.some((regex) => regex.test(match[2].startsWith(scope) ? match[2].slice(scope.length) : match[2])));
+  }));
+}
+
 function slotHasExample(context, slot, profile, edition) {
   return (context.examples ?? []).some((example) => example.edition === edition
-    && example.files.some((file) => slotMatches(slot, profile, example, file)));
+    && example.files.some((file) => slotMatches(slot, profile, example, file))) || slotFixture(context, slot, profile, edition);
 }
 
 function slotEvidence(context, edition, templates) {
@@ -156,7 +175,7 @@ function slotEvidence(context, edition, templates) {
     if (slotNeedsTemplate(original, slot) && !slotHasTemplate(context, slot, edition, templates) && !slotTemplateWaived(slot)) {
       out.push(finding('RT_COVERAGE_NO_TEMPLATE', slot.id, edition, `${slot.id} ${edition}: ${profile} slot has no existing template or scaffold path`, 'knowledge/hfs/slots.yaml'));
     }
-    if (!slotHasExample(context, slot, profile, edition) && !legWaived(context, slot, 'exampleNa')) {
+    if (!slotHasExample(context, slot, profile, edition)) {
       out.push(finding('RT_COVERAGE_NO_EXAMPLE', slot.id, edition, `${slot.id} ${edition}: no example file or dedicated fixture exercises the ${profile} slot`, 'knowledge/hfs/slots.yaml'));
     }
   }

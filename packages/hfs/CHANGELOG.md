@@ -1,5 +1,11 @@
 # Changelog
 
+## 4.7.22 - 2026-10-23
+- Changed: no check keeps a list of exceptions. The JSON a tool requires is declared once by format (`scripts/lib/json-formats.mjs`, bundled), the failure-code scanner no longer counts a literal the code only reads (`scripts/lib/failure-code-reads.mjs`, bundled), and a rule is proven by a package spec unless every enforcer it has runs only inside the runtime (`RUNTIME_ONLY_ENFORCERS`); the catalog keys `specNa`, `exampleNa` and the unreachable witness are gone.
+- Added: the specs of the deleted runtime tests that prove bundled checkers, restored as package specs (`src/*.spec.mjs`, helpers in `src/helpers`, fixtures in `src/fixtures`), and fresh specs for R296-R301, the tree codes of R01/R03, R112 and R216.
+- Changed: `scripts/gates/sonar-gate.mjs` and `scripts/gates/starcistacks.mjs` joined the bundled runtime copy, and a few exports the specs read are exported again.
+- Changed: a red candidate CI never passes: `packages/hfs/release/candidate-ci.mjs` has no ci-override record any more (owner ruling 2026-10-22, a loosening is always red).
+
 ## 4.7.21 - 2026-10-22
 - Changed: the bundled `scripts/lib/gate-loosening.mjs` has no approval route (owner ruling loosening-always-red, 2026-10-22): `approved` and `approvalIdOf` are gone, `looseningStep` is the land gate's always-red step whose only way out is restoring the gate, and the pure released-state judgement `loosensReleased` moved here from the runtime's check library. Spec: `src/gate-loosening.spec.mjs`.
 - Added: the bundled runtime copy of `scripts/lib/gate-loosening.mjs`, which judges whether one change loosens a gate. It is rename-aware: an allowlist or rule entry that only moves with a git rename of the paths it names (the removed line, with every renamed prefix rewritten, equals an added line) is no loosening, while an entry that also widens, or one added beside the move, still is. Spec: `src/gate-loosening.spec.mjs`.

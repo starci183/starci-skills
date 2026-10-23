@@ -12,7 +12,7 @@
 //   5. main did not move meanwhile; the pushed range passes the secret scan;
 //   6. the CANDIDATE CI (scripts/supervisor/release-candidate.mjs, OWNER RULING candidate-ci 2026-10-18): HEAD is pushed to refs/heads/release/candidate-<version> and the cut waits for
 //      every required workflow run of that exact sha; red (the failing jobs named), timeout or unreadable refuses and nothing reaches main (the candidate ref stays for diagnosis;
-//      a re-cut force-moves only it). The owner's sha-bound ci-override record is the one documented emergency path, and the release record logs its use;
+//      a re-cut force-moves only it). There is no override of a red candidate;
 //   7. only then the ANNOTATED tag is created on HEAD with the CHANGELOG section as its message (after the candidate, so a red candidate leaves no tag and the same version can be
 //      cut again on the fix), and main and the tag are pushed together, atomically: both refs move or neither does.
 // The push lock: a remote whose pushurl reads `DISABLED...` (the owner's lock while lands stay local) is pushed through its fetch url for this one push, without writing the config (pushLiftTarget).
@@ -161,7 +161,7 @@ function pushedResult({ out, repo, head, tag, branch, remote, mode, deps, candid
   const state = candidate?.verdict === 'candidate-green' ? 'green' : 'pending';
   (deps.writeCi ?? writeCiRecord)({ repo, head, tag, suite: mode, state, runs: (candidate?.workflows ?? []).map((w) => ({ id: w.run?.databaseId ?? null, status: w.run?.status ?? null, conclusion: w.run?.conclusion ?? null, event: w.run?.event ?? null, url: w.run?.url ?? null })) });
   const watch = `starci release ci-status --tag ${tag} --wait`;
-  const judged = `; the candidate CI of this sha was ${candidate?.verdict === 'candidate-green' ? 'green' : 'red under the owner override'} on ${candidate?.ref} before main moved - the tag run: ${watch}`;
+  const judged = `; the candidate CI of this sha was green on ${candidate?.ref} before main moved - the tag run: ${watch}`;
   // The pushed commit is on origin/main now: a local main left behind (a shared repository, another checkout) is fast-forwarded to it when that is safe.
   const mainAdvance = (deps.advanceMain ?? advanceLocalMain)({ root: repo, to: head, branch, remote });
   const moved = mainAdvance.moved ? '; ' + mainAdvance.why : '';
@@ -182,7 +182,7 @@ async function candidateGate({ repo, run, cwd, head, remote, branch, tag, deps, 
   const lifted = pushLiftTarget({ pushUrl: configGet(cwd, `remote.${remote}.pushurl`).stdout, fetchUrl: configGet(cwd, `remote.${remote}.url`).stdout });
   // Not under the host lock: the wait runs nothing heavy here, and other heavy runs on this host must not queue behind GitHub for up to waitMinutes.
   const candidate = await (deps.candidate ?? candidateCi)({ repo, remote, pushTarget: lifted, head, tag, deps: deps.candidateDeps ?? {} });
-  out.candidate = { ref: candidate.ref ?? null, verdict: candidate.verdict, workflows: candidate.workflows ?? [], failing: candidate.failing ?? [], override: candidate.override ?? null };
+  out.candidate = { ref: candidate.ref ?? null, verdict: candidate.verdict, workflows: candidate.workflows ?? [], failing: candidate.failing ?? [] };
   if (!candidate.ok) return { refusal: refuse(candidate.verdict, candidate.why) };
   if (!unmoved(run, cwd, head)) return { refusal: refuse('main-moved', 'the checkout changed while the candidate CI ran: start over') };
   return { lifted, candidate };

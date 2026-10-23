@@ -27,7 +27,7 @@ it uses the same git call files as the CLI's git verbs, never a git process of i
       `refs/heads/release/candidate-<version>` and waits for the `ci` and `examples` workflow runs of that exact sha (OWNER RULING candidate-ci, 2026-10-18: never again does main
       receive a release whose CI is red), and only when they are green creates the ANNOTATED tag on the release commit with the CHANGELOG section as its message and pushes main
       and the tag atomically. A red candidate names its failing jobs and keeps its ref for diagnosis; a re-cut of the same version force-moves only the candidate ref, never main.
-      The owner's sha-bound `starci release ci-override` record is the one documented emergency path; the release record logs its use. After a cut the candidate ref is left on the remote.
+      There is no override of a red candidate. After a cut the candidate ref is left on the remote.
    5. Linux parity before the push: the CI jobs run locally on Linux, because every local gate runs on the author's machine and CI does not.
    6. CI runs on the release push of main and on the tag; the `github-release` job of `ci.yml` makes the GitHub Release from the CHANGELOG section (`starci release notes --tag <v*>`), marked a pre-release when the version has a pre-release part.
 4. **CI triggers** of the runtime are a push to `main`, a push of a release candidate ref `release/candidate-*`, a push of `v*` tags and `workflow_dispatch`, nothing else (R221): no other branch, no pull request; every `ci.yml` (and the runtime's `examples.yml`) must run on the candidate refs. One concurrency group per ref; a newer

@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.7.22 - 2026-10-23
+- Added: the verb `starci route model` (the model-selection preview, flags `--context-tokens` and `--models-dir` in kebab case).
+- Removed: the verb `starci release ci-override`; a red candidate CI never passes.
+- Changed: pins @starci/hfs 4.7.22.
+
 ## 1.7.21 - 2026-10-22
 - Changed: the catalog documents the release gate's bounded retry of a transient Sonar read.
 - Changed: pins @starci/hfs 4.7.21.

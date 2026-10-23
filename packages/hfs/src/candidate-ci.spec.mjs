@@ -1,11 +1,11 @@
-// The candidate CI of `starci app release push`: the exact sha goes to its candidate ref, and only a green ci.yml run of that sha (or the owner's
-// sha-bound override record) lets the default branch and the tag move. Every subprocess and the clock are fakes.
+// The candidate CI of `starci app release push`: the exact sha goes to its candidate ref, and only a green ci.yml run of that sha (a red
+// candidate never passes) lets the default branch and the tag move. Every subprocess and the clock are fakes.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { candidateRef, candidateStep, candidateVerdict, overrideOf, waitForCandidate } from '../release/candidate-ci.mjs';
+import { candidateRef, candidateStep, candidateVerdict, waitForCandidate } from '../release/candidate-ci.mjs';
 
 const HEAD = 'a'.repeat(40);
 const WAIT = Object.freeze({ pollSeconds: 30, graceMinutes: 10, waitMinutes: 90 });
@@ -65,19 +65,17 @@ test('a red candidate refuses and names the failing jobs and steps; nothing else
   assert.equal(calls.filter((call) => call[0] === 'git' && call[1] === 'push').length, 1, 'only the candidate push ran');
 });
 
-test('the owner override record of this exact sha lets a red candidate through and is reported', async (t) => {
+test('a red candidate has no override: an old override record on disk changes nothing', async (t) => {
   const common = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-candidate-'));
   t.after(() => fs.rmSync(common, { recursive: true, force: true }));
   fs.mkdirSync(path.join(common, 'starci-release'));
   const record = { schema: 'starci/ci-override@1', sha: HEAD, reason: 'flaky runner accepted', by: 'owner', at: '2026-10-18T00:00:00Z', runUrl: '' };
   fs.writeFileSync(path.join(common, 'starci-release', `${HEAD}.ci-override.json`), JSON.stringify(record));
   const { ctx } = fakeCtx({ reads: [[row({ conclusion: 'failure' })]], common });
-  assert.equal(overrideOf(ctx, HEAD).reason, 'flaky runner accepted');
-  assert.equal(overrideOf(ctx, 'b'.repeat(40)), null, 'an override is bound to its own sha');
   const judged = await candidateStep(ctx, { head: HEAD, tag: 'v1.2.3', prefix: 'v', remote: 'origin', wait: WAIT });
-  assert.equal(judged.ok, true);
-  assert.equal(judged.data.override.by, 'owner');
-  assert.match(judged.lines.at(-1), /RELEASE_CANDIDATE_CI_RED overridden by the owner \(owner\): flaky runner accepted/);
+  assert.equal(judged.ok, false);
+  assert.equal(judged.data.override, undefined);
+  assert.match(judged.lines.at(-1), /^RELEASE_CANDIDATE_CI_RED: /);
 });
 
 test('no run within the grace refuses as a missing candidate trigger; an endless run times out; unreadable GitHub is unknown', async () => {

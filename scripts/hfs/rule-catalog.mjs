@@ -17,7 +17,13 @@ const RULE_KINDS = Object.freeze(['codemod', 'lint', 'check', 'design']);
 const FINDING_CODE = /^[A-Z][A-Z0-9]*(_[A-Z0-9]+)+$/;
 const ENFORCER_ID = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
 const FILE_ENFORCERS = new Set(['machine', 'hfs', 'work-validate', 'sonar', 'runtime']);
-const RULE_KEYS = new Set(['id', 'code', 'law', 'scope', 'kinds', 'gates', 'failureCodes', 'editions', 'codeEditions', 'enforcers', 'cases', 'docs', 'exemplifiedBy', 'proves', 'witness', 'editionWhy', 'amendedBy', 'templateNa', 'specNa', 'exampleNa']);
+/**
+ * The enforcer kinds that run only inside the StarCi runtime repository (`starci runtime check`, `starci work`): no published package carries
+ * them, so no package spec can hold them (owner ruling no-runtime-specs: the runtime has no specs of its own; the package clean-test and the
+ * scaffold e2e are its tests), and no example app is a product they judge. A rule is runtime-judged when every enforcer it has is of these kinds.
+ */
+export const RUNTIME_ONLY_ENFORCERS = Object.freeze(['work-validate', 'runtime']);
+const RULE_KEYS = new Set(['id', 'code', 'law', 'scope', 'kinds', 'gates', 'failureCodes', 'editions', 'codeEditions', 'enforcers', 'cases', 'docs', 'exemplifiedBy', 'proves', 'witness', 'editionWhy', 'amendedBy', 'templateNa']);
 const CASE_KEYS = new Set(['id', 'date', 'source', 'ruling', 'quote', 'supersedes', 'status', 'staleWhen', 'amendedBy']);
 const CASE_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const ENFORCER_KEYS = new Set(['kind', 'id', 'status', 'at', 'editions', 'editionWhy']);
@@ -116,13 +122,6 @@ function witnessProblems(rule, label, bad) {
   const value = rule.witness;
   if (value === undefined) return;
   const at = `${label}.witness`;
-  if (isPlainObject(value)) {
-    unknownKeys(value, new Set(['status', 'reason', 'date']), at, bad);
-    if (value.status !== 'unreachable') bad.push(`${at}.status must be unreachable`);
-    textProblem(value.reason, `${at}.reason`, bad);
-    dateProblem(value.date, `${at}.date`, bad);
-    return;
-  }
   if (!nonEmptyList(value, at, bad)) return;
   value.forEach((item, index) => witnessEntryProblems(item, `${at}[${index}]`, bad));
 }
@@ -283,8 +282,6 @@ function checkRule(rule, index, catalog, codeOwner, bad) {
   if (rule.amendedBy !== undefined) caseReferenceProblems(rule.amendedBy, `${label}.amendedBy`, bad);
   optionalText(rule, 'editionWhy', label, bad);
   optionalText(rule, 'templateNa', label, bad);
-  optionalText(rule, 'specNa', label, bad);
-  optionalText(rule, 'exampleNa', label, bad);
   for (const key of ['docs', 'exemplifiedBy', 'proves']) evidenceProblems(rule, key, label, bad);
   witnessProblems(rule, label, bad);
   enumListProblems(rule, label, 'kinds', RULE_KINDS, bad);

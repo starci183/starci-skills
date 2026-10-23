@@ -77,7 +77,7 @@ function providerSecretFindings(repoRoot, file, repo, findings) {
 }
 
 /** Raw L17 findings. The catalog-driven findings filter decides which editions judge them. */
-function liteSecretCustodyFindings({ repoRoot, files, repo }) {
+export function liteSecretCustodyFindings({ repoRoot, files, repo }) {
   const findings = [];
   for (const file of files) {
     if (custodyPathFinding(file, repo, findings)) continue;

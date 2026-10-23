@@ -100,16 +100,6 @@ $defs:
         minLength: 1
         pattern: '\S'
         description: Why this rule has no scaffolded surface and therefore needs no rule template; required or managed slot templates remain checked separately.
-      specNa:
-        type: string
-        minLength: 1
-        pattern: '\S'
-        description: Why the codes of this rule carry no spec proof, citing owner:no-runtime-specs (the runtime has no specs; a rule enforced by runtime code is proven by the package clean-test and the scaffold e2e, not by a named spec). Package-enforced codes keep their proof.
-      exampleNa:
-        type: string
-        minLength: 1
-        pattern: '\S'
-        description: Why this rule names no example or fixture, citing owner:no-runtime-specs (its only example was a deleted runtime fixture and it judges the runtime itself, not an app).
       docs:
         type: array
         minItems: 1
@@ -146,8 +136,7 @@ $defs:
               oneOf:
                 - {$ref: '#/$defs/witness'}
                 - {$ref: '#/$defs/proof'}
-          - {$ref: '#/$defs/unreachableWitness'}
-        description: Mutations that make a conforming example emit the expected codes, dedicated fixture or spec-helper references with violating and passing evidence, or a dated explanation of why a mutation cannot reach this rule.
+        description: Mutations that make a conforming example emit the expected codes, or dedicated fixture or spec-helper references with violating and passing evidence. A rule judged only inside the runtime (RUNTIME_ONLY_ENFORCERS) needs none.
       enforcers:
         type: array
         minItems: 1
@@ -277,14 +266,6 @@ $defs:
         then: {required: [content]}
       - if: {properties: {op: {const: delete}}, required: [op]}
         then: {not: {required: [content]}}
-  unreachableWitness:
-    type: object
-    additionalProperties: false
-    required: [status, reason, date]
-    properties:
-      status: {const: unreachable}
-      reason: {type: string, minLength: 1}
-      date: {type: string, pattern: '^[0-9]{4}-[0-9]{2}-[0-9]{2}$', description: A valid calendar date, checked by the loader.}
   caseReference:
     type: string
     pattern: '^(?:case-[1-9][0-9]*|(?:ruling:)?R[0-9]{2,3}(?:/case-[1-9][0-9]*)?|owner:[a-z][a-z0-9]*(?:-[a-z0-9]+)*)$'

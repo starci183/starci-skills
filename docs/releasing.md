@@ -85,9 +85,9 @@ OWNER RULING `candidate-ci` (2026-10-18, `modules/kernel/owner-rulings.yaml`): "
 - Green: the annotated tag is created (only now, so a red candidate leaves no tag and the same version can be cut again on the fix) and main and the tag move in the one atomic push. The release record logs the candidate verdict, and the CI record of the sha is written green.
 - Red: `RELEASE_CANDIDATE_CI_RED` names the run URLs and every failing job and step; nothing reaches main. The candidate ref stays for diagnosis; the next cut of the same version force-moves only the candidate ref, never main.
 - No run within `graceMinutes` (a workflow that does not trigger on `release/candidate-*`), or no end within `waitMinutes`: `RELEASE_CANDIDATE_CI_TIMEOUT`. GitHub unreadable to the end: `RELEASE_CI_UNKNOWN`. Nothing reaches main.
-- Emergency path, owner-only: `starci release ci-override --sha <sha> --reason <text>` (a terminal, the first 12 sha characters typed) writes the sha-bound record that lets a red candidate through; the release record logs its use. Agents never write it.
+- There is no override: a red candidate never passes; fix, commit and cut again.
 
-The latest run on main no longer gates a cut: a red main (alpha.21's) needs no override before the next release, whose own candidate run decides. After a successful cut the candidate ref is left on the remote, naming the released sha. Apps follow the same flow through `starci app release push --execute` (`packages/hfs/release/candidate-ci.mjs`: the managed `ci.yml` triggers on `release/candidate-*`, and `starci app release gate` no longer reads the default-branch CI).
+The latest run on main no longer gates a cut: a red main (alpha.21's) blocks nothing before the next release, whose own candidate run decides. After a successful cut the candidate ref is left on the remote, naming the released sha. Apps follow the same flow through `starci app release push --execute` (`packages/hfs/release/candidate-ci.mjs`: the managed `ci.yml` triggers on `release/candidate-*`, and `starci app release gate` no longer reads the default-branch CI).
 
 ## The runtime itself: Sonar, no coverage
 
