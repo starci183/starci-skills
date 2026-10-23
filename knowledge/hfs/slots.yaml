@@ -2276,7 +2276,7 @@ slots:
     why: the canonical GraphQL client output of codegen is local and never committed; this specific slot overrides the tracked API parent
     rules: [FE_WIRE_GENERATED]
     exemplifiedBy:
-      - {path: packages/hfs/src/r52-wire-generated.spec.mjs, editions: [lite, full]}
+      - {path: packages/eslint/fe/r52-wire-generated.spec.mjs, editions: [lite, full]}
   - id: fe.transport.client
     since: 3.1.0
     profiles: [fe]

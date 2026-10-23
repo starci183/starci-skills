@@ -2,14 +2,14 @@
 // proves: BE_KIND_ISOLATION@full
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { byCodeUnit } from '../runtime/scripts/lib/list.mjs';
-import { appDeclaration, archFixture, findings, runArch, ts } from './helpers/hfs-arch-fixture.mjs';
-import { loadArchitectureConfig } from '../runtime/scripts/hfs/architecture/config.mjs';
-import { buildTypeScriptContext } from '../runtime/scripts/hfs/architecture/typescript.mjs';
-import { buildHfsGraph } from '../runtime/scripts/hfs/architecture/hfs-graph.mjs';
-import { checkTiers } from '../runtime/scripts/hfs/architecture/tiers.mjs';
-import { projectFixture } from '../../eslint/be/fixtures/project/tester.mjs';
-import { rules } from '../../eslint/be/project-graph.mjs';
+import { byCodeUnit } from './runtime/scripts/lib/list.mjs';
+import { appDeclaration, archFixture, findings, runArch, ts } from '../../hfs/src/helpers/hfs-arch-fixture.mjs';
+import { loadArchitectureConfig } from './runtime/scripts/hfs/architecture/config.mjs';
+import { buildTypeScriptContext } from './runtime/scripts/hfs/architecture/typescript.mjs';
+import { buildHfsGraph } from './runtime/scripts/hfs/architecture/hfs-graph.mjs';
+import { checkTiers } from './runtime/scripts/hfs/architecture/tiers.mjs';
+import { projectFixture } from './fixtures/project/tester.mjs';
+import { rules } from './project-graph.mjs';
 
 const declaration = { apps: [{ name: 'core', kind: 'api' }], patterns: ['event-bus', 'fenced-job'] };
 const passingFiles = {

@@ -5,13 +5,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-import { projectFixture } from '../../eslint/be/fixtures/project/tester.mjs';
-import { rules } from '../../eslint/fe/project-graph.mjs';
-import { checkArchitecture } from '../runtime/scripts/hfs/architecture/index.mjs';
-import { checkGrammar } from '../runtime/scripts/hfs/architecture/frontend-grammar.mjs';
-import { loadArchitectureConfig } from '../runtime/scripts/hfs/architecture/config.mjs';
-import { buildTypeScriptContext, relativePath } from '../runtime/scripts/hfs/architecture/typescript.mjs';
-import { LINT_ENFORCERS } from '../runtime/scripts/hfs/architecture/surface.mjs';
+import { projectFixture } from '../be/fixtures/project/tester.mjs';
+import { rules } from './project-graph.mjs';
+import { checkArchitecture } from './runtime/scripts/hfs/architecture/index.mjs';
+import { checkGrammar } from './runtime/scripts/hfs/architecture/frontend-grammar.mjs';
+import { loadArchitectureConfig } from './runtime/scripts/hfs/architecture/config.mjs';
+import { buildTypeScriptContext, relativePath } from './runtime/scripts/hfs/architecture/typescript.mjs';
+import { LINT_ENFORCERS } from './runtime/scripts/hfs/architecture/surface.mjs';
 
 const ts = createRequire(import.meta.url)('typescript');
 const entry = 'apps/web/src/app/page.tsx';

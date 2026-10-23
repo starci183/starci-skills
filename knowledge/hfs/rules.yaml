@@ -393,15 +393,15 @@ rules:
       - {kind: eslint-fe, id: no-double-cast}
     proves:
       - {path: packages/hfs/src/hfs-ts-strict.spec.mjs, editions: [lite, full], codes: [HFS_TS_STRICT]}
-      - {path: packages/hfs/src/hfs-ts-strict-rule-tester.spec.mjs, editions: [lite, full], codes: [FE_TYPE_ESCAPE]}
+      - {path: packages/eslint/fe/hfs-ts-strict-rule-tester.spec.mjs, editions: [lite, full], codes: [FE_TYPE_ESCAPE]}
     exemplifiedBy:
       - {path: "packages/hfs/templates/be/tool-config/tsconfig.json", editions: ["lite", "full"]}
       - {path: "packages/hfs/templates/fe/tool-config/tsconfig.json", editions: ["lite", "full"]}
       - {path: packages/hfs/src/hfs-ts-strict.spec.mjs, editions: [lite, full], codes: [HFS_TS_STRICT]}
-      - {path: packages/hfs/src/hfs-ts-strict-rule-tester.spec.mjs, editions: [lite, full], codes: [FE_TYPE_ESCAPE]}
+      - {path: packages/eslint/fe/hfs-ts-strict-rule-tester.spec.mjs, editions: [lite, full], codes: [FE_TYPE_ESCAPE]}
     witness:
       - {path: packages/hfs/src/hfs-ts-strict.spec.mjs, editions: [lite, full], codes: [HFS_TS_STRICT]}
-      - {path: packages/hfs/src/hfs-ts-strict-rule-tester.spec.mjs, editions: [lite, full], codes: [FE_TYPE_ESCAPE]}
+      - {path: packages/eslint/fe/hfs-ts-strict-rule-tester.spec.mjs, editions: [lite, full], codes: [FE_TYPE_ESCAPE]}
   - id: R23
     code: "HFS_CONTRACT_SNAPSHOT_DRIFT"
     editions: ["lite", "full"]
@@ -451,16 +451,16 @@ rules:
       - {kind: eslint-be, id: dead-exports}
       - {kind: eslint-fe, id: dead-exports}
     proves:
-      - {path: packages/hfs/src/hfs-unused-export.spec.mjs, editions: [lite, full], codes: [HFS_UNUSED_EXPORT, HFS_UNUSED_FILE]}
+      - {path: packages/eslint/be/hfs-unused-export.spec.mjs, editions: [lite, full], codes: [HFS_UNUSED_EXPORT, HFS_UNUSED_FILE]}
     exemplifiedBy:
       - {path: "packages/hfs/templates/be/skeleton-lite/apps/api/src/main.ts", edition: "lite"}
       - {path: "packages/hfs/templates/be/skeleton/apps/__app__/src/main.ts", edition: "full"}
       - {path: "packages/hfs/templates/fe/skeleton-lite/apps/web/src/app/[locale]/page.tsx", edition: "lite"}
       - {path: "packages/hfs/templates/fe/skeleton/apps/app/src/app/[locale]/page.tsx", edition: "full"}
-      - {path: packages/hfs/src/hfs-unused-export.spec.mjs, editions: [lite, full], codes: [HFS_UNUSED_EXPORT, HFS_UNUSED_FILE]}
+      - {path: packages/eslint/be/hfs-unused-export.spec.mjs, editions: [lite, full], codes: [HFS_UNUSED_EXPORT, HFS_UNUSED_FILE]}
     witness:
-      - {path: packages/hfs/src/hfs-unused-export.spec.mjs, edition: lite, codes: [HFS_UNUSED_EXPORT, HFS_UNUSED_FILE]}
-      - {path: packages/hfs/src/hfs-unused-export.spec.mjs, edition: full, codes: [HFS_UNUSED_EXPORT, HFS_UNUSED_FILE]}
+      - {path: packages/eslint/be/hfs-unused-export.spec.mjs, edition: lite, codes: [HFS_UNUSED_EXPORT, HFS_UNUSED_FILE]}
+      - {path: packages/eslint/be/hfs-unused-export.spec.mjs, edition: full, codes: [HFS_UNUSED_EXPORT, HFS_UNUSED_FILE]}
   - id: R26
     code: "BE_TIER_DIRECTION"
     editions: [lite, full]
@@ -530,13 +530,13 @@ rules:
       - {kind: eslint-be, id: feature-layout}
       - {kind: eslint-be, id: application-never-imports-transport}
     proves:
-      - {path: packages/hfs/src/a16-r29-r31.spec.mjs, editions: [lite, full]}
+      - {path: packages/eslint/be/a16-r29-r31.spec.mjs, editions: [lite, full]}
     exemplifiedBy:
       - {path: packages/hfs/templates/be/patterns/api/feature.module.ts.tpl, editions: [lite, full]}
-      - {path: packages/hfs/src/a16-r29-r31.spec.mjs, editions: [lite, full]}
+      - {path: packages/eslint/be/a16-r29-r31.spec.mjs, editions: [lite, full]}
     witness:
-      - {path: packages/hfs/src/a16-r29-r31.spec.mjs, edition: lite}
-      - {path: packages/hfs/src/a16-r29-r31.spec.mjs, edition: full}
+      - {path: packages/eslint/be/a16-r29-r31.spec.mjs, edition: lite}
+      - {path: packages/eslint/be/a16-r29-r31.spec.mjs, edition: full}
   - id: R30
     code: "BE_PUBLIC_SURFACE"
     law: "Every owner has one `index.ts`; cross-owner imports use it, same-owner imports are relative and never go through it; it holds only named `export { }` lines, no `export *`, no alias re-export (`export { X as Y }`, `export const Y = X`, `export type Y = X`, `export interface Y extends X {}`: one declaration has one name), within the owner slot's `indexExports` budget (60 for domain and feature owners, 80 for `be.integrations` provider entries); cross-package imports use the package name and a declared export."
@@ -1064,13 +1064,13 @@ rules:
       - {kind: eslint-fe, id: no-hand-typed-wire}
       - {kind: hfs, id: wire-generated, at: scripts/hfs/rules/frontend-tree.mjs}
     proves:
-      - {path: packages/hfs/src/r52-wire-generated.spec.mjs, editions: [lite, full], codes: [FE_WIRE_GENERATED]}
+      - {path: packages/eslint/fe/r52-wire-generated.spec.mjs, editions: [lite, full], codes: [FE_WIRE_GENERATED]}
     exemplifiedBy:
       - {path: packages/hfs/templates/fe/table/graphql/query.types.ts.tpl, editions: [lite, full]}
-      - {path: packages/hfs/src/r52-wire-generated.spec.mjs, editions: [lite, full], codes: [FE_WIRE_GENERATED]}
+      - {path: packages/eslint/fe/r52-wire-generated.spec.mjs, editions: [lite, full], codes: [FE_WIRE_GENERATED]}
     witness:
-      - {path: packages/hfs/src/r52-wire-generated.spec.mjs, edition: lite, codes: [FE_WIRE_GENERATED]}
-      - {path: packages/hfs/src/r52-wire-generated.spec.mjs, edition: full, codes: [FE_WIRE_GENERATED]}
+      - {path: packages/eslint/fe/r52-wire-generated.spec.mjs, edition: lite, codes: [FE_WIRE_GENERATED]}
+      - {path: packages/eslint/fe/r52-wire-generated.spec.mjs, edition: full, codes: [FE_WIRE_GENERATED]}
   - id: R53
     code: "FE_ERROR_BOUNDARY_MISSING"
     editions: [lite, full]
@@ -1083,14 +1083,14 @@ rules:
       - {kind: eslint-fe, id: no-null-suspense-fallback}
       - {kind: machine, id: error-boundary-missing, at: scripts/hfs/architecture/required-files.mjs}
     proves:
-      - {path: packages/hfs/src/r53-error-boundaries.spec.mjs, editions: [lite, full], codes: [FE_ERROR_BOUNDARY_MISSING, FE_SUSPENSE_NULL_FALLBACK]}
+      - {path: packages/eslint/fe/r53-error-boundaries.spec.mjs, editions: [lite, full], codes: [FE_ERROR_BOUNDARY_MISSING, FE_SUSPENSE_NULL_FALLBACK]}
     exemplifiedBy:
       - {path: packages/hfs/templates/fe/skeleton-lite/apps/web/src/app/global-error.tsx, edition: lite}
       - {path: packages/hfs/templates/fe/skeleton/apps/app/src/app/global-error.tsx, edition: full}
-      - {path: packages/hfs/src/r53-error-boundaries.spec.mjs, editions: [lite, full], codes: [FE_ERROR_BOUNDARY_MISSING, FE_SUSPENSE_NULL_FALLBACK]}
+      - {path: packages/eslint/fe/r53-error-boundaries.spec.mjs, editions: [lite, full], codes: [FE_ERROR_BOUNDARY_MISSING, FE_SUSPENSE_NULL_FALLBACK]}
     witness:
-      - {path: packages/hfs/src/r53-error-boundaries.spec.mjs, edition: lite, codes: [FE_ERROR_BOUNDARY_MISSING, FE_SUSPENSE_NULL_FALLBACK]}
-      - {path: packages/hfs/src/r53-error-boundaries.spec.mjs, edition: full, codes: [FE_ERROR_BOUNDARY_MISSING, FE_SUSPENSE_NULL_FALLBACK]}
+      - {path: packages/eslint/fe/r53-error-boundaries.spec.mjs, edition: lite, codes: [FE_ERROR_BOUNDARY_MISSING, FE_SUSPENSE_NULL_FALLBACK]}
+      - {path: packages/eslint/fe/r53-error-boundaries.spec.mjs, edition: full, codes: [FE_ERROR_BOUNDARY_MISSING, FE_SUSPENSE_NULL_FALLBACK]}
   - id: R54
     code: "FE_ROUTE_FILES_THIN"
     law: "Route files mount one owner; Next conventions (`proxy.ts`, metadata)."
@@ -1780,13 +1780,13 @@ rules:
     docs: ["docs/be-shape-coverage.md#r89"]
     gates: ["pre-commit","settle","land","ci"]
     proves:
-      - {path: packages/hfs/src/be-r89-source-form-coverage.spec.mjs, editions: [lite, full]}
+      - {path: packages/eslint/be/be-r89-source-form-coverage.spec.mjs, editions: [lite, full]}
     exemplifiedBy:
       - {path: packages/hfs/templates/be/patterns/api/graphql.input.ts.tpl, editions: [lite, full]}
-      - {path: packages/hfs/src/be-r89-source-form-coverage.spec.mjs, editions: [lite, full]}
+      - {path: packages/eslint/be/be-r89-source-form-coverage.spec.mjs, editions: [lite, full]}
     witness:
-      - {path: packages/hfs/src/be-r89-source-form-coverage.spec.mjs, edition: lite, codes: [BE_SOURCE_FORM, BE_PUBLIC_CONTRACT_FORM]}
-      - {path: packages/hfs/src/be-r89-source-form-coverage.spec.mjs, edition: full, codes: [BE_SOURCE_FORM, BE_PUBLIC_CONTRACT_FORM]}
+      - {path: packages/eslint/be/be-r89-source-form-coverage.spec.mjs, edition: lite, codes: [BE_SOURCE_FORM, BE_PUBLIC_CONTRACT_FORM]}
+      - {path: packages/eslint/be/be-r89-source-form-coverage.spec.mjs, edition: full, codes: [BE_SOURCE_FORM, BE_PUBLIC_CONTRACT_FORM]}
   - id: R90
     code: "BE_INFRA_OWNER"
     law: "Each raw infrastructure library (HTTP, cache, queue, scheduler, logger, date, config, events) is imported or referenced only by its one owning platform or integration capability, and the `HttpClient` port of `platform/http` is called only by an `integrations` capability."
@@ -1891,13 +1891,13 @@ rules:
     templateNa: "Vendor boundary violations and installed Grammar package contracts are checked against consumer ownership; no managed template scaffolds a vendor install or a forbidden import."
     proves:
       - packages/eslint/fe/r93-vendor-coverage.spec.mjs
-      - packages/hfs/src/r93-grammar-ownership.spec.mjs
+      - packages/eslint/fe/r93-grammar-ownership.spec.mjs
     exemplifiedBy:
       - {path: packages/eslint/fe/r93-vendor-coverage.spec.mjs, editions: [lite, full]}
-      - {path: packages/hfs/src/r93-grammar-ownership.spec.mjs, editions: [lite, full]}
+      - {path: packages/eslint/fe/r93-grammar-ownership.spec.mjs, editions: [lite, full]}
     witness:
       - {path: packages/eslint/fe/r93-vendor-coverage.spec.mjs, editions: [lite, full], codes: [FE_VENDOR_BOUNDARY]}
-      - {path: packages/hfs/src/r93-grammar-ownership.spec.mjs, editions: [lite, full], codes: [ARCH_GRAMMAR_CONTRACT_INVALID, ARCH_GRAMMAR_EXPORT_BYPASS]}
+      - {path: packages/eslint/fe/r93-grammar-ownership.spec.mjs, editions: [lite, full], codes: [ARCH_GRAMMAR_CONTRACT_INVALID, ARCH_GRAMMAR_EXPORT_BYPASS]}
   - id: R94
     code: "FE_SLOT_FILE_ROLE"
     law: "A front-end file is owned by a slot and named by it: a slot that owns a directory (route, feature, components, hooks, api module) holds only the files its `allows` list names, and holds them inside a folder of its own."
@@ -2683,11 +2683,11 @@ rules:
     enforcers:
       - {kind: eslint-be, id: kind-isolation}
       - {kind: machine, id: tiers, at: scripts/hfs/architecture/tiers.mjs}
-    proves: [packages/hfs/src/architecture-kind-isolation-coverage.spec.mjs]
+    proves: [packages/eslint/be/architecture-kind-isolation-coverage.spec.mjs]
     exemplifiedBy:
-      - {path: packages/hfs/src/architecture-kind-isolation-coverage.spec.mjs, editions: [lite, full], codes: [BE_KIND_ISOLATION]}
+      - {path: packages/eslint/be/architecture-kind-isolation-coverage.spec.mjs, editions: [lite, full], codes: [BE_KIND_ISOLATION]}
     witness:
-      - {path: packages/hfs/src/architecture-kind-isolation-coverage.spec.mjs, editions: [lite, full], codes: [BE_KIND_ISOLATION]}
+      - {path: packages/eslint/be/architecture-kind-isolation-coverage.spec.mjs, editions: [lite, full], codes: [BE_KIND_ISOLATION]}
   - id: R157
     code: "BE_JOB_WRITE_OUTSIDE_OWNER"
     editions: [lite, full]

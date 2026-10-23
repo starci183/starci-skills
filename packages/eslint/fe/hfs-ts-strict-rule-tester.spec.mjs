@@ -3,8 +3,8 @@
 import test from 'node:test';
 import { RuleTester } from 'eslint';
 import tsParser from '@typescript-eslint/parser';
-import { rules } from '../../eslint/fe/type-safety.mjs';
-import { at, fixtureHfs } from '../../eslint/fe/fixtures/typed/tester.mjs';
+import { rules } from './type-safety.mjs';
+import { at, fixtureHfs } from './fixtures/typed/tester.mjs';
 
 for (const edition of ['lite', 'full']) {
   test(`${edition}: type escape rules reject unsafe expressions and accept checked types`, () => {

@@ -8,9 +8,9 @@ import { appWiring, appWiringMain, wiringFixturePath } from '../runtime/scripts/
 import { bootProofFindings } from '../runtime/scripts/hfs/rules/boot-proof.mjs';
 import { a15Findings } from '../runtime/scripts/hfs/rules/a15-findings.mjs';
 
-const FIXTURES = fileURLToPath(new URL('../../.tmp-docs/', import.meta.url));
-// The wiring proof resolves @nestjs/common through the repository's node_modules, so the fixtures live under the repository root, not in
-// os.tmpdir(). Each test removes its own directory; the parent is removed too when this file created it, so no empty directory is left
+const FIXTURES = fileURLToPath(new URL('../.tmp-docs/', import.meta.url));
+// The wiring proof resolves @nestjs/common through this package's own node_modules (its devDependencies), so the fixtures live under
+// packages/hfs, not in os.tmpdir(). Each test removes its own directory; the parent is removed too when this file created it, so no empty directory is left
 // behind for the tree check (HFS_EMPTY_DIR).
 const FIXTURES_EXISTED = fs.existsSync(FIXTURES);
 after(() => {

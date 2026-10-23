@@ -9,11 +9,11 @@ import os from 'node:os';
 import path from 'node:path';
 import { RuleTester } from 'eslint';
 import parser from '@typescript-eslint/parser';
-import { noNullSuspenseFallback } from '../../eslint/fe/next-conventions.mjs';
-import { checkRequiredFiles } from '../runtime/scripts/hfs/architecture/required-files.mjs';
-import { openHfs } from '../runtime/scripts/hfs/slots.mjs';
+import { noNullSuspenseFallback } from './next-conventions.mjs';
+import { checkRequiredFiles } from './runtime/scripts/hfs/architecture/required-files.mjs';
+import { openHfs } from './runtime/scripts/hfs/slots.mjs';
 
-const RUNTIME_ROOT = path.resolve(import.meta.dirname, '../runtime');
+const RUNTIME_ROOT = path.resolve(import.meta.dirname, 'runtime');
 const BOUNDARIES = [
   'apps/web/src/app/global-error.tsx',
   'apps/web/src/app/[locale]/error.tsx',

@@ -9,14 +9,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
-import { projectFixture } from '../../eslint/be/fixtures/project/tester.mjs';
-import { rules } from '../../eslint/be/project-graph.mjs';
-import { checkFeatureShape } from '../runtime/scripts/hfs/architecture/feature-shape.mjs';
-import { openHfs } from '../runtime/scripts/hfs/slots.mjs';
+import { projectFixture } from './fixtures/project/tester.mjs';
+import { rules } from './project-graph.mjs';
+import { checkFeatureShape } from './runtime/scripts/hfs/architecture/feature-shape.mjs';
+import { openHfs } from './runtime/scripts/hfs/slots.mjs';
 
 const FEATURE = 'src/features/api/orders';
 const VALUE = 'export const value = 1;\n';
-const runtimeRoot = fileURLToPath(new URL('../runtime/', import.meta.url));
+const runtimeRoot = fileURLToPath(new URL('./runtime/', import.meta.url));
 const shape = f => checkFeatureShape({
   config: { root: f.root }, graph: { resolver: openHfs({ root: runtimeRoot, repoRoot: f.root }) },
 });

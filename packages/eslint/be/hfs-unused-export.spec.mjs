@@ -3,9 +3,9 @@
 // proves: HFS_UNUSED_FILE@lite
 // proves: HFS_UNUSED_FILE@full
 import test from 'node:test';
-import { projectFixture } from '../../eslint/be/fixtures/project/tester.mjs';
-import { rules as beRules } from '../../eslint/be/project-graph.mjs';
-import { rules as feRules } from '../../eslint/fe/project-graph.mjs';
+import { projectFixture } from './fixtures/project/tester.mjs';
+import { rules as beRules } from './project-graph.mjs';
+import { rules as feRules } from '../fe/project-graph.mjs';
 
 const sourceCase = (fixture, files, file) => ({ filename: fixture.at(file), code: files[file] });
 

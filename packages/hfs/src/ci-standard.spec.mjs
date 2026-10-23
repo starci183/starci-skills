@@ -20,12 +20,12 @@ const compliant = (edition) => ({
   jobs: {
     fast: job([checkout, { run: 'echo fast' }]),
     lint: job([checkout, baseRef, { run: 'starci app lint --side ${{ matrix.side }}', env: HEAP }], { strategy: { matrix: { side: ['be', 'fe'] } } }),
-    test: job([checkout, { name: 'unit', run: 'npx jest --shard=${{ matrix.shard }}/2 --coverageThreshold={}', env: { STARCI_COVERAGE_SHARD: '1' } }], { strategy: { matrix: { shard: [1, 2] } } }),
+    test: job([checkout, { name: 'unit', run: 'npx jest --shard=${{ matrix.shard }}/2', env: { STARCI_COVERAGE_SHARD: '1' } }], { strategy: { matrix: { shard: [1, 2] } } }),
     coverage: job([
       checkout,
       { run: 'starci app coverage merge' },
       { run: 'starci app coverage verify', env: HEAP },
-      { uses: `codecov/codecov-action@${SHA}` },
+      { uses: `codecov/codecov-action@${SHA}`, with: { use_oidc: true, fail_ci_if_error: true } },
     ], { permissions: { 'id-token': 'write' } }),
     build: job([checkout, { run: 'docker build .' }]),
     ...(edition === 'lite' ? { 'db-types': job([checkout, { run: 'echo types' }]) } : {}),
@@ -70,7 +70,7 @@ for (const edition of ['lite', 'full']) {
     doc.jobs.fast.steps.push({ uses: `actions/cache@${SHA}`, with: { key: 'k-${{ github.sha }}' } });
     doc.jobs.coverage.steps[3]['continue-on-error'] = true;
     const found = items(judge(doc, edition));
-    for (const item of ['test-sharding', 'lint-parallel', 'sonar-lint-per-side', 'cache-saved-always', 'optional-providers']) assert.ok(found.includes(item), item);
+    for (const item of ['test-sharding', 'lint-parallel', 'sonar-lint-per-side', 'cache-saved-always', 'required-providers']) assert.ok(found.includes(item), item);
   });
 
   test(`${edition}: ${FAILURE} fail - the app check reads only the managed ci.yml of an app root`, (t) => {

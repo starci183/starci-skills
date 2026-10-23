@@ -7,9 +7,9 @@ import os from 'node:os';
 import path from 'node:path';
 import { RuleTester } from 'eslint';
 import parser from '@typescript-eslint/parser';
-import { noHandTypedWire } from '../../eslint/fe/transport.mjs';
-import { at, fixtureHfs, LITE_FE_DECLARATION } from '../../eslint/fe/fixtures/typed/tester.mjs';
-import { appFrontendFindings, wireSchemaDigest, WIRE_SCHEMA_STAMP } from '../runtime/scripts/hfs/rules/frontend-tree.mjs';
+import { noHandTypedWire } from './transport.mjs';
+import { at, fixtureHfs, LITE_FE_DECLARATION } from './fixtures/typed/tester.mjs';
+import { appFrontendFindings, wireSchemaDigest, WIRE_SCHEMA_STAMP } from '../../hfs/runtime/scripts/hfs/rules/frontend-tree.mjs';
 
 const SNAPSHOT = 'be/contracts/api/schema.graphql';
 const OPERATION = 'fe/apps/web/src/modules/api/graphql/queries/query-ping.ts';
