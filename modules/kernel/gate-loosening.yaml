@@ -15,6 +15,52 @@ gateFiles:
   - modules/kernel/command-policy.yaml
   - modules/kernel/verdict-contract.yaml
   - modules/kernel/op-incident-policy.yaml
+  # The host boundary: a verb removed from forbiddenForStarciOrchestration is a ban lifted (owner-rulings orca-terminal-create-official was one).
+  - modules/host/orca/api.yaml
+  # The standards the checks and CI follow: a rule, a job or a pinned condition removed is a check removed.
+  - knowledge/hfs/ci-standard.yaml
+  - knowledge/sonar-gate.yaml
+
+# The code that IS a check (scripts/lib/check-code-loosening.mjs): a folder (ends in a slash) or one file. A bypass done by editing one of these
+# instead of a list above is a loosening just the same: a bypass marker added (scripts/lib/bypass-markers.mjs), enforcement lines (a finding
+# pushed, a failing exit, an assertion) or a ban-list row removed, an exemption widened (an ignore / exclude entry, skipLibCheck), a
+# threshold lowered. Spec files and fixtures are not watched here: they spell markers on purpose.
+checkCode:
+  # the check scripts, rule modules and the gates themselves
+  - scripts/checks/
+  - scripts/gates/
+  - scripts/guards/
+  - scripts/hfs/rules/
+  - scripts/hfs/runtime-rules/
+  - scripts/hfs/check.mjs
+  - scripts/hfs/runtime-check.mjs
+  - scripts/hfs/coverage-scope.mjs
+  - scripts/hfs/runtime-coverage-scope.mjs
+  - scripts/hfs/ci-declaration.mjs
+  - scripts/supervisor/land-gate-loosening.mjs
+  - scripts/supervisor/land-full-check.mjs
+  - scripts/lib/gate-loosening.mjs
+  - scripts/lib/check-code-loosening.mjs
+  - scripts/lib/bypass-markers.mjs
+  - scripts/lib/sonar-way.mjs
+  - scripts/lib/sonar-syntax-rules.mjs
+  # the canon templates an app is rendered from (hooks, workflows, package scripts, tool and quality configs)
+  - packages/hfs/templates/
+  # the packages that carry the canon and the product gate
+  - packages/hfs/sync/
+  - packages/hfs/release/
+  - packages/hfs/ci/
+  - packages/hfs/coverage/
+  - packages/hfs/lint/
+  - packages/eslint/
+  - packages/stylelint/
+  - packages/jest-preset/
+  - packages/tsconfig/
+  - packages/prettier-config/
+  # CI workflows
+  - .github/workflows/
+  - codecov.yml
+  - sonar-project.properties
 
 # Files whose entries are exceptions: a list item added to one is a loosening.
 allowlistFiles:
@@ -23,7 +69,7 @@ allowlistFiles:
 # A number of a gate file is a threshold when a word of its key (split on camelCase and - _ .) is listed: a lower value loosens a floor,
 # a higher value loosens a ceiling.
 thresholds:
-  floors: [min, minimum, floor, required, threshold, score, coverage]
+  floors: [min, minimum, floor, required, threshold, score, coverage, branches, statements, functions, lines]
   ceilings: [max, maximum, limit, cap, tolerance, slack, allowed, budget]
 
 # Product code: a deleted or weakened spec counts only together with a change to one of these.

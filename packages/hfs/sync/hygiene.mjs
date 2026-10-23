@@ -3,7 +3,9 @@
 // .starcistacks must not be a plaintext secret (only *.enc is sealed). It is also the secrets guard of the commit: every staged file, in
 // any tree, is read from the index and judged with the one secret judgement of `starci app check` (scripts/hfs/rules/secrets.mjs: a secret by
 // being, an .enc that is no sops envelope, a line that matches a secret pattern), so no plaintext secret reaches the history whatever
-// .gitignore says (`git add -f`, a path tracked before a rule tightened). There is no override. At an HFS app root (hfs.json) it also
+// .gitignore says (`git add -f`, a path tracked before a rule tightened). There is no override. It also
+// refuses every bypass marker the index holds (R303: an inline disable, a type-check escape, a skipped test, a failure swallowed in a hook or
+// workflow; scripts/lib/bypass-markers.mjs), so a bypass fails at the commit and not only at the release. At an HFS app root (hfs.json) it also
 // refuses a back-end logic file the index adds without its unit spec beside it (BE_UNIT_SPEC_NOT_STAGED,
 // scripts/hfs/rules/staged-specs.mjs over the coverage scope; a constants-only file has nothing to test), naming the file. The pre-commit hook judges the staged files;
 // scripts/gates/hfs-sync.mjs judges every tracked file.
@@ -17,6 +19,8 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { secretFileFindings } from '../runtime/scripts/hfs/rules/secrets.mjs';
 import { stagedSpecFindings } from '../runtime/scripts/hfs/rules/staged-specs.mjs';
+import { HFS_BYPASS_MARKER, bypassMessage } from '../runtime/scripts/hfs/rules/bypass-markers.mjs';
+import { bypassesIn } from '../runtime/scripts/lib/bypass-markers.mjs';
 import { loadSlotManifest } from '../runtime/scripts/hfs/slots.mjs';
 import { runGit } from '../runtime/scripts/api/git/lib.mjs';
 import { loadTypescript } from '../runtime/scripts/lib/package-at.mjs';
@@ -104,12 +108,20 @@ function secretGuardFindings(cwd, files, alreadyRefused = new Set()) {
   });
 }
 
-/** Findings for `files`: the guarded trees, then the secret guard over every file. */
+/** The bypass markers (R303) of `files` read from the index: an inline disable, a type-check escape, a skipped test or a swallowed failure fails at the commit. */
+function bypassGuardFindings(cwd, files) {
+  return files.flatMap(file => {
+    const text = stagedText(cwd, file);
+    return text === null ? [] : bypassesIn(file, text).map(hit => ({ file, code: HFS_BYPASS_MARKER, message: bypassMessage(file, hit) }));
+  });
+}
+
+/** Findings for `files`: the guarded trees, then the secret guard and the bypass guard over every file. */
 export function judge(cwd, files) {
   const guarded = files.filter(GUARDED);
   const findings = hygieneFindings(guarded, ignoredAmong(cwd, guarded.filter(file => file.startsWith(WORK))));
   const refused = new Set(findings.filter(finding => finding.code === 'HFS_PLAINTEXT_SECRET').map(finding => finding.file));
-  return { checked: files.length, findings: [...findings, ...secretGuardFindings(cwd, files, refused)] };
+  return { checked: files.length, findings: [...findings, ...secretGuardFindings(cwd, files, refused), ...bypassGuardFindings(cwd, files)] };
 }
 
 // The scripts/housekeeping/ledger-hygiene.mjs of the checkout under judgment: the root git names for `cwd`, which carries

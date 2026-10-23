@@ -23,3 +23,17 @@ localized text. A Markdown README in such a directory is still English prose.
 test scripts and testing dependencies in both editions. The restriction includes
 files under `scripts/` and every front-end package manifest. Keep production
 source and build or lint scripts; remove test tooling from the front-end side.
+
+<a id="r303"></a>
+
+## R303 no bypass of a check
+
+`HFS_BYPASS_MARKER` rejects, in both editions and in every side, the text that makes a check pass
+without satisfying it: an inline disable of any tool (ESLint, stylelint, TSLint, Prettier, Biome), a
+type-check escape (`@ts-ignore`, `@ts-expect-error`, `@ts-nocheck`), a Sonar exclusion comment, an
+istanbul, c8 or v8 coverage ignore, a skipped, focused or todo test or a skip option, and a failure
+swallowed in a hook, script or workflow (`|| true`, `continue-on-error`, `set +e`, `HUSKY=0`,
+`--no-verify`, `fail_ci_if_error: false`). A front end has no specs, but its source is still judged
+for the inline disables. `starci app check` reads the tracked tree; `starci app hygiene`, which the
+managed pre-commit hook runs, reads the staged files from the index, so a bypass fails at the commit.
+Fix the cause and delete the marker.

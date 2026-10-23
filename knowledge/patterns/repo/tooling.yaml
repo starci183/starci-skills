@@ -163,9 +163,9 @@ rules:
   - id: REPO-TOOLING-4
     title: No inline configuration and no rule off
     kind: mandatory
-    hfsRules: [R17, R18, R104]
+    hfsRules: [R17, R18, R104, R303]
     requirement: |
-      `noInlineConfig` is true in both ESLint factories: no `eslint-disable`, no `@ts-ignore`, no `@ts-expect-error`. The ESLint
+      `noInlineConfig` is true in both ESLint factories: no `eslint-disable`, no `@ts-ignore`, no `@ts-expect-error`; HFS_BYPASS_MARKER refuses these and every other bypass (skipped tests, swallowed failures) in the tracked tree and the staged files. The ESLint
       configuration of each side is the rendered one-liner; no rule is off, warned or redefined, and a rule that a check
       supersedes is removed from the canon plugin in the .claude runtime, never switched off in an app.
     rationale: |
@@ -179,6 +179,7 @@ rules:
         - HFS_RULE_OFF_WITHOUT_REPLACEMENT
         - HFS_INLINE_SUPPRESSION
         - HFS_LINT_SUPPRESSION_FILE
+        - HFS_BYPASS_MARKER
       manual: []
     relatedExamples: []
   - id: REPO-TOOLING-5

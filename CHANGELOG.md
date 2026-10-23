@@ -6,6 +6,13 @@ until every S* row in `docs/goal.md` holds with fresh evidence, then `1.0.0` fre
 
 ## [Unreleased]
 
+### Added
+- No bypass lands unnoticed. The gate-loosening detector (`modules/kernel/gate-loosening.yaml`, `scripts/lib/gate-loosening.mjs`, `scripts/lib/check-code-loosening.mjs`) now also watches the code of the checks: the check scripts and rule modules, the canon templates, the lint, stylelint, jest and tsconfig packages, CI workflows and hook templates (`checkCode`). A bypass marker added there (`scripts/lib/bypass-markers.mjs`: any inline disable, a type-check escape, a Sonar or coverage ignore, a skipped or focused test, `|| true`, `continue-on-error`, `set +e`, `HUSKY=0`, `--no-verify`, `--passWithNoTests`), fewer enforcement lines than before, a ban-list row removed from a check script, an exemption widened and a lowered coverage floor are loosenings and always red, rename-aware. The Orca forbidden list (`modules/host/orca/api.yaml`), `knowledge/hfs/ci-standard.yaml` and `knowledge/sonar-gate.yaml` are gate files.
+- R303 `HFS_BYPASS_MARKER`: `starci app check` refuses the same markers in a product repository (a front end included, which has no specs), and `starci app hygiene` reads them from the index.
+
+### Changed
+- The managed `.husky/pre-commit` runs `starci app sync --check` and ends the hook on every failing step; the stylelint step no longer lets a failure pass.
+
 ## [1.0.0-alpha.26] — 2026-10-22
 
 ### Changed

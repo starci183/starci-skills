@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+- Added: R303 `HFS_BYPASS_MARKER` in `starci app check` and the bypass guard of `starci app hygiene` (staged files read from the index): an inline disable of any tool, a type-check escape, a Sonar or coverage ignore, a skipped or focused test and a failure swallowed in a hook or workflow are refused in a product repository, the front end included.
+- Changed: the managed `.husky/pre-commit` runs `starci app sync --check` and ends the hook when any step fails; the stylelint step can no longer be skipped by a failing run.
+
 ## 4.7.21 - 2026-10-22
 - Changed: the bundled `scripts/lib/gate-loosening.mjs` has no approval route (owner ruling loosening-always-red, 2026-10-22): `approved` and `approvalIdOf` are gone, `looseningStep` is the land gate's always-red step whose only way out is restoring the gate, and the pure released-state judgement `loosensReleased` moved here from the runtime's check library. Spec: `src/gate-loosening.spec.mjs`.
 - Added: the bundled runtime copy of `scripts/lib/gate-loosening.mjs`, which judges whether one change loosens a gate. It is rename-aware: an allowlist or rule entry that only moves with a git rename of the paths it names (the removed line, with every renamed prefix rewritten, equals an added line) is no loosening, while an entry that also widens, or one added beside the move, still is. Spec: `src/gate-loosening.spec.mjs`.

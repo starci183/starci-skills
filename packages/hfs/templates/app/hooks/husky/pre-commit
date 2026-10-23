@@ -1,15 +1,16 @@
 {{header}}
-# Commit gate (L0 only): work hygiene and the secrets guard of the staged files, eslint of the staged files of each side,
-# stylelint over the staged CSS of fe, a prettier check of the staged files. Types and the targeted specs belong to the op gate.
-npx starci app hygiene
+# Commit gate (L0 only): work hygiene, the secrets guard and the bypass guard (no inline disable, type-check escape, skipped test or
+# swallowed failure: HFS_BYPASS_MARKER) of the staged files, managed files equal to their render, eslint of the staged files of each
+# side, stylelint over the staged CSS of fe, a prettier check of the staged files. Every step ends the hook when it fails: none can be
+# skipped. Types and the targeted specs belong to the op gate.
+npx starci app hygiene || exit $?
+npx starci app sync --check || exit $?
 # NUL-delimited paths keep filenames intact; bounded batches fit the Windows command line.
 git diff --cached --name-only --diff-filter=ACMR -z --relative=be -- '*.ts' '*.mts' '*.cts' '*.js' '*.mjs' '*.cjs' |
   xargs -0 -n 50 sh -c 'if [ "$#" -gt 0 ]; then cd be && npx eslint -- "$@"; fi' sh || exit $?
 git diff --cached --name-only --diff-filter=ACMR -z --relative=fe -- '*.ts' '*.tsx' '*.mts' '*.cts' '*.js' '*.jsx' '*.mjs' '*.cjs' |
   xargs -0 -n 50 sh -c 'if [ "$#" -gt 0 ]; then cd fe && npx eslint --max-warnings=0 --no-warn-ignored -- "$@"; fi' sh || exit $?
-styles=$(git diff --cached --name-only --diff-filter=ACMR --relative=fe -- '*.css') || exit $?
-if [ -n "$styles" ]; then
-  (cd fe && npx stylelint $styles)
-fi
+git diff --cached --name-only --diff-filter=ACMR -z --relative=fe -- '*.css' |
+  xargs -0 -n 50 sh -c 'if [ "$#" -gt 0 ]; then cd fe && npx stylelint "$@"; fi' sh || exit $?
 git diff --cached --name-only --diff-filter=ACMR -z |
   xargs -0 -n 50 sh -c 'if [ "$#" -gt 0 ]; then npx prettier --check --ignore-unknown -- "$@"; fi' sh || exit $?

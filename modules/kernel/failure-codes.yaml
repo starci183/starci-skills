@@ -14911,6 +14911,16 @@ HFS_LINT_SUPPRESSION_FILE:
   owner: op-retry
   kind: check-finding
 
+HFS_BYPASS_MARKER:
+  title: "A product repository holds no bypass of a check"
+  title_vi: "Kho có đoạn bỏ qua một bước kiểm tra"
+  meaning_vi: "Kho có đoạn làm cho một bước kiểm tra qua mà không thỏa nó ở `<f>`: chú thích tắt luật (eslint, stylelint, prettier, biome), `ts-ignore`/`ts-expect-error`/`ts-nocheck`, `NOSONAR`, bỏ qua độ phủ istanbul/c8/v8, bài test bị bỏ qua hoặc chỉ chạy riêng, hoặc lỗi bị nuốt trong hook, script hay workflow (`|| true`, `continue-on-error`, `set +e`, `HUSKY=0`, `--no-verify`, `fail_ci_if_error: false`)."
+  causes_vi:
+    - "Vi phạm luật R303: một lần bỏ qua kiểm tra luôn là lỗi (phán quyết của chủ sở hữu loosening-always-red); kiểm tra được thỏa bằng cách sửa nguyên nhân, không phải bỏ qua. Giao diện (FE) không có test nhưng mã nguồn vẫn bị soát các chú thích tắt luật."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: xóa đoạn bỏ qua và sửa nguyên nhân thật (mã, kiểu dữ liệu, test, bước chạy)."
+  owner: op-retry
+  kind: check-finding
+
 HFS_PEER_INTEGRATION_MISSING:
   title: "An app declares the runtime peer its driver integration needs"
   title_vi: "Thiếu gói peer mà tích hợp driver cần khi chạy"

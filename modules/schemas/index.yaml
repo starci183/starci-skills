@@ -977,7 +977,7 @@ moduleLocalDocumentKinds:
     governs: "The Supervisor's menu: the judgment points waiting on it, the typed options that answer each, and how a Decision Item is routed to a kind."
     files: [modules/supervisor/supervisor-menu.yaml]
   - id: starci/module-kernel-gate-loosening@1
-    governs: "What loosens a gate, mechanically: the gate files, the allowlists, the threshold words and the spec markers a change is judged by, and how the owner approves one."
+    governs: "What loosens a gate, mechanically: the gate files, the check code, the allowlists, the threshold words and the spec markers a change is judged by; a loosening is always red."
     files: [modules/kernel/gate-loosening.yaml]
   - id: starci/supervisor-bridging@1
     governs: "Cross-workflow dependency findings and Supervisor bridging actions."
