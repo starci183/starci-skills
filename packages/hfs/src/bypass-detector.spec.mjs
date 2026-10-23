@@ -14,7 +14,7 @@ import { spawnSync } from 'node:child_process';
 import { looseningsOf, loosensReleased, parseDiff } from '../runtime/scripts/lib/gate-loosening.mjs';
 import { bypassesIn } from '../runtime/scripts/lib/bypass-markers.mjs';
 import { bypassMarkerFindings } from '../runtime/scripts/hfs/rules/bypass-markers.mjs';
-import { runWorkHygiene } from '../sync/hygiene.mjs';
+import { judge as hygieneJudge, runWorkHygiene } from '../sync/hygiene.mjs';
 
 const RULES = Object.freeze({
   gateFiles: ['knowledge/hfs/ci-standard.yaml'],
@@ -168,6 +168,30 @@ test('HFS_BYPASS_MARKER: the tree rule and the staged pre-commit guard refuse a 
   assert.equal(lines.filter((line) => line.startsWith('HFS_BYPASS_MARKER ')).length, 3, lines.join('\n'));
   assert.match(lines.find((line) => line.includes('fe/src/bad.ts')), /fe\/src\/bad\.ts:1 spells/);
 });
+
+/** A git repository holding `files` in its index (the staged guard reads the index); removed after the test. */
+const stagedRepo = (t, files) => {
+  const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-bypass-proof-')));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  git(root, 'init', '-q', '-b', 'main');
+  for (const [file, text] of Object.entries(files)) write(root, file, text);
+  git(root, 'add', '-A');
+  return root;
+};
+
+const bypassCode = 'HFS_BYPASS_MARKER';
+for (const edition of ['lite', 'full']) {
+  test(`${bypassCode} ${edition}: the tree rule and the staged guard refuse an inline disable in a front end`, (t) => {
+    const root = stagedRepo(t, { 'fe/src/bad.ts': `export const bad = 1; ${join('// eslint', '-disable-line')}\n` });
+    assert.equal(bypassMarkerFindings({ repoRoot: root, files: ['fe/src/bad.ts'] })[0].code, bypassCode);
+    assert.equal(hygieneJudge(root, ['fe/src/bad.ts']).findings[0].code, bypassCode);
+  });
+  test(`${bypassCode} ${edition}: the tree rule and the staged guard accept a clean front end`, (t) => {
+    const root = stagedRepo(t, { 'fe/src/ok.ts': 'export const ok = 1;\n' });
+    assert.deepEqual(bypassMarkerFindings({ repoRoot: root, files: ['fe/src/ok.ts'] }), []);
+    assert.deepEqual(hygieneJudge(root, ['fe/src/ok.ts']).findings, []);
+  });
+}
 
 test('the pre-commit hook ends on every failing step: the stylelint step cannot be skipped', () => {
   const hook = fs.readFileSync(new URL('../templates/app/hooks/husky/pre-commit', import.meta.url), 'utf8');

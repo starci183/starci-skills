@@ -1,12 +1,12 @@
 // sonar-new-code.mjs - the New Code definition a Sonar project is ensured with, and how each provider stores and reads it back. Pure.
 // Without a New Code definition a SonarQube Cloud project's gate status is NONE and the scanner's quality-gate wait reports the gate
-// "not set" (alpha.27: the shape-slot and full-app example projects carried the gate but no New Code definition). The canonical
+// "not set" (alpha.27: two example projects carried the gate but no New Code definition). The canonical
 // period is knowledge/sonar-gate.yaml `gate.newCodePeriod` of the repository's edition; a stack target may declare its own
 // `resource.newCodePeriod` of the same shape. SonarQube Server and Community Build store it through api/new_code_periods; SonarQube
 // Cloud has no such web service and keeps it as the project setting `sonar.leak.period` (a number of days, or `previous_version`).
 
 /** The period types a declaration may name, and whether each carries a value. */
-export const NEW_CODE_TYPES = Object.freeze({ NUMBER_OF_DAYS: 'days', PREVIOUS_VERSION: 'none' });
+const NEW_CODE_TYPES = Object.freeze({ NUMBER_OF_DAYS: 'days', PREVIOUS_VERSION: 'none' });
 /** The setting SonarQube Cloud keeps a project's New Code definition in. */
 export const CLOUD_NEW_CODE_SETTING = 'sonar.leak.period';
 const MAX_DAYS = 90;
