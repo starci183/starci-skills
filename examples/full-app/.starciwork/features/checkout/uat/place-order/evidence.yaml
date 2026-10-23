@@ -1,0 +1,63 @@
+# Written by starci uat record (scripts/uat/uat-record.mjs): run 20261022T132045Z-a61bbb84 walked uat.checkout.place-order in a real browser outside
+# a Kernel workflow; every cited file is a blob of the artifact store and of this example's fixture store.
+schema: work/evidence@1
+record: uat.checkout.place-order
+recordDigest: aaa333f713efca3d09703335b425be4a5e947c5a71976e8a9b339b2e3ab8aac2
+run:
+  id: 20261022T132045Z-a61bbb84
+  outcome: pass
+  result:
+    name: result.md
+    sha256: 176f7f31dd81c844833f8119a2543eb3ad4c9f2c18cb402a71c2f320ce8f1732
+  screens:
+    - name: screens/step1-sign-in-and-catalogue.png
+      sha256: b55002bfe5376bfb8e3b9591212456fff7ad465433b1a818f51a3e50357ef566
+    - name: screens/step2-add-one-product.png
+      sha256: 26c5cd0c3e80e1544c043c9625a79614c1b06c93f567bdae6c4e5ba1770c2a43
+    - name: screens/step3-confirm-order.png
+      sha256: 965c099dd4b4f62907eba00fc6ad9ed9e2da4deb8f0be7327f0576fe587e419c
+    - name: screens/step4-replay-confirmation.png
+      sha256: 2b7878e925dcc8304bb1d1277d12a25c50891014eb2acdd137b7e0a6540d9100
+    - name: screens/step5-confirm-empty-cart.png
+      sha256: 57b583d446bc5ea4e1bfe2535f2afe7d95b946f9b407400f586b160c9fee4426
+    - name: screens/step6-beyond-stock-refusal.png
+      sha256: 54bb8cd21d9f6b78f661b44264e39d860d610b69430810aea1da0a2b4b356074
+    - name: screens/step7-account-page.png
+      sha256: 98d51510dd70ec06b184fa249da81145c8a4517bf051881517ca8adad84749d3
+  videos:
+    - name: videos/place-order-1.webm
+      sha256: 85451a51041370086d47975047fc5a2fcc9e10532374d935c8eb580341346e9a
+    - name: videos/place-order-2.webm
+      sha256: 8fba04edb55670601ccde590c8b2de992418a4a7dcc66701e507335af69bd4c5
+outcome: pass
+assets:
+  - name: runs/20261022T132045Z-a61bbb84/manifest.yaml
+    sha256: 9829bbf5446196a3705c32bf3e583e3d2988b52f3f456fe6fd0dfc61b4c1c448
+  - name: runs/20261022T132045Z-a61bbb84/result.md
+    sha256: 176f7f31dd81c844833f8119a2543eb3ad4c9f2c18cb402a71c2f320ce8f1732
+  - name: runs/20261022T132045Z-a61bbb84/screens/step1-sign-in-and-catalogue.png
+    sha256: b55002bfe5376bfb8e3b9591212456fff7ad465433b1a818f51a3e50357ef566
+  - name: runs/20261022T132045Z-a61bbb84/screens/step2-add-one-product.png
+    sha256: 26c5cd0c3e80e1544c043c9625a79614c1b06c93f567bdae6c4e5ba1770c2a43
+  - name: runs/20261022T132045Z-a61bbb84/screens/step3-confirm-order.png
+    sha256: 965c099dd4b4f62907eba00fc6ad9ed9e2da4deb8f0be7327f0576fe587e419c
+  - name: runs/20261022T132045Z-a61bbb84/screens/step4-replay-confirmation.png
+    sha256: 2b7878e925dcc8304bb1d1277d12a25c50891014eb2acdd137b7e0a6540d9100
+  - name: runs/20261022T132045Z-a61bbb84/screens/step5-confirm-empty-cart.png
+    sha256: 57b583d446bc5ea4e1bfe2535f2afe7d95b946f9b407400f586b160c9fee4426
+  - name: runs/20261022T132045Z-a61bbb84/screens/step6-beyond-stock-refusal.png
+    sha256: 54bb8cd21d9f6b78f661b44264e39d860d610b69430810aea1da0a2b4b356074
+  - name: runs/20261022T132045Z-a61bbb84/screens/step7-account-page.png
+    sha256: 98d51510dd70ec06b184fa249da81145c8a4517bf051881517ca8adad84749d3
+  - name: runs/20261022T132045Z-a61bbb84/videos/place-order-1.webm
+    sha256: 85451a51041370086d47975047fc5a2fcc9e10532374d935c8eb580341346e9a
+  - name: runs/20261022T132045Z-a61bbb84/videos/place-order-2.webm
+    sha256: 8fba04edb55670601ccde590c8b2de992418a4a7dcc66701e507335af69bd4c5
+provenance:
+  actor: uat-record
+  tool: starci uat record --flow uat.checkout.place-order -- npx playwright test -c
+    browser/playwright.config.ts uat-place-order.ts --reporter=line
+  environment: local
+  capturedAt: 2026-10-22T13:20:45.904Z
+  stack: The walk drove the app served at http://localhost:4069 and the dev stack its .starcistacks
+    declares, in a real browser recorded by the runtime's Playwright recorder.

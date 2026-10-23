@@ -1,0 +1,16 @@
+# uat.identity.sign-in - Register a pair, be refused alike on a wrong one, sign in
+
+Run 20261022T132227Z-c9dc8c26 against http://localhost:4069: **pass**.
+
+| step | check | expected | observed | note |
+| --- | --- | --- | --- | --- |
+| 1. register | loading | yes | yes | the submit showed its pending label while the identity api answered |
+| 1. register | completion | yes | yes | the account page shows "Signed in as uat-person-20261022t132227zc9dc8c26@example.test." |
+| 2. wrong-password | errorFeedback | yes | yes | one uniform refusal shows; it names neither half (0 lines name one) |
+| 3. empty-password | validation | yes | yes | the form holds Sign in disabled while the password is empty; no call reached the identity api |
+| 4. register-conflict | errorFeedback | yes | yes | a conflict refusal shows; the first pair still signs in |
+| 5. sign-in-again | completion | yes | yes | a session issued again and the account page shows the same person |
+
+## Resources
+
+- created person uat-person-20261022t132227zc9dc8c26@example.test: registered through the product's register door for this run

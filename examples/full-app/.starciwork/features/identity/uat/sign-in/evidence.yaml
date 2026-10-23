@@ -1,0 +1,51 @@
+# Written by starci uat record (scripts/uat/uat-record.mjs): run 20261022T132227Z-c9dc8c26 walked uat.identity.sign-in in a real browser outside
+# a Kernel workflow; every cited file is a blob of the artifact store and of this example's fixture store.
+schema: work/evidence@1
+record: uat.identity.sign-in
+recordDigest: 88895311756263f98c45d62015e8fe69509269430d1e546e4523ae5274d0c15d
+run:
+  id: 20261022T132227Z-c9dc8c26
+  outcome: pass
+  result:
+    name: result.md
+    sha256: db5e96d6e9d7574d21674b3eb4c8dafa45cab574f4e015d1db99daff97549eeb
+  screens:
+    - name: screens/step1-register.png
+      sha256: 9672ef260d455f2a225dd0bb4022132ea22c0e337e637010b3cf097925096600
+    - name: screens/step2-wrong-password.png
+      sha256: f93778a7f841c377eca022e9339dc026ff4af417eeee79724917959084f9822a
+    - name: screens/step3-empty-password.png
+      sha256: 03fc1cd2e512d3cb2ae14f40b864254fbbd201134b4ea8767c0ec3b040697412
+    - name: screens/step4-register-conflict.png
+      sha256: f61bc1f569872ef63ead319d3a841dd305456bd50a1edce797a2f9c81833d17e
+    - name: screens/step5-sign-in-again.png
+      sha256: 1d51c8fbd7641b31f3753d393984f24b7ce41644f46b0c6ba032c272ff49583c
+  videos:
+    - name: videos/sign-in.webm
+      sha256: 9b227ab00d8c25ae64e5887fd3c77eebde29d384c406ce3440ec75f9a96261cd
+outcome: pass
+assets:
+  - name: runs/20261022T132227Z-c9dc8c26/manifest.yaml
+    sha256: 12cd3cf05e2942d5537914a4a2765cc335bc8a0e9ef16cc24f0afdce01c7aac0
+  - name: runs/20261022T132227Z-c9dc8c26/result.md
+    sha256: db5e96d6e9d7574d21674b3eb4c8dafa45cab574f4e015d1db99daff97549eeb
+  - name: runs/20261022T132227Z-c9dc8c26/screens/step1-register.png
+    sha256: 9672ef260d455f2a225dd0bb4022132ea22c0e337e637010b3cf097925096600
+  - name: runs/20261022T132227Z-c9dc8c26/screens/step2-wrong-password.png
+    sha256: f93778a7f841c377eca022e9339dc026ff4af417eeee79724917959084f9822a
+  - name: runs/20261022T132227Z-c9dc8c26/screens/step3-empty-password.png
+    sha256: 03fc1cd2e512d3cb2ae14f40b864254fbbd201134b4ea8767c0ec3b040697412
+  - name: runs/20261022T132227Z-c9dc8c26/screens/step4-register-conflict.png
+    sha256: f61bc1f569872ef63ead319d3a841dd305456bd50a1edce797a2f9c81833d17e
+  - name: runs/20261022T132227Z-c9dc8c26/screens/step5-sign-in-again.png
+    sha256: 1d51c8fbd7641b31f3753d393984f24b7ce41644f46b0c6ba032c272ff49583c
+  - name: runs/20261022T132227Z-c9dc8c26/videos/sign-in.webm
+    sha256: 9b227ab00d8c25ae64e5887fd3c77eebde29d384c406ce3440ec75f9a96261cd
+provenance:
+  actor: uat-record
+  tool: starci uat record --flow uat.identity.sign-in -- npx playwright test -c
+    browser/playwright.config.ts uat-sign-in.ts --reporter=line
+  environment: local
+  capturedAt: 2026-10-22T13:22:27.591Z
+  stack: The walk drove the app served at http://localhost:4069 and the dev stack its .starcistacks
+    declares, in a real browser recorded by the runtime's Playwright recorder.

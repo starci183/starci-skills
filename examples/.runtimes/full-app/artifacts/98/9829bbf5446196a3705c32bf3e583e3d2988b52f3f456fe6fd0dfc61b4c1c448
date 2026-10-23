@@ -1,0 +1,165 @@
+{
+  "flow": "uat.checkout.place-order",
+  "run": "20261022T132045Z-a61bbb84",
+  "baseURL": "http://localhost:4069",
+  "outcome": "pass",
+  "steps": [
+    {
+      "order": 1,
+      "label": "sign-in-and-catalogue",
+      "action": "Sign in as the disposable person and open the catalogue.",
+      "startedAt": "2026-10-22T13:20:58.800Z",
+      "endedAt": "2026-10-22T13:20:59.481Z",
+      "screen": "screens/step1-sign-in-and-catalogue.png",
+      "checks": [
+        {
+          "id": "loading",
+          "expected": "yes",
+          "observed": "yes",
+          "note": "the sign-in submit showed its pending label"
+        },
+        {
+          "id": "completion",
+          "expected": "yes",
+          "observed": "yes",
+          "note": "signed in: true; the catalogue lists products: true; with prices: true"
+        }
+      ],
+      "error": null
+    },
+    {
+      "order": 2,
+      "label": "add-one-product",
+      "action": "Add one product to the cart.",
+      "startedAt": "2026-10-22T13:20:59.481Z",
+      "endedAt": "2026-10-22T13:20:59.728Z",
+      "screen": "screens/step2-add-one-product.png",
+      "checks": [
+        {
+          "id": "completion",
+          "expected": "yes",
+          "observed": "yes",
+          "note": "the tile answered \"In your cart: 1\": true; the cart shows the line: true"
+        }
+      ],
+      "error": null
+    },
+    {
+      "order": 3,
+      "label": "confirm-order",
+      "action": "Confirm the order.",
+      "startedAt": "2026-10-22T13:20:59.729Z",
+      "endedAt": "2026-10-22T13:21:00.244Z",
+      "screen": "screens/step3-confirm-order.png",
+      "checks": [
+        {
+          "id": "loading",
+          "expected": "yes",
+          "observed": "yes",
+          "note": "the confirm button showed its pending label"
+        },
+        {
+          "id": "completion",
+          "expected": "yes",
+          "observed": "yes",
+          "note": "confirmation 603690af-dd62-430b-9e9c-a16546503b0f; the cart reads empty: true"
+        }
+      ],
+      "error": null
+    },
+    {
+      "order": 4,
+      "label": "replay-confirmation",
+      "action": "Send the same confirmation again unchanged.",
+      "startedAt": "2026-10-22T13:21:00.244Z",
+      "endedAt": "2026-10-22T13:21:00.361Z",
+      "screen": "screens/step4-replay-confirmation.png",
+      "checks": [
+        {
+          "id": "completion",
+          "expected": "yes",
+          "observed": "yes",
+          "note": "the service returned the first order marked already sent: true; same order id shown: true"
+        },
+        {
+          "id": "errorFeedback",
+          "expected": "no",
+          "observed": "no",
+          "note": "refusal lines after the replay: 0"
+        }
+      ],
+      "error": null
+    },
+    {
+      "order": 5,
+      "label": "confirm-empty-cart",
+      "action": "Try to confirm with the cart now empty.",
+      "startedAt": "2026-10-22T13:21:00.361Z",
+      "endedAt": "2026-10-22T13:21:00.494Z",
+      "screen": "screens/step5-confirm-empty-cart.png",
+      "checks": [
+        {
+          "id": "errorFeedback",
+          "expected": "yes",
+          "observed": "yes",
+          "note": "the empty checkout states the cart-empty refusal and offers no confirm: true"
+        }
+      ],
+      "error": null
+    },
+    {
+      "order": 6,
+      "label": "beyond-stock-refusal",
+      "action": "Add a line for more of a product than the catalogue holds, then confirm.",
+      "startedAt": "2026-10-22T13:21:00.494Z",
+      "endedAt": "2026-10-22T13:21:01.240Z",
+      "screen": "screens/step6-beyond-stock-refusal.png",
+      "checks": [
+        {
+          "id": "errorFeedback",
+          "expected": "yes",
+          "observed": "yes",
+          "note": "the refusal names the product, the stock 2 and the requested 3: true; the cart kept its line: true"
+        }
+      ],
+      "error": null
+    },
+    {
+      "order": 7,
+      "label": "account-page",
+      "action": "Open the account page.",
+      "startedAt": "2026-10-22T13:21:01.241Z",
+      "endedAt": "2026-10-22T13:21:01.410Z",
+      "screen": "screens/step7-account-page.png",
+      "checks": [
+        {
+          "id": "completion",
+          "expected": "yes",
+          "observed": "yes",
+          "note": "the account page names this run's person: true; it confirms the person has orders (only this run's order can cause that): true"
+        }
+      ],
+      "error": null
+    }
+  ],
+  "resources": [
+    {
+      "action": "created",
+      "kind": "person",
+      "id": "uat-buyer-20261022t132045za61bbb84@example.test",
+      "note": "registered through the product's register door for this run"
+    },
+    {
+      "action": "created",
+      "kind": "order",
+      "id": "603690af-dd62-430b-9e9c-a16546503b0f",
+      "note": "written by this run's confirmation; final, the product has no delete"
+    },
+    {
+      "action": "verified-absent",
+      "kind": "session",
+      "id": "run-session",
+      "note": "ended through the product sign-out; the account page reads signed out: true"
+    }
+  ]
+}

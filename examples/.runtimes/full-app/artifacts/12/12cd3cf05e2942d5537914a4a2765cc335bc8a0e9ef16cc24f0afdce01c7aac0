@@ -1,0 +1,107 @@
+{
+  "flow": "uat.identity.sign-in",
+  "run": "20261022T132227Z-c9dc8c26",
+  "baseURL": "http://localhost:4069",
+  "outcome": "pass",
+  "steps": [
+    {
+      "order": 1,
+      "label": "register",
+      "action": "Register a new email and password pair for the disposable person.",
+      "startedAt": "2026-10-22T13:22:37.332Z",
+      "endedAt": "2026-10-22T13:22:44.385Z",
+      "screen": "screens/step1-register.png",
+      "checks": [
+        {
+          "id": "loading",
+          "expected": "yes",
+          "observed": "yes",
+          "note": "the submit showed its pending label while the identity api answered"
+        },
+        {
+          "id": "completion",
+          "expected": "yes",
+          "observed": "yes",
+          "note": "the account page shows \"Signed in as uat-person-20261022t132227zc9dc8c26@example.test.\""
+        }
+      ],
+      "error": null
+    },
+    {
+      "order": 2,
+      "label": "wrong-password",
+      "action": "Submit the registered email with a wrong password.",
+      "startedAt": "2026-10-22T13:22:44.385Z",
+      "endedAt": "2026-10-22T13:22:46.515Z",
+      "screen": "screens/step2-wrong-password.png",
+      "checks": [
+        {
+          "id": "errorFeedback",
+          "expected": "yes",
+          "observed": "yes",
+          "note": "one uniform refusal shows; it names neither half (0 lines name one)"
+        }
+      ],
+      "error": null
+    },
+    {
+      "order": 3,
+      "label": "empty-password",
+      "action": "Submit the sign-in form with the password left empty.",
+      "startedAt": "2026-10-22T13:22:46.515Z",
+      "endedAt": "2026-10-22T13:22:50.816Z",
+      "screen": "screens/step3-empty-password.png",
+      "checks": [
+        {
+          "id": "validation",
+          "expected": "yes",
+          "observed": "yes",
+          "note": "the form holds Sign in disabled while the password is empty; no call reached the identity api"
+        }
+      ],
+      "error": null
+    },
+    {
+      "order": 4,
+      "label": "register-conflict",
+      "action": "Register the same email again with a different password.",
+      "startedAt": "2026-10-22T13:22:50.816Z",
+      "endedAt": "2026-10-22T13:22:58.110Z",
+      "screen": "screens/step4-register-conflict.png",
+      "checks": [
+        {
+          "id": "errorFeedback",
+          "expected": "yes",
+          "observed": "yes",
+          "note": "a conflict refusal shows; the first pair still signs in"
+        }
+      ],
+      "error": null
+    },
+    {
+      "order": 5,
+      "label": "sign-in-again",
+      "action": "Sign in with the registered pair a second time.",
+      "startedAt": "2026-10-22T13:22:58.110Z",
+      "endedAt": "2026-10-22T13:23:00.263Z",
+      "screen": "screens/step5-sign-in-again.png",
+      "checks": [
+        {
+          "id": "completion",
+          "expected": "yes",
+          "observed": "yes",
+          "note": "a session issued again and the account page shows the same person"
+        }
+      ],
+      "error": null
+    }
+  ],
+  "resources": [
+    {
+      "action": "created",
+      "kind": "person",
+      "id": "uat-person-20261022t132227zc9dc8c26@example.test",
+      "note": "registered through the product's register door for this run"
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+# uat.checkout.place-order - Browse, confirm an order, replay it, and hit both refusals
+
+Run 20261022T132045Z-a61bbb84 against http://localhost:4069: **pass**.
+
+| step | check | expected | observed | note |
+| --- | --- | --- | --- | --- |
+| 1. sign-in-and-catalogue | loading | yes | yes | the sign-in submit showed its pending label |
+| 1. sign-in-and-catalogue | completion | yes | yes | signed in: true; the catalogue lists products: true; with prices: true |
+| 2. add-one-product | completion | yes | yes | the tile answered "In your cart: 1": true; the cart shows the line: true |
+| 3. confirm-order | loading | yes | yes | the confirm button showed its pending label |
+| 3. confirm-order | completion | yes | yes | confirmation 603690af-dd62-430b-9e9c-a16546503b0f; the cart reads empty: true |
+| 4. replay-confirmation | completion | yes | yes | the service returned the first order marked already sent: true; same order id shown: true |
+| 4. replay-confirmation | errorFeedback | no | no | refusal lines after the replay: 0 |
+| 5. confirm-empty-cart | errorFeedback | yes | yes | the empty checkout states the cart-empty refusal and offers no confirm: true |
+| 6. beyond-stock-refusal | errorFeedback | yes | yes | the refusal names the product, the stock 2 and the requested 3: true; the cart kept its line: true |
+| 7. account-page | completion | yes | yes | the account page names this run's person: true; it confirms the person has orders (only this run's order can cause that): true |
+
+## Resources
+
+- created person uat-buyer-20261022t132045za61bbb84@example.test: registered through the product's register door for this run
+- created order 603690af-dd62-430b-9e9c-a16546503b0f: written by this run's confirmation; final, the product has no delete
+- verified-absent session run-session: ended through the product sign-out; the account page reads signed out: true
