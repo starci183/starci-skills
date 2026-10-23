@@ -119,6 +119,7 @@
     "@graphql-tools/utils": "12.1.0",
     "dayjs": "1.11.21",
     "globals": "^17.12.0",
+    "multer": "2.5.0",
     "zustand": "5.0.12"
   }
 }

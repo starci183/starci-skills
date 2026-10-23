@@ -346,7 +346,7 @@ test('a scaffolded app imports the be lcov into Sonar and Codecov with exactly t
   const PINS = parseYaml(fs.readFileSync(path.join(RUNTIME, 'knowledge', 'hfs', 'canon-pins.yaml'), 'utf8')).pins;
   for (const dependency of ['@nestjs/graphql', '@nestjs/apollo', '@apollo/server', 'graphql', '@as-integrations/express5']) assert.equal(manifest.dependencies[dependency], PINS[dependency].version, `the api app's GraphQL stack installs ${dependency}`);
   // One version of each skew-prone fe-stack package across the whole install (npm overrides), at its canon pin.
-  assert.deepEqual(manifest.overrides, Object.fromEntries(['@graphql-tools/utils', '@xyflow/react', 'dayjs', 'zod', 'zustand'].map((name) => [name, PINS[name].version])));
+  assert.deepEqual(manifest.overrides, Object.fromEntries(['@graphql-tools/utils', '@xyflow/react', 'dayjs', 'multer', 'zod', 'zustand'].map((name) => [name, PINS[name].version])));
   const product = JSON.parse(fs.readFileSync(path.join(root, 'fe', 'apps', 'app', 'package.json'), 'utf8'));
   const landing = JSON.parse(fs.readFileSync(path.join(root, 'fe', 'apps', 'landing', 'package.json'), 'utf8'));
   for (const concern of stack.concerns.filter((entry) => entry.tier === 'core')) {

@@ -29,14 +29,14 @@ pins:
     source: packages/grammar/package.json
     why: 'the grammar front ends read: the brand layer sets `--font-sans` and `--font-mono` and the grammar reads them; it carries the Input tel kind, the copyable and read-only Input, the IconButton disclosure props and count badge, ChatBubble, FillViewport, Textarea mentions and Enter-to-send, the leading PrimaryRailLayout rail, the plate-less Image, ListRow, the soft Alert, Progress steps, the floating primary IconButton, FlowGraph, the STATE-8 loading views and the bordered selectable TagGroup chips. The runtime source version wins for a @starci package.'
   '@starci/eslint-canon-be':
-    version: 3.4.37
+    version: 3.4.38
     group: starci
     install: registry
     side: be
     source: packages/eslint/be/package.json
     why: 'the back-end ESLint canon: `loadHfs(import.meta.url)` of be/eslint.config.mjs finds the app-root hfs.json (kind app) and gives every linted file the view of the be side, and the project graph is built per side; its bundled runtime copies (slots, canon-pins, failure codes, the architecture machine) put .starcistacks and .sops.yaml at the app root; `starciBeConfig({ hfs: loadHfs(import.meta.url) })` is the typed factory and the BE-CONVENTION laws are its rules.'
   '@starci/eslint-canon-fe':
-    version: 8.4.36
+    version: 8.4.37
     group: starci
     install: registry
     side: fe
@@ -76,14 +76,14 @@ pins:
     source: packages/test-world/package.json
     why: 'the shared e2e library of every back end (R47, R48), a devDependency of every back end: the warm stack behind toxiproxy, the network-edge fakes, the Nest boot, the typed useTestWorld handle, useSandbox for contract specs and the outage lock. Kafka is real own infra (the one digest-pinned apache/kafka KRaft image, a broker listener and proxy per slot, slot-prefixed topics, consumer groups and client ids) and Postgres is schema-per-context (a schema and a login role per context in a shared database). Each worker has its own data slot (<ns>_w<k>) with its own databases, Keycloak realm, leased Redis DB, bucket/collection/topic prefixes, fakes host, toxiproxy proxies and outage lock; a run provisions min(jest workers, workers cap, default 2) slots, and state file protocol 2 pairs exactly with @starci/jest-preset (TEST_WORLD_PAIR_MISMATCH otherwise). A modules world boots real peer apps beside its modules, world.apps.<name>.during(fn) is the outage of a peer app, w.keycloak.clientSecret(client) answers the run-generated secret of a confidential realm client, world.keycloak.events/sessions read the realm user events and live sessions, world.infra.postgresql.connection(name) takes one database connection down while the others serve, and world.resolve and scope.resolve take any Nest token. Every path a declaration names (`stack`, seeds, the realm, Dockerfiles) resolves from the app root (the directory of hfs.json); the globalSetup registers the path aliases as TypeScript resolves them. Its CLI main is exported at ./cli for starci app stack.'
   '@starci/cli':
-    version: 1.7.29
+    version: 1.7.30
     group: starci
     install: registry
     side: both
     source: packages/cli/package.json
     why: 'the only StarCi command package; product repositories install it for starci app, while @starci/hfs remains its pinned transitive implementation.'
   '@starci/hfs':
-    version: 4.7.29
+    version: 4.7.30
     group: starci
     install: registry
     side: both
@@ -471,6 +471,11 @@ pins:
     group: framework
     side: be
     why: 'an npm override of every app root (and of the examples that serve GraphQL), never a declared dependency: @nestjs/graphql 13.x pulls @graphql-tools/utils <=12.0.0, which npm audit --audit-level=high reports (GHSA-7mx3-vvmw-hjmv, prototype pollution in mergeDeep). 12.1.0 is a fixed release on the same major and the lowest one every declared range accepts (@graphql-tools/schema and /merge, used at runtime, require ^12.1.0; NIVO v0.2.1 6a1d8e80 overrides 12.0.4, below that range), so the advisory closes without the breaking @nestjs/graphql 14. DROP this pin and the override when @nestjs/graphql 14 is adopted (owner ruling graphql-tools-utils-override, 2026-10-18).'
+  'multer':
+    version: 2.5.0
+    group: framework
+    side: be
+    why: 'an npm override of every app root and of the examples, never a declared dependency: @nestjs/platform-express 11.2.x (and 12.x) depends on exactly multer 2.4.0, which npm audit --audit-level=high reports (GHSA-q7qp-rjg7-q26m, a denial of service through a pending asynchronous fileFilter after request teardown, published 2026-10-24). 2.5.0 is the fixed release on the same major. DROP this pin and the override when a @nestjs/platform-express release depends on multer 2.5.0 or later.'
   '@nestjs/apollo':
     version: 13.4.5
     group: framework
