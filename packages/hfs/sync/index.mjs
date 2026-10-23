@@ -345,7 +345,8 @@ export function variables(app, scope, presets, sonarKey, manifest = loadSlotMani
     buildFe: 'npm run codegen --silent && turbo run build --filter=./fe/apps/*',
     // The be side with its tsc; every fe workspace with its own typecheck script through turbo (the packages are built first: ^build).
     typecheck: 'npm run codegen --silent && tsc -p be/tsconfig.json && turbo run typecheck',
-    lintPrefix: 'npm run codegen --silent && ',
+    // The typed lint reads the types the fe packages declare (their dist, turbo.json: lint dependsOn ^build), so the packages are built first.
+    lintPrefix: packages ? 'npm run codegen --silent && turbo run build --filter=./fe/packages/* && ' : 'npm run codegen --silent && ',
     nodeMajor: String(NODE_MAJOR),
     sonarKey: sonarKey ?? app.project,
     sonarHostLine: sonarHostLine(quality.sonar),

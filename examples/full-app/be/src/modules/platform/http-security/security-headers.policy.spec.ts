@@ -55,4 +55,34 @@ describe("applySecurityHeaders", () => {
         )
         expect(nextCalls).toBe(1)
     })
+
+    it.each([null, 1, {}, { disable: jest.fn() }])(
+        "refuses an HTTP adapter whose instance %p is no express application",
+        async (instance) => {
+            const subject = await build()
+            const adapter = mock<ReturnType<INestApplication["getHttpAdapter"]>>()
+            adapter.getInstance.mockReturnValue(instance)
+            const app = mock<INestApplication>()
+            app.getHttpAdapter.mockReturnValue(adapter)
+
+            expect(() => subject.applySecurityHeaders(app)).toThrow("HTTP_SECURITY_REQUEST_INVALID")
+            expect(app.use).not.toHaveBeenCalled()
+        },
+    )
+
+    it("accepts an express application that is a function or a plain object", async () => {
+        const subject = await build()
+        const callable = Object.assign(() => undefined, { disable: jest.fn(), set: jest.fn() })
+        const plain = { disable: jest.fn(), set: jest.fn() }
+        for (const server of [callable, plain]) {
+            const adapter = mock<ReturnType<INestApplication["getHttpAdapter"]>>()
+            adapter.getInstance.mockReturnValue(server)
+            const app = mock<INestApplication>()
+            app.getHttpAdapter.mockReturnValue(adapter)
+
+            subject.applySecurityHeaders(app)
+
+            expect(server.disable).toHaveBeenCalledWith("x-powered-by")
+        }
+    })
 })

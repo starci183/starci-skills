@@ -11,7 +11,8 @@ const isExpressApplication = (value: unknown): value is Express =>
 
 const expressOf = (app: INestApplication): Express => {
     const instance: unknown = app.getHttpAdapter().getInstance()
-    if (!isExpressApplication(instance)) throw new HttpSecurityError({ code: HttpSecurityErrorCode.RequestInvalid, params: { fields: "HTTP_ADAPTER" } })
+    if (!isExpressApplication(instance))
+        throw new HttpSecurityError({ code: HttpSecurityErrorCode.RequestInvalid, params: { fields: "HTTP_ADAPTER" } })
     return instance
 }
 

@@ -10,7 +10,8 @@ import { PRIMARY_CONNECTION } from "./primary.connection"
 import { DATABASE_PROBE, PRIMARY_ENTITY_MANAGER } from "./primary.decorators"
 
 /** The `schema` option of a connection, left out when the connection names none. */
-const schemaOption = (schema: string | undefined): Partial<Record<"schema", string>> => (schema === undefined ? {} : { schema })
+const schemaOption = (schema: string | undefined): Partial<Record<"schema", string>> =>
+    schema === undefined ? {} : { schema }
 
 /** The token each declared connection provides its shared EntityManager under. */
 type EntityManagerToken = typeof PRIMARY_ENTITY_MANAGER

@@ -122,3 +122,35 @@ describe("HTTP edge installation", () => {
         },
     )
 })
+
+describe("HTTP edge adapter", () => {
+    it.each([null, 1, {}, { disable: jest.fn() }])(
+        "refuses an HTTP adapter whose instance %p is no express application",
+        async (instance) => {
+            const edge = await buildEdge()
+            const { app } = appWithServer()
+            const adapter = mock<ReturnType<INestApplication["getHttpAdapter"]>>()
+            adapter.getInstance.mockReturnValue(instance)
+            app.getHttpAdapter.mockReturnValue(adapter)
+            expect(() => edge.applyHttpSecurity(app, options, { trustProxy: 1 })).toThrow(
+                "HTTP_SECURITY_REQUEST_INVALID",
+            )
+            expect(app.enableCors).not.toHaveBeenCalled()
+        },
+    )
+
+    it("accepts an express application that is a function or a plain object", async () => {
+        const edge = await buildEdge()
+        const callable = Object.assign(() => undefined, { disable: jest.fn(), set: jest.fn() })
+        const plain = { disable: jest.fn(), set: jest.fn() }
+        for (const server of [callable, plain]) {
+            const { app } = appWithServer()
+            const adapter = mock<ReturnType<INestApplication["getHttpAdapter"]>>()
+            adapter.getInstance.mockReturnValue(server)
+            app.getHttpAdapter.mockReturnValue(adapter)
+            edge.applyHttpSecurity(app, options, { trustProxy: 1 })
+            expect(server.disable).toHaveBeenCalledWith("x-powered-by")
+            expect(server.set).toHaveBeenCalledWith("trust proxy", 1)
+        }
+    })
+})

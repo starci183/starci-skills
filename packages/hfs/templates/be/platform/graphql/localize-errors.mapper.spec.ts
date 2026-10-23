@@ -65,17 +65,20 @@ describe("localizeError", () => {
         expect(errors.text).toHaveBeenCalledWith("ITEM_NOT_FOUND", { id: "i-1", retries: 2 }, "en")
     })
 
-    it.each([undefined, null, ["i-1"], "i-1", 42, false])("interpolates no params when extensions.params is %p", (params) => {
-        const errors = mock<ErrorsService>()
-        errors.text.mockReturnValue("The item was not found")
-        const error: GraphQLFormattedError = {
-            message: "ITEM_NOT_FOUND",
-            extensions: { code: "ITEM_NOT_FOUND", params },
-        }
+    it.each([undefined, null, ["i-1"], "i-1", 42, false])(
+        "interpolates no params when extensions.params is %p",
+        (params) => {
+            const errors = mock<ErrorsService>()
+            errors.text.mockReturnValue("The item was not found")
+            const error: GraphQLFormattedError = {
+                message: "ITEM_NOT_FOUND",
+                extensions: { code: "ITEM_NOT_FOUND", params },
+            }
 
-        expect(localizeError(errors, "en", error).message).toBe("The item was not found")
-        expect(errors.text).toHaveBeenCalledWith("ITEM_NOT_FOUND", {}, "en")
-    })
+            expect(localizeError(errors, "en", error).message).toBe("The item was not found")
+            expect(errors.text).toHaveBeenCalledWith("ITEM_NOT_FOUND", {}, "en")
+        },
+    )
 })
 
 describe("localizeErrorsPlugin", () => {

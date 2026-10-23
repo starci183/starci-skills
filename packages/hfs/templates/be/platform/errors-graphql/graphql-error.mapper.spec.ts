@@ -49,4 +49,19 @@ describe("formatGraphqlError", () => {
         })
         expect(errors.describe).toHaveBeenCalledWith(cause)
     })
+
+    it("leaves out the locations and path a formatted error does not carry", () => {
+        const subject = formatGraphqlError
+        const errors = mock<ErrorsService>()
+        errors.describe.mockReturnValue({ code: "ERRORS_INTERNAL", kind: "internal", status: 500, params: {} })
+
+        expect(subject(errors, { message: "raw" }, new GraphQLError("GRAPHQL_PARSE_FAILED"))).toEqual({
+            message: "raw",
+            extensions: { kind: "invalid" },
+        })
+        expect(subject(errors, { message: "raw" }, new Error("boom"))).toEqual({
+            message: "ERRORS_INTERNAL",
+            extensions: { code: "ERRORS_INTERNAL", kind: "internal", params: {} },
+        })
+    })
 })

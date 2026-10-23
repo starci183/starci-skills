@@ -7,8 +7,4 @@ type StatusChipProps = {
 }
 
 /** Leaf: one pill-shaped status label. */
-export const StatusChip = (props: StatusChipProps) => (
-    <Badge tone={props.tone}>
-        {props.label}
-    </Badge>
-)
+export const StatusChip = (props: StatusChipProps) => <Badge tone={props.tone}>{props.label}</Badge>

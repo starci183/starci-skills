@@ -6,7 +6,8 @@ import { EnvSource } from "@modules/platform/config"
 import { parsePrimaryDatabaseConfig } from "@modules/platform/database"
 
 /** The `schema` option of a connection, left out when the connection names none. */
-const schemaOption = (schema: string | undefined): Partial<Record<"schema", string>> => (schema === undefined ? {} : { schema })
+const schemaOption = (schema: string | undefined): Partial<Record<"schema", string>> =>
+    schema === undefined ? {} : { schema }
 
 /** The database connections shared by every lite integration collaboration. */
 export interface TestDatabases {

@@ -64,7 +64,11 @@ describe("outcome mappers", () => {
         it("turns a refusal into the capability error with its parameters", () => {
             const outcome = subject.refused<CapabilityErrorCode>("CAPABILITY_REFUSED", { resource: "value-1" })
 
-            expect(thrownBy(() => subject.unwrapOutcome(outcome, CapabilityError))).toMatchObject({ name: "CapabilityError", code: "CAPABILITY_REFUSED", params: { resource: "value-1" } })
+            expect(thrownBy(() => subject.unwrapOutcome(outcome, CapabilityError))).toMatchObject({
+                name: "CapabilityError",
+                code: "CAPABILITY_REFUSED",
+                params: { resource: "value-1" },
+            })
         })
     })
 })

@@ -10,7 +10,8 @@ let authentication: SupabaseClient["auth"] | undefined
  * redirect's code is exchanged by `detectSessionInUrl`, no route handler). It never calls `.from()`, `.rpc()` or storage:
  * data goes through modules/api to the back end, which verifies the access token.
  */
-const authOf = (): SupabaseClient["auth"] => (authentication ??= createClient(supabaseUrl(), supabaseAnonKey(), {
+const authOf = (): SupabaseClient["auth"] =>
+    (authentication ??= createClient(supabaseUrl(), supabaseAnonKey(), {
         auth: { flowType: "pkce", detectSessionInUrl: true, persistSession: true, autoRefreshToken: true },
     }).auth)
 

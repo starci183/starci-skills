@@ -10,7 +10,8 @@ import { PRIMARY_ENTITY_MANAGER } from "./primary.decorators"
 import { SeedRunnerService } from "./seed-runner.service"
 
 /** The `schema` option of a connection, left out when the connection names none. */
-const schemaOption = (schema: string | undefined): Partial<Record<"schema", string>> => (schema === undefined ? {} : { schema })
+const schemaOption = (schema: string | undefined): Partial<Record<"schema", string>> =>
+    schema === undefined ? {} : { schema }
 
 /** The token each declared connection provides its shared EntityManager under. */
 type EntityManagerToken = typeof PRIMARY_ENTITY_MANAGER
