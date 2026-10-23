@@ -31,6 +31,14 @@ export function discoverExampleApps(root) {
   }).map((entry) => entry.name).sort(byCodeUnit);
 }
 
+/** The example apps that declare a browser journey (hfs.json `browser: true`, the opt-in slot app.browser-config), sorted by name: the matrix of the examples workflow's browser job. */
+export function discoverBrowserExampleApps(root) {
+  return discoverExampleApps(root).filter((name) => {
+    try { return JSON.parse(fs.readFileSync(path.join(root, EXAMPLES_ROOT, name, 'hfs.json'), 'utf8'))?.browser === true; }
+    catch { return false; }
+  });
+}
+
 /** The generic services-block template a starcistacks follow-up leg is pointed at (S11-02: one template
  *  for every repository). */
 export const STACK_DECLARATION_TEMPLATE = `${EXAMPLES_ROOT}/starcistacks-services/template.services.yaml`;

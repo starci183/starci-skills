@@ -52,6 +52,7 @@ jobs:
     outputs:
       apps: ${{ steps.list.outputs.apps }}
       images: ${{ steps.images.outputs.images }}
+      browsers: ${{ steps.browsers.outputs.browsers }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
@@ -71,6 +72,11 @@ jobs:
         run: |
           images=$(npm run starci --silent -- runtime check --only examples-ci -- --images)
           echo "images=$images" >> "$GITHUB_OUTPUT"
+      # The apps that declare a browser journey (hfs.json browser: true): the matrix of the browser job.
+      - id: browsers
+        run: |
+          browsers=$(npm run starci --silent -- runtime check --only examples-ci -- --browsers)
+          echo "browsers=$browsers" >> "$GITHUB_OUTPUT"
 
   # The example trees as records: the runtime's own YAML loader and Work-layout gate (no build: the runtime reads this tree).
   records:
@@ -244,7 +250,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        app: ${{ fromJSON(needs.apps.outputs.apps) }}
+        app: ${{ fromJSON(needs.apps.outputs.browsers) }}
     defaults:
       run:
         working-directory: examples/${{ matrix.app }}

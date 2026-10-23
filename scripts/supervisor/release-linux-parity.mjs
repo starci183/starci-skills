@@ -9,7 +9,7 @@
 // out) on a READ-ONLY mount, and extracted to a copy inside the container to write in (then a throwaway git repository, since the checks read git). Docker is spoken
 // only through the scripts/api/docker call files, to a container this run names and removes; no port is published and no other container is touched.
 // A red step, or no docker daemon, is a red L4 step: it blocks the cut.
-// Seams (deps): select (a filter over the planned steps), docker ({version, run, rm}), archive (repo, file -> {ok, error}), workflows (repo -> [{file, doc}]), apps (repo -> [names]; runL4 hands over its example apps), logDir, now.
+// Seams (deps): select (a filter over the planned steps), docker ({version, run, rm}), archive (repo, file -> {ok, error}), workflows (repo -> [{file, doc}]), apps (repo -> [names]; runL4 hands over its example apps), browsers (repo -> [names] of the apps with a browser journey, the browser job's matrix), logDir, now.
 import fs from 'node:fs';
 import path from 'node:path';
 import { parseYaml } from '../../engine/yaml.mjs';
@@ -22,6 +22,7 @@ import { safeRemove } from '../api/fs/safe-remove.mjs';
 import { artifactHoldReason } from '../machine/artifact-hold.mjs';
 import { DEFAULT_NODE, parityImage } from '../lib/node-image.mjs';
 import { byCodeUnit } from '../lib/list.mjs';
+import { discoverBrowserExampleApps } from '../lib/example-refs.mjs';
 import { tempRoot } from '../../engine/temp-root.mjs';
 import { makeTempDir } from '../api/fs/make-temp-dir.mjs';
 
@@ -90,10 +91,17 @@ function planStep({ file, id, app, ctx, jobEnv, defaultDir, step, seen, node }) 
   return { node: nextNode, entry: { name, dir, run: run.trim(), env: jobEnv } };
 }
 
-function planJob({ file, id, job, apps, base, seen, state, steps, skipped }) {
+/** The apps a job runs once each: every example app for a matrix on outputs.apps, the browser apps for the browser job's outputs.browsers, [null] without a matrix. Pure. */
+function matrixAppsOf(job, apps, browsers) {
+  const matrix = job.strategy?.matrix?.app;
+  if (matrix === undefined) return [null];
+  return /\boutputs\.browsers\b/.test(String(matrix)) ? browsers : apps;
+}
+
+function planJob({ file, id, job, apps, browsers, base, seen, state, steps, skipped }) {
   const where = `${file}:${id}`;
   if (/workflow_dispatch|refs\/tags/.test(String(job.if ?? ''))) { skipped.push({ name: where, reason: 'manual or tag-only job' }); return; }
-  const matrixApps = job.strategy?.matrix?.app !== undefined ? apps : [null];
+  const matrixApps = matrixAppsOf(job, apps, browsers);
   for (const app of matrixApps) {
     const ctx = { matrix: app ? { app } : {}, env: base.env };
     const jobEnv = literalEnv({ ...base.env, ...job.env }, ctx);
@@ -112,11 +120,11 @@ function planJob({ file, id, job, apps, base, seen, state, steps, skipped }) {
  * A job whose matrix is the derived app list runs once per example app; a job gated on workflow_dispatch or on a release tag (the GitHub Release job) is left out whole; a step identical to an earlier one
  * (same directory, command and the env it reads: the repeated root install) runs once.
  */
-function parityPlan({ workflows, apps }) {
+function parityPlan({ workflows, apps, browsers = [] }) {
   const steps = [], skipped = [], seen = new Set(), state = { node: null };
   for (const { file, doc } of workflows) {
     const base = { env: { ...doc.env } };
-    for (const [id, job] of Object.entries(doc.jobs ?? {})) planJob({ file, id, job, apps, base, seen, state, steps, skipped });
+    for (const [id, job] of Object.entries(doc.jobs ?? {})) planJob({ file, id, job, apps, browsers, base, seen, state, steps, skipped });
   }
   return { image: parityImage(state.node ?? DEFAULT_NODE), steps, skipped };
 }
@@ -163,7 +171,7 @@ export function runParity(repo, deps = {}) {
   const logDir = (deps.logDir ?? (() => { const dir = path.join(tempRoot(), 'starci-release-l4'); fs.mkdirSync(dir, { recursive: true }); return dir; }))();
   const log = path.join(logDir, `${STEP_NAME}-${t0}.log`);
   const docker = deps.docker ?? { version: dockerVersion, run: dockerRun, rm: containerRm };
-  const plan = parityPlan({ workflows: (deps.workflows ?? readWorkflows)(repo), apps: (deps.apps ?? (() => []))(repo) });
+  const plan = parityPlan({ workflows: (deps.workflows ?? readWorkflows)(repo), apps: (deps.apps ?? (() => []))(repo), browsers: (deps.browsers ?? discoverBrowserExampleApps)(repo) });
   if (deps.select) plan.steps = plan.steps.filter((step, index, all) => deps.select(step, index, all));
   const result = (ok, why, extra = {}) => ({ name: STEP_NAME, ok, log, ms: now() - t0, skips: [], image: plan.image, steps: plan.steps.map((s) => s.name), skipped: plan.skipped, ...(why && { why }), ...extra });
   const refuse = (why) => { fs.writeFileSync(log, `${why}\n`); return result(false, why); };

@@ -38,7 +38,7 @@ import { loadSlotManifest } from '../hfs/slots.mjs';
 import { renderRuntimeSonar } from '../hfs/runtime-coverage-scope.mjs';
 import { declaredSonarKeys, repositoryName, DECLARATION } from '../../packages/hfs/sync/sonar-key.mjs';
 import { dockerfilePath } from '../hfs/rules/docker.mjs';
-import { discoverExampleApps } from '../lib/example-refs.mjs';
+import { discoverExampleApps, discoverBrowserExampleApps } from '../lib/example-refs.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { readTextFile } from '../lib/read-text.mjs';
 import { isFile } from '../lib/fs-kind.mjs';
@@ -54,10 +54,21 @@ const checkoutCommand = (command) => command.replace(/^starci\s+/, 'npm run star
 const runsCommand = (step, command) => [command, checkoutCommand(command)].some((candidate) => String(step?.run ?? '').includes(candidate));
 const MATRIX_JOB = 'apps';
 const MATRIX_EXPRESSION = `\${{ fromJSON(needs.${MATRIX_JOB}.outputs.apps) }}`;
+/** The browser job runs the apps that declare a browser journey: its matrix is the --browsers output, which the lister exposes as outputs.browsers. */
+const BROWSERS_COMMAND = 'starci runtime check --only examples-ci -- --browsers';
+const BROWSER_JOB = 'browser';
+const BROWSER_EXPRESSION = `\${{ fromJSON(needs.${MATRIX_JOB}.outputs.browsers) }}`;
+/** The matrix expression a matrix job reads: the browser apps for the browser job, every app for every other job. */
+const matrixExpressionOf = (id) => (id === BROWSER_JOB ? BROWSER_EXPRESSION : MATRIX_EXPRESSION);
 
 /** The example apps: every examples/<name>/hfs.json of kind app, sorted by name. */
 export function exampleApps(root = ROOT) {
   return discoverExampleApps(root);
+}
+
+/** The example apps with a browser journey (hfs.json `browser: true`), sorted by name. */
+export function exampleBrowserApps(root = ROOT) {
+  return discoverBrowserExampleApps(root);
 }
 
 /** Whether an example declares an app whose generated contract includes unit tests and coverage: every edition does (a lite back end keeps full's unit run, owner ruling 2026-10-12). */
@@ -183,8 +194,9 @@ const read = readTextFile;
 /** The workflow findings: the derived matrix contract, the dispatch-only stack layers, and no hard-coded example path. */
 const matrixJobFindings = (matrixJobs, add) => {
   for (const [id, job] of matrixJobs) {
-    if (String(job.strategy.matrix.app ?? '') !== MATRIX_EXPRESSION || Object.keys(job.strategy.matrix).length !== 1)
-      add('EXAMPLES_CI_MATRIX_NOT_DERIVED', `${WORKFLOW}#jobs.${id}`, `the matrix must be exactly app: ${MATRIX_EXPRESSION} (never a hand-written list)`);
+    const expression = matrixExpressionOf(id);
+    if (String(job.strategy.matrix.app ?? '') !== expression || Object.keys(job.strategy.matrix).length !== 1)
+      add('EXAMPLES_CI_MATRIX_NOT_DERIVED', `${WORKFLOW}#jobs.${id}`, `the matrix must be exactly app: ${expression} (never a hand-written list)`);
     if (![job.needs].flat().includes(MATRIX_JOB)) add('EXAMPLES_CI_MATRIX_NOT_DERIVED', `${WORKFLOW}#jobs.${id}`, `needs must include ${MATRIX_JOB}`);
   }
 };
@@ -208,7 +220,7 @@ const SYNC_COMMAND = 'release sync-runtime';
 const SWALLOWING_ECHO = /echo\s+"[^"\n]*\$\(/;
 const listerFindings = (lister, add) => {
   const steps = lister?.steps ?? [];
-  const firstListing = steps.findIndex((step) => runsCommand(step, MATRIX_COMMAND) || runsCommand(step, IMAGES_COMMAND));
+  const firstListing = steps.findIndex((step) => [MATRIX_COMMAND, IMAGES_COMMAND, BROWSERS_COMMAND].some((command) => runsCommand(step, command)));
   const syncAt = steps.findIndex((step) => String(step?.run ?? '').includes(SYNC_COMMAND));
   if (firstListing >= 0 && (syncAt < 0 || syncAt > firstListing))
     add('EXAMPLES_CI_LISTER_UNSAFE', `${WORKFLOW}#jobs.${MATRIX_JOB}`, `job ${MATRIX_JOB} must run \`starci ${SYNC_COMMAND}\` before the listing steps: packages/hfs/runtime is generated and untracked, so a fresh checkout cannot start the CLI without it`);
@@ -222,6 +234,9 @@ const workflowFindings = (doc, text, apps, add) => {
   listerFindings(lister, add);
   if (!lister || !(lister.steps ?? []).some((step) => runsCommand(step, MATRIX_COMMAND)) || !String(lister.outputs?.apps ?? '').includes('steps.'))
     add('EXAMPLES_CI_MATRIX_NOT_DERIVED', WORKFLOW, `job ${MATRIX_JOB} must run \`${MATRIX_COMMAND}\` and expose its output as outputs.apps`);
+  const listsBrowsers = (lister?.steps ?? []).some((step) => runsCommand(step, BROWSERS_COMMAND)) && String(lister?.outputs?.browsers ?? '').includes('steps.');
+  if (jobs[BROWSER_JOB] && !listsBrowsers)
+    add('EXAMPLES_CI_MATRIX_NOT_DERIVED', WORKFLOW, `job ${MATRIX_JOB} must run \`${BROWSERS_COMMAND}\` and expose its output as outputs.browsers, the matrix of job ${BROWSER_JOB}`);
   const matrixJobs = Object.entries(jobs).filter(([id, job]) => id !== IMAGES_JOB && job?.strategy?.matrix);
   if (!matrixJobs.length) add('EXAMPLES_CI_MATRIX_NOT_DERIVED', WORKFLOW, 'no job runs the example apps as a matrix');
   matrixJobFindings(matrixJobs, add);
@@ -287,6 +302,7 @@ function checkExamplesCi(root = ROOT) {
 
 function examplesCiMain(argv = [], { root = ROOT, out = (s) => process.stdout.write(s) } = {}) {
   if (argv.includes('--matrix')) { out(`${JSON.stringify(exampleApps(root))}\n`); return 0; }
+  if (argv.includes('--browsers')) { out(`${JSON.stringify(exampleBrowserApps(root))}\n`); return 0; }
   if (argv.includes('--images')) { out(`${JSON.stringify(exampleImages(root))}\n`); return 0; }
   if (argv.includes('--write')) {
     fs.writeFileSync(path.join(root, CODECOV), renderCodecov(root));
