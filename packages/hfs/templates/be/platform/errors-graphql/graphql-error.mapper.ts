@@ -16,16 +16,16 @@ export const formatGraphqlError = (
     if (error instanceof GraphQLError && error.originalError === undefined) {
         return {
             message: formatted.message,
-            locations: formatted.locations,
-            path: formatted.path,
+            ...(formatted.locations === undefined ? {} : { locations: formatted.locations }),
+            ...(formatted.path === undefined ? {} : { path: formatted.path }),
             extensions: { kind: "invalid" },
         }
     }
     const description = errors.describe(error instanceof GraphQLError ? error.originalError : error)
     return {
         message: description.code,
-        locations: formatted.locations,
-        path: formatted.path,
+        ...(formatted.locations === undefined ? {} : { locations: formatted.locations }),
+        ...(formatted.path === undefined ? {} : { path: formatted.path }),
         extensions: { code: description.code, kind: description.kind, params: description.params },
     }
 }

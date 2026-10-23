@@ -11,12 +11,12 @@ export interface BookingFormBaseProps {
         readonly addCalendarLabel: string
         readonly resourcePending: boolean
         readonly calendarPending: boolean
-        readonly lastResource?: string
-        readonly lastCalendar?: string
+        readonly lastResource: string | undefined
+        readonly lastCalendar: string | undefined
         readonly bookingTitle: string
         readonly submitLabel: string
         readonly bookingPending: boolean
-        readonly bookingStatus?: string
+        readonly bookingStatus: string | undefined
         readonly resourceId: FormInputField
         readonly startsAt: FormInputField
         readonly endsAt: FormInputField

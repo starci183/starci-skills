@@ -28,7 +28,7 @@ const sessionOf = (session: Session | null): AuthSession | undefined =>
         : { userId: session.user.id, ...(session.user.email === undefined ? {} : { email: session.user.email }) }
 
 /** A Supabase Auth error as the provider reports it: its HTTP status, its code and its message. */
-type ProviderError = { readonly status?: number; readonly code?: string; readonly message: string }
+type ProviderError = { readonly status: number | undefined; readonly code: string | undefined; readonly message: string }
 
 /** The failure kind of a Supabase Auth error: refused credentials, rejected input, or the provider unavailable. */
 const kindOf = (status: number | undefined): string => {

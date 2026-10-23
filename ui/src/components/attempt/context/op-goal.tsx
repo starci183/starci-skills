@@ -7,38 +7,39 @@ import { t } from '../../../i18n/t';
 import { FeedbackState } from '../../feedback-state';
 import { formatAbsolute } from '../../../i18n/vi';
 
+/** The business concept id (C8) under which the Op goal panel is filed; it is stamped on data-concept so the rendered DOM traces back to its spec. */
 export const concept: Concept = 'C8';
 
 const h3 = 'm-0 mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground';
 type OwnedPath = { rel: string; abs: string | null };
 
-function ownedPathsOf(attempt: AttemptDetailV3): OwnedPath[] {
+const ownedPathsOf = (attempt: AttemptDetailV3): OwnedPath[] => {
   if (attempt.where?.ownedPaths?.length) return attempt.where.ownedPaths;
   return (attempt.input?.ownedPaths ?? []).map(rel => ({ rel, abs: null as string | null }));
-}
+};
 
-function ProductsList({ produces, info }: Readonly<{ produces: string[]; info: OpInfo | null }>) {
+const ProductsList = ({ produces, info }: Readonly<{ produces: string[]; info: OpInfo | null }>) => {
   if (!produces.length) return <p className="m-0 text-sm text-muted-foreground">{info?.declarations?.writes ? t('The op contract declares no products.') : t('Product declarations not recorded')}</p>;
   return <ul className="m-0 flex list-none flex-col gap-1 p-0">{produces.map(item => <li key={item} className="break-all font-mono text-xs">{item}</li>)}</ul>;
-}
+};
 
-function OwnedList({ owned, scopeKnown }: Readonly<{ owned: OwnedPath[]; scopeKnown: boolean }>) {
+const OwnedList = ({ owned, scopeKnown }: Readonly<{ owned: OwnedPath[]; scopeKnown: boolean }>) => {
   if (!owned.length) return <p className="m-0 text-muted-foreground">{scopeKnown ? t('Captured write scope is empty') : t('Write scope not recorded')}</p>;
   return <div className="flex flex-col items-start gap-2">{owned.map(item => item.abs ? <PathLink key={item.rel} path={item.abs} label={item.rel} /> : <code key={item.rel} className="break-all text-xs">{item.rel}</code>)}</div>;
-}
+};
 
-function EffectsList({ effects, info }: Readonly<{ effects: string[]; info: OpInfo | null }>) {
+const EffectsList = ({ effects, info }: Readonly<{ effects: string[]; info: OpInfo | null }>) => {
   if (!effects.length) return <p className="m-0 text-muted-foreground">{info?.declarations?.sideEffects ? t('no external effects') : t('External effect declarations not recorded')}</p>;
   return <ul className="m-0 list-disc pl-6 text-xs">{effects.map(item => <li key={item} className="break-words">{item}</li>)}</ul>;
-}
+};
 
-function Description({ main, loading }: Readonly<{ main: string | null; loading: boolean }>) {
+const Description = ({ main, loading }: Readonly<{ main: string | null; loading: boolean }>) => {
   if (main) return <p className="m-0 max-w-[80ch] whitespace-pre-line break-words text-sm leading-relaxed">{main}</p>;
   return <p className="m-0 text-sm text-muted-foreground">{loading ? t('Loading the description…') : t('No description for this op yet.')}</p>;
-}
+};
 
 /** Shows the current operation's human purpose and declared outputs beside this dispatch's recorded write scope. */
-export function OpGoalCard({ attempt, info, loading }: Readonly<{ attempt: AttemptDetailV3; info: OpInfo | null; loading: boolean }>) {
+export const OpGoalCard = ({ attempt, info, loading }: Readonly<{ attempt: AttemptDetailV3; info: OpInfo | null; loading: boolean }>) => {
   const goalVi = info?.goal?.vi?.trim() || null;
   const goalEn = info?.goal?.en?.trim() || null;
   const main = goalVi ?? goalEn;
@@ -74,4 +75,4 @@ export function OpGoalCard({ attempt, info, loading }: Readonly<{ attempt: Attem
       </Advanced>
     </div>
   </Card>;
-}
+};

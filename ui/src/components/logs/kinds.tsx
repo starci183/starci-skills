@@ -3,6 +3,7 @@ import type { LogRow } from '../../contract';
 import type { Concept } from '../concept';
 import { t } from '../../i18n/t';
 
+/** The business concept id (C17) under which the log kind icons and level vocabulary is filed; it is stamped on data-concept so the rendered DOM traces back to its spec. */
 export const concept: Concept = 'C17';
 
 /** One icon per log-kind family (prefix before the first dot, or the whole kind). */
@@ -11,12 +12,14 @@ const familyIcons: Record<string, LucideIcon> = {
   check: ListChecks, land: GitMerge, reconciler: Cog, incident: AlertTriangle, warning: AlertTriangle, report: FileText,
   gc: Trash2, invariant: ShieldAlert,
 };
-export function KindIcon({ kind, className }: Readonly<{ kind: string; className?: string }>) {
+/** The small icon of a log kind's family (file, command, step, decision and so on), so rows can be scanned by type. */
+export const KindIcon = ({ kind, className }: Readonly<{ kind: string; className?: string }>) => {
   const family = kind.split('.')[0] ?? kind;
   const Icon = kind === 'step.end' ? Check : (familyIcons[family] ?? Dot);
   return <Icon className={className} aria-hidden="true" />;
-}
+};
 
+/** The upper-case label each log level is shown with. */
 export const levelLabels: Record<LogRow['level'], string> = { debug: 'DEBUG', info: 'INFO', warn: 'WARN', error: 'ERROR' };
 /** debug/info stay neutral (no tone); warn = warning tone, error = failed tone. */
 export const levelTone: Record<LogRow['level'], 'warning' | 'failed' | undefined> = { debug: undefined, info: undefined, warn: 'warning', error: 'failed' };

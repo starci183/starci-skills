@@ -4,7 +4,7 @@ Five TypeScript configs, all strict, all with `noImplicitAny`, and every strictn
 
 | File | For | Adds to `base.json` |
 |---|---|---|
-| `base.json` | anything | `strict`, `noImplicitAny`, `strictNullChecks`, `noImplicitOverride`, `noFallthroughCasesInSwitch`, `noImplicitReturns`, `noUncheckedIndexedAccess`, `noUnusedLocals`, `noUnusedParameters`, `allowUnusedLabels: false`, `isolatedModules`, `esModuleInterop`, `resolveJsonModule`, `skipLibCheck` |
+| `base.json` | anything | `strict`, `noImplicitAny`, `strictNullChecks`, `noImplicitOverride`, `noFallthroughCasesInSwitch`, `noImplicitReturns`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `noUnusedLocals`, `noUnusedParameters`, `allowUnusedLabels: false`, `isolatedModules`, `esModuleInterop`, `resolveJsonModule`, `skipLibCheck` |
 | `be.json` | back end | `allowJs: false`, decorators and decorator metadata, `nodenext` module and resolution (CommonJS output, since a back end has no `"type": "module"`), ES2023, `noEmit` |
 | `build.json` | back-end emit | `be.json` with `noEmit: false` |
 | `next.json` | front-end app | `esnext` + `bundler`, `react-jsx`, DOM libs, `noEmit`, the `next` plugin |

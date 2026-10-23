@@ -13,7 +13,7 @@ type CheckboxProps = Readonly<
 >
 
 /** HeroUI checkbox with boolean compatibility props and an optional integrated label. */
-function Checkbox({
+const Checkbox = ({
   checked,
   defaultChecked,
   onCheckedChange,
@@ -26,15 +26,20 @@ function Checkbox({
   isDisabled,
   isRequired,
   ...props
-}: CheckboxProps) {
+}: CheckboxProps) => {
+  const selected = checked ?? isSelected
+  const initiallySelected = defaultChecked ?? defaultSelected
+  const changed = onCheckedChange ?? onChange
+  const unavailable = disabled ?? isDisabled
+  const needed = required ?? isRequired
   return (
     <HeroCheckbox
       {...props}
-      isSelected={checked ?? isSelected}
-      defaultSelected={defaultChecked ?? defaultSelected}
-      onChange={onCheckedChange ?? onChange}
-      isDisabled={disabled ?? isDisabled}
-      isRequired={required ?? isRequired}
+      {...(selected === undefined ? {} : { isSelected: selected })}
+      {...(initiallySelected === undefined ? {} : { defaultSelected: initiallySelected })}
+      {...(changed === undefined ? {} : { onChange: changed })}
+      {...(unavailable === undefined ? {} : { isDisabled: unavailable })}
+      {...(needed === undefined ? {} : { isRequired: needed })}
     >
       <HeroCheckbox.Content>
         <HeroCheckbox.Control>
@@ -44,6 +49,6 @@ function Checkbox({
       </HeroCheckbox.Content>
     </HeroCheckbox>
   )
-}
+};
 
 export { Checkbox }

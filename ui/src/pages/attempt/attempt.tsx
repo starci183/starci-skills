@@ -24,30 +24,41 @@ import { formatBytes, formatSpan, hashParam, setHashParam } from '../../componen
 import { t } from '../../i18n/t';
 import { formatAbsolute } from '../../i18n/vi';
 
+/** The business concept id (C7) under which the attempt page is filed; it is stamped on data-concept so the rendered DOM traces back to its spec. */
 export const concept: Concept = 'C7';
 const baseOf = (project: string, id: string) => `/api/attempts/${encodeURIComponent(project)}/${encodeURIComponent(id)}`;
 /** Where each step lives on the page; every step scrolls to its own section. Run/checks/land sections live under "Advanced" and open when targeted. */
 const anchors: Record<AttemptStep, string> = { dispatch: 'attempt-op-goal', run: 'attempt-step-run', report: 'attempt-result', checks: 'attempt-step-checks', commit: 'attempt-step-commit', verdict: 'attempt-step-verdict', land: 'attempt-step-land' };
 const advancedIds = new Set(['attempt-input', 'attempt-step-checks', 'attempt-where', 'attempt-evidence', 'attempt-step-run', 'attempt-step-diff', 'attempt-step-land', 'attempt-timeline', 'attempt-decisions']);
 
-function initialStep(attempt: AttemptDetailV3): AttemptStep {
+const scrollTargetOf = (picked: AttemptStep | null, fileId: number | null): string | null => {
+  if (picked) return anchors[picked];
+  return fileId != null ? 'attempt-evidence' : null;
+};
+
+const initialStep = (attempt: AttemptDetailV3): AttemptStep => {
   if (verificationSummary(attempt).failed > 0) return 'checks';
   if (attempt.ui === 'awaiting-owner' || attempt.ui === 'rejected') return 'verdict';
   if (attempt.reportedAt && attempt.verdict == null) return 'verdict';
   if (attempt.verdict === null) return 'run';
   return 'verdict';
-}
+};
+
+const tokensText = (total: AttemptDetailV3['usage']['total'] | undefined): string => {
+  const complete = total?.completeness?.fields.input.complete && total.completeness.fields.output.complete;
+  if (complete && total?.input != null && total.output != null) return t('{n} tokens', { n: compactVi(total.input + total.output) });
+  return total?.input != null || total?.output != null ? t('tokens partially recorded') : t('tokens not recorded');
+};
 
 /** "gpt-6.1-sol · codex-agent · 12 min 52 sec · tokens not recorded" */
-function costSummary(a: AttemptDetailV3): string {
+const costSummary = (a: AttemptDetailV3): string => {
   const end = a.settledAt ?? a.reportedAt;
   const total = a.usage?.total;
-  const complete = total?.completeness?.fields.input.complete && total.completeness.fields.output.complete;
-  return [a.modelAuthority === 'attested' ? a.model : t('model not observed'), a.agent ?? a.where?.agent, a.dispatchedAt && end ? formatSpan(end - a.dispatchedAt) : null, complete && total?.input != null && total.output != null ? t('{n} tokens', { n: compactVi(total.input + total.output) }) : total?.input != null || total?.output != null ? t('tokens partially recorded') : t('tokens not recorded')].filter(Boolean).join(' · ');
-}
+  return [a.modelAuthority === 'attested' ? a.model : t('model not observed'), a.agent ?? a.where?.agent, a.dispatchedAt && end ? formatSpan(end - a.dispatchedAt) : null, tokensText(total)].filter(Boolean).join(' · ');
+};
 
 /** One "Advanced" card. `nonce` > 0 means a deep link / step click asked for it open; a new nonce remounts it open. */
-function AdvancedSection({ id, title, summary, concept: c, nonce, children }: Readonly<{ id: string; title: string; summary: string; concept: Concept; nonce: number; children: React.ReactNode }>) {
+const AdvancedSection = ({ id, title, summary, concept: c, nonce, children }: Readonly<{ id: string; title: string; summary: string; concept: Concept; nonce: number; children: React.ReactNode }>) => {
   return <StaggerItem>
     <ConceptBlock concept={c} as="section" id={id} className="min-w-0 scroll-mt-24">
       <Advanced key={`${id}:${nonce}`} variant="card" title={title} summary={summary} defaultOpen={nonce > 0}>
@@ -55,15 +66,15 @@ function AdvancedSection({ id, title, summary, concept: c, nonce, children }: Re
       </Advanced>
     </ConceptBlock>
   </StaggerItem>;
-}
+};
 
-function AttemptPage() {
+const AttemptPage = () => {
   const route = useRoute();
   if (route.kind !== 'attempt') return null;
   return <AttemptDetailPage key={`${route.project}/${route.attemptId}`} project={route.project} attemptId={route.attemptId} routeStep={route.step} />;
-}
+};
 
-function AttemptDetailPage({ project, attemptId, routeStep }: Readonly<{ project: string; attemptId: string; routeStep: AttemptStep }>) {
+const AttemptDetailPage = ({ project, attemptId, routeStep }: Readonly<{ project: string; attemptId: string; routeStep: AttemptStep }>) => {
   const attempt = useApiQuery<AttemptDetailV3>(baseOf(project, attemptId), { topics: [`attempt:${project}:${attemptId}`], intervalMs: 20_000 });
   const data = attempt.data;
   const [fileId, setFileId] = useState<number | null>(() => { const raw = hashParam('file'); return raw && /^\d+$/.test(raw) ? Number(raw) : null; });
@@ -88,7 +99,7 @@ function AttemptDetailPage({ project, attemptId, routeStep }: Readonly<{ project
   useEffect(() => {
     if (!data || scrolled.current) return;
     scrolled.current = true;
-    const target = picked ? anchors[picked] : fileId != null ? 'attempt-evidence' : null;
+    const target = scrollTargetOf(picked, fileId);
     if (target) window.requestAnimationFrame(() => document.getElementById(target)?.scrollIntoView({ block: 'start' }));
   }, [data, picked, fileId]);
 
@@ -141,6 +152,6 @@ function AttemptDetailPage({ project, attemptId, routeStep }: Readonly<{ project
       </Stagger>
     </Enter>
   </div>;
-}
+};
 
 export default AttemptPage;

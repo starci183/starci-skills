@@ -6,22 +6,32 @@ import { t } from '../../i18n/t';
 import type { BlobLink, LandRun, Ref, UiState } from '../../contract';
 import { BlobLinkButton, RefLink, at, dash, number } from './panel';
 
+/** Names the frame concept this module belongs to, for the target details list. */
 export const concept = 'frame';
 
+/** A supervised service as the system page reads it: state, probe history and the port or URL it serves. */
 export type Service = { name: string; kind: string; state: string; ui: UiState; since: number; restarts24h: number; failedProbes24h: number; lastProbe: { at: number; ok: boolean; latencyMs: number | null; detail: unknown } | null; port: number | null; url: string | null; quarantinedUntil: number | null };
+/** A Kernel or agent seat with its booting, liveness and transcript facts as recorded for the system page. */
 export type Seat = { id: string; role: string; project: string | null; wf: string | null; state: string; parkedReason: string | null; ui: UiState; terminal: Ref | null; agent: string | null; model: string | null; bootedAt: number | null; lastSeenAt: number | null; replacedCount: number; inputFailuresConsecutive: number; deaf: boolean; lastSnapshotAt: number | null; transcript: BlobLink | null };
+/** A recorded terminal shell with when it opened and whether its close was verified. */
 export type Terminal = { handle: string; title: string; role: string; openedAt: number; closedAt: number | null; closeVerifiedAt: number | null; closedBy: string | null; ui: UiState };
+/** The service-side row a details drawer can be opened for: a service, a seat or a terminal. */
 export type ServiceTarget = { kind: 'service'; row: Service } | { kind: 'seat'; row: Seat } | { kind: 'terminal'; row: Terminal };
+/** A queued land ticket with its lane, commit and gate timing. */
 export type LandTicket = { scope: 'runtime'; ticket: string; lane: string; commit: string; state: string; enqueuedAt: number; gateAt: number | null; busyHolder: string | null; startedAt: number | null; ui: UiState };
+/** A repository push receipt: what moved from which SHA to which, and its recorded outcome and output. */
 export type Push = { id: number; repo: string; repoRole: string | null; scope: 'runtime' | 'project' | 'unknown'; project: string | null; branch: string; head: string; from: string; to: string; result: string; reason: string | null; failureSignature: string | null; stdout: BlobLink | null; stderr: BlobLink | null; at: number; ui: UiState };
+/** A runtime lane (worktree and branch) with who owns it and when it landed or was removed. */
 export type Lane = { scope: 'runtime'; name: string; worktree: string | null; branch: string; baseSha: string | null; headSha: string | null; owner: string | null; supJob: Ref | null; supJobId: string | null; state: string; ui: UiState; createdAt: number; landedAt: number | null; removedAt: number | null; report: BlobLink | null };
+/** The land-side row a details drawer can be opened for: a land run or commit, ticket, lane or push. */
 export type LandTarget = { kind: 'land-run' | 'commit'; row: LandRun } | { kind: 'land-ticket'; row: LandTicket } | { kind: 'lane'; row: Lane } | { kind: 'push'; row: Push };
 
-function Facts({ rows }: Readonly<{ rows: [string, string][] }>) {
+const Facts = ({ rows }: Readonly<{ rows: [string, string][] }>) => {
   return <dl className="grid gap-4 text-sm sm:grid-cols-2">{rows.map(([label, value]) => <div key={label} className="min-w-0"><dt className="text-xs text-muted-foreground">{label}</dt><dd className="mt-1 break-words [overflow-wrap:anywhere]">{value}</dd></div>)}</dl>;
-}
+};
 
-export function ServiceFacts({ selected }: Readonly<{ selected: ServiceTarget }>) {
+/** Lays out the recorded facts of a selected service, seat or terminal for the details drawer. */
+export const ServiceFacts = ({ selected }: Readonly<{ selected: ServiceTarget }>) => {
   if (selected.kind === 'service') {
     const row = selected.row;
     return <div className="flex flex-col gap-4"><StateChip state={row.ui} label={row.state} /><Facts rows={[
@@ -44,16 +54,18 @@ export function ServiceFacts({ selected }: Readonly<{ selected: ServiceTarget }>
     ['Handle', row.handle], [t('Role'), row.role], [t('First seen'), at(row.openedAt)], [t('Closed at'), at(row.closedAt)],
     [t('Close verified at'), at(row.closeVerifiedAt)], [t('Closed by'), dash(row.closedBy)],
   ]} /></div>;
-}
+};
 
-export function landTargetTitle(selected: LandTarget) {
+/** The drawer title naming which kind of land record is selected. */
+export const landTargetTitle = (selected: LandTarget) => {
   if (selected.kind === 'land-ticket') return `Ticket ${selected.row.ticket}`;
   if (selected.kind === 'lane') return `Lane ${selected.row.name}`;
   if (selected.kind === 'push') return `Push #${selected.row.id}`;
   return `Land #${selected.row.id}`;
-}
+};
 
-export function LandFacts({ selected }: Readonly<{ selected: LandTarget }>) {
+/** Lays out the recorded facts of a selected land run, ticket, lane or push for the details drawer. */
+export const LandFacts = ({ selected }: Readonly<{ selected: LandTarget }>) => {
   if (selected.kind === 'land-ticket') {
     const row = selected.row;
     return <div className="flex flex-col gap-4"><StateChip state={row.ui} label={row.state} /><Facts rows={[
@@ -82,4 +94,4 @@ export function LandFacts({ selected }: Readonly<{ selected: LandTarget }>) {
     {row.reason && <SourceWarning>{row.reason}</SourceWarning>}<div className="text-sm">Push: <RefLink refValue={row.push} /></div>
     {row.specs != null && <Advanced title={t('Recorded specs')} keepMounted><pre className="blob-text">{JSON.stringify(row.specs, null, 2)}</pre></Advanced>}
     <div><h3 className="mb-2 font-medium">Stderr</h3><BlobText blob={row.stderr} /></div><div><h3 className="mb-2 font-medium">Stdout</h3><BlobText blob={row.stdout} /></div></div>;
-}
+};

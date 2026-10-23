@@ -12,6 +12,7 @@ import { formatAbsolute } from '../../../i18n/vi';
 import { Advanced } from '../../motion';
 import { Button } from '../../ui/button';
 
+/** The business concept id (C8) under which the Op input context panel is filed; it is stamped on data-concept so the rendered DOM traces back to its spec. */
 export const concept: Concept = 'C8';
 
 const none = <span className="text-muted-foreground">{t('Not recorded')}</span>;
@@ -20,7 +21,7 @@ const verdictWords: Record<string, string> = { pass: t('passed'), fail: t('faile
 const empty = (value: unknown) => value == null || (Array.isArray(value) && !value.length) || (typeof value === 'object' && !Array.isArray(value) && !Object.keys(value as object).length);
 const h3 = 'm-0 mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground';
 
-function GoalExcerpt({ text, revision }: Readonly<{ text: string | null; revision: number | null }>) {
+const GoalExcerpt = ({ text, revision }: Readonly<{ text: string | null; revision: number | null }>) => {
   const [open, setOpen] = useState(false);
   if (!text) return <p className="m-0 text-sm text-muted-foreground">{t('Could not read the workflow goal yet.')}</p>;
   const long = text.length > 280 || text.split('\n').length > 3;
@@ -31,34 +32,34 @@ function GoalExcerpt({ text, revision }: Readonly<{ text: string | null; revisio
       {long ? <Button type="button" variant="link" size="sm" aria-expanded={open} onClick={() => setOpen(!open)}>{open ? t('Collapse') : t('View full')}</Button> : null}
     </div>
   </div>;
-}
+};
 
 type Input = NonNullable<AttemptDetailV3['input']>;
 type Prior = NonNullable<AttemptDetailV3['prior']>;
 
-function settleReasonText(prior: Prior | null): string | null {
+const settleReasonText = (prior: Prior | null): string | null => {
   if (prior?.settleReason == null) return null;
   return typeof prior.settleReason === 'string' ? prior.settleReason : jsonText(prior.settleReason);
-}
+};
 
-function WriteScopeValue({ input }: Readonly<{ input: Input }>) {
+const WriteScopeValue = ({ input }: Readonly<{ input: Input }>) => {
   if (!input.writeScopeKnown) return none;
   if (!input.ownedPaths.length) return <>{t('Captured write scope is empty')}</>;
   return <span className="flex flex-col gap-1">{input.ownedPaths.map(rel => <code key={rel} className="break-all text-xs">{rel}</code>)}</span>;
-}
+};
 
-function RecordsValue({ input }: Readonly<{ input: Input }>) {
+const RecordsValue = ({ input }: Readonly<{ input: Input }>) => {
   if (!input.recordsKnown) return none;
   if (!input.records.length) return <>{t('Captured record list is empty')}</>;
   return <pre className={jsonBox}>{jsonText(input.records)}</pre>;
-}
+};
 
-function GoalValue({ goal }: Readonly<{ goal: Input['goal'] }>) {
+const GoalValue = ({ goal }: Readonly<{ goal: Input['goal'] }>) => {
   if (!goal) return none;
   return <>{goal.revision != null ? t('revision {n}', { n: goal.revision }) : t('Not recorded')} · <span className="break-all font-mono text-xs">{goal.identity ?? t('Not recorded')}</span></>;
-}
+};
 
-function InputGrid({ attempt, input }: Readonly<{ attempt: AttemptDetailV3; input: Input }>) {
+const InputGrid = ({ attempt, input }: Readonly<{ attempt: AttemptDetailV3; input: Input }>) => {
   const route = attempt.route;
   return <dl className="grid gap-3 text-sm md:grid-cols-2">
     <KeyVal label={t('Assignment')} value={input.what ?? none} />
@@ -69,30 +70,30 @@ function InputGrid({ attempt, input }: Readonly<{ attempt: AttemptDetailV3; inpu
     <KeyVal label="Goal" value={<GoalValue goal={input.goal} />} />
     <KeyVal label={t('Recorded dispatch routing')} value={route.by || route.chain || route.rejected ? <pre className={jsonBox}>{jsonText(route)}</pre> : none} />
   </dl>;
-}
+};
 
-function ObservedModel({ attempt }: Readonly<{ attempt: AttemptDetailV3 }>) {
+const ObservedModel = ({ attempt }: Readonly<{ attempt: AttemptDetailV3 }>) => {
   if (attempt.modelAuthority !== 'attested' || !attempt.model) return <span className="text-muted-foreground">{t('Not observed')}</span>;
   return <span>{attempt.model}<span className="block text-xs text-muted-foreground">{t('Agent attested')} · {formatAbsolute(attempt.attestedAt)}</span></span>;
-}
+};
 
-function ModelRows({ attempt }: Readonly<{ attempt: AttemptDetailV3 }>) {
+const ModelRows = ({ attempt }: Readonly<{ attempt: AttemptDetailV3 }>) => {
   const requested = [attempt.requestedModel ?? t('Not recorded'), attempt.effort && `effort ${attempt.effort}`, attempt.input?.difficulty && t('difficulty {level}', { level: attempt.input.difficulty })].filter(Boolean).join(' · ');
   return <dl className="mt-3 grid gap-3 text-sm md:grid-cols-2">
     <KeyVal label={t('Requested model · effort · difficulty')} value={requested} />
     <KeyVal label={t('Observed model')} value={<ObservedModel attempt={attempt} />} />
   </dl>;
-}
+};
 
-function GoalSection({ attempt, goal }: Readonly<{ attempt: AttemptDetailV3; goal: { text: string; revision: number } | null }>) {
+const GoalSection = ({ attempt, goal }: Readonly<{ attempt: AttemptDetailV3; goal: { text: string; revision: number } | null }>) => {
   const capturedGoal = attempt.capturedGoal;
   return <section><h3 className={h3}>{t('Captured workflow goal')}</h3><GoalExcerpt text={capturedGoal?.text ?? null} revision={capturedGoal?.revision ?? null} />
     {capturedGoal?.identity ? <p className="mt-2 break-all font-mono text-xs text-muted-foreground">{capturedGoal.identity}</p> : null}
     {goal ? <Advanced className="mt-4" title={t('Current workflow goal reference')} keepMounted><GoalExcerpt text={goal.text} revision={goal.revision} /></Advanced> : null}
   </section>;
-}
+};
 
-function KernelSection({ attempt }: Readonly<{ attempt: AttemptDetailV3 }>) {
+const KernelSection = ({ attempt }: Readonly<{ attempt: AttemptDetailV3 }>) => {
   const input = attempt.input;
   const captured = attempt.dispatchContext;
   return <section><h3 className={h3}>{t('Kernel hands to the op')}</h3>
@@ -102,17 +103,17 @@ function KernelSection({ attempt }: Readonly<{ attempt: AttemptDetailV3 }>) {
     {captured ? <Advanced className="mt-4" title={t('Captured contract provenance')} keepMounted><div className="grid gap-4"><dl className="grid gap-3 text-sm md:grid-cols-2"><KeyVal label={t('Contract revision')} value={captured.contractRev ?? none} /><KeyVal label={t('Runtime revision')} value={captured.runtimeSha ?? none} /></dl><p className="m-0 text-xs text-muted-foreground">{t('The dispatch packet and managed identity are captured records; contract input digests may be rebaselined by the runtime.')}</p><pre className={jsonBox}>{jsonText(captured)}</pre></div></Advanced> : null}
     {attempt.currentInput ? <Advanced className="mt-4" title={t('Current job context reference')} keepMounted><div className="grid gap-4"><p className="m-0 text-xs text-muted-foreground">{t('This mutable job context is not the historical dispatch input.')} · {formatAbsolute(attempt.currentInput.sourceAt)}</p><pre className={jsonBox}>{jsonText(attempt.currentInput)}</pre></div></Advanced> : null}
   </section>;
-}
+};
 
-function ReadsSection({ info }: Readonly<{ info: OpInfo | null }>) {
+const ReadsSection = ({ info }: Readonly<{ info: OpInfo | null }>) => {
   const reads = info?.reads ?? [];
   return <section><h3 className={h3}>{t('Op must read')}</h3>
     <p className="mb-2 mt-0 text-xs text-muted-foreground">{t('Current operation YAML reference')}</p>
     {reads.length ? <ul className="m-0 flex list-none flex-col gap-2 p-0 text-sm">{reads.map(item => <li key={item.id}><code className="break-all text-xs">{item.id}</code>{item.purpose ? <span className="text-muted-foreground"> — {item.purpose}</span> : null}</li>)}</ul> : <p className="m-0 text-sm text-muted-foreground">{info?.declarations?.reads ? t('The op contract declares no required reads.') : t('Required reads were not recorded.')}</p>}
   </section>;
-}
+};
 
-function PriorSection({ prior }: Readonly<{ prior: Prior }>) {
+const PriorSection = ({ prior }: Readonly<{ prior: Prior }>) => {
   const reason = settleReasonText(prior);
   return <section className="border-t pt-6"><h3 className={h3}>{t('Previous attempt for this unit')}</h3>
     <div className="flex flex-wrap items-center gap-2 text-sm">
@@ -124,10 +125,10 @@ function PriorSection({ prior }: Readonly<{ prior: Prior }>) {
     {reason ? <p className="mb-0 mt-2 whitespace-pre-wrap break-words text-xs text-muted-foreground">{t('Settle reason: {reason}', { reason })}</p> : null}
     {prior.nextStep ? <p className="mb-0 mt-2 text-xs text-muted-foreground">{t('Next step: {step}', { step: prior.nextStep })}</p> : null}
   </section>;
-}
+};
 
 /** Block 3 "Inputs & context": workflow goal, what the kernel handed over, what the op must read, and the previous attempt. */
-export function InputContextCard({ attempt, info, goal }: Readonly<{ attempt: AttemptDetailV3; info: OpInfo | null; goal: { text: string; revision: number } | null }>) {
+export const InputContextCard = ({ attempt, info, goal }: Readonly<{ attempt: AttemptDetailV3; info: OpInfo | null; goal: { text: string; revision: number } | null }>) => {
   const prior = attempt.prior ?? null;
   return <Card id="attempt-input" concept="C8" title={t('Inputs & context')} hint={t('what the kernel hands over, what the op must read')}>
     <div className="grid gap-6">
@@ -137,4 +138,4 @@ export function InputContextCard({ attempt, info, goal }: Readonly<{ attempt: At
       {prior ? <PriorSection prior={prior} /> : null}
     </div>
   </Card>;
-}
+};

@@ -37,10 +37,11 @@ export class FetchHttpClient implements HttpClient {
 
     private async send(request: HttpRequest, signal: AbortSignal): Promise<Response> {
         try {
+            const body = this.bodyOf(request)
             return await fetch(request.url, {
                 method: request.method,
                 headers: { ...this.contentTypeOf(request), ...request.headers },
-                body: this.bodyOf(request),
+                ...(body === undefined ? {} : { body }),
                 signal,
             })
         } catch (cause) {

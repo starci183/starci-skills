@@ -1,4 +1,5 @@
 import type { Concept } from '../concept';
+/** Names the C16 analytics concept this module belongs to, for the tries-per-unit retry histogram. */
 export const concept: Concept = 'C16';
 import type { AttemptRow } from '../../contract';
 import { toneVar, type Tone } from '../status';
@@ -9,13 +10,19 @@ import { t } from '../../i18n/t';
 
 const ROW = 30;
 /** The ledger sometimes stores the class as a JSON object; show its `class` field. */
-function failureName(raw: string): string {
+const failureName = (raw: string): string => {
   if (!raw.startsWith('{')) return raw;
   try { const parsed = JSON.parse(raw) as { class?: unknown }; return typeof parsed.class === 'string' ? parsed.class : raw; } catch { return raw; }
-}
+};
+/** The tone of a tries-per-unit bar: first try is calm, a second try warns, more is a failure. */
+const tryTone = (tries: number): Tone => {
+  if (tries === 1) return 'success';
+  return tries === 2 ? 'warning' : 'failed';
+};
+
 type Bar = { key: string; label: string; n: number; tone: Tone; title: string };
 
-function Bars({ bars, width, aria }: Readonly<{ bars: Bar[]; width: number; aria: string }>) {
+const Bars = ({ bars, width, aria }: Readonly<{ bars: Bar[]; width: number; aria: string }>) => {
   const max = Math.max(1, ...bars.map(b => b.n)), labelW = Math.min(150, width * 0.4), valueW = 36, plotW = Math.max(40, width - labelW - valueW - 10);
   const chars = Math.floor(labelW / 6.4);
   return <svg width={width} height={bars.length * ROW} role="img" aria-label={aria} className="block max-w-full">
@@ -25,12 +32,13 @@ function Bars({ bars, width, aria }: Readonly<{ bars: Bar[]; width: number; aria
       <text x={width} y={ROW / 2 + 4} textAnchor="end" className="fill-foreground text-[12px] font-semibold tabular-nums">{num(b.n, 0)}</text>
     </g>)}
   </svg>;
-}
+};
 
-export function Retries({ rows }: Readonly<{ rows: AttemptRow[] }>) {
+/** Shows how many tries each unit needed and which failure classes recur, so retry pressure is visible at a glance. */
+export const Retries = ({ rows }: Readonly<{ rows: AttemptRow[] }>) => {
   const [ref, width] = useWidth();
   const dist = [...triesPerUnit(rows).entries()].sort((a, b) => a[0] - b[0]);
-  const tryBars: Bar[] = dist.map(([tries, n]) => ({ key: `t${tries}`, label: t('Highest observed try: {n}', { n: tries }), n, tone: tries === 1 ? 'success' : tries === 2 ? 'warning' : 'failed',
+  const tryBars: Bar[] = dist.map(([tries, n]) => ({ key: `t${tries}`, label: t('Highest observed try: {n}', { n: tries }), n, tone: tryTone(tries),
     title: t('{n} units have observed try {tries} in this cohort', { n, tries }) }));
   const classes = [...groupBy(rows.filter(r => r.failureClass), r => failureName(r.failureClass as string)).entries()].map(([k, list]) => ({ k, n: list.length })).sort((a, b) => b.n - a.n).slice(0, 6);
   const failBars: Bar[] = classes.map(c => ({ key: c.k, label: c.k, n: c.n, tone: 'failed', title: t('{kind}: {n} attempts', { kind: c.k, n: c.n }) }));
@@ -44,4 +52,4 @@ export function Retries({ rows }: Readonly<{ rows: AttemptRow[] }>) {
       {failBars.length ? <Bars bars={failBars} width={width} aria={t('The common failure classes')} /> : <p className="text-xs text-muted-foreground">{t('No failure class recorded.')}</p>}
     </div>
   </ChartCard>;
-}
+};

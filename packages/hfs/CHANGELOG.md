@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- Changed: the skeletons, the GraphQL client templates and the lite auth partial compile under `exactOptionalPropertyTypes` (`@starci/tsconfig` 2.0.7): an option that may be absent is spread in only when present (credential guard, outcome mapper, GraphQL error mapper, the fetch and Apollo link options, the TypeORM schema), the Apollo client options and link parameters declare `signal` as `AbortSignal | undefined`, and `ApolloOutcome.data` is `TData | null | undefined`. Fixed: the lite `supabase-client.ts.tpl` partial calls `authOf()`, the function the skeleton defines, instead of the removed `supabase()`.
 - Changed: the bundled R280 detector (`HFS_UNUSED_SYMBOL`) resolves more catalog keys so a product needs fewer `i18n-dynamic-keys.yaml` entries: the type checker reads the standard library (a key typed as a union of literals is read through `filter`/`map` callbacks), a `??` or `||` default holds both operands, a nullish branch of a property owner is skipped, and a table of constants is read through the `readonly` fields of the interface or alias that types it. Spec: `src/unused-symbol-flow.spec.mjs`.
 - Changed: the bundled `knowledge/sonar-gate.yaml` holds every issue severity on changed lines and a change of any size to duplication (`ignoreBelowChangedLines: 0`).
 

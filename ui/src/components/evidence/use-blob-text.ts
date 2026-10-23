@@ -1,15 +1,18 @@
 import { useEffect, useState } from 'react';
 import type { EvidenceFile } from '../../contract';
 
+/** The evidence kinds whose bytes are text and can be fetched and rendered inline. */
 export const TEXT_KINDS = new Set(['json', 'yaml', 'markdown', 'text', 'diff']);
+/** Size in bytes above which only the head of a text file is fetched, to keep the viewer responsive. */
 export const TRUNCATE_OVER = 2 * 1024 * 1024;
 
+/** The load state of a blob's text together with why it failed, how it was decoded and whether it was cut short. */
 export type BlobText = { status: 'idle' | 'loading' | 'ready' | 'error'; text: string; error: string | null; httpStatus: number | null; truncated: boolean; sourceEncoding: string | null };
 const idle: BlobText = { status: 'idle', text: '', error: null, httpStatus: null, truncated: false, sourceEncoding: null };
 type Settled = { key: string; state: BlobText };
 
 /** Loads the decoded UTF-8 text of a text-like evidence file; bytes over 2 MB fetch only the first 2000 lines. */
-export function useBlobText(file: EvidenceFile | null): BlobText {
+export const useBlobText = (file: EvidenceFile | null): BlobText => {
   const [settled, setSettled] = useState<Settled | null>(null);
   // The effect reads only these primitives, so a new `file` object for the same blob does not refetch.
   const href = file?.href ?? null;
@@ -40,4 +43,4 @@ export function useBlobText(file: EvidenceFile | null): BlobText {
   if (key === null) return idle;
   if (settled?.key === key) return settled.state;
   return { ...idle, status: 'loading', truncated: bytes > TRUNCATE_OVER };
-}
+};

@@ -1,4 +1,5 @@
 import type { Concept } from '../../concept';
+/** Names the C8 evidence concept this module belongs to, for the JSON tree renderer. */
 export const concept: Concept = 'C8';
 import { useState } from 'react';
 import { LinkIcon } from 'lucide-react';
@@ -19,7 +20,7 @@ type Mode = { m: 'default' | 'all' | 'none'; n: number };
 const PAGE = 200;
 const LONG = 300;
 
-function parseJson(text: string): Parsed {
+const parseJson = (text: string): Parsed => {
   const src = text.replace(/^﻿/, '').trim();
   if (!src) return { ok: false, error: t('Empty file.') };
   let first = '';
@@ -29,12 +30,16 @@ function parseJson(text: string): Parsed {
     try { return { ok: true, docs: lines.map(l => JSON.parse(l) as Json), jsonl: true }; } catch { /* not JSONL either */ }
   }
   return { ok: false, error: first };
-}
+};
 
 const isContainer = (v: Json): v is Container => v !== null && typeof v === 'object';
-const keyPath = (base: string, k: EntryKey) => typeof k === 'number' ? `${base}[${k}]` : /^[A-Za-z_$][\w$]*$/.test(k) ? `${base}.${k}` : `${base}[${JSON.stringify(k)}]`;
+/** The JSONPath of a child: index brackets for arrays, dot access for plain names, quoted brackets for anything else. */
+const keyPath = (base: string, k: EntryKey): string => {
+  if (typeof k === 'number') return `${base}[${k}]`;
+  return /^[A-Za-z_$][w$]*$/.test(k) ? `${base}.${k}` : `${base}[${JSON.stringify(k)}]`;
+};
 
-function Leaf({ v }: Readonly<{ v: Json }>) {
+const Leaf = ({ v }: Readonly<{ v: Json }>) => {
   const [more, setMore] = useState(false);
   if (v === null) return <span className="italic text-muted-foreground">null</span>;
   if (typeof v === 'string') {
@@ -47,38 +52,38 @@ function Leaf({ v }: Readonly<{ v: Json }>) {
     );
   }
   return <span className="text-foreground">{JSON.stringify(v)}</span>;
-}
+};
 
 /** Copy actions occupy their own row space; coarse pointers retain visible 44px targets. */
 const touchBtn = `${toolbarBtn} pointer-coarse:size-11 pointer-coarse:justify-center pointer-coarse:px-0`;
-function Actions({ value, path }: Readonly<{ value: Json; path: string }>) {
+const Actions = ({ value, path }: Readonly<{ value: Json; path: string }>) => {
   return (
     <span className="ml-auto flex shrink-0 gap-1 opacity-0 transition-opacity focus-within:opacity-100 group-hover/row:opacity-100 pointer-coarse:opacity-100">
       <CopyButton className={touchBtn} labelClassName="pointer-coarse:sr-only" value={() => typeof value === 'string' ? value : JSON.stringify(value, null, 2)} label={t('Value')} title={t('Copy the value')} />
       <CopyButton className={touchBtn} labelClassName="pointer-coarse:sr-only" icon={<LinkIcon className="size-3" />} value={path} label={t('Path')} title={t('Copy path {path}', { path })} />
     </span>
   );
-}
+};
 
 type NodeProps = Readonly<{ k: Key; v: Json; path: string; depth: number; mode: Mode }>;
 
-function KeyLabel({ k }: Readonly<{ k: Key }>) {
+const KeyLabel = ({ k }: Readonly<{ k: Key }>) => {
   if (k === null) return null;
   return <span className={typeof k === 'number' ? 'text-muted-foreground' : 'font-medium text-foreground/80'}>{typeof k === 'number' ? k : `"${k}"`}<span className="text-muted-foreground">: </span></span>;
-}
+};
 
-function LeafNode({ k, v, path }: Readonly<{ k: Key; v: Json; path: string }>) {
+const LeafNode = ({ k, v, path }: Readonly<{ k: Key; v: Json; path: string }>) => {
   return (
     <div className="group/row relative flex items-start gap-1 py-px pl-4">
       <span className="min-w-0 flex-1 break-words"><KeyLabel k={k} /><Leaf v={v} /></span>
       <Actions value={v} path={path} />
     </div>
   );
-}
+};
 
 const entriesOf = (v: Container): Entry[] => (Array.isArray(v) ? v.map((x, i): [number, Json] => [i, x]) : Object.entries(v));
 
-function ContainerBody({ entries, limit, onMore, path, depth, mode, isArr }: Readonly<{ entries: Entry[]; limit: number; onMore: () => void; path: string; depth: number; mode: Mode; isArr: boolean }>) {
+const ContainerBody = ({ entries, limit, onMore, path, depth, mode, isArr }: Readonly<{ entries: Entry[]; limit: number; onMore: () => void; path: string; depth: number; mode: Mode; isArr: boolean }>) => {
   return <>
     {entries.length === 0 ? <div className="py-px pl-4 text-muted-foreground">{isArr ? t('empty array') : t('empty object')}</div> : null}
     {entries.slice(0, limit).map(([ck, cv]) => <Node key={ck} k={ck} v={cv} path={keyPath(path, ck)} depth={depth + 1} mode={mode} />)}
@@ -87,9 +92,9 @@ function ContainerBody({ entries, limit, onMore, path, depth, mode, isArr }: Rea
     ) : null}
     <div className="py-px pl-4 text-muted-foreground">{isArr ? ']' : '}'}</div>
   </>;
-}
+};
 
-function ContainerNode({ k, v, path, depth, mode }: Readonly<{ k: Key; v: Container; path: string; depth: number; mode: Mode }>) {
+const ContainerNode = ({ k, v, path, depth, mode }: Readonly<{ k: Key; v: Container; path: string; depth: number; mode: Mode }>) => {
   const [open, setOpen] = useState(() => mode.m === 'all' || (mode.m === 'default' && depth < 2));
   const [limit, setLimit] = useState(PAGE);
   const isArr = Array.isArray(v);
@@ -115,15 +120,27 @@ function ContainerNode({ k, v, path, depth, mode }: Readonly<{ k: Key; v: Contai
       </Accordion.Item>
     </Accordion>
   );
-}
+};
 
-function Node({ k, v, path, depth, mode }: NodeProps) {
+const Node = ({ k, v, path, depth, mode }: NodeProps) => {
   if (!isContainer(v)) return <LeafNode k={k} v={v} path={path} />;
   return <ContainerNode k={k} v={v} path={path} depth={depth} mode={mode} />;
-}
+};
+
+type LineDoc = { line: number; doc: Json };
+type DocTreeProps = Readonly<{ docs: LineDoc[]; single: boolean; mode: Mode }>;
+
+/** The tree body: one document as a plain tree, or one root node per JSONL line. */
+const DocTree = ({ docs, single, mode }: DocTreeProps) => {
+  if (single) {
+    const first = docs[0];
+    return first === undefined ? null : <Node k={null} v={first.doc} path="$" depth={0} mode={mode} />;
+  }
+  return <>{docs.map(entry => <Node key={entry.line} k={t('line {n}', { n: entry.line })} v={entry.doc} path={`$[${entry.line - 1}]`} depth={0} mode={mode} />)}</>;
+};
 
 /** JSON literals are source data, independent of runtime status; invalid input retains the raw text. */
-export function JsonView({ text }: Readonly<{ text: string }>) {
+export const JsonView = ({ text }: Readonly<{ text: string }>) => {
   const [mode, setMode] = useState<Mode>({ m: 'default', n: 0 });
   const [raw, setRaw] = useState(false);
   const parsed = parseJson(text);
@@ -135,8 +152,7 @@ export function JsonView({ text }: Readonly<{ text: string }>) {
       </div>
     );
   }
-  const single = !parsed.jsonl;
-  const firstDoc = parsed.docs[0];
+  const lineDocs = parsed.docs.map((doc, at): LineDoc => ({ line: at + 1, doc }));
   return (
     <Frame className="evidence-code-frame">
       <Toolbar right={<span>{parsed.jsonl ? t('JSONL · {n} lines', { n: parsed.docs.length }) : 'JSON'}</span>}>
@@ -149,11 +165,9 @@ export function JsonView({ text }: Readonly<{ text: string }>) {
       </Toolbar>
       {raw ? <TextView text={text} query="" className="rounded-none border-0" /> : (
         <div key={mode.n} className="max-h-[70vh] overflow-auto bg-background p-3 font-mono text-xs leading-5">
-          {single
-            ? (firstDoc === undefined ? null : <Node k={null} v={firstDoc} path="$" depth={0} mode={mode} />)
-            : parsed.docs.map((d, i) => <Node key={`${i}-${typeof d}`} k={t('line {n}', { n: i + 1 })} v={d} path={`$[${i}]`} depth={0} mode={mode} />)}
+          <DocTree docs={lineDocs} single={!parsed.jsonl} mode={mode} />
         </div>
       )}
     </Frame>
   );
-}
+};

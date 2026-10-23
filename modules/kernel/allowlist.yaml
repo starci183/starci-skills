@@ -248,7 +248,7 @@ not-codes:
 # exact directory whose direct *.json children are all admitted (an append-only record written one file
 # per entry, a package whose every direct JSON is toolchain config, or a test-world fake's recorded
 # payloads in the third party's own JSON wire format — subdirectories are not admitted, and the directory
-# must exist). Generated runtime mirrors (GENERATED_MIRROR_ROOTS in scripts/checks/check-json-exceptions.mjs)
+# must exist). Generated roots (ruleParams.runtime.generated of knowledge/hfs/runtime-slots.yaml)
 # are not authored source and are not listed.
 json-exceptions:
   directories:

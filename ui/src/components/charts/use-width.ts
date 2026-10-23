@@ -1,9 +1,10 @@
 import type { Concept } from '../concept';
+/** Names the C16 analytics concept this module belongs to, for the container-width measuring hook the charts size themselves with. */
 export const concept: Concept = 'C16';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 /** Measured pixel width of a container, so SVG text stays at a readable size at 375 px and 1440 px. */
-export function useWidth(fallback = 640): [(node: HTMLElement | null) => void, number] {
+export const useWidth = (fallback = 640): [(node: HTMLElement | null) => void, number] => {
   const [width, setWidth] = useState(fallback);
   const observer = useRef<ResizeObserver | null>(null);
   const ref = useCallback((node: HTMLElement | null) => {
@@ -18,4 +19,4 @@ export function useWidth(fallback = 640): [(node: HTMLElement | null) => void, n
   }, [fallback]);
   useEffect(() => () => observer.current?.disconnect(), []);
   return [ref, width];
-}
+};

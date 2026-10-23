@@ -16,7 +16,7 @@ import type { ErrorReporter } from "../links/error"
 export interface CreateAuthApolloClientOptions {
     readonly uri: string
     readonly auth: AccessTokenSource
-    readonly signal?: AbortSignal
+    readonly signal: AbortSignal | undefined
     readonly report?: ErrorReporter
 }
 

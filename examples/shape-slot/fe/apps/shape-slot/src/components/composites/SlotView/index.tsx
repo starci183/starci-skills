@@ -28,7 +28,7 @@ export const SlotView = <T,>(props: SlotViewProps<T>) => {
                 message={labels.error}
                 actionLabel={labels.retry}
                 actionVariant="secondary"
-                onAction={props.onRetry}
+                {...(props.onRetry === undefined ? {} : { onAction: props.onRetry })}
             />
         )
     }

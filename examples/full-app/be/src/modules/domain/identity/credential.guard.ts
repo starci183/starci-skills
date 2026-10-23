@@ -28,7 +28,7 @@ export class CredentialGuard implements CanActivate {
         ])
         if (metadata === undefined) return true
         const request: CredentialRequest = requestOf(context)
-        request.credentialPrincipal = undefined
+        delete request.credentialPrincipal
         const id: unknown = request.params?.id
         const principal = await this.authenticator.authenticate(
             metadata,

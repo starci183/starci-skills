@@ -11,6 +11,7 @@ import { Tabs } from '../../ui/tabs';
 import { Advanced } from '../../motion';
 import { FeedbackState } from '../../feedback-state';
 
+/** The business concept id (C8) under which a single product row is filed; it is stamped on data-concept so the rendered DOM traces back to its spec. */
 export const concept: Concept = 'C8';
 
 const statusView: Record<ProductFile['status'], { status: Status; label: string }> = {
@@ -18,23 +19,30 @@ const statusView: Record<ProductFile['status'], { status: Status; label: string 
   unchanged: { status: 'queued', label: t('unchanged') }, missing: { status: 'retry', label: t('unreadable') },
 };
 
-function Content({ file }: Readonly<{ file: ProductFile }>) {
+const ContentBody = ({ kind, text }: Readonly<{ kind: ProductFile['kind']; text: string }>) => {
+  if (kind === 'yaml') return <YamlView text={text} />;
+  if (kind === 'json') return <JsonView text={text} />;
+  if (kind === 'markdown') return <MarkdownView text={text} />;
+  return <TextView text={text} query="" />;
+};
+
+const Content = ({ file }: Readonly<{ file: ProductFile }>) => {
   if (file.content == null) {
     return <FeedbackState error={Boolean(file.error)}>{file.error ?? (file.status === 'deleted' ? t('The file was deleted in this commit, so it has no content.') : t('The server has not sent this file\'s content. See the "Changes" tab for what the op edited.'))}</FeedbackState>;
   }
   return <div className="min-w-0">
     {file.truncated ? <p className="mb-2 text-xs text-muted-foreground">{t('Large file: only the beginning is shown.')}</p> : null}
-    {file.kind === 'yaml' ? <YamlView text={file.content} /> : file.kind === 'json' ? <JsonView text={file.content} /> : file.kind === 'markdown' ? <MarkdownView text={file.content} /> : <TextView text={file.content} query="" />}
+    <ContentBody kind={file.kind} text={file.content} />
   </div>;
-}
+};
 
-function Diff({ file }: Readonly<{ file: ProductFile }>) {
+const Diff = ({ file }: Readonly<{ file: ProductFile }>) => {
   if (!file.diff) return <FeedbackState>{file.status === 'unchanged' ? t('This file is unchanged from its parent commit.') : t('No comparison available for this file.')}</FeedbackState>;
   return <div className="min-w-0">{file.diffTruncated ? <p className="mb-2 text-xs text-muted-foreground">{t('Long diff: only the beginning is shown.')}</p> : null}<DiffTextView text={file.diff} /></div>;
-}
+};
 
 /** One file the op wrote to the repo: status, path, size; opens into content and diff tabs. */
-export function ProductRow({ file, defaultOpen = false, extra }: Readonly<{ file: ProductFile; defaultOpen?: boolean; extra?: ReactNode }>) {
+export const ProductRow = ({ file, defaultOpen = false, extra }: Readonly<{ file: ProductFile; defaultOpen?: boolean; extra?: ReactNode }>) => {
   const [tab, setTab] = useState<'content' | 'diff'>(file.content == null && file.diff ? 'diff' : 'content');
   const view = statusView[file.status];
   return <li className="min-w-0 py-2 first:pt-0 last:pb-0">
@@ -55,4 +63,4 @@ export function ProductRow({ file, defaultOpen = false, extra }: Readonly<{ file
     </div>
     </Advanced>
   </li>;
-}
+};

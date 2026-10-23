@@ -23,7 +23,7 @@ rules:
     hfsRules: [R22]
     requirement: |
       Props and data shapes use `export type`. Hook params may use `export interface`. `fe/tsconfig.json` extends
-      `@starci/tsconfig/next.json` (`strict`, `noUncheckedIndexedAccess`, `noImplicitOverride`, `noFallthroughCasesInSwitch`,
+      `@starci/tsconfig/next.json` (`strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `noImplicitOverride`, `noFallthroughCasesInSwitch`,
       `allowJs: false`) and lowers no flag. Grammar uses type throughout.
     rationale: |
       One default keeps declarations uniform, and one flag set makes every app read the same.

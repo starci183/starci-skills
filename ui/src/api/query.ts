@@ -3,6 +3,10 @@ import type { Envelope, ReadErrorEnvelope, ReadErrorMeta, ReadSource } from '../
 import { t } from '../i18n/t';
 import { byCodeUnit } from '../lib/utils';
 
+/**
+ * The state of one cached API read as a component sees it: the data and its provenance, whether a
+ * read is in flight, and the failure with its code if the last read failed.
+ */
 export type QuerySnapshot<T> = {
   data: T | null;
   meta: Envelope<T>['meta'] | null;
@@ -35,7 +39,7 @@ let retryTimer: ReturnType<typeof setTimeout> | null = null;
 let liveTopics = '';
 let queryHealth = { latestAt: null as number | null, latestSuccessfulReadAt: null as number | null, staleCount: 0, errorCount: 0, sources: [] as string[], stale: [] as string[] };
 
-function getRecord(url: string): QueryRecord {
+const getRecord = (url: string): QueryRecord => {
   const existing = records.get(url);
   if (existing) return existing;
   const record: QueryRecord = {
@@ -44,9 +48,9 @@ function getRecord(url: string): QueryRecord {
   };
   records.set(url, record);
   return record;
-}
+};
 
-function updateHealth(): void {
+const updateHealth = (): void => {
   const activeByUrl = new Map([...records.values()].filter((item) => item.listeners.size > 0).map((item) => [item.url, item.state]));
   pageReads.forEach((read, url) => { if (!activeByUrl.has(url)) activeByUrl.set(url, read.state); });
   const active = [...activeByUrl.values()];
@@ -62,19 +66,19 @@ function updateHealth(): void {
     stale,
   };
   healthListeners.forEach((listener) => listener());
-}
+};
 
-function publish(record: QueryRecord, patch: Partial<QuerySnapshot<unknown>>): void {
+const publish = (record: QueryRecord, patch: Partial<QuerySnapshot<unknown>>): void => {
   record.state = { ...record.state, ...patch };
   record.listeners.forEach((_subscription, listener) => listener());
   updateHealth();
-}
+};
 
-function isObject(value: unknown): value is Record<string, unknown> {
+const isObject = (value: unknown): value is Record<string, unknown> => {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
-}
+};
 
-function isReadSource(source: unknown): source is ReadSource {
+const isReadSource = (source: unknown): source is ReadSource => {
   return isObject(source) && typeof source.db === 'string' && typeof source.rel === 'string'
     && (source.at === undefined || source.at === null || typeof source.at === 'number' && Number.isFinite(source.at))
     && (source.readAt === undefined || source.readAt === null || typeof source.readAt === 'number' && Number.isFinite(source.readAt))
@@ -83,61 +87,75 @@ function isReadSource(source: unknown): source is ReadSource {
     && (source.error === undefined || source.error === null || typeof source.error === 'string')
     && (source.ledgerId === undefined || typeof source.ledgerId === 'string')
     && (source.name === undefined || typeof source.name === 'string');
-}
+};
 
-function isReadMeta(meta: unknown): meta is ReadErrorMeta {
+const isReadMeta = (meta: unknown): meta is ReadErrorMeta => {
   return isObject(meta) && typeof meta.at === 'number' && Number.isFinite(meta.at)
     && Array.isArray(meta.sources) && meta.sources.every(isReadSource)
     && (meta.stale === undefined || Array.isArray(meta.stale) && meta.stale.every((source: unknown) => typeof source === 'string'));
-}
+};
 
-export function isEnvelope(value: unknown): value is Envelope<unknown> {
+/**
+ * Checks that a parsed response body has the shape of a successful read envelope, so unexpected
+ * server output is rejected instead of rendered.
+ */
+export const isEnvelope = (value: unknown): value is Envelope<unknown> => {
   if (!isObject(value) || !Object.hasOwn(value, 'data') || !isObject(value.meta)) return false;
   const meta = value.meta;
   return typeof meta.etag === 'string' && (meta.next === undefined || meta.next === null || typeof meta.next === 'string') && isReadMeta(meta);
-}
+};
 
-export function isReadErrorEnvelope(value: unknown): value is ReadErrorEnvelope {
+/**
+ * Checks that a parsed response body has the shape of the server's failed-read envelope, so its code
+ * and provenance can be trusted.
+ */
+export const isReadErrorEnvelope = (value: unknown): value is ReadErrorEnvelope => {
   return isObject(value) && isObject(value.error) && typeof value.error.code === 'string' && typeof value.error.message === 'string'
     && (value.meta === undefined || isReadMeta(value.meta));
-}
+};
 
-export function readErrorEnvelope(value: unknown): ReadErrorEnvelope {
+/**
+ * Returns a failed-read body as a typed envelope, or throws the translated invalid-response error
+ * when it does not have that shape.
+ */
+export const readErrorEnvelope = (value: unknown): ReadErrorEnvelope => {
   if (!isReadErrorEnvelope(value)) throw new Error(t('The API returned an invalid response.'));
   return value;
-}
+};
 
-export function readEnvelope(value: unknown): Envelope<unknown>;
-export function readEnvelope<T>(value: unknown, validate: (data: unknown) => data is T): Envelope<T>;
-export function readEnvelope(value: unknown, validate?: (data: unknown) => boolean): Envelope<unknown> {
-  if (!isEnvelope(value) || validate && !validate(value.data)) throw new Error(t('The API returned an invalid response.'));
-  return value;
-}
+/**
+ * Validates a successful response body and its payload with the caller's check, throwing the
+ * translated invalid-response error when either is wrong.
+ */
+export const readEnvelope = <T>(value: unknown, validate: (data: unknown) => data is T): Envelope<T> => {
+  if (!isEnvelope(value) || !validate(value.data)) throw new Error(t('The API returned an invalid response.'));
+  return { ...value, data: value.data };
+};
 
-function setLiveStatus(status: typeof liveStatus): void {
+const setLiveStatus = (status: typeof liveStatus): void => {
   if (liveStatus === status) return;
   liveStatus = status;
   liveListeners.forEach((listener) => listener());
-}
+};
 
-function clearSchedule(record: QueryRecord): void {
+const clearSchedule = (record: QueryRecord): void => {
   if (record.timer) clearTimeout(record.timer);
   record.timer = null;
-}
+};
 
-function schedule(record: QueryRecord): void {
+const schedule = (record: QueryRecord): void => {
   clearSchedule(record);
   if (document.hidden || record.listeners.size === 0) return;
   const interval = Math.min(...[...record.listeners.values()].map((item) => item.intervalMs));
   if (Number.isFinite(interval) && interval > 0) {
     record.timer = setTimeout(() => { void request(record); }, interval);
   }
-}
+};
 
 type ReadOutcome = { code: string; meta: ReadErrorMeta | null };
 
 /** Reads the failure message, code and provenance from a non-OK response; a status code alone is enough when the body is not JSON. */
-async function readHttpFailure(response: Response): Promise<{ message: string; code: string; meta: ReadErrorMeta | null }> {
+const readHttpFailure = async (response: Response): Promise<{ message: string; code: string; meta: ReadErrorMeta | null }> => {
   const failure = { message: `HTTP ${response.status}`, code: `HTTP_${response.status}`, meta: null as ReadErrorMeta | null };
   try {
     const body: unknown = await response.json();
@@ -149,30 +167,29 @@ async function readHttpFailure(response: Response): Promise<{ message: string; c
   }
   catch { /* A status code is enough when the response is not JSON. */ }
   return failure;
-}
+};
 
-function applyNotModified(record: QueryRecord, outcome: ReadOutcome): void {
+/** Records the failure code and meta of a non-OK response on `outcome` and throws its message with the HTTP status kept as the cause. */
+const throwHttpFailure = async (response: Response, outcome: ReadOutcome): Promise<never> => {
+  const failure = await readHttpFailure(response);
+  outcome.code = failure.code;
+  outcome.meta = failure.meta;
+  throw new Error(failure.message, { cause: response.status });
+};
+
+const applyNotModified = (record: QueryRecord, outcome: ReadOutcome): void => {
   if (record.state.meta === null) {
     outcome.code = 'INVALID_RESPONSE';
     throw new Error(t('The API returned an invalid response.'));
   }
   record.readVersion += 1;
   publish(record, { loading: false, observedAt: Date.now(), error: null, errorCode: null, errorMeta: null });
-}
+};
 
-async function readRecord(record: QueryRecord, controller: AbortController, outcome: ReadOutcome): Promise<void> {
-  const response = await fetch(record.url, {
-    method: 'GET',
-    headers: record.etag ? { 'If-None-Match': record.etag } : undefined,
-    signal: controller.signal,
-  });
-  if (controller.signal.aborted) return;
-  if (response.status === 304) { applyNotModified(record, outcome); return; }
+/** Reads a response that is not a 304: a non-OK answer is thrown with its status kept as the cause, an OK one is validated and published. */
+const readFresh = async (record: QueryRecord, controller: AbortController, response: Response, outcome: ReadOutcome): Promise<void> => {
   if (!response.ok) {
-    const failure = await readHttpFailure(response);
-    outcome.code = failure.code;
-    outcome.meta = failure.meta;
-    throw new Error(failure.message);
+    return throwHttpFailure(response, outcome);
   }
   outcome.code = 'INVALID_RESPONSE';
   const envelope: unknown = await response.json();
@@ -181,9 +198,20 @@ async function readRecord(record: QueryRecord, controller: AbortController, outc
   record.etag = response.headers.get('ETag') ?? envelope.meta.etag ?? null;
   record.readVersion += 1;
   publish(record, { data: envelope.data, meta: envelope.meta, loading: false, observedAt: Date.now(), error: null, errorCode: null, errorMeta: null });
-}
+};
 
-async function request(record: QueryRecord, refreshAfterCurrent = false): Promise<void> {
+const readRecord = async (record: QueryRecord, controller: AbortController, outcome: ReadOutcome): Promise<void> => {
+  const response = await fetch(record.url, {
+    method: 'GET',
+    headers: record.etag ? { 'If-None-Match': record.etag } : {},
+    signal: controller.signal,
+  });
+  if (controller.signal.aborted) return;
+  if (response.status === 304) applyNotModified(record, outcome);
+  else await readFresh(record, controller, response, outcome);
+};
+
+const request = async (record: QueryRecord, refreshAfterCurrent = false): Promise<void> => {
   if (document.hidden || record.listeners.size === 0) return;
   if (record.controller) {
     if (refreshAfterCurrent || record.controller.signal.aborted) record.pendingRefresh = true;
@@ -205,23 +233,23 @@ async function request(record: QueryRecord, refreshAfterCurrent = false): Promis
     if (record.pendingRefresh && !document.hidden && record.listeners.size > 0) void request(record);
     else schedule(record);
   }
-}
+};
 
-function activeTopics(): string[] {
+const activeTopics = (): string[] => {
   const topics = new Set<string>();
   records.forEach((record) => record.listeners.forEach((subscription) => subscription.topics.forEach((topic) => topics.add(topic))));
   return [...topics].sort(byCodeUnit);
-}
+};
 
-function closeLive(): void {
+const closeLive = (): void => {
   live?.close();
   live = null;
   liveTopics = '';
   if (retryTimer) clearTimeout(retryTimer);
   retryTimer = null;
-}
+};
 
-function connectLive(): void {
+const connectLive = (): void => {
   if (document.hidden) return;
   const topics = activeTopics();
   const joined = topics.join(',');
@@ -254,12 +282,12 @@ function connectLive(): void {
     setLiveStatus('polling');
     retryTimer = setTimeout(connectLive, 30_000);
   };
-}
+};
 
-function syncLive(): void {
+const syncLive = (): void => {
   if (document.hidden) { closeLive(); setLiveStatus('hidden'); return; }
   connectLive();
-}
+};
 
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) {
@@ -272,7 +300,11 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 
-export function useApiQuery<T>(url: string, options: { topics?: string[]; intervalMs?: number; enabled?: boolean; validate?: (data: unknown) => data is T } = {}): QuerySnapshot<T> {
+/**
+ * Subscribes a component to a GET endpoint through the shared cache: one request per URL, ETag
+ * revalidation, invalidation from the live stream and polling that pauses while the tab is hidden.
+ */
+export const useApiQuery = <T>(url: string, options: { topics?: string[]; intervalMs?: number; enabled?: boolean; validate?: (data: unknown) => data is T } = {}): QuerySnapshot<T> => {
   const { intervalMs = 30_000, enabled = true } = options;
   const topicKey = (options.topics ?? []).join('\u0000');
   const validate = useRef(options.validate);
@@ -294,14 +326,19 @@ export function useApiQuery<T>(url: string, options: { topics?: string[]; interv
   }, [url, topicKey, intervalMs, enabled]);
   const getSnapshot = useCallback(() => getRecord(url).state as QuerySnapshot<T>, [url]);
   return useSyncExternalStore(subscribe, getSnapshot);
-}
+};
 
-export function refreshQuery(url: string): void {
+/** Asks the shared cache to re-read a URL now, for callers that know its data has just changed. */
+export const refreshQuery = (url: string): void => {
   const record = getRecord(url);
   if (record.listeners.size) void request(record, true);
-}
+};
 
 type PagedOptions<T> = { topics?: string[]; intervalMs?: number; enabled?: boolean; getKey?: (row: T) => string; validateRow?: (row: unknown) => row is T };
+/**
+ * A query snapshot for a cursor-paged list, extended with the next cursor, the load-more and refresh
+ * actions and the state of the additional pages.
+ */
 export type PagedQuerySnapshot<T> = QuerySnapshot<T[]> & {
   next: string | null; loadMore: () => void; loadingMore: boolean; loadMoreError: string | null;
   loadMoreErrorCode: string | null; loadMoreErrorMeta: ReadErrorMeta | null;
@@ -312,12 +349,12 @@ export type PagedQuerySnapshot<T> = QuerySnapshot<T[]> & {
 type PagedState<T> = { url: string; pages: Envelope<T[]>[]; next?: string | null; loading: boolean; error: string | null;
   errorCode?: string | null; errorMeta?: ReadErrorMeta | null; observedAt: number | null; firstReadVersion?: number };
 
-function rowsValidator<T>(validateRow: ((row: unknown) => row is T) | undefined): (data: unknown) => data is T[] {
+const rowsValidator = <T>(validateRow: ((row: unknown) => row is T) | undefined): (data: unknown) => data is T[] => {
   return (data): data is T[] => Array.isArray(data) && (!validateRow || data.every(validateRow));
-}
+};
 
 /** Drops this owner's claim on each held additional page and forgets pages nobody else holds. */
-function releaseHeldPages(token: symbol, held: Set<string>): void {
+const releaseHeldPages = (token: symbol, held: Set<string>): void => {
   for (const pageUrl of held) {
     const read = pageReads.get(pageUrl);
     read?.owners.delete(token);
@@ -325,34 +362,31 @@ function releaseHeldPages(token: symbol, held: Set<string>): void {
   }
   held.clear();
   updateHealth();
-}
+};
 
 /** Fetches one additional page; resolves null once the request is no longer current. */
-async function fetchPageEnvelope<T>(pageUrl: string, signal: AbortSignal, stillCurrent: () => boolean,
-  validateRow: ((row: unknown) => row is T) | undefined, outcome: ReadOutcome): Promise<Envelope<T[]> | null> {
+const fetchPageEnvelope = async <T>(pageUrl: string, signal: AbortSignal, stillCurrent: () => boolean,
+  validateRow: ((row: unknown) => row is T) | undefined, outcome: ReadOutcome): Promise<Envelope<T[]> | null> => {
   const response = await fetch(pageUrl, { method: 'GET', signal });
   if (!stillCurrent()) return null;
   if (!response.ok) {
-    const failure = await readHttpFailure(response);
-    outcome.code = failure.code;
-    outcome.meta = failure.meta;
-    throw new Error(failure.message);
+    return throwHttpFailure(response, outcome);
   }
   outcome.code = 'INVALID_RESPONSE';
   const payload: unknown = await response.json();
   const envelope = readEnvelope<T[]>(payload, rowsValidator(validateRow));
   return stillCurrent() ? envelope : null;
-}
+};
 
-function uniqueRows<T>(rows: T[] | null, keyOf: ((row: T) => string) | undefined): T[] | null {
+const uniqueRows = <T>(rows: T[] | null, keyOf: ((row: T) => string) | undefined): T[] | null => {
   if (!rows || !keyOf) return rows;
   const unique = new Map<string, T>();
   for (const row of rows) { const key = keyOf(row); if (!unique.has(key)) unique.set(key, row); }
   return [...unique.values()];
-}
+};
 
 /** Additional pages retain their own read provenance; changing the base URL invalidates their epoch. */
-export function usePagedApiQuery<T>(url: string, options: PagedOptions<T> = {}): PagedQuerySnapshot<T> {
+export const usePagedApiQuery = <T>(url: string, options: PagedOptions<T> = {}): PagedQuerySnapshot<T> => {
   const base = useApiQuery<T[]>(url, { ...options, validate: rowsValidator(options.validateRow) });
   const [more, setMore] = useState<PagedState<T>>({ url, pages: [], loading: false, error: null, observedAt: null });
   const identity = useRef(url);
@@ -361,7 +395,7 @@ export function usePagedApiQuery<T>(url: string, options: PagedOptions<T> = {}):
   const heldPages = useRef(new Set<string>());
   const owner = useRef(Symbol('page-reader'));
   const enabled = options.enabled !== false;
-  const current: PagedState<T> = more.url === url ? more : { url, pages: [], loading: false, error: null, observedAt: null, next: undefined };
+  const current: PagedState<T> = more.url === url ? more : { url, pages: [], loading: false, error: null, observedAt: null };
   const releasePages = () => releaseHeldPages(owner.current, heldPages.current);
   useEffect(() => {
     identity.current = url;
@@ -386,7 +420,8 @@ export function usePagedApiQuery<T>(url: string, options: PagedOptions<T> = {}):
     };
   }, [url, enabled]);
   const awaitingFirstRead = current.firstReadVersion !== undefined && getRecord(url).readVersion <= current.firstReadVersion;
-  const next = awaitingFirstRead ? null : current.next === undefined ? base.meta?.next ?? null : current.next;
+  const pagedNext = current.next === undefined ? base.meta?.next ?? null : current.next;
+  const next = awaitingFirstRead ? null : pagedNext;
   const refresh = () => {
     epoch.current += 1;
     controller.current?.abort(); controller.current = null;
@@ -443,22 +478,30 @@ export function usePagedApiQuery<T>(url: string, options: PagedOptions<T> = {}):
   const reads = [base.observedAt, current.observedAt].filter((at): at is number => at !== null);
   return { ...base, data, meta, observedAt: reads.length ? Math.max(...reads) : null, next, loadMore, loadingMore: current.loading, loadMoreError: current.error,
     loadMoreErrorCode: current.errorCode ?? null, loadMoreErrorMeta: current.errorMeta ?? null, refresh, resetPages: refresh, pageMeta: metas };
-}
+};
 
-function subscribeLive(listener: () => void): () => void {
+const subscribeLive = (listener: () => void): () => void => {
   liveListeners.add(listener);
   return () => { liveListeners.delete(listener); };
-}
+};
 
-function subscribeHealth(listener: () => void): () => void {
+const subscribeHealth = (listener: () => void): () => void => {
   healthListeners.add(listener);
   return () => { healthListeners.delete(listener); };
-}
+};
 
-export function useLiveStatus(): typeof liveStatus {
+/**
+ * Reports whether updates currently arrive over the live stream, by polling, or are paused because
+ * the tab is hidden.
+ */
+export const useLiveStatus = (): typeof liveStatus => {
   return useSyncExternalStore(subscribeLive, () => liveStatus);
-}
+};
 
-export function useQueryHealth(): typeof queryHealth {
+/**
+ * Summarises every active read for the header: the latest observation, the failing and stale
+ * sources, and how many reads are failing.
+ */
+export const useQueryHealth = (): typeof queryHealth => {
   return useSyncExternalStore(subscribeHealth, () => queryHealth);
-}
+};

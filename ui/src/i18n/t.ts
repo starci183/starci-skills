@@ -1,6 +1,8 @@
 // t.ts - the UI's browser adapter for the one YAML catalog source. Build and dev generate this disposable map through
 // scripts/lib/i18n.mjs; source strings remain English and a missing entry renders as that source, never blank.
-import catalog from './generated/catalog';
+import catalogJson from './generated/catalog.json';
+
+const catalog: Record<string, string> = catalogJson;
 
 /** `text` with each `{name}` replaced by vars[name] (an unknown name is left as written). */
 export const fill = (text: string, vars: Record<string, string | number> = {}): string =>

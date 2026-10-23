@@ -43,7 +43,11 @@ export const SlotView = <T,>(props: SlotViewProps<T>) => {
     }
     if (slot.status === "empty") {
         return (
-            <StateBlock mascot={emptyMascot} title={labels.emptyTitle} description={labels.emptyDescription}>
+            <StateBlock
+                {...(emptyMascot === undefined ? {} : { mascot: emptyMascot })}
+                title={labels.emptyTitle}
+                description={labels.emptyDescription}
+            >
                 {emptyAction}
             </StateBlock>
         )

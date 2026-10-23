@@ -14,6 +14,7 @@ import { Select, ListBox } from '../ui/select';
 import { FeedbackState } from '../feedback-state';
 import { StatusChip } from '../status-chip';
 
+/** The business concept id (C7) under which the transcript viewer is filed; it is stamped on data-concept so the rendered DOM traces back to its spec. */
 export const concept: Concept = 'C7';
 type Snapshot = { id: number; at: number; lines: number; bytes: number };
 type Line = Transcript['lines'][number];
@@ -21,45 +22,45 @@ type TranscriptQuery = ReturnType<typeof useApiQuery<Transcript>>;
 type SnapshotsQuery = ReturnType<typeof useApiQuery<Snapshot[]>>;
 const PAGE = 300;
 
-function CopyLines({ lines }: Readonly<{ lines: readonly Line[] }>) {
+const CopyLines = ({ lines }: Readonly<{ lines: readonly Line[] }>) => {
   const [copied, setCopied] = useState(false);
   const copy = async () => {
     try { await navigator.clipboard.writeText(lines.map(line => line.text).join('\n')); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch { /* clipboard may be blocked */ }
   };
   return <Button type="button" variant="outline" onClick={() => { void copy(); }} disabled={!lines.length}>{copied ? <Check className="size-4" /> : <Copy className="size-4" />} {copied ? t('Copied') : t('Copy')}</Button>;
-}
+};
 
-function DownloadButton({ blob, attemptId }: Readonly<{ blob: BlobLink | null | undefined; attemptId: string }>) {
+const DownloadButton = ({ blob, attemptId }: Readonly<{ blob: BlobLink | null | undefined; attemptId: string }>) => {
   if (!blob) return null;
   return <Button variant="outline" onClick={() => { const link = document.createElement('a'); link.href = blob.href; link.download = `attempt-${attemptId}.txt`; link.click(); }}><ArrowDownToLine className="size-4" /> {t('Download .txt')}</Button>;
-}
+};
 
-function SearchForm({ draft, onDraft, search, onSearch }: Readonly<{ draft: string; onDraft: (value: string) => void; search: string; onSearch: (value: string) => void }>) {
+const SearchForm = ({ draft, onDraft, search, onSearch }: Readonly<{ draft: string; onDraft: (value: string) => void; search: string; onSearch: (value: string) => void }>) => {
   return <form className="flex w-full min-w-0 flex-none items-center gap-2 min-[760px]:w-auto min-[760px]:flex-1" onSubmit={event => { event.preventDefault(); onSearch(draft); }}>
     <InputGroup className="h-8 min-w-0 flex-1"><InputGroupInput value={draft} onChange={event => onDraft(event.target.value)} placeholder={t('Find text or /regex/')} aria-label={t('Search the transcript')} /><InputGroupAddon><Search className="size-4" aria-hidden="true" /></InputGroupAddon></InputGroup>
     <Button type="submit" variant="outline">{t('Search')}</Button>
     {search && <Button type="button" variant="ghost" size="icon" aria-label={t('Clear search')} onClick={() => { onDraft(''); onSearch(''); }}><X className="size-4" /></Button>}
   </form>;
-}
+};
 
-function JumpForm({ jump, onJump, onGo }: Readonly<{ jump: string; onJump: (value: string) => void; onGo: () => void }>) {
+const JumpForm = ({ jump, onJump, onGo }: Readonly<{ jump: string; onJump: (value: string) => void; onGo: () => void }>) => {
   return <form className="flex shrink-0 items-center gap-1.5" onSubmit={event => { event.preventDefault(); onGo(); }}>
     <Input inputMode="numeric" value={jump} onChange={event => onJump(event.target.value.replace(/\D/g, ''))} placeholder={t('Line…')} className="w-20" aria-label={t('Jump to line')} /><Button type="submit" variant="outline" disabled={!jump}>{t('Go')}</Button>
   </form>;
-}
+};
 
-function timeSourceLabel(source: Transcript['timeSource']): string {
+const timeSourceLabel = (source: Transcript['timeSource']): string => {
   if (source === 'blob') return t('Blob storage time');
   if (source === 'snapshot') return t('Snapshot capture time');
   return t('Source time not recorded');
-}
+};
 
-function linesSummary(data: Transcript | null, transcript: TranscriptQuery, total: number): string {
+const linesSummary = (data: Transcript | null, transcript: TranscriptQuery, total: number): string => {
   if (data) return t('{lines} lines · {kind}', { lines: total.toLocaleString('vi-VN'), kind: data.final ? t('final copy') : 'snapshot' });
   return transcript.error ? t('Transcript unavailable') : t('Reading transcript…');
-}
+};
 
-function StatusLine({ data, transcript, following, total }: Readonly<{ data: Transcript | null; transcript: TranscriptQuery; following: boolean; total: number }>) {
+const StatusLine = ({ data, transcript, following, total }: Readonly<{ data: Transcript | null; transcript: TranscriptQuery; following: boolean; total: number }>) => {
   const live = following && data && !transcript.error && !transcript.meta?.stale?.length;
   return <span className="flex flex-wrap items-center gap-2">
     {live && <StatusChip status="running" label={t('Live')} />}
@@ -67,34 +68,34 @@ function StatusLine({ data, transcript, following, total }: Readonly<{ data: Tra
     {data ? <span>· {timeSourceLabel(data.timeSource)}: {formatAbsolute(data.at)}</span> : null}
     {data && <span>· {t('sensitive data redacted, ANSI colour codes stripped')}</span>}
   </span>;
-}
+};
 
-function SnapshotPicker({ attemptId, snapshot, live, snapshots, onChange }: Readonly<{ attemptId: string; snapshot: string; live: boolean; snapshots: SnapshotsQuery; onChange: (value: string) => void }>) {
+const SnapshotPicker = ({ attemptId, snapshot, live, snapshots, onChange }: Readonly<{ attemptId: string; snapshot: string; live: boolean; snapshots: SnapshotsQuery; onChange: (value: string) => void }>) => {
   const latest = live ? t('Follow live') : t('Latest recorded copy');
   return <div className="flex min-w-0 items-center gap-2"><span>{t('At time')}</span><Select aria-label={t('At time')} value={snapshot || 'latest'} onChange={key => {
     if (key == null) return;
     const value = String(key);
     onChange(value === 'latest' ? '' : value);
   }} className="min-w-0 max-w-44"><Select.Trigger id={`snapshot-${attemptId}`} className="h-8"><Select.Value /><Select.Indicator /></Select.Trigger><Select.Popover><ListBox><ListBox.Item id="latest" textValue={latest}>{latest}<ListBox.ItemIndicator /></ListBox.Item>{snapshots.data?.map(item => <ListBox.Item key={item.id} id={String(item.id)} textValue={`${formatAbsolute(item.at)} · ${t('{n} lines', { n: item.lines })}`}>{formatAbsolute(item.at)} · {t('{n} lines', { n: item.lines })}<ListBox.ItemIndicator /></ListBox.Item>)}</ListBox></Select.Popover></Select></div>;
-}
+};
 
-function hitsSummary(hits: readonly { n: number }[], hitIndex: number, data: Transcript | null, transcript: TranscriptQuery): string {
+const hitsSummary = (hits: readonly { n: number }[], hitIndex: number, data: Transcript | null, transcript: TranscriptQuery): string => {
   if (hits.length) return t('{at}/{total} results', { at: hitIndex + 1, total: data?.hitCount ?? hits.length });
   if (data) return t('No results');
   return transcript.error ? t('Transcript unavailable') : t('Searching…');
-}
+};
 
-function HitNavigator({ hits, hitIndex, onHit, data, transcript }: Readonly<{ hits: readonly { n: number }[]; hitIndex: number; onHit: (index: number) => void; data: Transcript | null; transcript: TranscriptQuery }>) {
+const HitNavigator = ({ hits, hitIndex, onHit, data, transcript }: Readonly<{ hits: readonly { n: number }[]; hitIndex: number; onHit: (index: number) => void; data: Transcript | null; transcript: TranscriptQuery }>) => {
   const activeHit = hits[hitIndex] ?? null;
   return <div className="flex items-center gap-2 text-xs"><span aria-live="polite">{hitsSummary(hits, hitIndex, data, transcript)}</span><Button type="button" size="icon-xs" variant="outline" disabled={!hits.length} aria-label={t('Previous result')} onClick={() => onHit((hitIndex - 1 + hits.length) % hits.length)}><ChevronLeft className="size-3" /></Button><Button type="button" size="icon-xs" variant="outline" disabled={!hits.length} aria-label={t('Next result')} onClick={() => onHit((hitIndex + 1) % hits.length)}><ChevronRight className="size-3" /></Button>{activeHit && <span className="truncate text-muted-foreground">{t('line {n}', { n: activeHit.n })}</span>}</div>;
-}
+};
 
-function lineTone(active: boolean, hit: boolean | undefined): string {
+const lineTone = (active: boolean, hit: boolean | undefined): string => {
   if (active) return 'bg-[color:var(--status-warning)]/25';
   return hit ? 'bg-[color:var(--status-warning)]/10' : '';
-}
+};
 
-function LineList({ lines, search, focusLine, activeRef }: Readonly<{ lines: readonly Line[]; search: string; focusLine: number | null; activeRef: RefObject<HTMLDivElement | null> }>) {
+const LineList = ({ lines, search, focusLine, activeRef }: Readonly<{ lines: readonly Line[]; search: string; focusLine: number | null; activeRef: RefObject<HTMLDivElement | null> }>) => {
   return <div className="max-h-[32rem] min-w-0 overflow-auto rounded-lg border bg-default font-mono text-xs" role="log" aria-label={t('Transcript with sensitive data redacted')}>
     {lines.map((line, index) => {
       const previous = index > 0 ? lines[index - 1] : undefined;
@@ -108,23 +109,26 @@ function LineList({ lines, search, focusLine, activeRef }: Readonly<{ lines: rea
       </div>;
     })}
   </div>;
-}
+};
 
-function Pager({ from, total, onFrom, onTail }: Readonly<{ from: number; total: number; onFrom: (from: number) => void; onTail: () => void }>) {
+const Pager = ({ from, total, onFrom, onTail }: Readonly<{ from: number; total: number; onFrom: (from: number) => void; onTail: () => void }>) => {
   return <div className="flex flex-wrap justify-between gap-2"><Button variant="outline" size="sm" disabled={from <= 1} onClick={() => onFrom(Math.max(1, from - PAGE))}>{t('{n} lines back', { n: PAGE })}</Button>
     <Button variant="outline" size="sm" onClick={onTail}><ChevronDown className="size-4" /> {t('Jump to end')}</Button>
     <Button variant="outline" size="sm" disabled={from + PAGE > total} onClick={() => onFrom(from + PAGE)}>{t('{n} lines forward', { n: PAGE })}</Button></div>;
-}
+};
 
-function transcriptParams(search: string, from: number, snapshot: string): URLSearchParams {
+const transcriptParams = (search: string, from: number, snapshot: string): URLSearchParams => {
   const params = new URLSearchParams();
   if (search) { params.set('q', search); params.set('around', '3'); }
   else { params.set('from', String(from)); params.set('to', String(from + PAGE - 1)); }
   if (snapshot) params.set('snapshot', snapshot);
   return params;
-}
+};
 
-export function TranscriptViewer({ project, attemptId, live }: { readonly project: string; readonly attemptId: string; readonly live: boolean }) {
+type TranscriptViewerProps = { readonly project: string; readonly attemptId: string; readonly live: boolean };
+
+/** Searchable, pageable viewer of an attempt's redacted terminal transcript: follows live output, jumps to a line or search hit, and picks recorded snapshots. */
+export const TranscriptViewer = ({ project, attemptId, live }: TranscriptViewerProps) => {
   const base = `/api/attempts/${encodeURIComponent(project)}/${encodeURIComponent(attemptId)}/transcript`;
   const snapshots = useApiQuery<Snapshot[]>(`${base}/snapshots`, { topics: [`attempt:${project}:${attemptId}`], intervalMs: 60_000 });
   const [draft, setDraft] = useState('');
@@ -178,4 +182,4 @@ export function TranscriptViewer({ project, attemptId, live }: { readonly projec
     {data && <LineList lines={lines} search={search} focusLine={focusLine} activeRef={activeRef} />}
     {data && !search && <Pager from={from} total={total} onFrom={pageTo} onTail={tail} />}
   </ConceptBlock>;
-}
+};

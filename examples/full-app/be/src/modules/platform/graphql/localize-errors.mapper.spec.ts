@@ -16,7 +16,7 @@ type SpecErrorCode = "SPEC_INVARIANT"
 class SpecError extends DomainError<SpecErrorCode> {}
 
 const singleResponse = (errors?: ReadonlyArray<GraphQLFormattedError>): GraphQLResponse =>
-    mock<GraphQLResponse>({ body: { kind: "single", singleResult: { errors } } })
+    mock<GraphQLResponse>({ body: { kind: "single", singleResult: errors === undefined ? {} : { errors } } })
 
 const incrementalResponse = (): GraphQLResponse =>
     mock<GraphQLResponse>({ body: mock<IncrementalBody>({ kind: "incremental" }) })

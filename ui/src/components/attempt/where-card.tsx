@@ -8,26 +8,31 @@ import { CopyId, InfoChip, InfoRow, ShaId } from '../infra/rows';
 import type { Tone } from '../status';
 import { t } from '../../i18n/t';
 
+/** The business concept id (C6) under which the where-it-ran card is filed; it is stamped on data-concept so the rendered DOM traces back to its spec. */
 export const concept: Concept = 'C6';
 
-const bytes = (n: number) => (n >= 1048576 ? `${(n / 1048576).toFixed(1)} MB` : n >= 1024 ? `${(n / 1024).toFixed(1)} KB` : `${n} B`);
+const bytes = (n: number) => {
+  if (n >= 1048576) return `${(n / 1048576).toFixed(1)} MB`;
+  if (n >= 1024) return `${(n / 1024).toFixed(1)} KB`;
+  return `${n} B`;
+};
 const isFile = (rel: string) => !/[\\/]$/.test(rel) && /\.[a-z0-9]+$/i.test(rel);
 
 type Where = AttemptDetailV2['where'];
 
-function jobTone(status: string): Tone | undefined {
-  if (status === 'failed') return 'failed';
-  if (status === 'awaiting_owner') return 'owner';
-  if (status === 'succeeded' || status === 'passed') return 'success';
-  return undefined;
-}
+const jobToneProps = (status: string): { tone?: Tone } => {
+  if (status === 'failed') return { tone: 'failed' };
+  if (status === 'awaiting_owner') return { tone: 'owner' };
+  if (status === 'succeeded' || status === 'passed') return { tone: 'success' };
+  return {};
+};
 
-function WorktreeValue({ w }: Readonly<{ w: Where }>) {
+const WorktreeValue = ({ w }: Readonly<{ w: Where }>) => {
   if (!w.worktree) return <span className="text-muted-foreground">{t('Checkout location not recorded')}</span>;
   return <span className="inline-flex flex-wrap items-center gap-2"><PathLink path={w.worktree} kind="dir" />{w.worktreeRemovedAt ? <InfoChip tone="skipped">{t('removed')}</InfoChip> : null}</span>;
-}
+};
 
-function AssignedPaths({ w }: Readonly<{ w: Where }>) {
+const AssignedPaths = ({ w }: Readonly<{ w: Where }>) => {
   if (!w.ownedPaths.length) return <span className="text-muted-foreground">{w.scopeSource === 'contract' ? t('Captured write scope is empty') : t('Write scope not recorded')}</span>;
   return <ul className="m-0 flex list-none flex-col gap-2 p-0">
     {w.ownedPaths.map((p) => <li key={p.rel} className="flex flex-col gap-1">
@@ -35,19 +40,19 @@ function AssignedPaths({ w }: Readonly<{ w: Where }>) {
       <PathLink path={p.abs} kind={isFile(p.rel) ? 'file' : 'dir'} />
     </li>)}
   </ul>;
-}
+};
 
-function SessionRecord({ attempt }: Readonly<{ attempt: AttemptDetailV2 }>) {
+const SessionRecord = ({ attempt }: Readonly<{ attempt: AttemptDetailV2 }>) => {
   const transcript = attempt.terminal?.transcript ?? null;
   if (!transcript) return <span className="text-muted-foreground">{t('no transcript yet')}</span>;
   const transcriptHref = `#/a/${encodeURIComponent(attempt.project)}/${encodeURIComponent(String(attempt.id))}?step=run`;
   return <span className="inline-flex flex-wrap items-center gap-2"><Link href={transcriptHref}>{t('View transcript')}</Link>
     <span className="text-xs text-muted-foreground">{bytes(transcript.bytes)}{transcript.archived ? t(' · archived') : ''}</span>
     {attempt.terminal?.live ? <StatusChip status="running" label={t('running')} /> : null}</span>;
-}
+};
 
 /** S8: "Where it ran & resources" — every host location, id and resource the attempt touched. */
-export function AttemptWhereCard({ attempt }: Readonly<{ attempt: AttemptDetailV2 }>) {
+export const AttemptWhereCard = ({ attempt }: Readonly<{ attempt: AttemptDetailV2 }>) => {
   const w = attempt.where;
   return <section className="min-w-0" aria-label={t('Where it ran and resources')}>
     <h3 className="m-0 mb-2 text-sm font-semibold">{t('Where it ran & resources')}</h3>
@@ -85,7 +90,7 @@ export function AttemptWhereCard({ attempt }: Readonly<{ attempt: AttemptDetailV
         <InfoRow label={t('Parent agent')}><CopyId value={w.parentAgent} /></InfoRow>
         <InfoRow label="Trace span"><CopyId value={w.traceSpan} /></InfoRow>
         <InfoRow label={t('Job · current status')}>
-          <span className="inline-flex flex-wrap items-center gap-2"><CopyId value={w.job} />{w.jobStatus ? <InfoChip tone={jobTone(w.jobStatus)}>{w.jobStatus}</InfoChip> : null}</span>
+          <span className="inline-flex flex-wrap items-center gap-2"><CopyId value={w.job} />{w.jobStatus ? <InfoChip {...jobToneProps(w.jobStatus)}>{w.jobStatus}</InfoChip> : null}</span>
         </InfoRow>
         <InfoRow label={t('Session record')}>
           <SessionRecord attempt={attempt} />
@@ -98,4 +103,4 @@ export function AttemptWhereCard({ attempt }: Readonly<{ attempt: AttemptDetailV
       <UsageView usage={attempt.usage} />
     </div>
   </section>;
-}
+};

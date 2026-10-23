@@ -39,7 +39,7 @@ export const callGraphql = async (http: HttpClient, call: GraphqlCall): Promise<
     const response = await http.request({
         method: "POST",
         url: call.url,
-        headers: call.headers,
+        ...(call.headers === undefined ? {} : { headers: call.headers }),
         body: { query: call.query, variables: call.variables },
         timeoutMs: call.timeoutMs,
     })

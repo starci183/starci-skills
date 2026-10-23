@@ -8,31 +8,38 @@ import { StateChip } from '../state-chip';
 import { Panel, at, dash, number, stateOf } from './panel';
 import { t } from '../../i18n/t';
 
+/** Names the C14 admission concept this module belongs to, for the admission panel. */
 export const concept: Concept = 'C14';
 
-function reservationState(row: AdmissionReservation): UiState {
+const reservationState = (row: AdmissionReservation): UiState => {
   if (row.state === 'unknown') return 'unknown';
   if (row.state === 'released') return 'done';
   if (row.state === 'reserved') return 'waiting';
   return row.state === 'live' || row.state === 'launching' ? 'running' : 'unknown';
-}
+};
 
-function reservationLabel(row: AdmissionReservation): string {
+const reservationLabel = (row: AdmissionReservation): string => {
   if (row.state === 'unknown') return t('Unknown launch outcome · slot retained');
   if (row.state === 'reserved') return t('Slot reserved');
   if (row.state === 'launching') return t('Launching');
   if (row.state === 'live') return t('Launch recorded live');
   if (row.state === 'released') return t('Slot released');
   return t('Unknown');
-}
+};
 
-function capturedAt(value: number | string | null | undefined): string {
+const capturedAt = (value: number | string | null | undefined): string => {
   if (value == null) return '—';
   const epoch = typeof value === 'number' ? value : Date.parse(value);
   return Number.isFinite(epoch) ? at(epoch) : '—';
-}
+};
 
-function ReceiptFacts({ row }: Readonly<{ row: AdmissionReservation }>) {
+/** The word for a captured freshness flag: yes, no, or a dash when it was not recorded. */
+const freshLabel = (fresh: boolean | null | undefined): string => {
+  if (fresh === true) return t('Yes');
+  return fresh === false ? t('No') : '—';
+};
+
+const ReceiptFacts = ({ row }: Readonly<{ row: AdmissionReservation }>) => {
   const quota = row.quota;
   return <Advanced title={t('Receipt {id}', { id: row.id })} summary={`${row.role} · ${row.provider} / ${row.account}`}>
     <dl className="grid gap-4 text-sm sm:grid-cols-2">
@@ -56,7 +63,7 @@ function ReceiptFacts({ row }: Readonly<{ row: AdmissionReservation }>) {
           <div><dt className="text-xs text-muted-foreground">{t('Captured at')}</dt><dd className="mt-1">{capturedAt(quota.observedAt)}</dd></div>
           <div><dt className="text-xs text-muted-foreground">{t('Capacity evidence authority')}</dt><dd className="mt-1">{dash(quota.authority)}</dd></div>
           <div><dt className="text-xs text-muted-foreground">{t('Auth at capture')}</dt><dd className="mt-1">{dash(quota.auth)}</dd></div>
-          <div><dt className="text-xs text-muted-foreground">{t('Fresh at capture')}</dt><dd className="mt-1">{quota.fresh === true ? t('Yes') : quota.fresh === false ? t('No') : '—'}</dd></div>
+          <div><dt className="text-xs text-muted-foreground">{t('Fresh at capture')}</dt><dd className="mt-1">{freshLabel(quota.fresh)}</dd></div>
           <div><dt className="text-xs text-muted-foreground">{t('Quota state at capture')}</dt><dd className="mt-1">{dash(quota.state)}</dd></div>
           <div><dt className="text-xs text-muted-foreground">{t('Captured expiry')}</dt><dd className="mt-1">{capturedAt(quota.expiresAt)}</dd></div>
         </dl>
@@ -78,9 +85,10 @@ function ReceiptFacts({ row }: Readonly<{ row: AdmissionReservation }>) {
       </dl>
     </Advanced>
   </Advanced>;
-}
+};
 
-export function AdmissionPanel({ admission }: Readonly<{ admission: AdmissionView | null | undefined }>) {
+/** Shows which agent launch slots are reserved, with the quota evidence captured when each was admitted. */
+export const AdmissionPanel = ({ admission }: Readonly<{ admission: AdmissionView | null | undefined }>) => {
   const observed = admission?.observed === true;
   const rows = admission?.reservations ?? [];
   const ui: UiState = !observed || admission?.unknown == null || admission.unknown > 0
@@ -103,4 +111,4 @@ export function AdmissionPanel({ admission }: Readonly<{ admission: AdmissionVie
       </Advanced>
     </div> : <FeedbackState>{t('This database has no provider admission observations. Occupied slots are unknown.')}</FeedbackState>}
   </Panel>;
-}
+};

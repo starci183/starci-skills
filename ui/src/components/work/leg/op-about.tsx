@@ -5,14 +5,15 @@ import { legInfo } from '../pipeline/node/op-identity';
 import type { Concept } from '../../concept';
 import { t } from '../../../i18n/t';
 
+/** The business concept id (C4) under which the Op about panel is filed; it is stamped on data-concept so the rendered DOM traces back to its spec. */
 export const concept: Concept = 'C4';
 
-function Block({ title, children }: Readonly<{ title: string; children: React.ReactNode }>) {
+const Block = ({ title, children }: Readonly<{ title: string; children: React.ReactNode }>) => {
   return <section className="mt-6"><h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</h3>{children}</section>;
-}
+};
 
 /** "What this op does" + inputs, outputs, side effects, manifest — from the op's own yaml (read-only). */
-export function OpAbout({ leg }: Readonly<{ leg: LegRow }>) {
+export const OpAbout = ({ leg }: Readonly<{ leg: LegRow }>) => {
   const info = legInfo(leg);
   if (!info) return null;
   const goalVi = info.goal.vi ?? info.goal.en;
@@ -28,4 +29,4 @@ export function OpAbout({ leg }: Readonly<{ leg: LegRow }>) {
     <Block title={t('Op manifest file')}>{info.manifest ? <PathLink path={info.manifest} kind="file" /> : <p className="text-xs text-muted-foreground">{t('None')}</p>}</Block>
     <hr className="mt-6" />
   </div>;
-}
+};

@@ -14,32 +14,33 @@ import { AgentStack } from '../agent/agent-avatar';
 import { WhyBlock } from '../why/why-block';
 import { t } from '../../i18n/t';
 
+/** The business concept id (C4) under which the leg drawer is filed; it is stamped on data-concept so the rendered DOM traces back to its spec. */
 export const concept: Concept = 'C4';
 
-function Section({ title, children }: Readonly<{ title: string; children: React.ReactNode }>) {
+const Section = ({ title, children }: Readonly<{ title: string; children: React.ReactNode }>) => {
   return <section><h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</h3>{children}</section>;
-}
+};
 const none = <p className="text-xs text-muted-foreground">{t('None')}</p>;
 
 type NextStep = { href: string; label: string } | null;
 
-function currentWhy(leg: LegRow, latest: AttemptBrief | null): string {
+const currentWhy = (leg: LegRow, latest: AttemptBrief | null): string => {
   if (latest?.status === 'settling') return t('Awaiting settlement');
   if (latest?.open) return t('Running attempt #{id}.', { id: latest.id });
   return statusLabels[leg.status];
-}
+};
 
 // Recorded lifecycle and disposition remain separate from an Op's latest report summary.
-function whyText(leg: LegRow, latest: AttemptBrief | null, waiting: readonly string[]): string {
+const whyText = (leg: LegRow, latest: AttemptBrief | null, waiting: readonly string[]): string => {
   if (leg.binding === 'unbound') return t('No runtime unit is bound to this exact leg and goal revision.');
   if (leg.deferred) return t('Deferred: {reason}', { reason: leg.deferred });
   if (leg.status === 'external') return t('Handled externally');
   if (waiting.length && !leg.attempts.length) return t('Waiting for {list} to finish first.', { list: waiting.join(', ') });
   if (leg.current) return currentWhy(leg, latest);
   return `${statusLabels[leg.status]}.`;
-}
+};
 
-function nextStep(leg: LegRow, latest: AttemptBrief | null, waiting: readonly string[], byOp: ReadonlyMap<string, LegRow>, legHref: (op: string) => string): NextStep {
+const nextStep = (leg: LegRow, latest: AttemptBrief | null, waiting: readonly string[], byOp: ReadonlyMap<string, LegRow>, legHref: (op: string) => string): NextStep => {
   const latestStep = latest ? { href: latest.href, label: t('Open the latest attempt') } : null;
   if (leg.status === 'success') {
     const unit = leg.units[0];
@@ -50,11 +51,15 @@ function nextStep(leg: LegRow, latest: AttemptBrief | null, waiting: readonly st
   const waitingLeg = firstWaiting === undefined ? undefined : byOp.get(firstWaiting);
   if (firstWaiting !== undefined && waitingLeg) return { href: legHref(firstWaiting), label: t('View the waiting leg: {name}', { name: legName(waitingLeg) }) };
   return latestStep;
-}
+};
 
-const bindingLabel = (leg: LegRow) => leg.binding === 'recorded-unit' ? t('Bound by recorded unit and revision') : leg.binding === 'unbound' ? t('Runtime association unproven') : t('Operation scope; excluded from plan progress');
+const bindingLabel = (leg: LegRow) => {
+  if (leg.binding === 'recorded-unit') return t('Bound by recorded unit and revision');
+  if (leg.binding === 'unbound') return t('Runtime association unproven');
+  return t('Operation scope; excluded from plan progress');
+};
 
-function UnitsSection({ leg }: Readonly<{ leg: LegRow }>) {
+const UnitsSection = ({ leg }: Readonly<{ leg: LegRow }>) => {
   return <Section title={t('Units · {n}', { n: leg.units.length })}>{leg.units.length ? <ul className="divide-y">{leg.units.map(u => <li key={u.unit} className="flex flex-wrap items-center gap-x-2 gap-y-1 py-3">
     <span className="min-w-0 flex-1 break-words text-sm">{u.title}</span>
     <StatusChip status={statusFromUnit(u.state)} label={unitStateLabels[u.state] ?? u.state} />
@@ -62,30 +67,30 @@ function UnitsSection({ leg }: Readonly<{ leg: LegRow }>) {
     <Link href={u.href} aria-label={t('Open {title}', { title: u.title })}><ArrowRight className="size-3.5" aria-hidden="true" /></Link>
     <span className="w-full break-all font-mono text-xs text-muted-foreground">{u.unit} · {t('Goal revision {n}', { n: u.goalRevision })} · {u.subjectKey} · {t('{n} dispatches', { n: u.dispatches })}</span>
   </li>)}</ul> : none}</Section>;
-}
+};
 
-function noAttemptsReason(leg: LegRow, waiting: readonly string[]): string {
+const noAttemptsReason = (leg: LegRow, waiting: readonly string[]): string => {
   if (waiting.length) return waiting.join(', ');
   return leg.deferred ? t('the deferred condition to lift') : t('its turn to be dispatched');
-}
+};
 
-function AttemptsSection({ leg, attempts, waiting, now }: Readonly<{ leg: LegRow; attempts: readonly AttemptBrief[]; waiting: readonly string[]; now: number }>) {
+const AttemptsSection = ({ leg, attempts, waiting, now }: Readonly<{ leg: LegRow; attempts: readonly AttemptBrief[]; waiting: readonly string[]; now: number }>) => {
   return <Section title={t('Attempts · {n}', { n: attempts.length })}>{attempts.length
     ? <ol className="flex flex-col">{attempts.map(a => <AttemptCard key={a.id} attempt={a} now={now} />)}</ol>
     : <p className="border-t py-3 text-xs text-muted-foreground">{t('No attempts yet — this leg is waiting for {what}.', { what: noAttemptsReason(leg, waiting) })}</p>}</Section>;
-}
+};
 
-function DrawerTitle({ leg }: Readonly<{ leg: LegRow }>) {
+const DrawerTitle = ({ leg }: Readonly<{ leg: LegRow }>) => {
   return <span className="flex flex-wrap items-center gap-2"><span className="text-base">{legName(leg)}</span><StatusChip status={leg.status} /></span>;
-}
+};
 
-function DrawerDescription({ leg }: Readonly<{ leg: LegRow }>) {
+const DrawerDescription = ({ leg }: Readonly<{ leg: LegRow }>) => {
   const agents = legAgents(leg);
   return <><span className="break-all font-mono text-xs">{leg.op}</span> · {t('Leg {seq} · level {level}', { seq: leg.seq, level: leg.level })}{agents.length ? <span className="ml-2 inline-flex align-middle"><AgentStack agents={agents} size={18} /></span> : null}</>;
-}
+};
 
 /** Side drawer for one leg. Essentials: what it does, why it is (not) moving, the one next step. Everything else sits under "Advanced". */
-export function LegDrawer({ project, wf, leg, pipeline, now, onClose }: Readonly<{ project: string; wf: string; leg: LegRow | null; pipeline: PipelineView; now: number; onClose: () => void }>) {
+export const LegDrawer = ({ project, wf, leg, pipeline, now, onClose }: Readonly<{ project: string; wf: string; leg: LegRow | null; pipeline: PipelineView; now: number; onClose: () => void }>) => {
   if (!leg) return null;
   const byOp = new Map(pipeline.legs.map(l => [l.op, l]));
   const upstream = pipeline.edges.filter(e => e.to === leg.op).map(e => e.from);
@@ -117,4 +122,4 @@ export function LegDrawer({ project, wf, leg, pipeline, now, onClose }: Readonly
           </Advanced>
         </div>
   </Drawer>;
-}
+};

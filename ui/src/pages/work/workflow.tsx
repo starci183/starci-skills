@@ -26,8 +26,10 @@ import { PathLink } from '../../components/path-link';
 import { Button } from '../../components/ui/button';
 import { Tabs } from '../../components/ui/tabs';
 import { Advanced, Stagger, StaggerItem } from '../../components/motion';
+import { keyByOccurrence } from '../../components/attempt/frame/util';
 import { routeHref, useRoute, type WorkflowTab } from '../../router';
 
+/** The business concept id (C2) under which the workflow page is filed; it is stamped on data-concept so the rendered DOM traces back to its spec. */
 export const concept: Concept = 'C2';
 
 const tabs: { id: WorkflowTab; label: string; concept: string }[] = [
@@ -46,16 +48,22 @@ type Verify = { schema: string; ok: boolean; files: { checked: number; intact: n
 type Worktree = { kind: string; branch: string | null; path: string; repoRoot: string | null; lane: string | null; port: number | null; baseSha: string | null; headSha: string | null; jobId: string | null; attempt: number | null; ui: 'bad' | 'warn' | 'running' | 'waiting' | 'ok' | 'done' | 'unknown'; createdAt: number; removedAt: number | null; removeError: string | null };
 type UnitEdge = { id: string; href: string; from: string; to: string; kind: string; source: string; createdAt: number };
 
-function Panel({ title, children, concept, embedded = false }: { readonly title: string; readonly children: React.ReactNode; readonly concept: 'C1' | 'C2' | 'C4' | 'C5' | 'C12' | 'C15' | 'C17' | 'C11' | 'C7'; readonly embedded?: boolean }) {
+const embeddedCard = { inset: 'none', variant: 'transparent' } as const;
+
+type PanelProps = { readonly title: string; readonly children: React.ReactNode; readonly concept: 'C1' | 'C2' | 'C4' | 'C5' | 'C12' | 'C15' | 'C17' | 'C11' | 'C7'; readonly embedded?: boolean };
+
+const Panel = ({ title, children, concept, embedded = false }: PanelProps) => {
   return <ConceptBlock concept={concept} as="section" className="min-w-0">
-    <Card inset={embedded ? 'none' : undefined} variant={embedded ? 'transparent' : undefined}>
+    <Card {...(embedded ? embeddedCard : {})}>
       <CardHeader><CardTitle>{embedded ? <h3>{title}</h3> : <h2>{title}</h2>}</CardTitle></CardHeader>
       <CardContent className="flex min-w-0 flex-col gap-4">{children}</CardContent>
     </Card>
   </ConceptBlock>;
-}
+};
 
-function ReadAlerts({ snapshot, url, label }: { readonly snapshot: QuerySnapshot<unknown>; readonly url: string; readonly label?: string }) {
+type ReadAlertsProps = { readonly snapshot: QuerySnapshot<unknown>; readonly url: string; readonly label?: string };
+
+const ReadAlerts = ({ snapshot, url, label }: ReadAlertsProps) => {
   const prefix = label ? `${label} · ` : '';
   const partial = partialSources(snapshot);
   if (snapshot.meta && !snapshot.error && !partial.length) return null;
@@ -64,20 +72,24 @@ function ReadAlerts({ snapshot, url, label }: { readonly snapshot: QuerySnapshot
     {!snapshot.meta && !snapshot.error && !partial.length && <output className="block text-xs text-muted-foreground">{prefix}{t('Loading…')}</output>}
     {partial.length ? <FeedbackState error onRetry={() => refreshQuery(url)}>{prefix}{t('Source out of sync: {list}', { list: partial.join(', ') })}</FeedbackState> : null}
   </div>;
-}
+};
 
-function SourceFacts({ sources }: { readonly sources: ReadSource[] }) {
-  return <ul className="flex min-w-0 flex-col gap-2 text-xs text-muted-foreground">{sources.map((source, index) => <li key={`${source.db}:${source.rel}:${index}`} className="min-w-0 space-y-1">
+type SourceFactsProps = { readonly sources: ReadSource[] };
+
+const SourceFacts = ({ sources }: SourceFactsProps) => {
+  return <ul className="flex min-w-0 flex-col gap-2 text-xs text-muted-foreground">{keyByOccurrence(sources, source => `${source.db}:${source.rel}`).map(({ key, item: source }) => <li key={key} className="min-w-0 space-y-1">
     <p className="break-all font-mono">{source.db}:{source.rel} · {source.availability ?? t('Unknown')}{source.code ? ` · ${source.code}` : ''}</p>
     <p>{t('Observed {at}', { at: formatAbsolute(source.at) })} · {t('Read at')} {formatAbsolute(source.readAt)}</p>
     {source.error && <p className="whitespace-pre-wrap break-words">{source.error}</p>}
   </li>)}</ul>;
-}
+};
 
-function ReadState({ snapshot, url, label, includeAlerts = true }: { readonly snapshot: QuerySnapshot<unknown>; readonly url: string; readonly label?: string; readonly includeAlerts?: boolean }) {
+type ReadStateProps = { readonly snapshot: QuerySnapshot<unknown>; readonly url: string; readonly label?: string; readonly includeAlerts?: boolean };
+
+const ReadState = ({ snapshot, url, label, includeAlerts = true }: ReadStateProps) => {
   const prefix = label ? `${label} · ` : '';
   return <div className="space-y-2">
-    {includeAlerts && <ReadAlerts snapshot={snapshot} url={url} label={label} />}
+    {includeAlerts && <ReadAlerts snapshot={snapshot} url={url} {...(label === undefined ? {} : { label })} />}
     {snapshot.meta && <>
       <p className="text-xs text-muted-foreground">{prefix}{t('Read observed {at}', { at: formatAbsolute(snapshot.observedAt) })}</p>
       <Advanced keepMounted title={t('Read metadata')} className="text-xs text-muted-foreground"><div className="flex flex-col gap-4"><p>{t('Response assembled {at}', { at: formatAbsolute(snapshot.meta.at) })}</p><SourceFacts sources={snapshot.meta.sources} /></div></Advanced>
@@ -85,17 +97,21 @@ function ReadState({ snapshot, url, label, includeAlerts = true }: { readonly sn
     {snapshot.errorMeta && <Advanced keepMounted title={`${prefix}${t('Failed read metadata')}`} className="text-xs text-muted-foreground"><div className="flex flex-col gap-4"><p>{t('Response assembled {at}', { at: formatAbsolute(snapshot.errorMeta.at) })}{snapshot.errorCode ? ` · ${snapshot.errorCode}` : ''}</p><SourceFacts sources={snapshot.errorMeta.sources} /></div></Advanced>}
     {snapshot.meta?.next && <p className="text-xs text-muted-foreground">{t('More rows are available; this view shows one page.')}</p>}
   </div>;
-}
+};
 
-function MoreRows({ read, includeFailure = true }: { readonly read: { data: unknown[] | null; next: string | null; loadingMore: boolean; loadMoreError: string | null; loadMore: () => void }; readonly includeFailure?: boolean }) {
+type MoreRowsProps = { readonly read: { data: unknown[] | null; next: string | null; loadingMore: boolean; loadMoreError: string | null; loadMore: () => void }; readonly includeFailure?: boolean };
+
+const MoreRows = ({ read, includeFailure = true }: MoreRowsProps) => {
   return <div className="space-y-2 text-xs text-muted-foreground">
     {read.data && <p>{t('Loaded {n} rows · page scope; live data may change.', { n: read.data.length })}</p>}
     {includeFailure && read.loadMoreError && <FeedbackState error onRetry={read.loadMore}>{read.loadMoreError}</FeedbackState>}
     {read.next && <Button size="sm" variant="outline" disabled={read.loadingMore} onClick={read.loadMore}>{read.loadingMore ? t('Loading…') : t('Load more')}</Button>}
   </div>;
-}
+};
 
-function SnapshotFacts({ read }: { readonly read: MetricRead<unknown> }) {
+type SnapshotFactsProps = { readonly read: MetricRead<unknown> };
+
+const SnapshotFacts = ({ read }: SnapshotFactsProps) => {
   const snapshot = read.snapshot;
   return <div className="flex min-w-0 flex-col gap-2 text-xs text-muted-foreground">
     <p className="flex flex-wrap gap-x-3 gap-y-1"><span>{t('Snapshot #{id} · recorded {at}', { id: snapshot.id, at: formatAbsolute(snapshot.at) })}</span><span>{snapshot.payloadSource}</span>{snapshot.windowMs != null && <span>{t('Window {n} hours', { n: snapshot.windowMs / 3_600_000 })}</span>}</p>
@@ -105,13 +121,17 @@ function SnapshotFacts({ read }: { readonly read: MetricRead<unknown> }) {
       <dt>SHA</dt><dd className="break-all font-mono">{snapshot.dataSha ?? t('not recorded')}</dd>
     </dl></Advanced>
   </div>;
-}
+};
 
-function RecordedPayload({ value }: { readonly value: unknown }) {
+type RecordedPayloadProps = { readonly value: unknown };
+
+const RecordedPayload = ({ value }: RecordedPayloadProps) => {
   return <Advanced title={t('Recorded payload')} keepMounted><pre className="min-w-0 whitespace-pre-wrap break-all text-xs text-muted-foreground">{JSON.stringify(value, null, 2)}</pre></Advanced>;
-}
+};
 
-function UnitFacts({ unit }: { readonly unit: UnitRow }) {
+type UnitFactsProps = { readonly unit: UnitRow };
+
+const UnitFacts = ({ unit }: UnitFactsProps) => {
   return <div className="flex min-w-0 flex-col gap-2 text-xs text-muted-foreground">
     <p className="flex flex-wrap gap-x-3 gap-y-1"><span>{t('Goal revision {n}', { n: unit.goalRevision })}</span><span>{t('Recorded try #{tries} · unit budget {budget}', { tries: unit.tries, budget: unit.tryBudget })}</span><span>{t('{n} dispatches', { n: unit.attempts })}</span></p>
     <dl className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1">
@@ -121,9 +141,11 @@ function UnitFacts({ unit }: { readonly unit: UnitRow }) {
     </dl>
     <p className="break-all">{t('Current job {job}', { job: unit.currentJob ?? t('not recorded') })}</p>
   </div>;
-}
+};
 
-function UnitDetail({ project, wf, selected, state, graphMode }: { readonly project: string; readonly wf: string; readonly selected: string | null; readonly state: string | null; readonly graphMode: boolean }) {
+type UnitDetailProps = { readonly project: string; readonly wf: string; readonly selected: string | null; readonly state: string | null; readonly graphMode: boolean };
+
+const UnitDetail = ({ project, wf, selected, state, graphMode }: UnitDetailProps) => {
   const url = selected ? `/api/workflows/${encodeURIComponent(project)}/${encodeURIComponent(wf)}/units/${encodeURIComponent(selected)}` : '';
   const detail = useApiQuery<{ unit: UnitRow; attempts: AttemptRow[]; edges: { in: UnitEdge[]; out: UnitEdge[] }; decisions: { id: string; choice: string; rationale: string | null; at: number }[]; blockedBy: { reason: { code: string; params: Record<string, string | number> }; ui: UnitRow['ui'] }[] }>(url, { enabled: Boolean(selected), topics: [`wf:${project}:${wf}`, 'system'], intervalMs: 20_000 });
   const contract = useApiQuery<ContractInfo>('/api/contract', { enabled: Boolean(selected), topics: ['system'], intervalMs: 60_000 });
@@ -150,9 +172,14 @@ function UnitDetail({ project, wf, selected, state, graphMode }: { readonly proj
       </Advanced>
     </>}
   </section>;
-}
+};
 
-function UnitsTab({ project, wf, graph, graphTab }: { readonly project: string; readonly wf: string; readonly graph: QuerySnapshot<WorkGraph>; readonly graphTab: boolean }) {
+/** The workflow a tab of the workflow page reads: its project and its workflow id. */
+type WorkflowTabProps = { readonly project: string; readonly wf: string };
+
+type UnitsTabProps = WorkflowTabProps & { readonly graph: QuerySnapshot<WorkGraph>; readonly graphTab: boolean };
+
+const UnitsTab = ({ project, wf, graph, graphTab }: UnitsTabProps) => {
   const state = query().get('state');
   const stateParam = state ? `&state=${encodeURIComponent(state)}` : '';
   const url = `/api/workflows/${encodeURIComponent(project)}/${encodeURIComponent(wf)}/units?limit=200${stateParam}`;
@@ -172,11 +199,11 @@ function UnitsTab({ project, wf, graph, graphTab }: { readonly project: string; 
   const graphData = graph.data;
   const counts = graphData ? Object.fromEntries(['planned', 'queued', 'running', 'reported', 'deciding', 'done', 'failed', 'dropped'].map(value => [value, graphData.nodes.filter(node => node.state === value).length])) as Record<UnitState, number> : null;
   const graphUrl = `/api/workflows/${encodeURIComponent(project)}/${encodeURIComponent(wf)}/graph`;
-  return <Panel title={t('Units · {n}', { n: graphMode ? graphData?.nodes.length ?? '—' : units.meta ? rows.length : '—' })} concept="C4">
+  return <Panel title={t('Units · {n}', { n: unitCountOf(graphMode, graphData, units.meta != null, rows.length) })} concept="C4">
     <ReadState snapshot={graph} url={graphUrl} label={t('Unit graph')} />
     <Tabs selectedKey={graphMode ? 'graph' : 'list'} variant="secondary" className="min-w-0 gap-4">
       <Tabs.List aria-label={t('Units')}><Tabs.Tab id="list" href={href(selected, state, false)}>{t('List')}<Tabs.Indicator /></Tabs.Tab><Tabs.Tab id="graph" href={href(selected, null, true)}>{t('Unit graph')}<Tabs.Indicator /></Tabs.Tab></Tabs.List>
-      <Tabs.Panel id="graph" className="min-w-0">{graphMode && graph.data && <GraphView graph={graph.data} opLabels={contract.data?.opLabels} onUnit={unit => { window.location.hash = href(unit, null, true); }} />}</Tabs.Panel>
+      <Tabs.Panel id="graph" className="min-w-0">{graphMode && graph.data && <GraphView graph={graph.data} {...(contract.data?.opLabels ? { opLabels: contract.data.opLabels } : {})} onUnit={unit => { window.location.hash = href(unit, null, true); }} />}</Tabs.Panel>
       <Tabs.Panel id="list" className="flex min-w-0 flex-col gap-4">{!graphMode && <>
         <ReadState snapshot={units} url={url} label={t('List')} />
         {counts && <LifecycleBar counts={counts} selected={state as UnitState | null} onSelect={value => { window.location.hash = href(null, state === value ? null : value); }} />}
@@ -213,17 +240,22 @@ function UnitsTab({ project, wf, graph, graphTab }: { readonly project: string; 
     </Tabs>
     {selected && <UnitDetail project={project} wf={wf} selected={selected} state={state} graphMode={graphMode} />}
   </Panel>;
-}
+};
+
+const unitCountOf = (graphMode: boolean, graphData: WorkGraph | null, hasMeta: boolean, listed: number): number | string => {
+  if (graphMode) return graphData?.nodes.length ?? '—';
+  return hasMeta ? listed : '—';
+};
 
 /** Refine the broad running projection only when recorded report and unsettled attempt custody agree. */
-function attemptListStatus(attempt: AttemptRow) {
+const attemptListStatus = (attempt: AttemptRow) => {
   const status = statusFromUi(attempt.ui);
   const open = attempt.dispatchedAt != null && attempt.settledAt == null && attempt.endState == null && attempt.verdict == null;
   const reported = attempt.reportedAt != null || attempt.reportOutcome != null;
   return status === 'running' && open && reported ? 'settling' : status;
-}
+};
 
-function AttemptsTab({ project, wf }: { readonly project: string; readonly wf: string }) {
+const AttemptsTab = ({ project, wf }: WorkflowTabProps) => {
   const url = `/api/attempts?project=${encodeURIComponent(project)}&wf=${encodeURIComponent(wf)}&limit=200`;
   const attempts = usePagedApiQuery<AttemptRow>(url, { topics: [`wf:${project}:${wf}`, 'system'], intervalMs: 30_000, getKey: attempt => String(attempt.id) });
   const contract = useApiQuery<ContractInfo>('/api/contract', { topics: ['system'], intervalMs: 60_000 });
@@ -243,9 +275,9 @@ function AttemptsTab({ project, wf }: { readonly project: string; readonly wf: s
     })}</div>
     {attempts.meta && !attempts.error && !partialSources(attempts).length && !attempts.data?.length && <p className="text-sm text-muted-foreground">{t('No attempts yet.')}</p>}<MoreRows read={attempts} />
   </Panel>;
-}
+};
 
-function DecisionsTab({ project, wf }: { readonly project: string; readonly wf: string }) {
+const DecisionsTab = ({ project, wf }: WorkflowTabProps) => {
   const open = usePagedApiQuery<DecisionRow>(`/api/decisions?project=${encodeURIComponent(project)}&wf=${encodeURIComponent(wf)}&limit=200`, { topics: ['decisions'], intervalMs: 20_000, getKey: item => item.key });
   const log = usePagedApiQuery<DecisionLog>(`/api/decisions/log?project=${encodeURIComponent(project)}&wf=${encodeURIComponent(wf)}&limit=200`, { topics: [`wf:${project}:${wf}`, 'system'], intervalMs: 60_000, getKey: item => item.key });
   return <div className="flex min-w-0 flex-col gap-6 min-[760px]:gap-8">
@@ -271,9 +303,9 @@ function DecisionsTab({ project, wf }: { readonly project: string; readonly wf: 
       {log.meta && !log.error && !partialSources(log).length && !log.data?.length && <p className="text-sm text-muted-foreground">{t('No settled decisions yet.')}</p>}<MoreRows read={log} />
     </Panel>
   </div>;
-}
+};
 
-function WhyTab({ project, wf }: { readonly project: string; readonly wf: string }) {
+const WhyTab = ({ project, wf }: WorkflowTabProps) => {
   const url = `/api/workflows/${encodeURIComponent(project)}/${encodeURIComponent(wf)}/rca`;
   const rca = useApiQuery<MetricRead<Rca> | null>(url, { topics: [`wf:${project}:${wf}`, 'system'], intervalMs: 60_000 });
   const payload = rca.data?.payload;
@@ -284,7 +316,7 @@ function WhyTab({ project, wf }: { readonly project: string; readonly wf: string
       <p className="text-xs text-muted-foreground">{t('{n} recorded attempts · window {hours} hours', { n: payload.attempts, hours: payload.windowMs / 3_600_000 })}</p>
       <section className="flex min-w-0 flex-col gap-4">
         <h3 className="text-sm font-semibold">{t('Recorded cause analysis')}</h3>
-        <div className="divide-y">{payload.clusters.map((cluster, index) => <article key={`${cluster.cause}-${index}`} className="flex min-w-0 flex-col gap-3 py-4">
+        <div className="divide-y">{keyByOccurrence(payload.clusters, cluster => cluster.cause).map(({ key, item: cluster }) => <article key={key} className="flex min-w-0 flex-col gap-3 py-4">
           <div className="flex flex-wrap items-start justify-between gap-3"><div className="flex min-w-0 flex-wrap items-center gap-2"><Chip size="sm" variant="tertiary"><Chip.Label>{cluster.cause}</Chip.Label></Chip><WhyOwnerBadge owner={cluster.authority} /></div><span className="text-xs tabular-nums text-muted-foreground">{t('{open}/{count} open', { open: cluster.open, count: cluster.count })}</span></div>
           <p className="whitespace-pre-wrap break-words text-sm">{cluster.why}</p>
           <RecordedPayload value={cluster} />
@@ -301,11 +333,12 @@ function WhyTab({ project, wf }: { readonly project: string; readonly wf: string
         </article>)}</div>
       </section> : null}
       <RecordedPayload value={rca.data} />
-    </> : rca.meta && !rca.error && !partialSources(rca).length ? <p className="text-sm text-muted-foreground">{t('No analysis yet.')}</p> : null}
+    </> : null}
+    {!(rca.data && payload) && rca.meta && !rca.error && !partialSources(rca).length ? <p className="text-sm text-muted-foreground">{t('No analysis yet.')}</p> : null}
   </Panel>;
-}
+};
 
-function TimelineTab({ project, wf }: { readonly project: string; readonly wf: string }) {
+const TimelineTab = ({ project, wf }: WorkflowTabProps) => {
   const url = `/api/timeline?project=${encodeURIComponent(project)}&wf=${encodeURIComponent(wf)}&limit=200`;
   const timeline = usePagedApiQuery<TimelineItem>(url, { topics: [`wf:${project}:${wf}`, 'system'], intervalMs: 30_000, getKey: item => item.key });
   return <Panel title={t('Timeline')} concept="C17"><ReadState snapshot={timeline} url={url} />
@@ -330,9 +363,9 @@ function TimelineTab({ project, wf }: { readonly project: string; readonly wf: s
     })}</div>
     {timeline.meta && !timeline.error && !partialSources(timeline).length && !timeline.data?.length && <p className="text-sm text-muted-foreground">{t('No timeline yet.')}</p>}<MoreRows read={timeline} />
   </Panel>;
-}
+};
 
-function EvidenceTab({ project, wf }: { readonly project: string; readonly wf: string }) {
+const EvidenceTab = ({ project, wf }: WorkflowTabProps) => {
   const base = `/api/workflows/${encodeURIComponent(project)}/${encodeURIComponent(wf)}`;
   const mediaUrl = `/api/media?project=${encodeURIComponent(project)}&wf=${encodeURIComponent(wf)}&limit=200`;
   const media = usePagedApiQuery<MediaItem>(mediaUrl, { topics: [`wf:${project}:${wf}`, 'system'], intervalMs: 60_000, getKey: item => String(item.artifactId) });
@@ -347,19 +380,19 @@ function EvidenceTab({ project, wf }: { readonly project: string; readonly wf: s
         <p className="text-sm">{t('{proven}/{total} proven · {stale} stale · {missing} missing · {owed} must-have owed', { proven: proof.summary.proven, total: proof.summary.total, stale: proof.summary.stale, missing: proof.summary.missing, owed: proof.summary.mustOwed })}</p>
         <p className="text-muted-foreground">{t('Graph version {n}', { n: proof.graphVersion ?? t('Unknown') })}</p>
         <RecordedPayload value={coverage.data} />
-      </> : coverage.meta && !coverage.error && !partialSources(coverage).length ? <p className="text-muted-foreground">{t('No coverage snapshot yet')}</p> : null}</Panel>
+      </> : null}{!(coverage.data && proof) && coverage.meta && !coverage.error && !partialSources(coverage).length ? <p className="text-muted-foreground">{t('No coverage snapshot yet')}</p> : null}</Panel>
       <Panel embedded title={t('Proof integrity')} concept="C11"><ReadState snapshot={verify} url={`${base}/verify`} />{verify.data && integrity ? <>
         <SnapshotFacts read={verify.data} />
         <StatusChip className="w-fit" status={integrity.ok ? 'success' : 'failed'} label={integrity.ok ? t('Proof integrity passed') : t('Proof integrity failed')} />
         <p className="text-sm">{t('{intact}/{checked} files intact · {unchained} unchained · {events} chain events', { intact: integrity.files.intact, checked: integrity.files.checked, unchained: integrity.files.unchained, events: integrity.chain.events })}</p>
         <RecordedPayload value={verify.data} />
-      </> : verify.meta && !verify.error && !partialSources(verify).length ? <p className="text-muted-foreground">{t('No verify snapshot yet')}</p> : null}</Panel>
+      </> : null}{!(verify.data && integrity) && verify.meta && !verify.error && !partialSources(verify).length ? <p className="text-muted-foreground">{t('No verify snapshot yet')}</p> : null}</Panel>
     </div>
     <ReadState snapshot={media} url={mediaUrl} /><div className="divide-y">{media.data?.map(item => <Link key={item.artifactId} href={item.blob.href} target="_blank" rel="noreferrer" className="flex w-full min-w-0 items-start gap-3 py-4 text-sm text-foreground"><Layers3 className="size-4 shrink-0" aria-hidden="true" /><span className="flex min-w-0 flex-1 flex-col gap-2"><span className="whitespace-pre-wrap break-words font-medium">{item.label ?? item.name}</span><span className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground"><span>{item.role}</span><span>{item.attempt == null ? t('No attempt association recorded') : t('Attempt #{id}', { id: item.attempt })}</span></span><span className="break-all font-mono text-xs text-muted-foreground">#{item.artifactId} · {item.job}</span></span><ArrowRight className="size-4 shrink-0" aria-hidden="true" /></Link>)}</div>{media.meta && !media.error && !partialSources(media).length && !media.data?.length && <p className="text-sm text-muted-foreground">{t('No media yet.')}</p>}<MoreRows read={media} />
   </Panel>;
-}
+};
 
-function InfraTab({ project, wf }: { readonly project: string; readonly wf: string }) {
+const InfraTab = ({ project, wf }: WorkflowTabProps) => {
   const url = `/api/workflows/${encodeURIComponent(project)}/${encodeURIComponent(wf)}/worktrees?all=1`;
   const worktrees = usePagedApiQuery<Worktree>(url, { topics: ['system'], intervalMs: 60_000, getKey: item => item.path });
   return <Panel title={t('Infrastructure · worktrees')} concept="C15">
@@ -379,15 +412,15 @@ function InfraTab({ project, wf }: { readonly project: string; readonly wf: stri
           <p className="break-all font-mono text-muted-foreground">{item.jobId ?? t('not recorded')}</p>
         </div></Table.Cell>
         <Table.Cell className="align-top"><div className="flex flex-col gap-2 text-xs text-muted-foreground"><p>{t('Created {at}', { at: formatAbsolute(item.createdAt) })}</p>{item.removedAt != null && <p>{t('Removed {at}', { at: formatAbsolute(item.removedAt) })}</p>}</div></Table.Cell>
-        <Table.Cell className="max-w-[280px] align-top"><div className="flex min-w-0 flex-col gap-2"><Chip size="sm" variant="tertiary"><Chip.Label>{item.removedAt != null ? t('removed') : t('Removal not recorded')}</Chip.Label></Chip>{item.removeError && <p className="whitespace-pre-wrap break-words text-xs text-danger">{item.removeError}</p>}</div></Table.Cell>
+        <Table.Cell className="max-w-[280px] align-top"><div className="flex min-w-0 flex-col gap-2"><Chip size="sm" variant="tertiary"><Chip.Label>{item.removedAt != null ? t('removed') : t('Removal not recorded')}</Chip.Label></Chip>{item.removeError && <p className="whitespace-pre-wrap break-words text-xs text-danger-soft-foreground">{item.removeError}</p>}</div></Table.Cell>
       </Table.Row>)}</Table.Body>
     </Table.Content></Table.ScrollContainer></Table> : null}
     {worktrees.meta && !worktrees.error && !partialSources(worktrees).length && !worktrees.data?.length && <p className="text-sm text-muted-foreground">{t('No worktrees recorded.')}</p>}<MoreRows read={worktrees} />
   </Panel>;
-}
+};
 
 /** The op-chain opener resets when the workflow or tab changes; a selected leg opens it (closing the drawer keeps it mounted and focused). */
-function useChainOpen(project: string, wf: string, tab: WorkflowTab, legOp: string | null) {
+const useChainOpen = (project: string, wf: string, tab: WorkflowTab, legOp: string | null) => {
   const chainDefault = tab === 'units' || tab === 'graph';
   const [chainOpen, setChainOpen] = useState(() => chainDefault || Boolean(legOp));
   const chainScope = JSON.stringify([project, wf, tab]);
@@ -398,9 +431,12 @@ function useChainOpen(project: string, wf: string, tab: WorkflowTab, legOp: stri
     else if (legOp) setChainOpen(true);
   }
   return [chainOpen, setChainOpen] as const;
-}
+};
 
-export function WorkflowPage({ project, wf, tab = 'units' }: { readonly project: string; readonly wf: string; readonly tab?: WorkflowTab }) {
+type WorkflowPageProps = { readonly project: string; readonly wf: string; readonly tab?: WorkflowTab };
+
+/** Workflow detail page: header and progress, the op chain, a collapsed advanced area and one tab per record family (units, attempts, decisions, why, timeline, evidence, infrastructure). */
+export const WorkflowPage = ({ project, wf, tab = 'units' }: WorkflowPageProps) => {
   const [now, setNow] = useState(() => Date.now());
   const legOp = query().get('leg');
   const [chainOpen, setChainOpen] = useChainOpen(project, wf, tab, legOp);
@@ -450,7 +486,7 @@ export function WorkflowPage({ project, wf, tab = 'units' }: { readonly project:
           {pipe && !pipe.scheduling.readError && <Advanced keepMounted title={t('Scheduling graph reference · derivedPlan')} className="text-xs text-muted-foreground"><ul className="space-y-1 font-mono">{pipe.scheduling.ops.map(op => <li key={op} className="break-all">{op}</li>)}{pipe.scheduling.edges.map(edge => <li key={`${edge.from}>${edge.to}`} className="break-all">{edge.from} → {edge.to}</li>)}</ul></Advanced>}
           <div className="grid min-w-0 gap-6 min-[760px]:gap-8 lg:grid-cols-2">
             <Panel embedded title={t('Awaiting decision · {n}', { n: row.counts.decisionsOpen })} concept="C12"><ReadState snapshot={decisions} url={decisionsUrl} includeAlerts={false} /><div className="divide-y">{decisions.data?.map(item => <Link key={item.key} href={item.href} className="flex w-full min-w-0 items-start gap-3 py-3 text-sm text-foreground"><span className="flex min-w-0 flex-1 flex-col gap-2"><span className="flex flex-wrap items-center gap-2"><StatusChip status={statusFromUi(item.ui)} label={item.status} /><WhyOwnerBadge owner={item.decider} /></span><span className="whitespace-pre-wrap break-words">{item.summary}</span><span className="block break-all font-mono text-xs text-muted-foreground">{item.id}{item.overdue ? t(' · overdue') : ''}</span></span><ArrowRight className="size-4 shrink-0" aria-hidden="true" /></Link>)}</div>{decisions.meta && !decisions.error && !partialSources(decisions).length && !decisions.data?.length && <p className="text-sm text-muted-foreground">{t('No pending decisions.')}</p>}<MoreRows read={decisions} includeFailure={false} /></Panel>
-            <Panel embedded title={t('Blocking · {n}', { n: row.blockedBy.length })} concept="C4"><div className="divide-y">{row.blockedBy.map((item, index) => <Link key={`${item.ref.kind}-${item.ref.id}-${index}`} href={item.ref.href} className="flex w-full min-w-0 items-start gap-3 py-3 text-sm text-foreground"><span className="text-xs tabular-nums text-muted-foreground">{index + 1}.</span><StatusDot status={statusFromUi(item.ui)} /><span className="min-w-0 flex-1 break-words">{formatReason(item.reason)}<span className="block text-xs text-muted-foreground">{t('{who} · since {at}', { who: item.who, at: formatAbsolute(item.since) })}</span></span><ArrowRight className="size-4 shrink-0" aria-hidden="true" /></Link>)}</div>{row.blockedBy.length === 0 && <p className="text-sm text-muted-foreground">{t('No blockers recorded.')}</p>}</Panel>
+            <Panel embedded title={t('Blocking · {n}', { n: row.blockedBy.length })} concept="C4"><div className="divide-y">{keyByOccurrence(row.blockedBy, item => `${item.ref.kind}-${item.ref.id}`).map(({ key, item }, index) => <Link key={key} href={item.ref.href} className="flex w-full min-w-0 items-start gap-3 py-3 text-sm text-foreground"><span className="text-xs tabular-nums text-muted-foreground">{index + 1}.</span><StatusDot status={statusFromUi(item.ui)} /><span className="min-w-0 flex-1 break-words">{formatReason(item.reason)}<span className="block text-xs text-muted-foreground">{t('{who} · since {at}', { who: item.who, at: formatAbsolute(item.since) })}</span></span><ArrowRight className="size-4 shrink-0" aria-hidden="true" /></Link>)}</div>{row.blockedBy.length === 0 && <p className="text-sm text-muted-foreground">{t('No blockers recorded.')}</p>}</Panel>
           </div>
         </div>
       </Advanced>
@@ -469,9 +505,11 @@ export function WorkflowPage({ project, wf, tab = 'units' }: { readonly project:
       <Tabs.Panel id="infra" className="min-w-0">{tab === 'infra' && <InfraTab project={project} wf={wf} />}</Tabs.Panel>
     </Tabs></StaggerItem>
   </Stagger>;
-}
+};
 
-export default function WorkflowRoutePage() {
+const WorkflowRoutePage = () => {
   const route = useRoute();
   return route.kind === 'workflow' ? <WorkflowPage project={route.project} wf={route.wf} tab={route.tab} /> : null;
-}
+};
+
+export default WorkflowRoutePage;

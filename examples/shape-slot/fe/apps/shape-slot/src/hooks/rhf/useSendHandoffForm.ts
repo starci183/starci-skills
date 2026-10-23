@@ -30,7 +30,7 @@ type SendHandoffFormValues = z.infer<ReturnType<typeof useSendHandoffValidation>
 
 type UseSendHandoffFormParams = {
     readonly handoffId: string
-    readonly input?: SendInput
+    readonly input: SendInput | undefined
     readonly onReviewed: () => void
     readonly onSent: () => void
     readonly onClosed: () => void

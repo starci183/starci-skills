@@ -1,43 +1,51 @@
 import * as React from "react"
 import { Tooltip as HeroTooltip } from "@heroui/react"
 import { cn } from "@/lib/utils"
+import { Button, type ButtonControlProps } from "./button"
 
 const DelayContext = React.createContext(0)
 
-function TooltipProvider({ delayDuration = 0, children }: Readonly<{ delayDuration?: number; children?: React.ReactNode }>) {
+const TooltipProvider = ({ delayDuration = 0, children }: Readonly<{ delayDuration?: number; children?: React.ReactNode }>) => {
   return <DelayContext value={delayDuration}>{children}</DelayContext>
-}
+};
 
-function Tooltip({ open, delayDuration, ...props }:
-  Omit<React.ComponentProps<typeof HeroTooltip.Root>, "isOpen" | "delay"> & { open?: boolean; delayDuration?: number }) {
+type TooltipProps = Omit<React.ComponentProps<typeof HeroTooltip.Root>, "isOpen" | "delay"> & { open?: boolean; delayDuration?: number }
+
+const Tooltip = ({ open, delayDuration, ...props }: TooltipProps) => {
   const delay = React.useContext(DelayContext)
-  return <HeroTooltip.Root isOpen={open} delay={delayDuration ?? delay} {...props} />
-}
+  return <HeroTooltip.Root {...(open === undefined ? {} : { isOpen: open })} delay={delayDuration ?? delay} {...props} />
+};
 
-function TooltipTrigger({ asChild = false, children, ...props }:
-  React.ComponentProps<"button"> & { asChild?: boolean }) {
+type TooltipTriggerProps = Omit<ButtonControlProps, "asChild"> & { asChild?: boolean }
+
+const TooltipTrigger = ({ asChild = false, children, ...props }: TooltipTriggerProps) => {
   // A HeroUI Button or Link reads the vendor's focus/hover context without cloning.
   if (asChild) return <>{children}</>
-  return <HeroTooltip.Trigger<"button"> data-ui="tooltip-trigger" {...props}
-    render={triggerProps => <button {...triggerProps} type={props.type ?? "button"} />}>
-    {children}
-  </HeroTooltip.Trigger>
+  return <Button data-ui="tooltip-trigger" {...props}>{children}</Button>
+};
+
+type TooltipContentProps = React.ComponentProps<typeof HeroTooltip.Content> & {
+  side?: "top" | "right" | "bottom" | "left"
+  align?: "start" | "center" | "end"
+  sideOffset?: number
+  hidden?: boolean
 }
 
-function TooltipContent({ className, side = "top", align = "center", sideOffset, children, hidden, placement, offset, showArrow = true, ...props }:
-  React.ComponentProps<typeof HeroTooltip.Content> & {
-    side?: "top" | "right" | "bottom" | "left"
-    align?: "start" | "center" | "end"
-    sideOffset?: number
-    hidden?: boolean
-  }) {
-  const alignment = side === 'left' || side === 'right' ? align === 'start' ? 'top' : 'bottom' : align
+/** The cross-axis alignment a side-and-align pair resolves to: a vertical edge aligns top or bottom, a horizontal one keeps the requested alignment. */
+const crossAlignment = (side: NonNullable<TooltipContentProps["side"]>, align: NonNullable<TooltipContentProps["align"]>) => {
+  if (side !== "left" && side !== "right") return align
+  return align === "start" ? "top" : "bottom"
+}
+
+const TooltipContent = ({ className, side = "top", align = "center", sideOffset, children, hidden, placement, offset, showArrow = true, ...props }: TooltipContentProps) => {
+  const alignment = crossAlignment(side, align)
   const resolvedPlacement = align === 'center' ? side : `${side} ${alignment}` as NonNullable<React.ComponentProps<typeof HeroTooltip.Content>['placement']>
+  const distance = offset ?? sideOffset
   if (hidden) return null
   return <HeroTooltip.Content data-ui="tooltip-content" placement={placement ?? resolvedPlacement}
-    offset={offset ?? sideOffset} showArrow={showArrow} className={cn("max-w-xs text-xs", className)} {...props}>
+    {...(distance === undefined ? {} : { offset: distance })} showArrow={showArrow} className={cn("max-w-xs text-xs", className)} {...props}>
     {children}{showArrow && <HeroTooltip.Arrow />}
   </HeroTooltip.Content>
-}
+};
 
 export { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger }

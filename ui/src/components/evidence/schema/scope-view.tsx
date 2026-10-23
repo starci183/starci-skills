@@ -5,24 +5,30 @@ import { Advanced } from '../../motion';
 import { Card, Chip } from '@heroui/react';
 import { t } from '../../../i18n/t';
 
+/** Names the C8 evidence concept this module belongs to, for the scope and ownership view. */
 export const concept: Concept = 'C8';
 
 type Rec = Record<string, unknown>;
 const rec = (v: unknown): Rec | null => (v && typeof v === 'object' && !Array.isArray(v) ? v as Rec : null);
 const arr = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
-const str = (v: unknown): string | null => (typeof v === 'string' && v ? v : typeof v === 'number' ? String(v) : null);
+const str = (v: unknown): string | null => {
+  if (typeof v === 'string' && v) return v;
+  return typeof v === 'number' ? String(v) : null;
+};
 const strs = (v: unknown): string[] => arr(v).map(x => str(x) ?? '').filter(Boolean);
 
-function Section({ title, count, children }: Readonly<{ title: string; count?: number; children: ReactNode }>) {
+const Section = ({ title, count, children }: Readonly<{ title: string; count?: number; children: ReactNode }>) => {
   return <section className="min-w-0">
     <h4 className="mb-2 flex items-baseline gap-2 text-sm font-semibold">{title}{count != null ? <span className="text-xs font-normal text-muted-foreground">{count}</span> : null}</h4>
     {children}
   </section>;
-}
-const Bullets = ({ items }: { items: string[] }) => <ul className="max-w-[72ch] list-disc space-y-1 pl-5 text-sm">{items.map(t => <li key={t} className="break-words">{t}</li>)}</ul>;
+};
+type BulletsProps = Readonly<{ items: string[] }>;
+
+const Bullets = ({ items }: BulletsProps) => <ul className="max-w-[72ch] list-disc space-y-1 pl-5 text-sm">{items.map(t => <li key={t} className="break-words">{t}</li>)}</ul>;
 
 /** `starci/scope-evidence@1` (scope.json): what the op decided to include, own, defer and how far its effects may reach. */
-export function ScopeView({ data }: Readonly<{ data: unknown }>) {
+export const ScopeView = ({ data }: Readonly<{ data: unknown }>) => {
   const root = rec(data) ?? {};
   const scope = rec(root.scope) ?? {};
   const request = rec(scope.request) ?? {};
@@ -49,9 +55,9 @@ export function ScopeView({ data }: Readonly<{ data: unknown }>) {
 
     {nodes.length ? <Section title={t('Selected nodes')} count={nodes.length}>
       <ul className="grid min-w-0 gap-x-6 md:grid-cols-2">
-        {nodes.map((n, i) => {
+        {nodes.map(n => {
           const dependsOn = strs(n.dependsOn); const grounding = strs(n.grounding);
-          return <li key={str(n.id) ?? i} className="min-w-0 border-b py-4">
+          return <li key={str(n.id) ?? JSON.stringify(n)} className="min-w-0 border-b py-4">
             <div className="flex flex-wrap items-center gap-2"><code className="min-w-0 break-all font-mono text-xs font-semibold">{str(n.id)}</code>{str(n.kind) ? <Chip size="sm" variant="soft"><Chip.Label>{str(n.kind)}</Chip.Label></Chip> : null}</div>
             {str(n.purpose) ? <p className="mt-1 break-words text-muted-foreground">{str(n.purpose)}</p> : null}
             {str(n.path) ? <p className="mt-2 text-xs"><span className="text-muted-foreground">{t('Owned path:')} </span><code className="break-all font-mono">{str(n.path)}</code></p> : null}
@@ -74,4 +80,4 @@ export function ScopeView({ data }: Readonly<{ data: unknown }>) {
     {criteria.length ? <Section title={t('Completion criteria')}><Bullets items={criteria} /></Section> : null}
     {questions.length ? <Section title={t('Open questions')} count={questions.length}><Bullets items={questions} /></Section> : null}
   </Card>;
-}
+};

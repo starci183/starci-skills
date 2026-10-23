@@ -48,7 +48,7 @@ test('nest.json is gone: be.json is the one back-end preset, and the package exp
   for (const target of Object.values(manifest.exports)) assert.ok(fs.existsSync(path.join(here, target)), target);
 });
 
-const STRICT_FLAGS = ['strict', 'noImplicitAny', 'strictNullChecks', 'noUncheckedIndexedAccess', 'noImplicitOverride', 'noImplicitReturns', 'noFallthroughCasesInSwitch', 'noUnusedLocals', 'noUnusedParameters'];
+const STRICT_FLAGS = ['strict', 'noImplicitAny', 'strictNullChecks', 'noUncheckedIndexedAccess', 'exactOptionalPropertyTypes', 'noImplicitOverride', 'noImplicitReturns', 'noFallthroughCasesInSwitch', 'noUnusedLocals', 'noUnusedParameters'];
 
 for (const name of PRESETS) {
   test(`${name} inherits every strictness flag of base.json, none of them lowered`, () => {
@@ -136,6 +136,22 @@ test('an implicit any, an unchecked index and an unused local each fail to compi
         const codes = ts.getPreEmitDiagnostics(ts.createProgram([source], options)).map((d) => d.code);
         assert.ok(codes.includes(code), `${name} ${file}: expected TS${code}, got ${codes.join(',')}`);
       }
+    }
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+
+test('an explicit undefined in an optional property fails to compile under every preset', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-tsconfig-exact-'));
+  try {
+    const source = path.join(dir, 'optional.ts');
+    fs.writeFileSync(source, 'export const options: { readonly signal?: AbortSignal } = { signal: undefined }\n');
+    for (const name of PRESETS) {
+      const options = { ...effective(name), noEmit: true, incremental: false, plugins: undefined };
+      const codes = ts.getPreEmitDiagnostics(ts.createProgram([source], options)).map((d) => d.code);
+      assert.ok(codes.includes(2375), `${name}: expected TS2375, got ${codes.join(",")}`);
     }
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });

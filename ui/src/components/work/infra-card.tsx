@@ -8,12 +8,15 @@ import { t } from '../../i18n/t';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Table } from '../ui/table';
 
+/** The business concept id (C15) under which the infrastructure card is filed; it is stamped on data-concept so the rendered DOM traces back to its spec. */
 export const concept: Concept = 'C15';
 
+const embeddedProps = { inset: 'none', variant: 'transparent' } as const;
+
 /** Recorded storage and dispatch custody; terminal records do not establish current process liveness. */
-export function WorkflowInfraCard({ where, usage, embedded = false }: Readonly<{ where: WorkflowWhere; usage: Usage; embedded?: boolean }>) {
+export const WorkflowInfraCard = ({ where, usage, embedded = false }: Readonly<{ where: WorkflowWhere; usage: Usage; embedded?: boolean }>) => {
   return <section aria-label={t('Infrastructure and cost')} className="min-w-0">
-    <Card size="sm" inset={embedded ? 'none' : undefined} variant={embedded ? 'transparent' : undefined}>
+    <Card size="sm" {...(embedded ? embeddedProps : {})}>
       <CardHeader><CardTitle><h3>{t('Infrastructure & cost')}</h3></CardTitle></CardHeader>
       <CardContent className="flex min-w-0 flex-col gap-4">
         <p className="text-xs text-muted-foreground">{t('Recorded paths and dispatch custody. Current process liveness is unknown.')}</p>
@@ -58,4 +61,4 @@ export function WorkflowInfraCard({ where, usage, embedded = false }: Readonly<{
       </CardContent>
     </Card>
   </section>;
-}
+};

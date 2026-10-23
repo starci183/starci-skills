@@ -18,6 +18,7 @@ import { useRoute } from '../../router';
 import type { ContractInfo, LogRow, WorkflowRow } from '../../contract';
 import { partialSources } from '../../components/charts/chart-card';
 
+/** The business concept id (C17) under which the logs page is filed; it is stamped on data-concept so the rendered DOM traces back to its spec. */
 export const concept: Concept = 'C17';
 
 const inputClass = 'w-full min-w-0';
@@ -32,7 +33,7 @@ const asTime = (value: string | null) => {
 const fromTime = (value: string) => value ? String(new Date(value).getTime()) : '';
 const unique = (rows: LogRow[]): LogRow[] => [...new Map(rows.map((row) => [row.key, row])).values()].sort((a, b) => b.at - a.at || a.db.localeCompare(b.db) || b.seq - a.seq);
 
-function FilterFields({ filters, onChange, contract }: Readonly<{ filters: URLSearchParams; onChange: (name: string, value: string) => void; contract: ContractInfo | null }>) {
+const FilterFields = ({ filters, onChange, contract }: Readonly<{ filters: URLSearchParams; onChange: (name: string, value: string) => void; contract: ContractInfo | null }>) => {
   const fieldId = useId();
   const level = filters.get('minLevel') === 'warn' ? 'warn+' : filters.get('level') ?? 'all';
   const changeLevel = (value: string) => onChange('levelChoice', value);
@@ -45,19 +46,19 @@ function FilterFields({ filters, onChange, contract }: Readonly<{ filters: URLSe
     <div className="grid grid-cols-2 gap-2"><label className="grid min-w-0 gap-1 text-xs font-medium">Controller<Input value={filters.get('controller') ?? ''} onChange={(event) => onChange('controller', event.target.value)} placeholder={t('Controller name')} /></label><label className="grid min-w-0 gap-1 text-xs font-medium">{t('Kind prefix')}<Input value={filters.get('kind') ?? ''} onChange={(event) => onChange('kind', event.target.value)} placeholder={t('Example: reconciler.')} /></label></div>
     <div className="grid grid-cols-2 gap-2"><label className="grid min-w-0 gap-1 text-xs font-medium">{t('From')}<Input type="datetime-local" value={asTime(filters.get('since'))} onChange={(event) => onChange('since', fromTime(event.target.value))} /></label><label className="grid min-w-0 gap-1 text-xs font-medium">{t('Until')}<Input type="datetime-local" value={asTime(filters.get('until'))} onChange={(event) => onChange('until', fromTime(event.target.value))} /></label></div>
   </div>;
-}
+};
 
 const chipClass = 'max-w-full min-w-0';
 const chip = (active: boolean) => ({ className: `${chipClass}${active ? ' [&_[data-slot=select-trigger]]:bg-default' : ''}`, size: 'sm' as const, 'data-active': active });
 const ranges = [['900000', 'Last 15 minutes'], ['3600000', 'Last hour'], ['86400000', 'Last 24 hours'], ['604800000', 'Last 7 days']] as const;
 
-function changeRange(onChange: (name: string, value: string) => void, value: string): void {
+const changeRange = (onChange: (name: string, value: string) => void, value: string): void => {
   if (value === 'custom') return;
   onChange('until', '');
   onChange('since', value ? String(Date.now() - Number(value)) : '');
-}
+};
 
-function FilterBar({ filters, onChange, contract, onMore, activeCount, workflows }: Readonly<{ filters: URLSearchParams; onChange: (name: string, value: string) => void; contract: ContractInfo | null; workflows: Pick<WorkflowRow, 'id' | 'name' | 'project'>[]; onMore: () => void; activeCount: number }>) {
+const FilterBar = ({ filters, onChange, contract, onMore, activeCount, workflows }: Readonly<{ filters: URLSearchParams; onChange: (name: string, value: string) => void; contract: ContractInfo | null; workflows: Pick<WorkflowRow, 'id' | 'name' | 'project'>[]; onMore: () => void; activeCount: number }>) => {
   const level = filters.get('minLevel') === 'warn' ? 'warn+' : filters.get('level') ?? 'all';
   const customRange = filters.has('since') || filters.has('until');
   const advancedActive = filters.has('wf') || filters.has('actor') || filters.has('kind') || customRange || filters.has('since') || filters.has('until');
@@ -80,7 +81,7 @@ function FilterBar({ filters, onChange, contract, onMore, activeCount, workflows
       </div>
     </Advanced>
   </fieldset>;
-}
+};
 
 type StreamStatus = 'connecting' | 'live' | 'reconnecting';
 type Live = { key: string; streamed: LogRow[]; pending: LogRow[]; fresh: ReadonlySet<string> };
@@ -88,15 +89,15 @@ const emptyLive = (key: string): Live => ({ key, streamed: [], pending: [], fres
 const liveFor = (prev: Live, key: string): Live => prev.key === key ? prev : emptyLive(key);
 const STREAM_LIMIT = 200;
 
-function parseStreamRow(data: string): LogRow | null {
+const parseStreamRow = (data: string): LogRow | null => {
   try {
     const row = JSON.parse(data) as LogRow;
     return row.key && typeof row.at === 'number' ? row : null;
   } catch { return null; /* A malformed frame cannot replace a valid row. */ }
-}
+};
 
 /** Live tail: rows streamed after the first page, held back while the reader has scrolled away from the top. */
-function useLogStream(filterKey: string, following: boolean, streamUrl: string, apiUrl: string, base: LogRow[] | null) {
+const useLogStream = (filterKey: string, following: boolean, streamUrl: string, apiUrl: string, base: LogRow[] | null) => {
   const [liveState, setLive] = useState<Live>(() => emptyLive(filterKey));
   const [status, setStatus] = useState<StreamStatus>('connecting');
   const pausedRef = useRef(false);
@@ -161,9 +162,9 @@ function useLogStream(filterKey: string, following: boolean, streamUrl: string, 
   };
   const resume = () => { pausedRef.current = false; flushPending(); };
   return { rows, pending: live.pending, fresh: live.fresh, status, onScroll, resume };
-}
+};
 
-function applyWorkflowChoice(next: URLSearchParams, value: string): boolean {
+const applyWorkflowChoice = (next: URLSearchParams, value: string): boolean => {
   if (!value) { next.delete('wf'); return true; }
   try {
     const parsed: unknown = JSON.parse(value);
@@ -174,17 +175,17 @@ function applyWorkflowChoice(next: URLSearchParams, value: string): boolean {
     next.set('wf', wf);
     return true;
   } catch { return false; }
-}
+};
 
-function applyLevelChoice(next: URLSearchParams, value: string): void {
+const applyLevelChoice = (next: URLSearchParams, value: string): void => {
   next.delete('level');
   next.delete('minLevel');
   if (value === 'warn+') next.set('minLevel', 'warn');
   else if (value !== 'all') next.set('level', value);
-}
+};
 
 /** Updates the filters held in the URL hash; unparsable workflow choices are ignored. */
-function changeFilter(name: string, value: string): void {
+const changeFilter = (name: string, value: string): void => {
   const next = new URLSearchParams(window.location.hash.split('?')[1] ?? '');
   if (name === 'clear') for (const field of filterFields) next.delete(field);
   else if (name === 'workflowChoice') { if (!applyWorkflowChoice(next, value)) return; }
@@ -193,49 +194,51 @@ function changeFilter(name: string, value: string): void {
   else next.delete(name);
   const search = next.size ? `?${next}` : '';
   window.location.hash = `#/logs${search}`;
-}
+};
 
-function followLabel(searching: boolean, exactRecord: boolean, following: boolean, status: StreamStatus): string {
+const followLabel = (searching: boolean, exactRecord: boolean, following: boolean, status: StreamStatus): string => {
   if (searching) return `${t('Search results')} · ${t('Polling')}`;
   if (exactRecord) return t('Polling');
   if (!following) return t('Follow live');
   return status === 'live' ? t('Following live') : t('Reconnecting');
-}
+};
 
-function followHint(searching: boolean, exactRecord: boolean): string | undefined {
+const followHint = (searching: boolean, exactRecord: boolean): string | undefined => {
   if (searching) return t('Follow does not support full-text search; clear the keyword to enable.');
   return exactRecord ? t('Exact record lookup uses polling.') : undefined;
-}
+};
 
 type FollowState = { searching: boolean; exactRecord: boolean; following: boolean; status: StreamStatus };
 
-function LogsHeader({ activeCount, follow, onFollow, onOpenFilters }: Readonly<{ activeCount: number; follow: FollowState; onFollow: (value: boolean) => void; onOpenFilters: () => void }>) {
+const LogsHeader = ({ activeCount, follow, onFollow, onOpenFilters }: Readonly<{ activeCount: number; follow: FollowState; onFollow: (value: boolean) => void; onOpenFilters: () => void }>) => {
   const { searching, exactRecord, following, status } = follow;
   return <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs text-muted-foreground">{t('StarCi / observation')}</p><h1 className="mt-1 text-2xl font-semibold tracking-tight">{t('Logs')}</h1><p className="mt-1 text-sm text-muted-foreground">{t('The event stream from the host and project ledgers; filters live in the URL.')}</p></div>
     <div className="flex gap-2"><Button variant="outline" size="sm" className="md:hidden" onClick={onOpenFilters}><Filter size={15} /> {t('Filters')}{activeCount ? ` (${activeCount})` : ''}</Button><span title={followHint(searching, exactRecord)}><ToggleButton size="sm" isSelected={following} isDisabled={searching || exactRecord} onChange={onFollow}><Radio size={15} /> {followLabel(searching, exactRecord, following, status)}</ToggleButton></span></div></div>;
-}
+};
 
-function LogsSummary({ logs, rowCount, observed }: Readonly<{ logs: PagedQuerySnapshot<LogRow>; rowCount: number; observed: boolean }>) {
+const LogsSummary = ({ logs, rowCount, observed }: Readonly<{ logs: PagedQuerySnapshot<LogRow>; rowCount: number; observed: boolean }>) => {
   const sources = [...new Set(logs.meta?.sources.map(source => source.db) ?? [])];
   return <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground"><div className="flex flex-wrap items-center gap-2"><span>{t('{n} rows loaded', { n: observed ? rowCount : '—' })}</span><span>{sources.length ? sources.map((source) => source === 'machine' ? t('machine') : source).join(' · ') : t('Unknown')}</span></div><div className="flex min-w-0 items-center gap-2"><span>{logs.observedAt !== null ? t('Last successful API read: {at}', { at: formatAbsolute(logs.observedAt) }) : t('No successful API read yet')}</span><Button variant="ghost" size="icon" aria-label={t('Refresh')} onClick={logs.refresh}><RefreshCw size={15} /></Button></div></div>;
-}
+};
 
 type LogListProps = Readonly<{ logs: PagedQuerySnapshot<LogRow>; rows: LogRow[]; observed: boolean; fresh: ReadonlySet<string>; regionRef: Ref<HTMLDivElement>; onRegionScroll: (top: number) => void }>;
 
-function LogList({ logs, rows, observed, fresh, regionRef, onRegionScroll }: LogListProps) {
+const LogList = ({ logs, rows, observed, fresh, regionRef, onRegionScroll }: LogListProps) => {
   const unreadable = partialSources(logs).length > 0;
   const showRows = observed && (rows.length > 0 || !logs.error && !unreadable);
   const refreshFirst = logs.loadMoreErrorCode === 'BAD_CURSOR';
+  const waiting = !observed && !logs.error;
   return <>
     {logs.error && <FeedbackState error onRetry={logs.refresh}>{logs.data ? t('The source is failing; keeping the last rows read. ') : t('Could not read the logs. ')}{logs.error}</FeedbackState>}
     {unreadable ? <SourceWarning>{t('Source out of sync: {list}', { list: partialSources(logs).join(', ') })}</SourceWarning> : null}
-    {!observed && !logs.error ? <PageSkeleton label={t('Reading the logs…')} /> : showRows ? <LogView rows={rows} freshKeys={fresh} regionRef={regionRef} onRegionScroll={onRegionScroll} /> : null}
+    {waiting ? <PageSkeleton label={t('Reading the logs…')} /> : null}
+    {!waiting && showRows ? <LogView rows={rows} freshKeys={fresh} regionRef={regionRef} onRegionScroll={onRegionScroll} /> : null}
     {logs.loadMoreError && <FeedbackState error onRetry={refreshFirst ? logs.refresh : logs.loadMore}>{logs.loadMoreError}{refreshFirst ? ` · ${t('Refresh first page')}` : ''}</FeedbackState>}
     {logs.next && <Button variant="outline" className="w-full" disabled={logs.loadingMore} onClick={logs.loadMore}>{logs.loadingMore ? t('Loading…') : t('Load more')}</Button>}
   </>;
-}
+};
 
-export default function LogsPage() {
+const LogsPage = () => {
   const route = useRoute();
   const filterKey = route.kind === 'logs' ? route.filters.toString() : '';
   const filters = useMemo(() => new URLSearchParams(filterKey), [filterKey]);
@@ -279,4 +282,6 @@ export default function LogsPage() {
     </div>
     <Drawer open={filterOpen} onOpenChange={setFilterOpen} title={t('Log filters')} description={t('The choices are saved in the URL.')}><FilterFields filters={filters} onChange={changeFilter} contract={contract.data} /><div className="mt-6 grid grid-cols-2 gap-2"><Button variant="outline" onClick={() => changeFilter('clear', '')}>{t('Clear filters')}</Button><Button onClick={() => setFilterOpen(false)}>{t('View results')}</Button></div></Drawer>
   </ConceptBlock>;
-}
+};
+
+export default LogsPage;

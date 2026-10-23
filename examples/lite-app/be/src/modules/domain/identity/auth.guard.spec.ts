@@ -30,6 +30,13 @@ interface DoorMetadata {
     readonly credentialPrincipal?: CredentialPrincipal
 }
 
+/** The slice of the request the guard reads; an absent principal is an explicit undefined, never a mock function. */
+interface GuardRequest {
+    headers: Request["headers"]
+    principal: Principal | undefined
+    credentialPrincipal: CredentialPrincipal | undefined
+}
+
 const build = async (authorization?: string, door: DoorMetadata = {}) => {
     const reflector = mock<Reflector>()
     reflector.getAllAndOverride.mockImplementation((key: unknown) =>
@@ -37,7 +44,7 @@ const build = async (authorization?: string, door: DoorMetadata = {}) => {
     )
     const verifier = mock<AccessTokenVerifier>()
     const verify = verifier.verify
-    const request = mock<Request>({
+    const request = mock<GuardRequest>({
         headers: authorization === undefined ? {} : { authorization },
         principal: undefined,
         credentialPrincipal: door.credentialPrincipal,

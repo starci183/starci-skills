@@ -14,6 +14,7 @@ import { t } from '../i18n/t';
 import type { UiState } from '../contract';
 import type { AttemptStep } from '../router';
 
+/** The business concept id (frame) under which the component kit preview page is filed; it is stamped on data-concept so the rendered DOM traces back to its spec. */
 export const concept: Concept = 'frame';
 
 const states: UiState[] = ['bad', 'warn', 'running', 'waiting', 'ok', 'done', 'unknown'];
@@ -37,7 +38,7 @@ const steps = [
   { key: 'land', state: 'unknown', at: null },
 ] as const;
 
-function ThemeKit({ theme }: Readonly<{ theme: 'light' | 'dark' }>) {
+const ThemeKit = ({ theme }: Readonly<{ theme: 'light' | 'dark' }>) => {
   return <div className={'kit-preview ' + theme} data-theme={theme}>
     <Card variant="transparent" className="min-w-0">
       <Card.Header>
@@ -141,13 +142,15 @@ function ThemeKit({ theme }: Readonly<{ theme: 'light' | 'dark' }>) {
       </Card.Content>
     </Card>
   </div>;
-}
+};
 
-export default function KitPage() {
+const KitPage = () => {
   const [step, setStep] = useState<AttemptStep>('checks');
   return <ConceptBlock concept="frame" className="flex min-w-0 flex-col gap-6 md:gap-8">
     <header className="grid gap-2"><h1 className="text-2xl font-semibold tracking-tight">{t('Component kit')}</h1><p className="text-sm text-muted-foreground">{t('A UI sample for checking both themes. The numbers below are demo data of the component kit.')}</p></header>
     <div className="kit-grid"><ThemeKit theme="light" /><ThemeKit theme="dark" /></div>
     <ConceptBlock concept="C7"><Card><Card.Header><Card.Title>{t('Attempt lifecycle')}</Card.Title><Card.Description>{t('Demo data · no live source')}</Card.Description></Card.Header><Card.Content className="grid gap-4"><StepBar steps={toneSteps} selected={step} onSelect={setStep} /><StepBar steps={[...steps]} selected={step} onSelect={setStep} /></Card.Content></Card></ConceptBlock>
   </ConceptBlock>;
-}
+};
+
+export default KitPage;

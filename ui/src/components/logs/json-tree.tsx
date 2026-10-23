@@ -3,17 +3,18 @@ import { Accordion, Card } from '@heroui/react';
 import type { Concept } from '../concept';
 import { t } from '../../i18n/t';
 
+/** The business concept id (C17) under which the collapsible JSON tree is filed; it is stamped on data-concept so the rendered DOM traces back to its spec. */
 export const concept: Concept = 'C17';
 
 const isObject = (value: unknown): value is Record<string, unknown> | unknown[] => typeof value === 'object' && value !== null;
 
-function Scalar({ value }: Readonly<{ value: unknown }>) {
+const Scalar = ({ value }: Readonly<{ value: unknown }>) => {
   if (value === null) return <span className="text-muted-foreground">null</span>;
   if (typeof value === 'string') return <span className="break-words whitespace-pre-wrap text-foreground">"{value}"</span>;
   return <span className="text-foreground">{String(value as number | boolean)}</span>;
-}
+};
 
-function Node({ name, value, depth }: Readonly<{ name?: string; value: unknown; depth: number }>) {
+const Node = ({ name, value, depth }: Readonly<{ name?: string; value: unknown; depth: number }>) => {
   const [open, setOpen] = useState(depth < 1);
   const label = name != null ? <span className="text-muted-foreground">{name}: </span> : null;
   if (!isObject(value)) return <div className="py-1 pl-4">{label}<Scalar value={value} /></div>;
@@ -33,9 +34,9 @@ function Node({ name, value, depth }: Readonly<{ name?: string; value: unknown; 
       </Accordion.Body></Accordion.Panel>
     </Accordion.Item>
   </Accordion>;
-}
+};
 
 /** Collapsible JSON tree (no HTML injection: every leaf is rendered as text). */
-export function JsonTree({ value }: Readonly<{ value: unknown }>) {
+export const JsonTree = ({ value }: Readonly<{ value: unknown }>) => {
   return <Card variant="transparent" className="max-h-80 overflow-auto p-0 font-mono text-xs leading-5" aria-label={t('JSON data')}><Card.Content><Node value={value} depth={0} /></Card.Content></Card>;
-}
+};

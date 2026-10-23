@@ -18,6 +18,13 @@ const principal: Principal = { id: "user-1", role: "authenticated" }
 const API_KEY: CredentialPrincipal = { kind: "api-key", subject: "key-1", workspaceId: "ws-1" }
 const TOOL_TOKEN: CredentialPrincipal = { kind: "tool-token", subject: "tool-1", workspaceId: "ws-1" }
 
+/** The slice of the request the guard reads; an absent principal is an explicit undefined, never a mock function. */
+interface GuardRequest {
+    headers: Request["headers"]
+    principal: Principal | undefined
+    credentialPrincipal: CredentialPrincipal | undefined
+}
+
 const build = async (metadata: PublicMetadata | undefined, credential?: CredentialMetadata) => {
     const verifier = mock<{ verify: VerifySupabaseAccessToken }>()
     const reflector = mock<Reflector>()
@@ -39,10 +46,11 @@ const contextOf = (
     credentialPrincipal?: CredentialPrincipal,
     sessionPrincipal?: Principal,
 ) => {
-    const request = mock<Request>()
-    request.headers = authorization === undefined ? {} : { authorization }
-    request.principal = sessionPrincipal
-    request.credentialPrincipal = credentialPrincipal
+    const request = mock<GuardRequest>({
+        headers: authorization === undefined ? {} : { authorization },
+        principal: sessionPrincipal,
+        credentialPrincipal,
+    })
     const http = mock<ReturnType<ExecutionContext["switchToHttp"]>>()
     http.getRequest.mockReturnValue(request)
     const context = mock<ExecutionContext>()

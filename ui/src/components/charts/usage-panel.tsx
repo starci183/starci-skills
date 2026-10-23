@@ -1,4 +1,5 @@
 import type { Concept } from '../concept';
+/** Names the C16 analytics concept this module belongs to, for the token usage panel. */
 export const concept: Concept = 'C16';
 import { Card, Meter, ProgressBar } from '@heroui/react';
 import { useApiQuery, type QuerySnapshot } from '../../api/query';
@@ -10,15 +11,17 @@ import { FeedbackState } from '../feedback-state';
 type Group = UsageRow & { k: string };
 type UsageWindow = { window: '24h' | '7d'; recorded: boolean; byModel: Group[]; byOp: Group[]; byProvider: Group[]; byDay: Group[]; sources: string[] };
 
+const TRANSPARENT_FILL = { background: 'transparent' };
+
 const tokens = (row: UsageRow) => (row.input ?? 0) + (row.output ?? 0);
 const dayLabel = (key: string) => { const [, m, d] = key.split('-'); return `${d}/${m}`; };
 
-function Stat({ label, value, hint }: Readonly<{ label: string; value: string; hint?: string }>) {
+const Stat = ({ label, value, hint }: Readonly<{ label: string; value: string; hint?: string | undefined }>) => {
   return <Card variant="transparent" className="min-w-0"><Card.Header><Card.Description className="text-[13px]">{label}</Card.Description></Card.Header><Card.Content><p className="truncate text-xl font-semibold tabular-nums" title={hint}>{value}</p></Card.Content></Card>;
-}
+};
 
 /** Horizontal bars: input (blue) and output (green) per row, sorted by the server. */
-function TokenRows({ title, rows, name }: Readonly<{ title: string; rows: Group[]; name: (k: string) => string }>) {
+const TokenRows = ({ title, rows, name }: Readonly<{ title: string; rows: Group[]; name: (k: string) => string }>) => {
   const max = Math.max(1, ...rows.map(tokens));
   return <div className="min-w-0">
     <h4 className="m-0 mb-2 text-[13px] font-medium text-muted-foreground">{title}</h4>
@@ -29,7 +32,7 @@ function TokenRows({ title, rows, name }: Readonly<{ title: string; rows: Group[
         {row.input != null && row.output != null ? <Meter className="mt-1" value={tokens(row)} minValue={0} maxValue={max}
           aria-label={t('{name}: in {input}, out {output}', { name: name(row.k), input: compactVi(row.input), output: compactVi(row.output) })}
           valueLabel={t('in {input} · out {output} · {cost}', { input: compactVi(row.input), output: compactVi(row.output), cost: costVi(row.costUsd) })}>
-          <Meter.Track>{tokens(row) > 0 && <Meter.Fill style={{ background: 'transparent' }}>
+          <Meter.Track>{tokens(row) > 0 && <Meter.Fill style={TRANSPARENT_FILL}>
             <svg viewBox={`0 0 ${tokens(row)} 1`} preserveAspectRatio="none" className="h-full w-full" aria-hidden="true">
               <rect width={row.input} height="1" data-tone="running" className="fill-[var(--tone)]" />
               <rect x={row.input} width={row.output} height="1" data-tone="success" className="fill-[var(--tone)]" />
@@ -39,40 +42,48 @@ function TokenRows({ title, rows, name }: Readonly<{ title: string; rows: Group[
       </li>)}
     </ul>
   </div>;
-}
+};
+
+/** The plotted figure of a day: its cost when any day reported cost, else its token total, else unknown. */
+const dayValue = (r: Group, hasCost: boolean): number | null => {
+  if (hasCost) return r.costUsd;
+  return r.input == null && r.output == null ? null : tokens(r);
+};
 
 /** Cost (or, when no cost was reported, token) per day as columns. */
-function PerDay({ rows }: Readonly<{ rows: Group[] }>) {
+const PerDay = ({ rows }: Readonly<{ rows: Group[] }>) => {
   const hasCost = rows.some(r => r.costUsd != null);
-  const value = (r: Group) => hasCost ? r.costUsd : r.input == null && r.output == null ? null : tokens(r);
-  const max = Math.max(1e-9, ...rows.flatMap(r => value(r) == null ? [] : [value(r)!]));
+  const value = (r: Group) => dayValue(r, hasCost);
+  const max = Math.max(1e-9, ...rows.flatMap(r => value(r) ?? []));
   return <div>
     <h4 className="m-0 mb-2 text-[13px] font-medium text-muted-foreground">{hasCost ? t('Cost per day (USD, Vietnam time)') : t('Tokens per day (no provider-reported cost yet)')}</h4>
     <div className="flex h-36 max-w-full items-end gap-3 overflow-x-auto pb-1" role="img" aria-label={t('Columns per day')}>
       {rows.map(r => <div key={r.k} data-tone="running" className="flex min-w-16 flex-1 flex-col items-center justify-end gap-1" title={`${dayLabel(r.k)}: ${hasCost ? costVi(r.costUsd) : compactVi(value(r))}`}>
         <span className="text-[13px] tabular-nums text-muted-foreground">{hasCost ? costVi(r.costUsd) : compactVi(value(r))}</span>
-        {value(r) != null ? <svg viewBox="0 0 40 88" preserveAspectRatio="none" className="w-full max-w-10" style={{ height: `${(value(r)! / max) * 88}px` }} aria-hidden="true"><rect width="40" height="88" className="fill-[var(--tone)]" /></svg> : <span className="text-[13px] text-muted-foreground">—</span>}
+        {value(r) != null ? <svg viewBox="0 0 40 88" preserveAspectRatio="none" className="w-full max-w-10" style={{ height: `${(value(r) ?? 0) / max * 88}px` }} aria-hidden="true"><rect width="40" height="88" className="fill-[var(--tone)]" /></svg> : <span className="text-[13px] text-muted-foreground">—</span>}
         <span className="text-[13px] tabular-nums text-muted-foreground">{dayLabel(r.k)}</span>
       </div>)}
     </div>
   </div>;
-}
+};
 
-function sumKey(groups: readonly Group[], key: keyof UsageRow): number | null {
+const sumKey = (groups: readonly Group[], key: keyof UsageRow): number | null => {
   const values = groups.flatMap(r => typeof r[key] === 'number' ? [r[key] as number] : []);
   return values.length ? values.reduce((s, value) => s + value, 0) : null;
-}
+};
 
-function coverageOf(groups: readonly Group[], field: 'input' | 'output' | 'costUsd') {
+const coverageOf = (groups: readonly Group[], field: 'input' | 'output' | 'costUsd') => {
   const known = groups.reduce((n, row) => n + (row.completeness?.fields[field]?.known ?? 0), 0);
   const total = groups.reduce((n, row) => n + (row.completeness?.fields[field]?.total ?? row.n ?? 0), 0);
   return { known, total, complete: total > 0 && known === total };
-}
+};
 
-const ratio = (c: { known: number; total: number }) => `${c.known}/${c.total}`;
+type Coverage = { known: number; total: number };
+
+const ratio = (c: Coverage) => `${c.known}/${c.total}`;
 const optionalText = (value: number | null) => value == null ? undefined : String(value);
 
-function RecordedUsage({ usage }: Readonly<{ usage: UsageWindow }>) {
+const RecordedUsage = ({ usage }: Readonly<{ usage: UsageWindow }>) => {
   const groups = usage.byModel;
   const tin = sumKey(groups, 'input'), tout = sumKey(groups, 'output');
   const cacheRead = sumKey(groups, 'cacheRead'), cacheWrite = sumKey(groups, 'cacheWrite');
@@ -96,18 +107,19 @@ function RecordedUsage({ usage }: Readonly<{ usage: UsageWindow }>) {
     {usage.byProvider.length > 1 ? <TokenRows title={t('Tokens by provider')} rows={usage.byProvider} name={k => k} /> : null}
     {usage.byDay.length ? <PerDay rows={usage.byDay} /> : null}
   </div>;
-}
+};
 
-function UsageBody({ usage, query }: Readonly<{ usage: UsageWindow | null; query: QuerySnapshot<UsageWindow> }>) {
+const UsageBody = ({ usage, query }: Readonly<{ usage: UsageWindow | null; query: QuerySnapshot<UsageWindow> }>) => {
   if (usage?.recorded) return <RecordedUsage usage={usage} />;
   const partial = partialSources(query).length > 0;
   if (usage !== null && !query.error && !partial) return <FeedbackState>
     <span className="block font-medium">{t('Nothing recorded yet')}</span><span className="mt-1 block">{t('No attempt in this range has reported token or cost figures yet. Once the provider returns them the numbers will show here.')}</span>
   </FeedbackState>;
   return partial ? <FeedbackState>{t('Available sources returned no usage; the full scope is incomplete.')}</FeedbackState> : null;
-}
+};
 
-export function UsagePanel({ window: win, project }: Readonly<{ window: '24h' | '7d'; project: string }>) {
+/** Shows recorded token and cost usage for a window, with coverage figures so missing measurements read as unknown rather than zero. */
+export const UsagePanel = ({ window: win, project }: Readonly<{ window: '24h' | '7d'; project: string }>) => {
   const projectQuery = project ? `&project=${encodeURIComponent(project)}` : '';
   const url = `/api/metrics/usage?window=${win}${projectQuery}`;
   const query = useApiQuery<UsageWindow>(url, { topics: ['workers'], intervalMs: 30_000 });
@@ -117,4 +129,4 @@ export function UsagePanel({ window: win, project }: Readonly<{ window: '24h' | 
     <p className="mb-3 text-xs text-muted-foreground">{t('Scope: {scope}', { scope: project || t('Active project ledgers') })}</p>
     <UsageBody usage={query.data} query={query} />
   </ChartCard>;
-}
+};

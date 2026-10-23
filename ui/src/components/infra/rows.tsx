@@ -1,6 +1,7 @@
 import type { Concept } from '../concept';
 import type { Tone } from '../status';
 
+/** The business concept id (frame) under which the shared infrastructure detail rows are filed; it is stamped on data-concept so the rendered DOM traces back to its spec. */
 export const concept: Concept = 'frame';
 
 import { useState, type ReactNode } from 'react';
@@ -18,22 +19,24 @@ export const compactNumber = (value: number | null | undefined): string => {
   if (abs >= 1e4) return `${(value / 1e3).toFixed(1)}k`;
   return new Intl.NumberFormat('vi-VN').format(value);
 };
+/** A dollar amount with cents below 100 and whole dollars above, or a dash when nothing was recorded. */
 export const usd = (value: number | null | undefined): string => (value == null ? '—' : `$${value.toFixed(value >= 100 ? 0 : 2)}`);
 
 /** One label/value row; stacks label above value on narrow screens. */
-export function InfoRow({ label, children }: Readonly<{ label: string; children: ReactNode }>) {
+export const InfoRow = ({ label, children }: Readonly<{ label: string; children: ReactNode }>) => {
   return <div className="flex flex-col gap-1 border-b border-border py-2 text-[13px] last:border-b-0 sm:flex-row sm:items-start sm:gap-4">
     <dt className="shrink-0 text-muted-foreground sm:w-36">{label}</dt>
     <dd className="m-0 min-w-0 flex-1 break-words [overflow-wrap:anywhere]">{children}</dd>
   </div>;
-}
+};
 
-export function InfoChip({ children, tone }: Readonly<{ children: ReactNode; tone?: Tone }>) {
+/** A small soft chip for a fact about an item, tinted by its tone and dashed when the item was skipped. */
+export const InfoChip = ({ children, tone }: Readonly<{ children: ReactNode; tone?: Tone }>) => {
   return <Chip size="sm" variant="soft" data-tone={tone} className={`text-xs ${tone ? 'bg-[var(--tone-bg)] text-[var(--tone)]' : 'text-muted-foreground'} ${tone === 'skipped' ? 'border border-dashed border-[var(--tone-line)]' : ''}`}><Chip.Label>{children}</Chip.Label></Chip>;
-}
+};
 
 /** Mono id with a copy button (copies `copy ?? value`). */
-export function CopyId({ value, copy, title }: Readonly<{ value: string | null | undefined; copy?: string; title?: string }>) {
+export const CopyId = ({ value, copy, title }: Readonly<{ value: string | null | undefined; copy?: string; title?: string }>) => {
   const [copied, setCopied] = useState(false);
   if (!value) return <span className="text-muted-foreground">—</span>;
   const full = copy ?? value;
@@ -44,6 +47,10 @@ export function CopyId({ value, copy, title }: Readonly<{ value: string | null |
       {copied ? <Check className="size-3" aria-hidden="true" /> : <Copy className="size-3" aria-hidden="true" />}{copied ? t('Copied') : t('Copy')}
     </Button>
   </span>;
-}
+};
 
-export const ShaId = ({ sha }: Readonly<{ sha: string | null | undefined }>) => <CopyId value={sha ? sha.slice(0, 10) : null} copy={sha ?? undefined} title={sha ?? undefined} />;
+/** A git sha shortened to ten characters, with the full sha as its copy value and tooltip. */
+export const ShaId = ({ sha }: Readonly<{ sha: string | null | undefined }>) => {
+  if (!sha) return <CopyId value={null} />;
+  return <CopyId value={sha.slice(0, 10)} copy={sha} title={sha} />;
+};
