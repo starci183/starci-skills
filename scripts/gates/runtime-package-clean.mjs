@@ -16,6 +16,9 @@ import { isLinkLike } from '../api/fs/is-link-like.mjs';
 import { makeTempDir } from '../api/fs/make-temp-dir.mjs';
 import { tarFiles } from '../lib/tar-files.mjs';
 import { cleanEnv, gitTrackedUnder, PROOF_CODES, verifyPackedDependencies } from './package-clean-test.mjs';
+import { RUNTIME_MANIFEST_FILE, loadSlotManifest, ruleParams } from '../hfs/slots.mjs';
+import { driftOfRuntime } from '../hfs/sync-runtime.mjs';
+import { trimTrailingSlashes } from '../hfs/trailing-slashes.mjs';
 
 const PROBE = `
 import fs from 'node:fs';
@@ -78,6 +81,27 @@ const childEnvironment = (env, attempt) => {
     TEMP: path.join(attempt, 'temp'), TMP: path.join(attempt, 'temp'), TMPDIR: path.join(attempt, 'temp'), STARCI_ROLE: 'owner' };
 };
 
+/**
+ * The archive holds exactly the tracked set: every packed path is a git-tracked file of the root, or a file under a declared generated root
+ * (ruleParams.runtime.generated: the packages' runtime/ copies and the UI catalog, git-ignored output of their generator) whose copies equal what the
+ * generator writes from the tracked sources (driftOfRuntime). An ignored build cache, an untracked scratch file or a stale copy is red: npm's `files`
+ * selection over the working tree minus everything git does not track is the selection over the tracked set, so the archive equals it.
+ * Returns null, or the detail of the red. `deps.trackedUnder` and `deps.generatedDrift` are the seams of the two reads.
+ */
+export function untrackedPackedFiles({ files, root, deps = {} }) {
+  const tracked = (deps.trackedUnder ?? gitTrackedUnder)(root);
+  if (!tracked?.length) return { unrun: 'the tracked file inventory of the root is unavailable or empty' };
+  const trackedSet = new Set(tracked);
+  const generatedRoots = (deps.generatedRoots ?? (() => ruleParams(loadSlotManifest({ root, file: path.join(root, RUNTIME_MANIFEST_FILE) }), 'runtime').generated.map((entry) => `${trimTrailingSlashes(String(entry.root))}/`)))();
+  const packed = [...files.keys()].map((file) => file.replace(/^package\//u, ''));
+  const generated = packed.filter((file) => !trackedSet.has(file) && generatedRoots.some((prefix) => file.startsWith(prefix)));
+  const foreign = packed.filter((file) => !trackedSet.has(file) && !generatedRoots.some((prefix) => file.startsWith(prefix))).sort(byCodeUnit);
+  if (foreign.length) return { red: `root archive carries ${foreign.length} file(s) git does not track (ignored build output or scratch; the archive must equal the tracked set): ${foreign.slice(0, 5).join(', ')}` };
+  const drift = generated.length ? (deps.generatedDrift ?? driftOfRuntime)(root) : [];
+  if (drift.length) return { red: `root archive carries generated copies that differ from their generator (${drift.length}): ${drift.slice(0, 5).join('; ')}; run starci release sync-runtime` };
+  return { tracked: packed.length - generated.length, generated: generated.length };
+}
+
 /** The archive checks after the tarball is read: {required, payload}, or {error: finish result}. */
 const verifyArchive = ({ files, manifest, expectedIntegrity, integrity, root, deps, finish }) => {
   if (integrity !== expectedIntegrity) return { error: finish('red', PROOF_CODES.install, 'actual archive differs from the frozen publish pack') };
@@ -88,13 +112,16 @@ const verifyArchive = ({ files, manifest, expectedIntegrity, integrity, root, de
   if (unresolved.length) return { error: finish('red', PROOF_CODES.install, `root archive scripts import modules the archive omits (${unresolved.length}): ${unresolved.slice(0, 5).join('; ')}`) };
   const privateFile = [...files.keys()].find((file) => file.replaceAll('\\', '/').split('/').at(-1).toLowerCase() === SECRET_ENV_FILE.toLowerCase() || /^package[\\/]ext[\\/]sonar[\\/]secrets(?:[\\/]|$)/i.test(file));
   if (privateFile) return { error: finish('red', PROOF_CODES.install, `root archive contains private host configuration or custody: ${privateFile}`) };
+  const inventory = untrackedPackedFiles({ files, root, deps });
+  if (inventory.unrun) return { error: finish('unrun', PROOF_CODES.unrun, inventory.unrun) };
+  if (inventory.red) return { error: finish('red', PROOF_CODES.install, inventory.red) };
   const required = ['skills/starci/SKILL.md', 'skills/starci/agents/openai.yaml', 'skills/starci/references/host-startup.md',
     'ui/server.mjs', 'ui/api/index.mjs', 'ui/package.json', 'ui/package-lock.json'];
   const uiFiles = (deps.trackedUnder ?? gitTrackedUnder)(path.join(root, 'ui'));
   if (!uiFiles?.some((file) => file.startsWith('src/'))) return { error: finish('unrun', PROOF_CODES.unrun, 'tracked UI source inventory is unavailable or empty') };
   required.push(...uiFiles.filter((file) => /^(src|api)\//.test(file)).map((file) => `ui/${file}`));
   if (required.some((file) => !files.has(`package/${file}`))) return { error: finish('red', PROOF_CODES.install, 'root archive omits an owning prompt or UI source input') };
-  const payload = { name: manifest.name, version: manifest.version, files };
+  const payload = { name: manifest.name, version: manifest.version, files, inventory };
   const sourceFailure = verifyPackedDependencies([payload], root, { packageRoots: new Map([[manifest.name, root]]) });
   if (sourceFailure) return { error: finish('red', PROOF_CODES.install, sourceFailure) };
   return { required, payload };
