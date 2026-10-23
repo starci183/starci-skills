@@ -107,7 +107,7 @@ starci app db migrate [--execute] [--local | --linked | --url-env <NAME>] [--jso
 starci app db post-cutover [--execute] [--green-at <ISO> | --owner-confirms-old-app-gone] [--linked | --url-env <NAME>] [--json] [--cwd <dir>]
 starci app release gate [--execute] [--source <ref>] [--tag-prefix <prefix>] [--json] [--cwd <dir>]
 starci app release push [--execute] [--remote <name>] [--json] [--cwd <dir>]
-starci app upgrade --edition full [--plan] [--cwd <dir>]
+starci app upgrade [--edition full] [--plan] [--cwd <dir>]
 starci app stack <up|down|status> [--stack <dir>] [--services <list>] [--k3d] [--force] [--json] [--cwd <dir>]
 starci app stack <prepare|doctor|connect|disconnect|build-args|render|deploy|converge|verify|rollback|prune|backup|jobs> --env <env> [--execute] [--json] [--cwd <dir>]
 starci app explain <path> [--cwd <dir>] [--json]

@@ -61,6 +61,13 @@ unchanged lite tree through the full-edition view. The check is read-only; `--db
 comparison when the local stack is available. Applying `starci app upgrade --edition full` adds the full-only managed configuration,
 test layers and cli requirements without rewriting product code. Downgrade to lite is not supported.
 
+A new full app ships its test world (`scaffold/test-world.mjs`): the `@starci/test-world` declaration under `be/src/tests/world/`
+(the dev stack's Postgres per connection, the api apps, the cli app's migration runner as the migrate step), an integration spec of
+readiness over the real database and one e2e spec per api app booted over the migrated database, beside the contract spec of the
+be skeleton, so `test:integration`, `test:e2e` and `test:contract` of the release gate run real specs. On a full app that has no
+`be/src/tests/world/global-setup.ts`, `starci app upgrade [--plan]` adds those files and the test devDependencies it lacks; a world
+file that exists and differs refuses (`HFS_UPGRADE_FILE_CONFLICT`) and nothing is overwritten.
+
 ## Creating a service
 
 Every file of a spec-required role of `ruleParams.be.unitRoles` — a `*.service.ts`, a `*.cli.ts` of the cli feature root — owes exactly one colocated `<name>.<role>.spec.ts` (unit test standard), and any other file of a `ruleParams.be.logicRoles` role inside a `coverage: required` slot may carry one beside it. `starci app new` is the one way a service and its spec come into being together:

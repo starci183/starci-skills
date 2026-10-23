@@ -38,7 +38,7 @@ const words = name => name.replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/([A-Z
 export const pascalOf = name => words(name).map(word => word[0].toUpperCase() + word.slice(1).toLowerCase()).join('');
 /** `InjectPrimaryEntityManager` -> `PRIMARY_ENTITY_MANAGER`. */
 const tokenNameOf = decorator => words(decorator.replace(/^Inject/, '')).map(word => word.toUpperCase()).join('_');
-const camelOf = name => { const pascal = pascalOf(name); return pascal[0].toLowerCase() + pascal.slice(1); };
+export const camelOf = name => { const pascal = pascalOf(name); return pascal[0].toLowerCase() + pascal.slice(1); };
 
 const SERVICE_NAME = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 

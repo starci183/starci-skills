@@ -1,4 +1,6 @@
-// starci app upgrade --edition full: the additive edition migration from a lite app to the full HFS tree.
+// starci app upgrade --edition full: the additive edition migration from a lite app to the full HFS tree. On a full app,
+// `starci app upgrade` completes it instead: it adds the test world (scaffold/test-world.mjs) the app lacks, with the world's
+// devDependencies at canon pins, and never rewrites a file the app already has.
 //
 // The upgrade is deliberately assembled from the same full-edition render and scaffold templates as a new full app. It never
 // rewrites an existing product source file. A dry run returns the exact ordered operations; apply performs those operations and
@@ -14,6 +16,7 @@ import {
 } from "../runtime/scripts/hfs/slots.mjs";
 import { managedScriptNames } from "../runtime/scripts/hfs/architecture/managed-scripts.mjs";
 import { LOCK_STEP, npmLock, scaffoldWorkSeeds } from "../scaffold/app.mjs";
+import { WORLD_MARKER, testWorldFiles } from "../scaffold/test-world.mjs";
 import { byCodeUnit } from "../report/order.mjs";
 import {
   TEMPLATES_DIR,
@@ -306,13 +309,54 @@ function additionStep(root, file, authored) {
   return null;
 }
 
+/**
+ * The steps that complete an existing full app: every test world file it lacks when it has no world (an existing file that is not
+ * the scaffold's refuses, nothing is overwritten) and the full test toolchain devDependencies it lacks, at canon pins.
+ */
+function fullCompletion(root, declaration) {
+  const steps = [];
+  if (!fs.existsSync(path.join(root, ...WORLD_MARKER.split("/")))) {
+    for (const file of testWorldFiles(declaration)) {
+      const step = additionStep(root, file, new Map());
+      if (step) steps.push({ ...step, why: "Add the full test world and its baseline integration and e2e specs." });
+    }
+  }
+  const current = readJson(root, "package.json");
+  const missing = FULL_DEV_DEPENDENCIES.filter(
+    (name) => current.devDependencies?.[name] === undefined && current.dependencies?.[name] === undefined,
+  );
+  if (missing.length) {
+    const pins = parseYaml(fs.readFileSync(PINS_FILE, "utf8")).pins;
+    const added = pinnedPackage(root, pins).devDependencies;
+    const devDependencies = Object.fromEntries(
+      Object.entries({ ...current.devDependencies, ...Object.fromEntries(missing.map((name) => [name, added[name]])) })
+        .sort(([a], [b]) => a.localeCompare(b)),
+    );
+    steps.push({
+      op: "rewrite-managed",
+      path: "package.json",
+      why: `Add the test world toolchain the full app lacks (${missing.join(", ")}) at canon pins.`,
+      content: jsonText({ ...current, devDependencies }),
+      kind: "file",
+    });
+    steps.push({ op: "rewrite-managed", path: "package-lock.json", why: `Resolve the added pinned dependencies with ${LOCK_STEP}.`, kind: "lock" });
+  }
+  return { managed: [], steps, dependenciesChanged: missing.length > 0 };
+}
+
 async function model({ root, to, presets, manifest }) {
-  if (to !== "full")
+  if (to !== undefined && to !== "full")
     throw new UpgradeError(
       "HFS_UPGRADE_TARGET_INVALID",
       "upgrade supports only --edition full",
     );
   const declaration = loadHfs(root, manifest);
+  if (declaration?.edition !== "lite") return fullCompletion(root, declaration);
+  if (to === undefined)
+    throw new UpgradeError(
+      "HFS_UPGRADE_USAGE",
+      "a lite app upgrades with starci app upgrade --edition full",
+    );
   const hadCli = declaration.sides.be.apps.some(
     (app) => app.kind === "cli" && app.name === "cli",
   );
@@ -449,7 +493,7 @@ async function upgradeEdition({
       if (!locked.ok)
         throw new UpgradeError(
           "HFS_UPGRADE_LOCK_FAILED",
-          `\`${LOCK_STEP}\` could not resolve the upgraded lockfile (${locked.detail}); the lite app was restored`,
+          `\`${LOCK_STEP}\` could not resolve the upgraded lockfile (${locked.detail}); the app was restored`,
         );
     }
   } catch (error) {
@@ -474,11 +518,6 @@ function upgradeArguments(argv) {
     } else if (arg === "--plan") plan = true;
     else throw new UpgradeError("HFS_UPGRADE_USAGE", `unknown argument ${arg}`);
   }
-  if (to === undefined)
-    throw new UpgradeError(
-      "HFS_UPGRADE_USAGE",
-      "starci app upgrade needs --edition full",
-    );
   return { root, to, plan };
 }
 
@@ -491,7 +530,7 @@ export async function upgradeMain(
   const steps = await upgradeEdition({ root, to, plan, presets });
   for (const step of steps) stdout(`${step.op} ${step.path}: ${step.why}\n`);
   stdout(
-    `starci app upgrade --edition full${plan ? " --plan" : ""}: ${steps.length} step${steps.length === 1 ? "" : "s"} ${plan ? "planned; no file written" : "applied"}\n`,
+    `starci app upgrade${to ? ` --edition ${to}` : ""}${plan ? " --plan" : ""}: ${steps.length} step${steps.length === 1 ? "" : "s"} ${plan ? "planned; no file written" : "applied"}${steps.length === 0 ? " (the full app is complete)" : ""}\n`,
   );
   return 0;
 }

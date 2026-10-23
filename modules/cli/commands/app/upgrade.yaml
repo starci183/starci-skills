@@ -1,11 +1,14 @@
 group: app
 verb: upgrade
 owner: "@starci/hfs"
-summary: upgrade a lite app to the full edition (--edition full); a full app is already current
+summary: upgrade a lite app to full (--edition full), or add the test world a full app lacks
 impl: null
 flags:
   - {name: plan, type: boolean, summary: preview the upgrade without writing}
-exit: {"0": already full, "2": refusal or bad usage}
+exit: {"0": "upgraded, completed, or the full app is already complete", "2": refusal or bad usage}
 json: none
-examples: ['starci app upgrade', 'starci app upgrade --edition full --plan']
+conventions:
+  - "a full app without be/src/tests/world/global-setup.ts gets the test world of a new full app and the test devDependencies it lacks"
+  - "a world file that exists and differs refuses HFS_UPGRADE_FILE_CONFLICT; nothing is overwritten"
+examples: ['starci app upgrade', 'starci app upgrade --plan', 'starci app upgrade --edition full --plan']
 editions: [full, lite]

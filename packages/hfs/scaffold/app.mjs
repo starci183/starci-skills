@@ -21,6 +21,7 @@ import { dbTypesPath, generateDbTypes } from '../emit/db-types.mjs';
 import { TEMPLATES_DIR, appSource, imageFiles, render, renderTargets, writeTargets } from '../sync/index.mjs';
 import { ScaffoldError } from './service.mjs';
 import { SUPABASE_PORT_VARIABLES, supabasePortVars } from './supabase-ports.mjs';
+import { testWorldFiles } from './test-world.mjs';
 import { FE_APP_SCRIPTS, PACKAGE_MANAGER, WORKSPACES, WORKSPACE_LINT, feAppPackageName } from '../runtime/scripts/hfs/rules/monorepo.mjs';
 import { isLinkLike } from '../runtime/scripts/api/fs/is-link-like.mjs';
 import { unlinkOnly } from '../runtime/scripts/api/fs/lib.mjs';
@@ -685,6 +686,8 @@ export function scaffoldApp({ name, into, presets, edition = 'full', authCallbac
       { path: `fe/packages/${name}-${pkg}/tsconfig.build.json`, content: jsonText(fePackageBuildTsconfig()) },
     ])),
     ...['app', 'be', 'fe'].flatMap(scope => skeletonOf(scope, app, { sonarGate: sonarGateName(parseYaml(fs.readFileSync(SONAR_GATE_FILE, 'utf8')), app.edition), timestamp, registryVisibility, ...supabasePortVars(name) })),
+    // A full app has a test world (integration, e2e and contract are rows of its release gate); lite has none (ruling:R212/case-3, hosting amended by owner:lite-production-swarm).
+    ...(app.edition === 'lite' ? [] : testWorldFiles(app)),
   ];
   const writes = scaffoldWrites(root, original);
   try {

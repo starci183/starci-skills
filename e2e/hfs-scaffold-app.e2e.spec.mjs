@@ -11,6 +11,7 @@
 //   npm run migrate     `cli migrate run` against a REAL Postgres: @starci/test-world's stack.attach (the world/attach API
 //                       the jest world setup itself calls) provisions the run's own database and the `primary`
 //                       connection's schema-per-context login over the shared warm stack; stack.detach drops them again.
+//   npm run test:integration, test:e2e, test:contract   the test world the scaffold ships, each layer over the real warm stack.
 // The Postgres image is the one the example app's stack declaration pins (examples/full-app/.starcistacks). The whole
 // proof needs Docker: an unavailable docker FAILS the test (no skip); the release gate counts a skipped test red as well.
 import { test } from 'node:test';
@@ -87,7 +88,7 @@ const dockerProbe = spawnSync('docker', ['info'], { encoding: 'utf8', windowsHid
 const dockerUnavailable = dockerProbe.status === 0 ? false
   : `docker is unavailable: ${dockerProbe.error?.message ?? `${dockerProbe.stderr ?? dockerProbe.stdout ?? ''}`.trim().split(/\r?\n/)[0] ?? 'docker info failed'}`;
 
-test('starci app scaffold end to end: npm ci, codegen + typecheck, starci app lint clean, the be unit run and cli migrate run over a real Postgres', { timeout: 1_800_000 }, async (t) => {
+test('starci app scaffold end to end: npm ci, codegen + typecheck, starci app lint clean, the be unit run, cli migrate run over a real Postgres and the test world layers', { timeout: 2_700_000 }, async (t) => {
   assert.equal(dockerUnavailable, false, String(dockerUnavailable));
   assertTestWorldInstalled();
   const into = mkdtemp(t, 'hfs-scaffold-e2e-');
@@ -169,6 +170,15 @@ test('starci app scaffold end to end: npm ci, codegen + typecheck, starci app li
     assert.ok(names.includes('primary_migrations'), `the migrations ledger exists in the primary schema: ${names.join(', ')}`);
   } finally {
     await client.end().catch(() => undefined);
+  }
+
+  // The test world the scaffold ships (scaffold/test-world.mjs): the managed integration, e2e and contract scripts the release
+  // gate runs, each over the real warm stack its own globalSetup attaches; every test of every layer passes, none skipped.
+  const worldEnv = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('STARCI_')));
+  for (const layer of ['test:integration', 'test:e2e', 'test:contract']) {
+    const run = await step(`npm run ${layer}`, ['run', layer, '--', `--cacheDirectory=${path.join(into, '.jest-cache')}`], { env: worldEnv, timeout: 900_000 });
+    const summary = /Tests:\s+(\d+) passed, (\d+) total/.exec(`${run.stdout}\n${run.stderr}`);
+    assert.ok(summary && Number(summary[1]) > 0 && summary[1] === summary[2], `${layer} ran its specs and every test passed:\n${tail(run)}`);
   }
 });
 
