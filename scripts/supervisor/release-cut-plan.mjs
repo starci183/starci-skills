@@ -21,11 +21,12 @@ import { candidatePolicy } from './release-candidate.mjs';
  * answers `gh run list`. The verdict itself is the candidate CI of the exact sha being cut (scripts/supervisor/release-candidate.mjs, OWNER RULING candidate-ci 2026-10-18), no longer
  * the latest run on main: a red main no longer needs an owner override before the next release, and a red candidate never reaches main.
  */
-function ciPreflight({ repo, deps = {} }) {
+function ciPreflight({ repo, head, deps = {} }) {
   const unknown = (why) => ({ verdict: 'RELEASE_CI_UNKNOWN', why: `RELEASE_CI_UNKNOWN: ${why}; a cut must not proceed blind`, findings: [] });
   for (const workflow of (deps.candidatePolicy ?? candidatePolicy)().workflows) {
     try {
-      const reply = (deps.workflowRuns ?? workflowRuns)({ workflow, limit: 1 }, { cwd: repo });
+      // Read by the commit being cut: a workflow this release adds is not on the default branch yet, so GitHub cannot list it by name.
+      const reply = (deps.workflowRuns ?? workflowRuns)({ workflow, sha: head, limit: 1 }, { cwd: repo });
       if (reply.status !== 0 || !Array.isArray(JSON.parse(reply.stdout))) return unknown(`cannot read the runs of the ${workflow} workflow the candidate CI waits for`);
     } catch {
       return unknown(`cannot read the runs of the ${workflow} workflow the candidate CI waits for`);
@@ -67,7 +68,7 @@ export function publishPlanRefusal({ repo, deps = {} }) {
 
 /** The refusal of a cut before any suite runs: the candidate CI readable, leftovers in the checkout, the release definition, the publish plan, then SonarCloud (only when a Sonar proof will run); null when none refuses. */
 export async function preSuiteRefusal({ repo, run, cwd, head, remote, branch, tag, deps = {}, sonar = true }) {
-  return ciPreflight({ repo, deps }) ?? leftoversRefusal({ repo, deps }) ?? definitionRefusal({ run, cwd, head, remote, branch, tag, deps }) ?? publishPlanRefusal({ repo, deps }) ?? (sonar ? await sonarCloudRefusal({ repo, deps }) : null);
+  return ciPreflight({ repo, head, deps }) ?? leftoversRefusal({ repo, deps }) ?? definitionRefusal({ run, cwd, head, remote, branch, tag, deps }) ?? publishPlanRefusal({ repo, deps }) ?? (sonar ? await sonarCloudRefusal({ repo, deps }) : null);
 }
 
 /** The result of `release cut --plan`: every row of the cut with what happens to it (run, or stand in from this commit or an earlier one, and why), the push it makes, the record the pre-push hook then asks for. */
