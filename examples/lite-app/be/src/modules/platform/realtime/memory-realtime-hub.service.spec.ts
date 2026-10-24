@@ -21,7 +21,11 @@ const build = async () => {
 }
 
 /** The frames a reconnect after `after` receives from the retained buffer: the stream is stopped at once and then drained. */
-const replayed = async (hub: MemoryRealtimeHubService, topic: RealtimeTopic<Frame>, after: string): Promise<Array<Frame>> => {
+const replayed = async (
+    hub: MemoryRealtimeHubService,
+    topic: RealtimeTopic<Frame>,
+    after: string,
+): Promise<Array<Frame>> => {
     const iterator = hub.subscribe(topic, { after })[Symbol.asyncIterator]()
     await iterator.return?.()
     const frames: Array<Frame> = []
@@ -154,7 +158,10 @@ describe("MemoryRealtimeHubService replay", () => {
             name: "t:ids",
             accepts: (value: unknown): value is Frame => isFrame(value) && value.value > 0,
         }
-        const withoutId: RealtimeTopic<{ readonly value: number }> = { name: "t:ids", accepts: (value: unknown): value is { readonly value: number } => value !== undefined }
+        const withoutId: RealtimeTopic<{ readonly value: number }> = {
+            name: "t:ids",
+            accepts: (value: unknown): value is { readonly value: number } => value !== undefined,
+        }
         const numericId: RealtimeTopic<{ readonly id: number; readonly value: number }> = {
             name: "t:ids",
             accepts: (value: unknown): value is { readonly id: number; readonly value: number } => value !== undefined,
@@ -166,7 +173,9 @@ describe("MemoryRealtimeHubService replay", () => {
 
         await expect(replayed(hub, strict, "e-none")).resolves.toEqual([frameOf(1)])
     })
+})
 
+describe("MemoryRealtimeHubService replay bounds", () => {
     it("keeps at most REPLAY_FRAMES frames of one topic, dropping the oldest", async () => {
         const hub = await build()
         const topic = topicOf("t:bounded")
@@ -185,7 +194,9 @@ describe("MemoryRealtimeHubService replay", () => {
         for (let index = 0; index < REPLAY_TOPICS; index += 1) hub.publish(topicOf(`t:filler-${index}`), frameOf(index))
 
         await expect(replayed(hub, topicOf("t:first"), "e-none")).resolves.toEqual([])
-        await expect(replayed(hub, topicOf(`t:filler-${REPLAY_TOPICS - 1}`), "e-none")).resolves.toEqual([frameOf(REPLAY_TOPICS - 1)])
+        await expect(replayed(hub, topicOf(`t:filler-${REPLAY_TOPICS - 1}`), "e-none")).resolves.toEqual([
+            frameOf(REPLAY_TOPICS - 1),
+        ])
     })
 })
 
@@ -201,7 +212,10 @@ describe("MemoryRealtimeHubService stream", () => {
         await new Promise<void>((resolve) => setImmediate(resolve))
         subscription.unsubscribe()
 
-        expect(events).toEqual([{ retry: 3_000, comment: "open" }, { id: "e-1", data: frameOf(1) }])
+        expect(events).toEqual([
+            { retry: 3_000, comment: "open" },
+            { id: "e-1", data: frameOf(1) },
+        ])
         expect(hub.subscriberCount(topic)).toBe(0)
     })
 

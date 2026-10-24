@@ -50,7 +50,10 @@ export class MemoryRealtimeHubService implements RealtimeHub {
     }
 
     /** The subscription of the topic as server-sent events (see `eventStream`). */
-    stream<T extends EventFrame>(topic: RealtimeTopic<T>, options?: RealtimeSubscribeOptions): Observable<MessageEvent> {
+    stream<T extends EventFrame>(
+        topic: RealtimeTopic<T>,
+        options?: RealtimeSubscribeOptions,
+    ): Observable<MessageEvent> {
         return eventStream(this.subscribe(topic, options))
     }
 

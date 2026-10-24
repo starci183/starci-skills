@@ -1,5 +1,6 @@
 import type { DynamicModule } from "@nestjs/common"
 import { BOOKINGS_ERROR_KINDS } from "@modules/domain/bookings"
+import { CALENDAR_INBOX_ERROR_KINDS } from "@modules/domain/calendar-inbox"
 import { CALENDARS_ERROR_KINDS } from "@modules/domain/calendars"
 import { IDENTITY_ERROR_KINDS, IDENTITY_MESSAGES } from "@modules/domain/identity"
 import { LIVENESS_ERROR_KINDS, LIVENESS_MESSAGES } from "@modules/domain/liveness"
@@ -35,6 +36,7 @@ export const platformModules = (options: ApiOptions): Array<DynamicModule> => [
     ErrorsModule.register({
         isGlobal: true,
         kinds: [
+            CALENDAR_INBOX_ERROR_KINDS,
             CALENDARS_ERROR_KINDS,
             BOOKINGS_ERROR_KINDS,
             RESOURCES_ERROR_KINDS,

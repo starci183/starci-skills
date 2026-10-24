@@ -10,7 +10,10 @@ import type { RealtimeHub, RealtimeSubscribeOptions, RealtimeTopic } from "@modu
 import { BookingStatusController } from "./booking-status.controller"
 
 const principal: Principal = { id: "person-1", role: "authenticated" }
-const EVENT: MessageEvent = { id: "b-1:confirmed", data: { id: "b-1:confirmed", bookingId: "b-1", status: "confirmed" } }
+const EVENT: MessageEvent = {
+    id: "b-1:confirmed",
+    data: { id: "b-1:confirmed", bookingId: "b-1", status: "confirmed" },
+}
 
 /** A recording hub whose event stream yields one event and records the topic, the resume point and the release. */
 const hubAnswering = () => {
@@ -18,7 +21,9 @@ const hubAnswering = () => {
     const released: Array<string> = []
     const hub: RealtimeHub = {
         publish: () => undefined,
-        subscribe: () => ({ [Symbol.asyncIterator]: () => ({ next: () => Promise.resolve({ done: true, value: undefined }) }) }),
+        subscribe: () => ({
+            [Symbol.asyncIterator]: () => ({ next: () => Promise.resolve({ done: true, value: undefined }) }),
+        }),
         subscriberCount: () => 0,
         stream: <T extends { readonly id: string }>(topic: RealtimeTopic<T>, options?: RealtimeSubscribeOptions) => {
             streamed.push({ topic: topic.name, after: options?.after })
@@ -75,7 +80,9 @@ describe("BookingStatusController", () => {
         const door = await build(hub)
         const received: Array<MessageEvent> = []
 
-        door.stream(principal, undefined).subscribe((event) => received.push(event)).unsubscribe()
+        door.stream(principal, undefined)
+            .subscribe((event) => received.push(event))
+            .unsubscribe()
 
         expect(received).toEqual([EVENT])
     })

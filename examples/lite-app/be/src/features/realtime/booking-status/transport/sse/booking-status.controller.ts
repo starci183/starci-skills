@@ -17,7 +17,10 @@ export class BookingStatusController {
      * another owner receives nothing; a `Last-Event-ID` header only resumes after that frame inside the caller's own topic.
      */
     @Sse("stream")
-    stream(@CurrentPrincipal() principal: Principal, @Headers("last-event-id") lastEventId?: string): Observable<MessageEvent> {
+    stream(
+        @CurrentPrincipal() principal: Principal,
+        @Headers("last-event-id") lastEventId?: string,
+    ): Observable<MessageEvent> {
         return this.hub.stream(bookingStatusTopic(principal.id), { after: lastEventId })
     }
 }
