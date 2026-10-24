@@ -81,14 +81,24 @@ function prepareTestWorld(root, env = process.env, deps = {}) {
   if (!link.ok) return fail('SCAFFOLD_E2E_TEST_WORLD_PREPARE', `cannot inspect node_modules: ${link.error}`);
   if (link.linked) return fail('RT_NODE_MODULES_LINK', 'node_modules is a junction or symbolic link; remove it before preparation');
   try {
+    const details = [];
     const hash = createHash('sha256').update(fs.readFileSync(path.join(dir, 'package-lock.json'))).digest('hex');
-    if (!testWorldInstallStale(dir, hash, testWorldInstallRecord(dir))) return { ok: true, detail: 'test-world node_modules fresh' };
-    const install = (deps.runNpm ?? runNpm)(['ci', '--ignore-scripts'], { cwd: dir, env: withoutSeatEnv(env), timeout: 900_000 });
-    if (install.error || install.status !== 0) return fail('SCAFFOLD_E2E_TEST_WORLD_PREPARE', `npm ci --ignore-scripts exit ${install.status ?? install.error?.message}: ${String(install.stderr ?? '').slice(0, 200)}`);
-    const record = testWorldInstallRecord(dir);
-    if (!record) return fail('SCAFFOLD_E2E_TEST_WORLD_PREPARE', 'npm ci did not produce node_modules/.package-lock.json');
-    fs.writeFileSync(path.join(dir, 'node_modules', '.package-lock.json'), `${JSON.stringify({ ...record, starciLockHash: hash }, null, 2)}\n`);
-    return { ok: true, detail: 'test-world node_modules prepared (npm ci --ignore-scripts)' };
+    if (testWorldInstallStale(dir, hash, testWorldInstallRecord(dir))) {
+      const install = (deps.runNpm ?? runNpm)(['ci', '--ignore-scripts'], { cwd: dir, env: withoutSeatEnv(env), timeout: 900_000 });
+      if (install.error || install.status !== 0) return fail('SCAFFOLD_E2E_TEST_WORLD_PREPARE', `npm ci --ignore-scripts exit ${install.status ?? install.error?.message}: ${String(install.stderr ?? '').slice(0, 200)}`);
+      const record = testWorldInstallRecord(dir);
+      if (!record) return fail('SCAFFOLD_E2E_TEST_WORLD_PREPARE', 'npm ci did not produce node_modules/.package-lock.json');
+      fs.writeFileSync(path.join(dir, 'node_modules', '.package-lock.json'), `${JSON.stringify({ ...record, starciLockHash: hash }, null, 2)}\n`);
+      details.push('test-world node_modules prepared (npm ci --ignore-scripts)');
+    } else details.push('test-world node_modules fresh');
+    // The source canon registry packs with --ignore-scripts (no prepack build), and a scaffolded full app imports @starci/test-world from its world
+    // declaration: the packed dist must be the current build of the source.
+    if ((deps.distStale ?? distStale)(dir)) {
+      const build = (deps.runNpm ?? runNpm)(['run', 'build'], { cwd: dir, env: withoutSeatEnv(env), timeout: 600_000 });
+      if (build.error || build.status !== 0 || (deps.distStale ?? distStale)(dir)) return fail('SCAFFOLD_E2E_TEST_WORLD_PREPARE', `npm run build exit ${build.status ?? build.error?.message}: ${String(build.stderr ?? build.stdout ?? '').slice(0, 200)}`);
+      details.push('test-world dist built');
+    } else details.push('test-world dist fresh');
+    return { ok: true, detail: details.join('; ') };
   } catch (error) {
     return fail('SCAFFOLD_E2E_TEST_WORLD_PREPARE', String(error?.message ?? error));
   }
