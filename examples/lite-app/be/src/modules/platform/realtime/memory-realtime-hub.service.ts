@@ -1,5 +1,8 @@
 import { Injectable } from "@nestjs/common"
-import type { RealtimeHub, RealtimeSubscribeOptions, RealtimeTopic } from "./realtime.port"
+import type { MessageEvent } from "@nestjs/common"
+import type { Observable } from "rxjs"
+import { eventStream } from "./event-stream.mapper"
+import type { EventFrame, RealtimeHub, RealtimeSubscribeOptions, RealtimeTopic } from "./realtime.port"
 
 /** One open subscription: takes a pushed value and queues it for its client when the topic accepts it. */
 type Subscription = (frame: unknown) => void
@@ -46,6 +49,11 @@ export class MemoryRealtimeHubService implements RealtimeHub {
         return { [Symbol.asyncIterator]: () => this.open(topic, options?.after) }
     }
 
+    /** The subscription of the topic as server-sent events (see `eventStream`). */
+    stream<T extends EventFrame>(topic: RealtimeTopic<T>, options?: RealtimeSubscribeOptions): Observable<MessageEvent> {
+        return eventStream(this.subscribe(topic, options))
+    }
+
     /** How many subscriptions of the topic are open now. */
     subscriberCount(topic: RealtimeTopic<object>): number {
         return this.subscriptions.get(topic.name)?.size ?? 0
@@ -60,10 +68,7 @@ export class MemoryRealtimeHubService implements RealtimeHub {
         if (kept.length > REPLAY_FRAMES) kept.shift()
         this.retained.set(topic.name, kept)
         if (this.retained.size <= REPLAY_TOPICS) return
-        for (const oldest of this.retained.keys()) {
-            this.retained.delete(oldest)
-            return
-        }
+        this.retained.delete(String(this.retained.keys().next().value))
     }
 
     private replayAfter<T extends object>(topic: RealtimeTopic<T>, after: string | undefined): Array<T> {

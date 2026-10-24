@@ -56,9 +56,9 @@ describe("realtime: booking-status stream (integration)", () => {
 
     it("realtime/disconnect-releases-subscription: after the client leaves the hub holds no subscription for it", async () => {
         const { hub, open, waitFor } = world.modules
-        const topic = bookingStatusTopic("person-1")
+        const topic = bookingStatusTopic("person-3")
         const before = hub.subscriberCount(topic)
-        const stream = await open("token-person-1")
+        const stream = await open("token-person-3")
         await stream.readUntil(OPEN)
         expect(hub.subscriberCount(topic)).toBe(before + 1)
 

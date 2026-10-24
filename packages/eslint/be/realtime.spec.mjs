@@ -48,7 +48,7 @@ export class OrderStatusGateway {
 }`
 
 /** An SSE controller whose one `@Sse` method body and constructor are given. */
-const controller = ({ head = SSE_HEAD, ctor = "private readonly hub: RealtimeHub", params = "@CurrentPrincipal() principal: { id: string }, @Headers(\"last-event-id\") lastEventId?: string", body = "return this.hub.subscribe(`orders:${principal.id}`, { after: lastEventId })", extra = "" } = {}) => `${head}
+const controller = ({ head = SSE_HEAD, ctor = "private readonly hub: RealtimeHub", params = "@CurrentPrincipal() principal: { id: string }, @Headers(\"last-event-id\") lastEventId?: string", body = "return this.hub.stream(`orders:${principal.id}`, { after: lastEventId })", extra = "" } = {}) => `${head}
 @Controller("orders")
 export class OrderStatusController {
     constructor(${ctor}) {}
@@ -164,7 +164,7 @@ test("realtime-topic-scope: the topic is built from the principal parameter", ()
             { filename: SUBSCRIPTION, code: subscription() },
             { filename: SSE, code: controller() },
             // the Last-Event-ID only picks the replay point inside a topic built from the principal
-            { filename: SSE, code: controller({ body: "return this.hub.subscribe(['orders', principal.id].join(':'), { after: lastEventId })" }) },
+            { filename: SSE, code: controller({ body: "return this.hub.stream(['orders', principal.id].join(':'), { after: lastEventId })" }) },
             // the principal id may be passed through a call
             { filename: SUBSCRIPTION, code: subscription({ body: "return this.hub.subscribe(['orders', principal.id].join(':'))" }) },
             // a handler that never subscribes is not judged
@@ -177,8 +177,9 @@ test("realtime-topic-scope: the topic is built from the principal parameter", ()
             { filename: SUBSCRIPTION, code: subscription({ body: "return this.hub.subscribe(`orders:${orderId}`)" }), errors: [{ messageId: "scope" }] },
             { filename: SUBSCRIPTION, code: subscription({ body: "return this.hub.subscribe('orders')" }), errors: [{ messageId: "scope" }] },
             // a topic from the Last-Event-ID header or the client alone is a leak
+            { filename: SSE, code: controller({ body: "return this.hub.stream(`orders:${lastEventId}`)" }), errors: [{ messageId: "scope" }] },
             { filename: SSE, code: controller({ body: "return this.hub.subscribe(`orders:${lastEventId}`)" }), errors: [{ messageId: "scope" }] },
-            { filename: SSE, code: controller({ params: "@Headers(\"last-event-id\") lastEventId?: string", body: "return this.hub.subscribe('orders')" }), errors: [{ messageId: "scope" }] },
+            { filename: SSE, code: controller({ params: "@Headers(\"last-event-id\") lastEventId?: string", body: "return this.hub.stream('orders')" }), errors: [{ messageId: "scope" }] },
             // no principal parameter at all
             { filename: GATEWAY, code: gateway({ params: "", body: "return this.hub.subscribe('orders')" }), errors: [{ messageId: "scope" }] },
             // a principal parameter that is a lookalike decorator of another owner proves nothing

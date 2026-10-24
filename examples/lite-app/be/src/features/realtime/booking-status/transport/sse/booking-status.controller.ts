@@ -4,7 +4,7 @@ import type { Observable } from "rxjs"
 import { bookingStatusTopic } from "@modules/domain/bookings"
 import { CurrentPrincipal } from "@modules/domain/identity"
 import type { Principal } from "@modules/platform/cqrs"
-import { InjectRealtimeHub, eventStream } from "@modules/platform/realtime"
+import { InjectRealtimeHub } from "@modules/platform/realtime"
 import type { RealtimeHub } from "@modules/platform/realtime"
 
 @Controller("booking-status")
@@ -18,6 +18,6 @@ export class BookingStatusController {
      */
     @Sse("stream")
     stream(@CurrentPrincipal() principal: Principal, @Headers("last-event-id") lastEventId?: string): Observable<MessageEvent> {
-        return eventStream(this.hub.subscribe(bookingStatusTopic(principal.id), { after: lastEventId }))
+        return this.hub.stream(bookingStatusTopic(principal.id), { after: lastEventId })
     }
 }

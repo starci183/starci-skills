@@ -12,7 +12,7 @@
  *     plain REST route.
  *   - `realtime-read-only` (R185): the only value injected into a realtime door is the `RealtimeHub` of `platform/realtime`. No
  *     `EntityManager`, bus, queue, event bus or domain service reaches it.
- *   - `realtime-topic-scope` (R186): the topic passed to `hub.subscribe` is built from the principal parameter of the handler
+ *   - `realtime-topic-scope` (R186): the topic passed to `hub.subscribe` (or `hub.stream`, the SSE form) is built from the principal parameter of the handler
  *     (`@CurrentPrincipal()` of `domain/identity`, or `Principal` of `platform/cqrs` for a push-only stream), so a client
  *     can only listen to what the principal owns. A `Last-Event-ID` header only picks where the replay resumes inside that topic.
  *
@@ -60,9 +60,10 @@ const hasSocketServer = (context, node) => node.body.body.some((member) =>
 /** The authenticated principal port the socket middleware passes to a push-only stream. */
 const isStreamPrincipal = (context, param) => isOwnedType(context, param, { name: "Principal", capability: "cqrs", tier: "platform" })
 
-/** Subscriptions on the platform's hub, including those inside closures. */
+/** The hub calls that open a client's stream: `subscribe` (an async iterable of frames) and `stream` (server-sent events), including those inside closures. */
+const OPENING_CALLS = new Set(["subscribe", "stream"])
 const hubSubscriptions = (context, method) => callsOf(method).filter(({ receiver, method: called }) =>
-    called === "subscribe" && receiver !== null && isHubType(context, receiver))
+    OPENING_CALLS.has(called) && receiver !== null && isHubType(context, receiver))
 
 /** The nonstatic methods a push-only gateway uses to feed its socket server. */
 const streamMethods = (context, node) => {

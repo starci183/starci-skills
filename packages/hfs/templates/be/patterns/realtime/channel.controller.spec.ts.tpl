@@ -2,6 +2,7 @@ import { METHOD_METADATA, PATH_METADATA, SSE_METADATA } from "@nestjs/common/con
 import type { MessageEvent } from "@nestjs/common"
 import { RequestMethod } from "@nestjs/common"
 import { Test } from "@nestjs/testing"
+import { Observable } from "rxjs"
 import { @@service@@ } from "@@serviceModule@@"
 import type { Principal } from "@modules/platform/cqrs"
 import { REALTIME_HUB } from "@modules/platform/realtime"
@@ -9,41 +10,28 @@ import type { RealtimeHub, RealtimeSubscribeOptions, RealtimeTopic } from "@modu
 import { @@Channel@@Controller } from "./@@channel@@.controller"
 
 const principal: Principal = { id: "p-1", role: "authenticated" }
-/** A frame the topic of the domain contract accepts: replace the shape with the real frame of the channel; its `id` is the domain event id. */
-const FRAME = { id: "x-1" }
+/** One event of the channel: replace the data with the real frame; its `id` is the domain event id. */
+const EVENT: MessageEvent = { id: "x-1", data: { id: "x-1" } }
 
-/** A recording hub whose stream yields one frame, then waits until the transport returns its iterator. */
+/** A recording hub whose event stream yields one event and records the topic, the resume point and the release. */
 const hubAnswering = () => {
-    const subscribed: Array<{ readonly topic: string; readonly after: string | undefined }> = []
+    const streamed: Array<{ readonly topic: string; readonly after: string | undefined }> = []
     const released: Array<string> = []
     const hub: RealtimeHub = {
         publish: () => undefined,
+        subscribe: () => ({ [Symbol.asyncIterator]: () => ({ next: () => Promise.resolve({ done: true, value: undefined }) }) }),
         subscriberCount: () => 0,
-        subscribe: <T extends object>(topic: RealtimeTopic<T>, options?: RealtimeSubscribeOptions): AsyncIterable<T> => {
-            subscribed.push({ topic: topic.name, after: options?.after })
-            let release: () => void = () => undefined
-            const closed = new Promise<void>((resolve) => { release = resolve })
-            let sent = false
-            return {
-                [Symbol.asyncIterator]: () => ({
-                    next: async (): Promise<IteratorResult<T>> => {
-                        if (!sent && topic.accepts(FRAME)) {
-                            sent = true
-                            return { done: false, value: FRAME }
-                        }
-                        await closed
-                        return { done: true, value: undefined }
-                    },
-                    return: async (): Promise<IteratorResult<T>> => {
-                        released.push(topic.name)
-                        release()
-                        return { done: true, value: undefined }
-                    },
-                }),
-            }
+        stream: <T extends { readonly id: string }>(topic: RealtimeTopic<T>, options?: RealtimeSubscribeOptions) => {
+            streamed.push({ topic: topic.name, after: options?.after })
+            return new Observable<MessageEvent>((subscriber) => {
+                subscriber.next(EVENT)
+                return () => {
+                    released.push(topic.name)
+                }
+            })
         },
     }
-    return { hub, subscribed, released }
+    return { hub, streamed, released }
 }
 
 const build = async (hub: RealtimeHub) => {
@@ -54,62 +42,50 @@ const build = async (hub: RealtimeHub) => {
     return moduleRef.get(@@Channel@@Controller)
 }
 
-/** Subscribes like Nest does and resolves with the first event that carries data. */
-const firstData = (door: @@Channel@@Controller, caller: Principal, lastEventId?: string) =>
-    new Promise<{ event: MessageEvent; disconnect: () => void }>((resolve) => {
-        const subscription = door.stream(caller, lastEventId).subscribe((event) => {
-            if (event.data !== undefined) resolve({ event, disconnect: () => subscription.unsubscribe() })
-        })
-    })
-
 describe("@@Channel@@Controller", () => {
-    it("builds the topic only from the authenticated principal", async () => {
-        const { hub, subscribed } = hubAnswering()
+    it("streams the topic built only from the authenticated principal", async () => {
+        const { hub, streamed } = hubAnswering()
         const door = await build(hub)
 
-        const { disconnect } = await firstData(door, principal)
+        door.stream(principal, undefined).subscribe().unsubscribe()
 
-        expect(subscribed).toEqual([{ topic: @@service@@(principal.id).name, after: undefined }])
-        disconnect()
+        expect(streamed).toEqual([{ topic: @@service@@(principal.id).name, after: undefined }])
     })
 
     it("isolates another authenticated principal's topic", async () => {
-        const { hub, subscribed } = hubAnswering()
+        const { hub, streamed } = hubAnswering()
         const door = await build(hub)
 
-        const { disconnect } = await firstData(door, { id: "p-2", role: "authenticated" })
+        door.stream({ id: "p-2", role: "authenticated" }, undefined).subscribe().unsubscribe()
 
-        expect(subscribed.map((entry) => entry.topic)).toEqual([@@service@@("p-2").name])
-        expect(subscribed.map((entry) => entry.topic)).not.toContain(@@service@@(principal.id).name)
-        disconnect()
+        expect(streamed.map((entry) => entry.topic)).toEqual([@@service@@("p-2").name])
+        expect(streamed.map((entry) => entry.topic)).not.toContain(@@service@@(principal.id).name)
     })
 
     it("resumes after the Last-Event-ID inside the caller's own topic", async () => {
-        const { hub, subscribed } = hubAnswering()
+        const { hub, streamed } = hubAnswering()
         const door = await build(hub)
 
-        const { disconnect } = await firstData(door, principal, "x-0")
+        door.stream(principal, "x-0").subscribe().unsubscribe()
 
-        expect(subscribed).toEqual([{ topic: @@service@@(principal.id).name, after: "x-0" }])
-        disconnect()
+        expect(streamed).toEqual([{ topic: @@service@@(principal.id).name, after: "x-0" }])
     })
 
-    it("pushes a hub frame as an event whose id is the domain event id", async () => {
+    it("hands the events of the hub to the response as they are", async () => {
         const { hub } = hubAnswering()
         const door = await build(hub)
+        const received: Array<MessageEvent> = []
 
-        const { event, disconnect } = await firstData(door, principal)
+        door.stream(principal, undefined).subscribe((event) => received.push(event)).unsubscribe()
 
-        expect(event).toEqual({ id: FRAME.id, data: FRAME })
-        disconnect()
+        expect(received).toEqual([EVENT])
     })
 
-    it("releases the hub subscription when the client disconnects", async () => {
+    it("releases the hub stream when the client disconnects", async () => {
         const { hub, released } = hubAnswering()
         const door = await build(hub)
 
-        const { disconnect } = await firstData(door, principal)
-        disconnect()
+        door.stream(principal, undefined).subscribe().unsubscribe()
 
         expect(released).toEqual([@@service@@(principal.id).name])
     })

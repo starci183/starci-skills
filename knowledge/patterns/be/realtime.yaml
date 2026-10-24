@@ -107,9 +107,9 @@ rules:
       A realtime door is thin (R203 `BE_FEATURE_THIN`): it maps the subscription or the message and makes one delegating call
       to the hub. The only value it injects is the `RealtimeHub` of `platform/realtime` (`subscribe(topic, options?)` returns an
       async iterable of frames, `publish(topic, frame)` pushes one; a topic is a typed `RealtimeTopic<T>` built by the owning domain
-      contract, never a string written in a door). An SSE controller hands that iterable to `eventStream` of `platform/realtime`, which
-      returns the `Observable<MessageEvent>` Nest needs: the opening frame, one event per frame with its `id`, and the comment
-      heartbeat. No `EntityManager`, `CommandBus`, `QueryBus`, event bus, queue or
+      contract, never a string written in a door). An SSE controller calls `hub.stream(topic, { after })` instead, which returns the
+      `Observable<MessageEvent>` Nest needs (the hub maps its own subscription with `eventStream` of `platform/realtime`): the
+      opening frame, one event per frame with its `id`, and the comment heartbeat. No `EntityManager`, `CommandBus`, `QueryBus`, event bus, queue or
       service of `modules/domain` is injected: a domain service may write, so it is not provably read-only. The data a client
       needs is pushed by a reactor (or by the domain service that commits the change, in an app with no event bus); the socket
       library and the pub/sub engine (`socket.io`, `graphql-subscriptions`, `graphql-ws`) are imported only by `platform/realtime`,
@@ -184,7 +184,7 @@ rules:
     kind: mandatory
     hfsRules: [R184, R278, R90]
     requirement: |-
-      An SSE channel returns `eventStream(hub.subscribe(topic, { after: lastEventId }))` of `platform/realtime` and nothing else:
+      An SSE channel returns `hub.stream(topic, { after: lastEventId })` of `platform/realtime` and nothing else:
       the stream writes an opening frame with the reconnect delay (`retry`), one event per frame whose `id` is the domain event id
       of the frame (unique within the topic, for example `<booking>:<status>`), and a comment heartbeat (`: heartbeat`) every 15 to 25
       seconds while the channel is idle, below the idle timeout of the ingress. The heartbeat timer belongs to `platform/realtime`
@@ -203,7 +203,7 @@ rules:
     cases:
       - id: case-1
         when: A client on a flaky network reconnects after missing two pushes
-        write: 'The browser reconnects with Last-Event-ID: b-1:confirmed, hub.subscribe(topic, { after: "b-1:confirmed" }) replays the retained frames after it, then goes live; the front end also refetches the status once on open.'
+        write: 'The browser reconnects with Last-Event-ID: b-1:confirmed, hub.stream(topic, { after: "b-1:confirmed" }) replays the retained frames after it, then goes live; the front end also refetches the status once on open.'
     verification:
       automated:
         - BE_REALTIME_SHAPE
@@ -338,7 +338,7 @@ liteAdapter:
     graphql-ws subscriptions are not used in lite.
   ports:
     - {port: RealtimeHub.publish (platform/realtime), adapter: "the memory hub of the api process retains the frame (bounded) and hands it to the open SSE streams; the socket.io server emits to the namespace room of the topic (no Redis adapter: one instance)"}
-    - {port: RealtimeHub.subscribe, adapter: "the SSE controller streams hub.subscribe(topic, { after }) through eventStream; the gateway's stream joins the room built from the principal, as full"}
+    - {port: RealtimeHub.subscribe, adapter: "the SSE controller streams hub.stream(topic, { after }) (the subscription through eventStream); the gateway's stream joins the room built from the principal, as full"}
     - {port: topic scope, adapter: "the topic and the room name built from @CurrentPrincipal (BE_REALTIME_TOPIC_SCOPE), as full"}
   forbids: [redis, ioredis, "@socket.io/redis-adapter", graphql-ws, graphql-subscriptions]
   proof: >-

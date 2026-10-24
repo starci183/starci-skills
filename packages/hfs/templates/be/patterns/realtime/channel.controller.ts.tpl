@@ -4,7 +4,7 @@ import type { Observable } from "rxjs"
 import { @@service@@ } from "@@serviceModule@@"
 import { CurrentPrincipal } from "@modules/domain/identity"
 import type { Principal } from "@modules/platform/cqrs"
-import { InjectRealtimeHub, eventStream } from "@modules/platform/realtime"
+import { InjectRealtimeHub } from "@modules/platform/realtime"
 import type { RealtimeHub } from "@modules/platform/realtime"
 
 @Controller("@@channel@@")
@@ -18,6 +18,6 @@ export class @@Channel@@Controller {
      */
     @Sse("stream")
     stream(@CurrentPrincipal() principal: Principal, @Headers("last-event-id") lastEventId?: string): Observable<MessageEvent> {
-        return eventStream(this.hub.subscribe(@@service@@(principal.id), { after: lastEventId }))
+        return this.hub.stream(@@service@@(principal.id), { after: lastEventId })
     }
 }

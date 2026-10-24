@@ -164,7 +164,7 @@ test("R47: a webhook or realtime door carries its own spec beside it, and only i
       // a door spec with no door beside it
       { filename: at("src/features/webhooks/ghost/transport/http/ghost.webhook.spec.ts"), code: "export {}", errors: [{ messageId: "orphan" }] },
       { filename: at("src/features/realtime/orders/transport/websocket/orders.gateway.spec.ts"), code: "export {}", errors: [{ messageId: "orphan" }] },
-      { filename: at("src/features/realtime/orders/transport/sse/orders.controller.spec.ts"), code: "export {}", errors: [{ messageId: "orphan" }] },
+      { filename: at("src/features/realtime/orders/transport/sse/ghost.controller.spec.ts"), code: "export {}", errors: [{ messageId: "orphan" }] },
       // the same name outside the slot of the kind is an ordinary non-service unit spec
       { filename: at("src/features/plan/transport/http/pay.webhook.spec.ts"), code: "export {}", errors: [{ messageId: "notService" }] },
       // the kind's slot holds door specs only: a controller spec of another role is still refused
