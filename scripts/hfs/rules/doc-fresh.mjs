@@ -18,6 +18,9 @@ const DOCUMENT = /(?:^|\/)README\.md$|(?:^|\/)docs\/.+\.mdx?$/i;
 const KEY = /^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*$/;
 const EXTERNAL = /^(?:[a-z][a-z0-9+.-]*:|\/\/|#)/i;
 const PLACEHOLDER = /[<>{}*$]/;
+const ERROR_CODE_FILE = /(?:^|\/)errors\/[^/]+\.[cm]?[jt]s$|\.error\.[cm]?[jt]s$|\.messages\.[cm]?[jt]s$/;
+const ERROR_CODE_PROSE = /\b(?:error|failure|exception)s?\s+codes?\b/i;
+const ENV_PROSE = /\benv(?:ironment)?\b|\bvariable\b/i;
 const PATH_TOKEN = /^(?:\.\.?\/)?[\w@.-]+(?:\/[\w@.()[\]-]+)*\/?$/;
 let runtimeCatalogs;
 
@@ -225,8 +228,18 @@ function symbolCall(ts, node) {
   return ts.isPropertyAccessExpression(callee) && ts.isIdentifier(callee.expression) && callee.expression.text === 'Symbol' && callee.name.text === 'for';
 }
 
-function declaredTokens(ts, source, tokens) {
+/** A code the app declares: a string literal of an error file (enum member, kind map) or an `errors.<CODE>` message key. */
+function declaredErrorCode(ts, node) {
+  if (!ts.isStringLiteralLike(node)) return undefined;
+  const key = /^(?:errors\.)?([A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+)$/.exec(node.text);
+  return key?.[1];
+}
+
+function declaredTokens(ts, source, tokens, file = '') {
+  const errorFile = ERROR_CODE_FILE.test(file);
   const visit = (node) => {
+    const code = errorFile ? declaredErrorCode(ts, node) : undefined;
+    if (code) tokens.add(code);
     if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && KEY.test(node.name.text) && symbolCall(ts, node.initializer)) tokens.add(node.name.text);
     ts.forEachChild(node, visit);
   };
@@ -240,14 +253,15 @@ function injectionTokens(repoRoot, tracked) {
   for (const file of tracked) {
     if (!/\.[cm]?[jt]sx?$/.test(file) || /(?:(?:^|\/)(?:tests?|__tests__)\/)|(?:(?:\.(?:spec|test)|-spec)\.[cm]?[jt]sx?$)/.test(file)) continue;
     const text = readText(repoRoot, file) ?? '';
-    declaredTokens(ts, ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true), tokens);
+    declaredTokens(ts, ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true), tokens, file);
   }
   return tokens;
 }
 
 function unknownEnvironmentName(name, line, keys, codes, tokens, explicit) {
   if (!KEY.test(name) || /^R\d+$/.test(name) || codes.has(name)) return false;
-  if (!explicit && tokens.has(name) && !/\benv(?:ironment)?\b|\bvariable\b/i.test(line)) return false;
+  if (!explicit && tokens.has(name) && !ENV_PROSE.test(line)) return false;
+  if (!explicit && ERROR_CODE_PROSE.test(line) && !ENV_PROSE.test(line)) return false;
   if (!name.includes('_') && !keys.has(name) && !/\benv(?:ironment)?\b|\b(?:key|variable)s?\b/i.test(line)) return false;
   return !keys.has(name) && !(name.endsWith('_FILE') && keys.has(name.slice(0, -5)));
 }

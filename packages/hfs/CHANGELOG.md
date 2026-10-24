@@ -1,6 +1,7 @@
 # Changelog
 
 ## 4.7.31 - 2026-10-24
+- Fixed: the doc check `HFS_DOC_ENV_UNKNOWN` (R270) no longer reads a documented error code as an environment key: codes the app declares in `errors/`, `*.error.ts` and `*.messages.ts` (`errors.<CODE>` keys) and names in a sentence about error codes pass, while an undeclared environment key still fails.
 - Added: the SSE door templates of the realtime pattern (`channel.sse` module, options and definition); lite may serve SSE beside its socket.io gateway (amended R212).
 - Changed: a new app's starter dependencies (full and lite) carry `zod` at its canon pin, which is `side: both` (the boundary-schema pattern, R304 and R305).
 

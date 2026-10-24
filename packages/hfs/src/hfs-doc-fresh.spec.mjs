@@ -143,6 +143,26 @@ for (const edition of ['lite', 'full']) {
     ]);
   });
 
+  test(`HFS_DOC_ENV_UNKNOWN@${edition}: declared error codes and error-code prose pass while undeclared environment keys still fail`, (t) => {
+    const context = fixture(t, edition, { ...manifests,
+      'be/src/modules/platform/http-security/errors/http-security.error.ts': 'export enum HttpSecurityErrorCode { RequestInvalid = "HTTP_SECURITY_REQUEST_INVALID", RateLimited = "HTTP_SECURITY_RATE_LIMITED" }',
+      'be/src/modules/platform/http-security/messages/http-security.messages.ts': 'export const en = { "errors.HTTP_SECURITY_ORIGIN_REJECTED": "Origin rejected" };',
+      'be/src/tests/fixtures/codes.error.ts': 'export const ONLY_TEST_CODE = "TEST_ONLY_CODE";',
+      'README.md': [
+        'A bad body answers `HTTP_SECURITY_REQUEST_INVALID`; a flood answers `HTTP_SECURITY_RATE_LIMITED`.',
+        'A foreign origin answers `HTTP_SECURITY_ORIGIN_REJECTED`.',
+        'The error code `PROVIDER_TIMEOUT` is mapped by the gateway.',
+        'Environment `HTTP_SECURITY_REQUEST_INVALID`.',
+        'process.env.HTTP_SECURITY_RATE_LIMITED',
+        'Undeclared `TEST_ONLY_CODE` and `RETIRED_DB_URL`.',
+      ].join('\n'),
+    });
+    const hits = docFreshFindings(context).filter((finding) => finding.code === 'HFS_DOC_ENV_UNKNOWN');
+    assert.deepEqual(hits.map((finding) => [finding.reference, finding.line]), [
+      ['HTTP_SECURITY_REQUEST_INVALID', 4], ['HTTP_SECURITY_RATE_LIMITED', 5], ['TEST_ONLY_CODE', 6], ['RETIRED_DB_URL', 6],
+    ]);
+  });
+
   test(`HFS_DOC_RULE_UNKNOWN@${edition}: nonexistent rule references fail`, (t) => {
     const context = fixture(t, edition, { ...manifests, 'docs/policy.md': `Follow ${UNKNOWN} and \`${UNKNOWN}9\`.` });
     const hits = docFreshFindings(context).filter((finding) => finding.code === 'HFS_DOC_RULE_UNKNOWN');
