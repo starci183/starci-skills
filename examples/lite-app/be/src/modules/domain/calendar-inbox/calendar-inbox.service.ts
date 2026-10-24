@@ -53,7 +53,8 @@ export class CalendarInboxService {
             const [pending] = await manager.query<Array<PendingCalendarReceipt>>(FIND_PENDING_CALENDAR_INBOX, [receipt])
             if (pending === undefined) return
             const delivery = CalendarDeliverySchema.safeParse(pending.payload)
-            if (!delivery.success) throw new CalendarInboxError({ code: CalendarInboxErrorCode.MalformedPayload, cause: delivery.error })
+            if (!delivery.success)
+                throw new CalendarInboxError({ code: CalendarInboxErrorCode.MalformedPayload, cause: delivery.error })
             await this.deliveries.acceptCalendarDelivery(delivery.data, manager)
             await manager.query(COMPLETE_CALENDAR_INBOX, [pending.id])
         })

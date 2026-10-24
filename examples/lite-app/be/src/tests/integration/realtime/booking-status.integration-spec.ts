@@ -33,7 +33,9 @@ describe("realtime: booking-status stream (integration)", () => {
         expect(stream.headers.get("x-accel-buffering")).toBe("no")
         expect(stream.headers.get("cache-control")).toContain("no-transform")
         expect(received).toContain("retry: 3000")
-        expect(received).toContain('id: b-1:confirmed\ndata: {"id":"b-1:confirmed","bookingId":"b-1","status":"confirmed"}')
+        expect(received).toContain(
+            'id: b-1:confirmed\ndata: {"id":"b-1:confirmed","bookingId":"b-1","status":"confirmed"}',
+        )
         stream.disconnect()
     })
 

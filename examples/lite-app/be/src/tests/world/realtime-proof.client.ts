@@ -70,7 +70,8 @@ export const createRealtimeProof = async () => {
             readUntil: async function readUntil(marker: string): Promise<string> {
                 if (received.includes(marker)) return received
                 const chunk = await reader?.read()
-                if (chunk === undefined || chunk.done) throw new TestWorldError({ code: TestWorldErrorCode.StreamEnded, params: { marker } })
+                if (chunk === undefined || chunk.done)
+                    throw new TestWorldError({ code: TestWorldErrorCode.StreamEnded, params: { marker } })
                 received += chunk.value
                 return readUntil(marker)
             },

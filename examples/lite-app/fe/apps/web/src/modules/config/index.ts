@@ -15,5 +15,3 @@ export const supabaseUrl = (): string => required("NEXT_PUBLIC_SUPABASE_URL", pr
 /** The public anonymous key of Supabase Auth; the back end verifies every access token it is sent. */
 export const supabaseAnonKey = (): string =>
     required("NEXT_PUBLIC_SUPABASE_ANON_KEY", process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
-/** The back end's event-stream endpoint at `path`, on the origin of its GraphQL endpoint (the streams of modules/api/sse). */
-export const eventStreamUrl = (path: string): string => new URL(path, graphqlUrl()).href

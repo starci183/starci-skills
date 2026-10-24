@@ -122,7 +122,6 @@ describe("eventStream", () => {
         expect(events.slice(1)).toEqual([{ comment: "heartbeat" }, { comment: "heartbeat" }])
         subscription.unsubscribe()
     })
-
 })
 
 describe("eventStream disconnects and failures", () => {

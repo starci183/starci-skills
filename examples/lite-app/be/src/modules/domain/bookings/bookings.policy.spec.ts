@@ -19,7 +19,9 @@ describe("booking status policy", () => {
             const subject = await buildSubject()
 
             expect(subject.bookingStatusFrame("b-1", "confirmed")).toEqual(FRAME)
-            expect(subject.bookingStatusFrame("b-1", "confirmed")).toEqual(subject.bookingStatusFrame("b-1", "confirmed"))
+            expect(subject.bookingStatusFrame("b-1", "confirmed")).toEqual(
+                subject.bookingStatusFrame("b-1", "confirmed"),
+            )
             expect(subject.bookingStatusFrame("b-1", "reminded").id).not.toBe(FRAME.id)
         })
     })
