@@ -338,8 +338,8 @@ pins:
   'zod':
     version: 4.6.7
     group: framework
-    side: fe
-    why: 'the schema library of front-end forms and boundary parsing (fe-stack forms), also an npm override of every app root; 4.6.7 (the registry latest on 2026-10-24) closes GHSA-mrhx-c7xc-m3w5 (high, fixed in 4.6.6), which npm audit --audit-level=high reported against 4.4.3.'
+    side: both
+    why: 'the schema library of front-end forms (fe-stack forms) and, on the back end, of the boundary parsers (R304 and R305: provider responses, model output and queue payloads, never a transport DTO), also an npm override of every app root; 4.6.7 (the registry latest on 2026-10-24) closes GHSA-mrhx-c7xc-m3w5 (high, fixed in 4.6.6), which npm audit --audit-level=high reported against 4.4.3.'
   '@reduxjs/toolkit':
     version: 2.11.2
     group: framework

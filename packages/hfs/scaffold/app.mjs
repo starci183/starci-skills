@@ -157,7 +157,7 @@ const STARTER_DEPENDENCIES = Object.freeze({
   dependencies: {
     '@apollo/server': null, '@nestjs/apollo': null, '@nestjs/common': null, '@nestjs/core': null, '@nestjs/cqrs': null, '@nestjs/graphql': null,
     '@nestjs/platform-express': null, '@nestjs/typeorm': null, 'nest-commander': null, pg: null, graphql: null,
-    'class-transformer': null, 'class-validator': null, 'reflect-metadata': null, rxjs: null, tslib: null, typeorm: null,
+    'class-transformer': null, 'class-validator': null, 'reflect-metadata': null, rxjs: null, tslib: null, typeorm: null, zod: null,
   },
   devDependencies: {
     turbo: null, '@nestjs/testing': null, '@starci/cli': null, '@starci/eslint-canon-be': null, '@starci/eslint-canon-fe': null, '@starci/jest-preset': null,
@@ -178,7 +178,7 @@ const LITE_STARTER_DEPENDENCIES = Object.freeze({
     '@apollo/server': null, '@nestjs/apollo': null, '@nestjs/common': null, '@nestjs/core': null, '@nestjs/cqrs': null, '@nestjs/graphql': null,
     '@nestjs/platform-express': null, '@nestjs/typeorm': null, '@supabase/supabase-js': null,
     'class-transformer': null, 'class-validator': null, graphql: null, jose: null, pg: null,
-    'reflect-metadata': null, rxjs: null, tslib: null, typeorm: null,
+    'reflect-metadata': null, rxjs: null, tslib: null, typeorm: null, zod: null,
   },
   devDependencies: {
     turbo: null, '@nestjs/testing': null, '@starci/eslint-canon-be': null, '@starci/eslint-canon-fe': null, '@starci/cli': null,

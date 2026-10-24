@@ -123,6 +123,7 @@ profiles:
       - BE-TYPING-5
       - BE-TYPING-6
       - BE-TYPING-7
+      - BE-TYPING-8
       - BE-WEBHOOK-1
       - BE-WEBHOOK-2
       - BE-WEBHOOK-3
@@ -239,6 +240,20 @@ profiles:
         semantic:
           guidance: docs/architecture.md
           review: Verify the baseline migration against the live schema, and that each projection carries what its consumer needs.
+        status: implemented
+      - id: NEST-HFS-BOUNDARY-SCHEMA
+        sourceRuleIds: [BE-TYPING-5, BE-TYPING-8]
+        applicability: { include: ['src/**/*.ts', 'apps/**/*.ts', 'libs/**/*.ts'], exclude: ['**/*.d.ts'] }
+        mechanical:
+          requirement: Untrusted data that never reaches a DTO (a provider response, model output, a queue or outbox payload read back) is parsed through a bounded zod schema declared in `<name>.schema.ts` of a domain, platform or integrations owner; zod appears in no feature, transport door or DTO folder, and every string, array, set, record and map of a schema has an upper bound.
+          check:
+            kind: eslint
+            sourceOnly: false
+            ruleIds: [starci-be/schema-place, starci-be/schema-bounded]
+            expected: { severity: error }
+        semantic:
+          guidance: knowledge/patterns/be/typing.yaml
+          review: Verify that the schema describes the provider's contract and that a failed parse becomes an owner error instead of partly trusted data.
         status: implemented
       - id: NEST-HFS-DEFAULT-DENY-CONFIG
         sourceRuleIds: [BE-IMPORTS-6, BE-ERROR-5]

@@ -6,6 +6,9 @@ until every S* row in `docs/goal.md` holds with fresh evidence, then `1.0.0` fre
 
 ## [Unreleased]
 
+### Added
+- The `boundary-schema` pattern (alpha.30 item B, owner decision 2026-10-24): the back end validates by zone, `class-validator` for every transport door and `zod` for boundary data that never reaches a DTO (provider responses, model output, queue and outbox payloads read back). Rule BE-TYPING-8; R304 `BE_SCHEMA_PLACE` (zod only in a `<name>.schema.ts` of a domain, platform or integrations owner, never in a feature, door or `dto/`, never beside `class-validator`); R305 `BE_SCHEMA_BOUNDED` (every string, array, set, record and map bounded, no `z.any()`, `z.unknown()` or `z.json()`). The slot manifest declares the `schema` role suffix (a measured logic role, covered through its reader's spec). The `zod` canon pin is `side: both` (4.6.7) and a new app's starter dependencies carry it. Reference readers: full-app `integrations/sepay` (provider response) and lite-app `domain/calendar-inbox` (inbox payload read back). No schema is shared with the front end and `nestjs-zod` is not adopted.
+
 ## [1.0.0-alpha.29] — 2026-10-24
 
 ### Changed

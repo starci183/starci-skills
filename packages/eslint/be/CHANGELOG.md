@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+- New: `schema-place` (R304 `BE_SCHEMA_PLACE`: `zod` is imported only from a `<name>.schema.ts` of a domain, platform or integrations owner; never in a feature, a transport door or a `dto/` folder; a schema file imports no `class-validator`, `class-transformer` or `@nestjs/graphql`) and `schema-bounded` (R305 `BE_SCHEMA_BOUNDED`: every `z.string()`, array, set, record and map has an upper bound, and `z.any()`, `z.unknown()` and `z.json()` are refused).
+- Changed: the bundled slot manifest declares the `schema` role suffix and the `zod` pin is `side: both`.
+
 ## 3.4.38 - 2026-10-24
 - Changed: the bundled canon pins add the multer 2.5.0 security override and select @starci/hfs 4.7.30 and @starci/cli 1.7.30.
 

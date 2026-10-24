@@ -1,4 +1,8 @@
 export { SepayTransferMapper } from "./sepay-transfer.mapper"
+export { readSepayTransactions } from "./sepay-transactions.mapper"
+export { SEPAY_ERROR_KINDS, SepayError, SepayErrorCode } from "./errors/sepay.error"
+export { SEPAY_MESSAGES } from "./messages/sepay.messages"
+export type { SepayTransaction } from "./sepay-transactions.schema"
 export { parseSepayConfig } from "./sepay.config"
 export { SepayModule } from "./sepay.module"
 export { HttpSecurityErrorCode } from "@modules/platform/http-security"

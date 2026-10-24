@@ -5279,3 +5279,43 @@ rules:
       - {path: packages/hfs/src/bypass-detector.spec.mjs, editions: [lite, full], codes: [HFS_BYPASS_MARKER]}
     witness:
       - {path: packages/hfs/src/bypass-detector.spec.mjs, editions: [lite, full], codes: [HFS_BYPASS_MARKER]}
+  - id: R304
+    code: "BE_SCHEMA_PLACE"
+    law: "The back end validates by zone. A transport door (GraphQL `@InputType`, REST request class) is validated by `class-validator` (R42); untrusted data that never reaches a DTO (a provider's HTTP response, structured model output, a queue or outbox payload read back, a tool argument) is read through a `zod` schema. `zod` is imported only from a `<name>.schema.ts` file (or its spec) of a `modules/domain`, `modules/platform` or `modules/integrations` owner, never in a feature, a transport door or a `dto/` folder, and a schema file imports neither `class-validator`, `class-transformer` nor `@nestjs/graphql`. The reader that calls the schema maps a failed parse to its owner's error family. No schema is shared between the front end and the back end: the shared contract is the emitted `schema.graphql` and `openapi.json`."
+    kinds: [lint, design]
+    gates: [pre-commit, settle, land, ci]
+    failureCodes: ["BE_SCHEMA_PLACE"]
+    enforcers:
+      - {kind: eslint-be, id: schema-place}
+    editions: [lite, full]
+    docs: [docs/quality-bar.md#r304]
+    proves:
+      - {path: packages/eslint/be/boundary-schema.spec.mjs, editions: [lite, full], codes: [BE_SCHEMA_PLACE]}
+    exemplifiedBy:
+      - {path: examples/full-app/be/src/modules/integrations/sepay/sepay-transactions.schema.ts, edition: full}
+      - {path: examples/lite-app/be/src/modules/domain/calendar-inbox/calendar-delivery.schema.ts, edition: lite}
+      - {path: packages/eslint/be/boundary-schema.spec.mjs, editions: [lite, full], codes: [BE_SCHEMA_PLACE]}
+    witness:
+      - {path: packages/eslint/be/boundary-schema.spec.mjs, edition: lite, codes: [BE_SCHEMA_PLACE]}
+      - {path: packages/eslint/be/boundary-schema.spec.mjs, edition: full, codes: [BE_SCHEMA_PLACE]}
+    templateNa: "A schema is declared per boundary by its owner; the canon scaffolds none, and the two example schemas are the reference."
+  - id: R305
+    code: "BE_SCHEMA_BOUNDED"
+    law: "Every `zod` schema is bounded: each `z.string()` (and the string formats `z.email()`, `z.url()` and kin) has `.max(n)` or `.length(n)`, each `z.array(...)` and `z.set(...)` has `.max(n)`, `.length(n)` or `.size(n)`, each `z.record(...)` and `z.map(...)` bounds its entry count by a `.refine`/`.check`, and `z.any()`, `z.unknown()` and `z.json()` are refused. A bound is a finite positive number: `Infinity`, `0` and `Number.MAX_*` are no bound. An unbounded collection whose elements all fail validation allocates an issue per element (GHSA-mrhx-c7xc-m3w5), and an unbounded string is an unbounded cost on any zod version."
+    kinds: [lint, design]
+    gates: [pre-commit, settle, land, ci]
+    failureCodes: ["BE_SCHEMA_BOUNDED"]
+    enforcers:
+      - {kind: eslint-be, id: schema-bounded}
+    editions: [lite, full]
+    docs: [docs/quality-bar.md#r305]
+    proves:
+      - {path: packages/eslint/be/boundary-schema.spec.mjs, editions: [lite, full], codes: [BE_SCHEMA_BOUNDED]}
+    exemplifiedBy:
+      - {path: examples/full-app/be/src/modules/integrations/sepay/sepay-transactions.schema.ts, edition: full}
+      - {path: examples/lite-app/be/src/modules/domain/calendar-inbox/calendar-delivery.schema.ts, edition: lite}
+      - {path: packages/eslint/be/boundary-schema.spec.mjs, editions: [lite, full], codes: [BE_SCHEMA_BOUNDED]}
+    witness:
+      - {path: packages/eslint/be/boundary-schema.spec.mjs, edition: lite, codes: [BE_SCHEMA_BOUNDED]}
+      - {path: packages/eslint/be/boundary-schema.spec.mjs, edition: full, codes: [BE_SCHEMA_BOUNDED]}
+    templateNa: "A schema is declared per boundary by its owner; the canon scaffolds none, and the two example schemas are the reference."

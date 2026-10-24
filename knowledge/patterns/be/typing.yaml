@@ -127,7 +127,7 @@ rules:
         write: 'catch (error: unknown) { throw new DatabaseError({ code: DatabaseErrorCode.QueryFailed, cause: error }) }'
       - id: case-2
         when: An external payload
-        write: 'a class-validator DTO in transport/http/dto validated by the global ValidationPipe, or a typed reader that narrows `unknown` field by field; never a cast.'
+        write: 'a class-validator DTO in transport/http/dto validated by the global ValidationPipe, or (data that never reaches a DTO) a reader that parses `unknown` through the owner''s `<name>.schema.ts` (BE-TYPING-8); never a cast.'
     verification:
       automated:
         - HFS_INLINE_SUPPRESSION
@@ -181,4 +181,40 @@ rules:
         - BE_INPUT_BOUNDED
       manual:
         - Test validation, unknown and nested input handling and safe output fields.
+    relatedExamples: []
+  - id: BE-TYPING-8
+    title: Boundary data is parsed by a bounded zod schema in its owner
+    kind: mandatory
+    hfsRules: [R304, R305]
+    requirement: |-
+      The back end validates by zone. A transport door (GraphQL `@InputType`, REST request class) is validated by
+      `class-validator` (BE-TYPING-7) and never by zod. Untrusted data that does not arrive through a DTO (a provider's HTTP
+      response, the structured output of a model, a queue or outbox payload read back, a tool argument) is read through a
+      `zod` schema declared in `<name>.schema.ts` of the `modules/domain`, `modules/platform` or `modules/integrations`
+      owner that reads it; `zod` is imported nowhere else, and a schema file imports neither `class-validator`,
+      `class-transformer` nor `@nestjs/graphql`. The reader calls `safeParse`, returns the inferred type and maps a failed
+      parse to its owner's error family (`<Owner>ErrorCode.MalformedResponse`); it never returns partly trusted data. Every
+      string has `.max(n)` or `.length(n)`, every array and set `.max(n)`, `.length(n)` or `.size(n)`, every record and map a
+      `.refine` or `.check` on its entry count, and `z.any()`, `z.unknown()` and `z.json()` do not exist. The schema file is a
+      measured role like the reader that imports it (a `mapper`, `client` or `service`): the reader's spec reaches every
+      schema statement and covers the reject branch, so no schema is excluded from coverage. No schema is shared with the front end: the shared contract is the emitted `schema.graphql` and `openapi.json`,
+      and the canon adopts no zod-to-DTO bridge.
+    rationale: |-
+      A hand-written `typeof` ladder narrows what its author remembered and drifts from the provider; one schema is the reader
+      and the type. The two validation layers stay disjoint so a door has one validator, and every bound is lint-enforced
+      because an unbounded array whose elements all fail validation allocates an issue each (GHSA-mrhx-c7xc-m3w5) and an
+      unbounded string is an unbounded cost on any version.
+    cases:
+      - id: case-1
+        when: A provider response
+        write: 'integrations/sepay/sepay-transactions.schema.ts: export const SepayTransactionsSchema = z.object({ status: z.number().int(), transactions: z.array(SepayTransactionSchema).max(100) }); sepay-transactions.mapper.ts: const answer = SepayTransactionsSchema.safeParse(body); if (!answer.success) throw new SepayError({ code: SepayErrorCode.MalformedResponse, cause: answer.error }).'
+      - id: case-2
+        when: A payload read back from the inbox or a queue
+        write: 'domain/calendar-inbox/calendar-delivery.schema.ts: export const CalendarDeliverySchema = z.object({ id: z.string().max(64) }); the service parses the retained payload before any effect and fails the job with CalendarInboxErrorCode.MalformedPayload.'
+    verification:
+      automated:
+        - BE_SCHEMA_PLACE
+        - BE_SCHEMA_BOUNDED
+      manual:
+        - Review that the schema describes the provider's contract and that a failed parse is an owner error, not a swallowed value.
     relatedExamples: []

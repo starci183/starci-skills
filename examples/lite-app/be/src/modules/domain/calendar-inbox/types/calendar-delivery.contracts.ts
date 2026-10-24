@@ -8,6 +8,6 @@ export interface CalendarDelivery {
 export interface PendingCalendarReceipt {
     /** The inbox receipt identity. */
     readonly id: string
-    /** The delivery retained until processing succeeds. */
-    readonly payload: CalendarDelivery
+    /** The delivery retained until processing succeeds, as the row holds it: unread until the delivery schema parses it. */
+    readonly payload: unknown
 }

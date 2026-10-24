@@ -1,5 +1,8 @@
 # Changelog
 
+## Unreleased
+- Changed: a new app's starter dependencies (full and lite) carry `zod` at its canon pin, which is `side: both` (the boundary-schema pattern, R304 and R305).
+
 ## 4.7.30 - 2026-10-24
 - Changed: a new app root overrides multer to its canon pin 2.5.0: @nestjs/platform-express depends on exactly multer 2.4.0, which carries GHSA-q7qp-rjg7-q26m (high); the bundled canon pins add `multer` and select @starci/cli 1.7.30, @starci/eslint-canon-be 3.4.38 and @starci/eslint-canon-fe 8.4.37.
 
