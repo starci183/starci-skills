@@ -19,6 +19,7 @@ import { webhookShape, webhookVerifyFirst } from "./webhooks.mjs"
 
 const WEBHOOK = at("src/features/webhooks/payment/transport/http/payment.webhook.ts")
 const GATEWAY = at("src/features/realtime/order-status/transport/websocket/order-status.gateway.ts")
+const SSE = at("src/features/realtime/order-status/transport/sse/order-status.controller.ts")
 
 const PROOF = "this.signature.verify({ rawBody: body, signature })"
 const INTAKE = "await this.payments.acceptNotification(body)"
@@ -53,6 +54,22 @@ export class OrderStatusGateway {
     constructor(private readonly hub: RealtimeHub${injections}) {}
     @SubscribeMessage("orders")
     watch(@CurrentPrincipal() principal: { id: string }): AsyncIterable<object> {
+        ${body}
+    }
+}`
+
+const SSE_HEAD = `import { Controller, Headers, Sse } from "@nestjs/common"
+import { CurrentPrincipal } from "@modules/domain/identity"
+import { RealtimeHub } from "@modules/platform/realtime"
+`
+
+/** Both editions serve the same event-stream door: one `@Sse` method, the hub as the only value injected, the topic from the principal. */
+const sseController = ({ body = 'return this.hub.subscribe(["orders", principal.id].join(":"), { after: lastEventId })', injections = "", imports = "" } = {}) => SSE_HEAD + imports + `
+@Controller("orders")
+export class OrderStatusController {
+    constructor(private readonly hub: RealtimeHub${injections}) {}
+    @Sse("stream")
+    watch(@CurrentPrincipal() principal: { id: string }, @Headers("last-event-id") lastEventId?: string): AsyncIterable<object> {
         ${body}
     }
 }`
@@ -108,6 +125,38 @@ for (const edition of ["lite", "full"]) {
         ruleTester({ root: TYPED_ROOT, hfs }).run("realtime-topic-scope", realtimeTopicScope, {
             valid: [{ filename: GATEWAY, code: gateway() }],
             invalid: [{ filename: GATEWAY, code: gateway({ body: 'return this.hub.subscribe("orders")' }), errors: [{ messageId: "scope" }] }],
+        })
+    })
+
+    test(`realtime-shape accepts one SSE controller and rejects a plain route beside its stream in ${edition}`, () => {
+        assert.equal(hfs.edition, edition)
+        ruleTester({ root: TYPED_ROOT, hfs }).run("realtime-shape", realtimeShape, {
+            valid: [{ filename: SSE, code: sseController() }],
+            invalid: [{
+                filename: SSE,
+                code: sseController({ imports: "import { Get } from '@nestjs/common'\n" }).replace('@Sse("stream")', '@Get("read")\n    read(): string { return "x" }\n    @Sse("stream")'),
+                errors: [{ messageId: "foreign" }],
+            }],
+        })
+    })
+
+    test(`realtime-read-only keeps the SSE controller to the platform hub in ${edition}`, () => {
+        assert.equal(hfs.edition, edition)
+        ruleTester({ root: TYPED_ROOT, hfs }).run("realtime-read-only", realtimeReadOnly, {
+            valid: [{ filename: SSE, code: sseController() }],
+            invalid: [{
+                filename: SSE,
+                code: sseController({ imports: "import { OrderService } from '@modules/domain/order'\n", injections: ", private readonly orders: OrderService" }),
+                errors: [{ messageId: "injects" }],
+            }],
+        })
+    })
+
+    test(`realtime-topic-scope scopes the SSE stream to the principal, not to Last-Event-ID, in ${edition}`, () => {
+        assert.equal(hfs.edition, edition)
+        ruleTester({ root: TYPED_ROOT, hfs }).run("realtime-topic-scope", realtimeTopicScope, {
+            valid: [{ filename: SSE, code: sseController() }],
+            invalid: [{ filename: SSE, code: sseController({ body: "return this.hub.subscribe(`orders:${lastEventId}`)" }), errors: [{ messageId: "scope" }] }],
         })
     })
 }

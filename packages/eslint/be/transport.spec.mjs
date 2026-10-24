@@ -31,6 +31,7 @@ const T = "src/features/api/plan/transport"
 const RESOLVER = at(`${T}/graphql/place-order.resolver.ts`)
 const DTO = at(`${T}/graphql/dto/place-order.input.ts`)
 const CONTROLLER = at(`${T}/http/pay.controller.ts`)
+const SSE = at("src/features/realtime/orders/transport/sse/orders.controller.ts")
 const CONSUMER = at(`${T}/message/paid.consumer.ts`)
 const CLI = at(`${T}/cli/seed.cli.ts`)
 const DOMAIN = at("src/modules/domain/order/order.service.ts")
@@ -198,6 +199,15 @@ test("door-lives-in-features: a provider webhook door lives in the webhooks slot
     })
 })
 
+test("door-lives-in-features: an SSE stream door lives in the sse slot of the realtime kind", () => {
+    const head = `import { Controller } from "@nestjs/common"
+`
+    kinds.run("door-lives-in-features", doorLivesInFeatures, {
+        valid: [{ filename: SSE, code: `${head}@Controller() export class C {}` }],
+        invalid: [{ filename: at("src/features/realtime/orders/transport/graphql/orders.subscription.ts"), code: `${head}@Controller() export class C {}`, errors: [{ messageId: "wrongSlot" }] }],
+    })
+})
+
 test("transport-is-thin: the doors of the webhook and realtime kinds answer to their own kind laws, not to the one-dispatch shape", () => {
     kinds.run("transport-is-thin", transportIsThin, {
         valid: [
@@ -302,6 +312,31 @@ class PlainGuard { canActivate() { return true } }
                 { filename: CONTROLLER, code: `${head}@Controller("orders") class C { @Get() list() { const reason = Reason.Health; return { reason } } }`, errors: [{ messageId: "unjustified" }] },
                 { filename: CONTROLLER, code: `${head}const Other = (_options: unknown): MethodDecorator => () => undefined\n@Controller("orders") class C { @Other({ reason: Reason.Health }) @Get() list() { return { items: [] } } }`, errors: [{ messageId: "unjustified" }] },
                 { filename: CONTROLLER, code: `${head}${operations}@Controller("api/v1") class C { @Post() list(@Body() body: { id: string }) { return body } }`, errors: [{ messageId: "unjustified" }] },
+            ],
+        })
+    })
+
+    test(`BE_REST_DOOR_EVIDENCE: ${edition} accepts an event stream only as the @Sse method of the sse slot`, () => {
+        const hfs = hfsFromDeclaration({ ...appDeclaration("be", { ...BE_DECLARATION, patterns: ["realtime"] }), edition }, TYPED_ROOT)
+        const editionTester = ruleTester({ root: TYPED_ROOT, hfs })
+        const head = `import { Controller, Get, Sse } from "@nestjs/common"
+import { Sse as Stream } from "@nestjs/common"
+`
+        editionTester.run("rest-door-needs-a-reason", restDoorNeedsAReason, {
+            valid: [
+                { filename: SSE, code: `${head}@Controller("orders") class C { @Sse("stream") stream() { return [] as never } }` },
+                // a renamed import is the same export
+                { filename: SSE, code: `${head}@Controller("orders") class C { @Stream("stream") stream() { return [] as never } }` },
+                // a same-named local decorator is no route of Nest at all, so nothing is judged
+                { filename: SSE, code: `import { Controller } from "@nestjs/common"
+const Sse = (_path: string): MethodDecorator => () => undefined
+@Controller("orders") class C { @Sse("stream") stream() { return [] as never } }` },
+            ],
+            invalid: [
+                // the same @Sse parked in an api http door has no evidence
+                { filename: CONTROLLER, code: `${head}@Controller("orders") class C { @Sse("stream") stream() { return [] as never } }`, errors: [{ messageId: "unjustified" }] },
+                // a plain GET inside the sse slot is not an event stream
+                { filename: SSE, code: `${head}@Controller("orders") class C { @Get() list() { return 1 } }`, errors: [{ messageId: "unjustified" }] },
             ],
         })
     })

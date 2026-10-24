@@ -24,7 +24,7 @@
  * Specs and tests are not in the graph, so an export used only by a spec is dead, on purpose, with these exceptions (unit test
  * standard): the unit spec of every unit role (ruleParams.be.unitRoles: `<name>.service.spec.ts`, `<name>.cli.spec.ts`) and of every logic role
  * (ruleParams.be.logicRoles: `<name>.policy.spec.ts`, `<name>.client.spec.ts`, ...), a
- * unit spec of a webhook, gateway or subscription door (`.webhook.spec.ts`, `.gateway.spec.ts`, `.subscription.spec.ts`: a door has no service of its own), a
+ * unit spec of a webhook, gateway, subscription or SSE controller door (`.webhook.spec.ts`, `.gateway.spec.ts`, `.subscription.spec.ts`, `.controller.spec.ts`: a door has no service of its own), a
  * `*.builder.ts` under src/tests/fixtures/builders, and a file of the test world (slots be.tests.world and be.tests.world.kit, which
  * open and migrate the real databases of the e2e run) read from disk or staged in the git index count as consumers, because a spec can only provide an
  * Inject*() token or a param type the entry exports, and the world wires the same capabilities the apps do. An integration
@@ -177,8 +177,8 @@ function deadFiles(graph, config) {
   return { violations, judged: judgedFiles.length, roots: roots.size };
 }
 
-/** The unit spec of a webhook, gateway or subscription door: a door has no service of its own, so its spec is the only unit spec of its kind. */
-const DOOR_SPEC = /^src\/features\/(?:webhooks|realtime)\/.+\.(?:webhook|gateway|subscription)\.spec\.ts$/u;
+/** The unit spec of a webhook, gateway, subscription or SSE controller door: a door has no service of its own, so its spec is the only unit spec of its kind. */
+const DOOR_SPEC = /^src\/features\/(?:webhooks|realtime)\/.+\.(?:webhook|gateway|subscription|controller)\.spec\.ts$/u;
 const BUILDER_CONSUMER = /^src\/tests\/fixtures\/builders\/.+\.builder\.ts$/u;
 /** The test world slots (knowledge/hfs/slots.yaml): their files wire the real capabilities of the e2e run. */
 const WORLD_SLOTS = new Set(['be.tests.world', 'be.tests.world.kit']);

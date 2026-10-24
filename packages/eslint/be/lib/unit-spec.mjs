@@ -81,11 +81,11 @@ export const unitRoleOfSubject = (hfs, filename) => {
 }
 
 /** The slots of the feature kinds whose door carries its own unit spec beside it. */
-const DOOR_SPEC_SLOTS = new Set(["be.feature.webhooks.http", "be.feature.realtime.graphql", "be.feature.realtime.websocket"])
+const DOOR_SPEC_SLOTS = new Set(["be.feature.webhooks.http", "be.feature.realtime.graphql", "be.feature.realtime.websocket", "be.feature.realtime.sse"])
 
 /** The door a `<name>.<role>.spec.ts` of a feature kind tests, or null: `payment.webhook.spec.ts` gives `payment.webhook.ts`. */
 export const doorOfSpec = (hfs, filename) => {
     if (!isUnitSpecFile(hfs, filename) || !DOOR_SPEC_SLOTS.has(hfs.slotOf(filename) ?? "")) return null
-    const match = /^(.+.(?:webhook|gateway|subscription)).spec.ts$/.exec(baseOf(filename))
+    const match = /^(.+.(?:webhook|gateway|subscription|controller)).spec.ts$/.exec(baseOf(filename))
     return match ? `${match[1]}.ts` : null
 }

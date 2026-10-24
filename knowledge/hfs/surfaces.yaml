@@ -59,6 +59,7 @@ surfaces:
         - be.feature.realtime.graphql
         - be.feature.realtime.dto
         - be.feature.realtime.websocket
+        - be.feature.realtime.sse
         - be.cli
         - be.domain
         - be.errors
@@ -117,6 +118,7 @@ surfaces:
         - be.feature.realtime.graphql
         - be.feature.realtime.dto
         - be.feature.realtime.websocket
+        - be.feature.realtime.sse
         - be.cli
         - be.domain
         - be.errors

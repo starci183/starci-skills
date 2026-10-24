@@ -34,7 +34,7 @@ rules:
       name is the operation name and `name:` equals the method. There is one Nest module per transport
       (`<feature>-graphql.module.ts`), never one per operation.
       REST in lite and full carries evidence on each route decorator: a probe, auth handshake, signed webhook, actual byte
-      stream or public versioned operation served from the app's nonempty `defineOperations` table. A class-level reason or
+      stream, event stream (an `@Sse` method of the be.feature.realtime.sse slot, nowhere else) or public versioned operation served from the app's nonempty `defineOperations` table. A class-level reason or
       an unused `StreamableFile` import proves no route; the implementation must actually stream bytes when that is its reason.
     rationale: |-
       One flat shape per operation makes the operation, its input, its output and its mapper findable from the name alone.

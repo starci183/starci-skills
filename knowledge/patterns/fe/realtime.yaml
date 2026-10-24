@@ -2,23 +2,27 @@ schema: starci/knowledge-source@1
 id: fe.realtime
 title: Realtime
 purpose: |-
-  How does the front end receive pushes from the back end? socket.io-client singletons per namespace and one side-effect
-  component, in both editions; lite runs the gateway inside the be api process.
+  How does the front end receive pushes from the back end? A one-way push is a server-sent-events stream read by a fetch
+  operation of modules/api/sse and a use<Channel>Stream hook that writes the SWR keys it changes (the default, in both
+  editions); a channel that also sends messages uses socket.io-client singletons per namespace and one side-effect
+  component. Lite runs either door inside the be api process.
 appliesTo:
   - frontend
 family: fe
 # The slot ids this topic teaches (knowledge/hfs/slots.yaml); scripts/gates/read-digest.mjs inverts these
 # into the READ-step slot -> pattern-topic map (knowledge/op-gate.yaml kinds), each slot's topics in index.yaml order.
-slots: [fe.hooks.socketio, fe.components.providers]
+slots: [fe.hooks.socketio, fe.components.providers, fe.modules.api]
 provenance:
   reviewedAt: 2026-10-13
   sources:
     - "knowledge/hfs/fe-stack.yaml"
     - "starci-lab/starci-academy origin/main: src/hooks/socketio/{sockets.ts,SocketIoSideEffects.tsx,utils.ts}"
     - "knowledge/patterns/be/realtime.yaml"
+    - "owner decision 2026-10-24 (SSE is the default door for one-way push; ruling:R212/case-5)"
   limitations: |-
     FE_STACK_FORBIDDEN proves that no forbidden alternative is declared or imported; it does not prove the canonical
-    library is used well. starci-academy illustrates the usage; the catalog decides.
+    library is used well. starci-academy illustrates the usage; the catalog decides. The front end has no specs: an SSE hook
+    is proven by the back end's realtime/* scenarios against a real stream and by the walk of the surface, not by an FE spec.
 rules:
   - id: FE-REALTIME
     title: "socket.io-client singletons and one side-effect component"
@@ -30,8 +34,17 @@ rules:
       SocketIoSideEffects.tsx, mounted once by components/providers, connects on sign-in and disconnects on sign-out,
       registers the listeners, and dispatches each event to redux or mutates the SWR keys it changes; enums/ name the
       publication and subscription events and types/ their payloads. Consumers get a socket through a use<X>SocketIo
-      hook only to emit. A resource is refreshed by the socket or by polling, never both. graphql-ws, raw WebSocket,
-      Supabase Realtime and other push SDKs are refused in both editions.
+      hook only to emit. A resource is refreshed by the socket, by an event stream or by polling, never two of them.
+      graphql-ws, raw WebSocket, Supabase Realtime and other push SDKs are refused in both editions.
+      A one-way channel that the back end serves as server-sent events (be.feature.realtime.sse) needs no library: its reader
+      is an operation of the API layer, `modules/api/sse/<area>/stream-<channel>.ts`, that opens the stream with `fetch` and
+      the bearer access token (the native `EventSource` cannot send an `Authorization` header, and a token in the URL is
+      refused), parses the events, and when the connection ends or fails reopens it with the id of the last event as
+      `Last-Event-ID` after a capped, doubling wait. A `use<Channel>Stream` hook of the domain's hooks folder runs that
+      operation in an effect that aborts it on cleanup, writes the SWR key of each pushed change with
+      `mutate(key, data, { revalidate: false })`, and revalidates the watched key on every open, which closes the gap since the
+      last event (the stream carries changes, the query operation carries the snapshot). The query hook of that resource does
+      not poll.
     rationale: |-
       One connection per namespace and one place that turns events into state avoid duplicate listeners and leaked
       connections.
@@ -44,6 +57,11 @@ rules:
         source: owner
         when: "Owner ruling 2026-10-13: a lite app subscribed to Supabase Realtime from the front end"
         write: "The back end serves the same socket.io gateway from its api process (be.feature.realtime.websocket, one instance, no Redis adapter); the front end listens through hooks/socketio as in full."
+      - id: case-3
+        date: "2026-10-24"
+        source: owner
+        when: "A booking status that the back end pushes after a job (a one-way channel), where the front end polled with refreshInterval"
+        write: "modules/api/sse/booking-status/stream-booking-status.ts follows GET /booking-status/stream with fetch and the bearer token; hooks/bookings/useBookingStatusStream.ts writes QUERY_BOOKING_STATUS_SWR_KEY for each push and revalidates it on open; useQueryBookingStatusSwr drops its refreshInterval (lite-app)."
     verification:
       automated:
         - FE_SIZE_AND_STATE_BUDGET

@@ -16,10 +16,11 @@ import { I18nModule } from "@modules/platform/i18n"
 import { JOBS_ERROR_KINDS, JOBS_MESSAGES, JobsModule } from "@modules/platform/jobs"
 import { LoggingModule } from "@modules/platform/logging"
 import { QueueModule } from "@modules/platform/queue"
+import { RealtimeModule } from "@modules/platform/realtime"
 import type { ApiOptions } from "../api.options"
 
 /**
- * The platform area of the API: every platform capability (the queue, the fenced jobs and the
+ * The platform area of the API: every platform capability (the queue, the fenced jobs, the realtime hub and the
  * GraphQL server included), registered once and app-wide. A composition group holds one area's module list and
  * nothing else; `app.module.ts` spreads it into its imports.
  */
@@ -47,6 +48,7 @@ export const platformModules = (options: ApiOptions): Array<DynamicModule> => [
         ],
     }),
     CqrsModule.register({ isGlobal: true }),
+    RealtimeModule.register({ isGlobal: true }),
     HttpSecurityModule.register({
         isGlobal: true,
         ...options.httpSecurity,

@@ -23,6 +23,7 @@ const HTTP = at("src/modules/platform/http/http.client.ts")
 const RETRY = at("src/modules/platform/retry/retry.service.ts")
 const EVENT_BUS = at("src/modules/platform/event-bus/event-bus.service.ts")
 const QUEUE = at("src/modules/platform/queue/queue.service.ts")
+const REALTIME = at("src/modules/platform/realtime/event-stream.mapper.ts")
 const LOGGING = at("src/modules/platform/logging/logging.service.ts")
 const CLOCK = at("src/modules/platform/clock/clock.service.ts")
 const CACHE = at("src/modules/integrations/cache/cache.client.ts")
@@ -63,6 +64,8 @@ export { Kafka }` },
 import { BullModule } from "@nestjs/bullmq"
 export { Worker, BullModule }` },
             { filename: EVENT_BUS, code: `export const tick = () => setInterval(() => 1, 5)` },
+            // the SSE heartbeat of platform/realtime owns its interval
+            { filename: REALTIME, code: `export const beat = () => setInterval(() => 1, 5)` },
             { filename: QUEUE, code: `export const tick = () => setTimeout(() => 1, 5)` },
             { filename: LOGGING, code: `import winston from "winston"\nexport { winston }` },
             { filename: CLOCK, code: `import dayjs from "dayjs"\nimport utc from "dayjs/plugin/utc"\nimport { toZonedTime } from "date-fns-tz"\nexport { dayjs, utc, toZonedTime }` },
@@ -88,6 +91,9 @@ export { axios }` },
             { filename: DOMAIN, code: `export const get = () => globalThis.fetch("/")`, errors: [{ messageId: "foreign" }] },
             { filename: DOMAIN, code: `export const wait = () => new Promise((resolve) => setTimeout(resolve, 5))`, errors: [{ messageId: "foreign" }] },
             { filename: DOMAIN, code: `export const tick = () => setInterval(() => 1, 5)`, errors: [{ messageId: "foreign" }] },
+            { filename: FEATURE, code: `export const beat = () => setInterval(() => 1, 5)`, errors: [{ messageId: "foreign" }] },
+            // platform/realtime owns the interval, not the timeout
+            { filename: REALTIME, code: `export const wait = () => setTimeout(() => 1, 5)`, errors: [{ messageId: "foreign" }] },
             // a timer reached through the node module, renamed, or by its bare name
             { filename: DOMAIN, code: `import { setTimeout as wait } from "node:timers/promises"\nexport { wait }`, errors: [{ messageId: "foreign" }] },
             { filename: DOMAIN, code: `import { setTimeout as wait } from "timers/promises"\nexport { wait }`, errors: [{ messageId: "foreign" }] },

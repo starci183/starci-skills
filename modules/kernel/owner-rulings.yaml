@@ -574,10 +574,18 @@ rulings:
     ruling: "The owner's words are \"Go han cua duyet loosening va 12 entry cu trong alpha.27; loosening la luon do\" (remove the loosening approval route and the 12 old entries in alpha.27; a loosening is always red), relayed by the alpha.27 lead. A change that loosens a gate or check is always refused by the land gate and flagged by the gate-loosening self-check; no approval lets one through, the owner's included, and the fix is to restore the gate. The 12 gate-loosening-<fingerprint> approval entries are removed with the route. An entry that only moves with a git rename of the paths it names is no loosening."
     supersedes: []
     enforcedBy: [scripts/lib/gate-loosening.mjs, scripts/supervisor/land-gate-loosening.mjs, scripts/checks/check-gate-loosening.mjs, modules/kernel/roles.yaml]
+  - id: lite-sse-door
+    date: '2026-10-24'
+    source: "the owner in chat (alpha.30 BE patterns research, owner decisions 2026-10-24: the lite edition may serve SSE, and SSE is the default door for one-way push)"
+    ruling: "The lite edition may serve server-sent events from the api process, beside the in-process socket.io gateway of R212 case-2: SSE is the third door of the existing realtime pattern (slot be.feature.realtime.sse, not a new pattern), served in both editions and the default door for one-way server-to-client push; the socket.io gateway stays for a genuinely bidirectional channel and the GraphQL subscription stays full-only (graphql-ws is still refused in lite). The hub is single-replica: one process holds the subscriptions and the bounded replay buffer, so the api pins replicas: 1 (STACKS_REALTIME_SCALED); a multi-replica hub is a later decision."
+    supersedes:
+      - {rule: R212, case: case-2}
+    enforcedBy: [R184, R185, R186, R212, R278]
 
 supersedes:
   'ruling:R212/case-2': ['ruling:R212/case-1']
   'ruling:R212/case-4': ['ruling:R212/case-1', 'ruling:R212/case-2']
+  'ruling:R212/case-5': ['ruling:R212/case-2']
   'ruling:R289':
     - id: 'ruling:R245'
       clause: 'parses inline or imports'

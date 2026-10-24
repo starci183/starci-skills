@@ -11,5 +11,7 @@ api.lite-app.example {
         health_uri /health/ready
         health_interval 10s
         health_timeout 3s
+        # server-sent events (/booking-status/stream): flush every write at once; never add `encode` to this route
+        flush_interval -1
     }
 }

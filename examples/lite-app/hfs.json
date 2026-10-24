@@ -31,7 +31,7 @@
           "kind": "cli"
         }
       ],
-      "kinds": ["api", "cli", "jobs", "webhooks"],
+      "kinds": ["api", "cli", "jobs", "realtime", "webhooks"],
       "connections": [
         {
           "name": "primary",
@@ -43,7 +43,7 @@
       ],
       "reads": ["supabase/types/"],
       "optionalSlots": ["be.contract.graphql"],
-      "patterns": ["fenced-job", "queue", "webhooks"]
+      "patterns": ["fenced-job", "queue", "realtime", "webhooks"]
     },
     "fe": {
       "apps": [

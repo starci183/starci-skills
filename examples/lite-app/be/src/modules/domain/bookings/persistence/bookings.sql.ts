@@ -8,8 +8,11 @@ RETURNING id, resource_id, starts_at, ends_at, status`
 /** Reads the confirmation status of one public.bookings row by id and owner ($1 id, $2 owner). */
 export const FIND_BOOKING_STATUS = sql`SELECT id, status FROM public.bookings WHERE id = $1 AND owner_id = $2 LIMIT 1`
 
-/** Moves one pending booking to confirmed; a confirmed booking is left as it is, so a repeated job changes nothing ($1 id). */
-export const CONFIRM_BOOKING = sql`UPDATE public.bookings SET status = 'confirmed' WHERE id = $1 AND status = 'pending'`
+/** Moves one pending booking to confirmed and answers the row it moved (id, owner); a confirmed booking is left as it is and answers nothing, so a repeated job changes and pushes nothing ($1 id). */
+export const CONFIRM_BOOKING = sql`WITH confirmed AS (
+    UPDATE public.bookings SET status = 'confirmed' WHERE id = $1 AND status = 'pending' RETURNING id, owner_id
+)
+SELECT id, owner_id FROM confirmed`
 
 /** Marks the reminder of one booking sent; a reminded booking is left as it is, so a repeated job changes nothing ($1 id). */
 export const REMIND_BOOKING = sql`UPDATE public.bookings SET reminder_sent_at = now() WHERE id = $1 AND reminder_sent_at IS NULL`

@@ -3,9 +3,12 @@ import { builder, fakeTransaction, mock, mockEntityManager } from "@starci/jest-
 import type { MockEntityManager } from "@starci/jest-preset"
 import { ResourcesService } from "@modules/domain/resources"
 import { PRIMARY_ENTITY_MANAGER } from "@modules/platform/database"
+import { REALTIME_HUB } from "@modules/platform/realtime"
+import type { RealtimeHub } from "@modules/platform/realtime"
 import { BookingConfirmationQueue } from "@modules/queues/booking-confirmation"
 import { BookingReminderQueue } from "@modules/queues/booking-reminder"
 import type { CreateBookingParams } from "./bookings.contracts"
+import { bookingStatusTopic } from "./bookings.policy"
 import { BookingsService } from "./bookings.service"
 import { BookingsErrorCode } from "./errors/bookings.error"
 import {
@@ -35,6 +38,7 @@ const build = async (entityManager: MockEntityManager) => {
     resources.resources.mockResolvedValue({ id: "resource-1" })
     const confirmations = mock<BookingConfirmationQueue>()
     const reminders = mock<BookingReminderQueue>()
+    const hub = mock<RealtimeHub>()
     const moduleRef = await Test.createTestingModule({
         providers: [
             BookingsService,
@@ -42,9 +46,10 @@ const build = async (entityManager: MockEntityManager) => {
             { provide: ResourcesService, useValue: resources },
             { provide: BookingConfirmationQueue, useValue: confirmations },
             { provide: BookingReminderQueue, useValue: reminders },
+            { provide: REALTIME_HUB, useValue: hub },
         ],
     }).compile()
-    return { bookings: moduleRef.get(BookingsService), resources, confirmations, reminders }
+    return { bookings: moduleRef.get(BookingsService), resources, confirmations, reminders, hub }
 }
 
 describe("BookingsService.createBooking", () => {
@@ -172,22 +177,39 @@ describe("BookingsService.bookingStatus", () => {
 })
 
 describe("BookingsService.confirmBooking", () => {
-    it("confirms the pending booking the job names", async () => {
-        const em = mockEntityManager({ query: [CONFIRM_BOOKING, []] })
-        const { bookings } = await build(em)
+    it("confirms the pending booking the job names and pushes the new status to its owner once the write is done", async () => {
+        const em = mockEntityManager({ query: [CONFIRM_BOOKING, [{ id: "booking-1", owner_id: "person-1" }]] })
+        const { bookings, hub } = await build(em)
 
         await bookings.confirmBooking({ bookingId: "booking-1" })
 
         expect(em.query).toHaveBeenCalledWith(CONFIRM_BOOKING, ["booking-1"])
+        expect(hub.publish).toHaveBeenCalledTimes(1)
+        expect(hub.publish).toHaveBeenCalledWith(bookingStatusTopic("person-1"), {
+            id: "booking-1:confirmed",
+            bookingId: "booking-1",
+            status: "confirmed",
+        })
     })
 
-    it("changes nothing for a payload that is not a confirm-booking payload", async () => {
+    it("pushes nothing when the booking was already confirmed, so a repeated job is silent", async () => {
+        const em = mockEntityManager({ query: [CONFIRM_BOOKING, []] })
+        const { bookings, hub } = await build(em)
+
+        await bookings.confirmBooking({ bookingId: "booking-1" })
+
+        expect(em.query).toHaveBeenCalledWith(CONFIRM_BOOKING, ["booking-1"])
+        expect(hub.publish).not.toHaveBeenCalled()
+    })
+
+    it("changes and pushes nothing for a payload that is not a confirm-booking payload", async () => {
         const em = mockEntityManager()
-        const { bookings } = await build(em)
+        const { bookings, hub } = await build(em)
 
         await bookings.confirmBooking({ orderId: "order-1" })
 
         expect(em.query).not.toHaveBeenCalled()
+        expect(hub.publish).not.toHaveBeenCalled()
     })
 })
 

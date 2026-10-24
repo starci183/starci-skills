@@ -388,7 +388,7 @@ function realtimeIssues(input, add) {
     const component = mapping(input.doc.components)[id], app = component?.app ?? id;
     if (!apis.has(app) || service.deploy?.replicas === 1) continue;
     if (appComposesRealtime(input.repoRoot, app, list(input.files)))
-      add('STACKS_REALTIME_SCALED', `services.${id}.deploy.replicas`, 'A lite API composing realtime must pin deploy.replicas: 1 because its gateway runs in one API process');
+      add('STACKS_REALTIME_SCALED', `services.${id}.deploy.replicas`, 'A lite API composing realtime must pin deploy.replicas: 1 because its realtime hub and gateway live in one API process');
   }
 }
 

@@ -18,7 +18,7 @@ The code requirements apply equally to lite and full. The database requirements 
 - <a id="r263"></a>R263 `BE_WEBHOOK_SCOPE`: signed-webhook reasons belong to verified webhook doors or declared verifiers. A third-party OAuth redirect (a GET route with `PublicReason.AuthHandshake` on a path that is not a webhook or events path) is not a webhook door (owner:oauth-redirect-not-webhook, Theo y tro: the owner delegated the decision to main, 2026-10-17); a POST, a webhook or events path and any other reason stay judged. A domain receipt port (no base class, constructor of platform ports only, one of them the Inbox) may be called inside the receipt transaction (owner:webhook-receipt-port); another domain service, a bus or a `process` callback there is processing and is reported as an intake finding. `BE_WEBHOOK_INBOX_KEY` requires intake to deduplicate by the stable delivery identifier, commit its inbox receipt and typed outbox event, and hand processing to a reactor or job after commit.
 - <a id="r264"></a>R264 `HFS_FEATURE_LOGIC_ROLE`: every feature-tier support role stays thin; branching and business logic belong in capability modules. One narrow exemption (owner ruling 2026-10-16 "Theo y tro", ruling `feature-type-file-register-enum-type`): a `registerEnumType(...)` call of `@nestjs/graphql` at module top level of a `<name>.type.ts` file of the GraphQL transport slot (`be.transport.graphql`) declares a schema enum, and `starci app emit` loads only those files; the same call in any other role or slot, or inside a function, is still logic.
 - <a id="r265"></a>R265 `BE_COMPOSITION_UNTYPED`: typed module, provider, queue and scheduler collections live in `compose/<area>.ts`, never in `main.ts`, environment or options files; ownership follows resolved types rather than names.
-- <a id="r278"></a> R278 `BE_REST_DOOR_EVIDENCE`: each REST route carries evidence for an allowed exception to GraphQL in both editions. `BE_REST_ROUTE_UNDECLARED` refuses a public REST operation absent from the typed operations table. A route that serves an external machine client (n8n, till, external API, agent tools) is declared by `@Credential({ kind: "<literal>" })` from the identity capability on the route or its controller; the identity capability declares the `CredentialGuard` (a `CanActivate`) that authenticates that kind, so the wire format of the client stays unchanged (owner:credential-guarded-rest-door, Theo y tro: the owner delegated the decision to main, 2026-10-16). An unguarded route and an anonymous route without a closed `PublicReason` still fail.
+- <a id="r278"></a> R278 `BE_REST_DOOR_EVIDENCE`: each REST route carries evidence for an allowed exception to GraphQL in both editions. `BE_REST_ROUTE_UNDECLARED` refuses a public REST operation absent from the typed operations table. A route that serves an external machine client (n8n, till, external API, agent tools) is declared by `@Credential({ kind: "<literal>" })` from the identity capability on the route or its controller; the identity capability declares the `CredentialGuard` (a `CanActivate`) that authenticates that kind, so the wire format of the client stays unchanged (owner:credential-guarded-rest-door, Theo y tro: the owner delegated the decision to main, 2026-10-16). A server-sent-events stream is an event-stream route: the `@Sse` method of a `<channel>.controller.ts` in the be.feature.realtime.sse slot is its own evidence (owner:lite-sse-door, 2026-10-24); the same `@Sse` in any other slot, and any other route inside the sse slot, proves nothing. An unguarded route and an anonymous route without a closed `PublicReason` still fail.
 - <a id="r279"></a> R279 `BE_THIRD_PARTY_OWNER`: vendor SDK ownership derives from package dependencies; SDK calls stay in their owning integration, with declared pure-library exceptions.
 - <a id="r281"></a> R281 `BE_SPEC_FORM_ALL_ROLES`: every logic-role unit spec gets its subject from a providers-only TestingModule with doubles and asserts exact outcomes, without constructing the subject or mocking modules.
 - <a id="r289"></a> R289 `BE_APP_ENV_REQUIRED`: each back-end app owns a typed `<app>.env.ts` reader and `main.ts` delegates environment reads to it. `BE_APP_MODULE_LIST_INLINE` requires the app module to spread its typed composition groups rather than declare an inline module list.
@@ -91,7 +91,7 @@ R165). Every `image` of a product with more than one service is pinned (`HFS_IMA
 ## The contract between services
 
 GraphQL is the default synchronous door in both editions. REST is limited to probes, auth handshakes, signed webhooks, byte
-streams and the declared public v1 table; its evidence belongs to each route decorator, not to a class-level import or label.
+streams, the `@Sse` event stream of a realtime channel and the declared public v1 table; its evidence belongs to each route decorator, not to a class-level import or label.
 When Supabase is declared, the front end uses it for Auth only and reads product data through the back end.
 
 A synchronous API keeps its snapshot under `be/contracts/<service>/` (`schema.graphql`, `openapi.json`), emitted by `npm run
@@ -198,9 +198,10 @@ The same ordering applies to a GET subscription challenge.
 
 <a id="r184"></a>
 
-`BE_REALTIME_SHAPE` (R184) requires one socket gateway or one GraphQL subscription resolver in the matching file role, with
-only that protocol's subscription operations or authenticated server push streams. API queries, mutations and REST routes
-belong in API features. Lite serves the socket.io gateway in its API process; GraphQL subscriptions belong to full.
+`BE_REALTIME_SHAPE` (R184) requires one SSE controller, one socket gateway or one GraphQL subscription resolver in the matching
+file role, with only that protocol's subscription operations or authenticated server push streams (an SSE controller has one
+`@Sse` stream and no other route). API queries, mutations and REST routes belong in API features. Lite serves SSE (the default door
+for one-way push, owner decision 2026-10-24) or the socket.io gateway in its API process; GraphQL subscriptions belong to full.
 
 <a id="r185"></a>
 
@@ -211,7 +212,7 @@ repositories and queues stay outside the door; reactors feed the hub after their
 
 `BE_REALTIME_TOPIC_SCOPE` (R186) requires every hub subscription topic to use the handler's authenticated
 `@CurrentPrincipal()` parameter, or the platform `Principal` supplied to a server push stream. A constant or client-only topic
-does not establish the subscriber's ownership. These webhook and realtime boundaries apply in both editions.
+(a `Last-Event-ID` header included) does not establish the subscriber's ownership. These webhook and realtime boundaries apply in both editions.
 
 ## Specs
 
