@@ -1,5 +1,8 @@
 # Changelog
 
+## 8.4.38 - 2026-10-24
+- Changed: the bundled runtime copies and canon pins carry the alpha.30 canon (the `zod` pin is `side: both`) and select @starci/hfs 4.7.31 and @starci/cli 1.7.31.
+
 ## 8.4.37 - 2026-10-24
 - Changed: the bundled canon pins add the multer 2.5.0 security override and select @starci/hfs 4.7.30 and @starci/cli 1.7.30.
 

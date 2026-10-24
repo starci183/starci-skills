@@ -4,9 +4,13 @@ All notable changes to StarCi are documented here. The runtime is on the `1.0.0-
 until every S* row in `docs/goal.md` holds with fresh evidence, then `1.0.0` freezes them.
 `package.json` `version` is the only version authority.
 
-## [Unreleased]
+## [1.0.0-alpha.30] — 2026-10-24
+
+### Changed
+- Candidate package pins select HFS 4.7.31, CLI 1.7.31, jest preset 2.3.5, test-world 1.2.3, tsconfig 2.0.7, prettier config 1.0.4, back-end canon 3.4.39 and front-end canon 8.4.38.
 
 ### Added
+- SSE is the third door of the `realtime` pattern (alpha.30 item C, owner decision 2026-10-24): slot `be.feature.realtime.sse`, a hub-only `@Sse` controller with heartbeat comment frames and `Last-Event-ID` resume, the lite edition may serve it (R212 amended), the FE reads it through a fetch-based event-stream reader, and the lite-app `booking-status` example proves it.
 - The `boundary-schema` pattern (alpha.30 item B, owner decision 2026-10-24): the back end validates by zone, `class-validator` for every transport door and `zod` for boundary data that never reaches a DTO (provider responses, model output, queue and outbox payloads read back). Rule BE-TYPING-8; R304 `BE_SCHEMA_PLACE` (zod only in a `<name>.schema.ts` of a domain, platform or integrations owner, never in a feature, door or `dto/`, never beside `class-validator`); R305 `BE_SCHEMA_BOUNDED` (every string, array, set, record and map bounded, no `z.any()`, `z.unknown()` or `z.json()`). The slot manifest declares the `schema` role suffix (a measured logic role, covered through its reader's spec). The `zod` canon pin is `side: both` (4.6.7) and a new app's starter dependencies carry it. Reference readers: full-app `integrations/sepay` (provider response) and lite-app `domain/calendar-inbox` (inbox payload read back). No schema is shared with the front end and `nestjs-zod` is not adopted.
 
 ## [1.0.0-alpha.29] — 2026-10-24

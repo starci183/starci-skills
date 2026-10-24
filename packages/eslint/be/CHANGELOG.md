@@ -1,6 +1,7 @@
 # Changelog
 
-## Unreleased
+## 3.4.39 - 2026-10-24
+- New: the realtime lint recognises the SSE door (`be.feature.realtime.sse`, a hub-only `@Sse` controller under `transport/sse`); the bundled slot manifest and rules carry the amended R212.
 - New: `schema-place` (R304 `BE_SCHEMA_PLACE`: `zod` is imported only from a `<name>.schema.ts` of a domain, platform or integrations owner; never in a feature, a transport door or a `dto/` folder; a schema file imports no `class-validator`, `class-transformer` or `@nestjs/graphql`) and `schema-bounded` (R305 `BE_SCHEMA_BOUNDED`: every `z.string()`, array, set, record and map has an upper bound, and `z.any()`, `z.unknown()` and `z.json()` are refused).
 - Changed: the bundled slot manifest declares the `schema` role suffix and the `zod` pin is `side: both`.
 

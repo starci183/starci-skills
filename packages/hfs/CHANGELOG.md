@@ -1,6 +1,7 @@
 # Changelog
 
-## Unreleased
+## 4.7.31 - 2026-10-24
+- Added: the SSE door templates of the realtime pattern (`channel.sse` module, options and definition); lite may serve SSE beside its socket.io gateway (amended R212).
 - Changed: a new app's starter dependencies (full and lite) carry `zod` at its canon pin, which is `side: both` (the boundary-schema pattern, R304 and R305).
 
 ## 4.7.30 - 2026-10-24

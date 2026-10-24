@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.7.31 - 2026-10-24
+- Changed: pins @starci/hfs 4.7.31 (the boundary-schema pattern and the SSE realtime door).
+
 ## 1.7.30 - 2026-10-24
 - Changed: pins @starci/hfs 4.7.30 (the multer security override of a new app).
 
