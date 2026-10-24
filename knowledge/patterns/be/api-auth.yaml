@@ -164,10 +164,13 @@ rules:
     hfsRules: [R42]
     requirement: |-
       The global `ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true })` is registered. Every property
-      of an input class carries class-validator decorators, every string has `@MaxLength`, an enum has `@IsEnum`, and a nested
-      object has `@ValidateNested()` with `@Type(...)`. GraphQL depth is at most 10 and complexity limits are set in
-      `platform/graphql`. A global default rate-limit tier applies to every operation and `@RateLimit(RateTier.Strict)` is on
-      every `AuthHandshake` and `SignedWebhook` door.
+      of an input class carries class-validator decorators, every string has `@MaxLength`, an enum has `@IsEnum`, an array has
+      `@IsArray()` with `@ArrayMaxSize`, and a nested object has `@ValidateNested()` with `@Type(...)`. GraphQL depth is at
+      most 10 and complexity limits are set in `platform/graphql`. A global default rate-limit tier applies to every operation
+      and `@RateLimit(RateTier.Strict)` is on every `AuthHandshake` and `SignedWebhook` door. The throttler counts in the store
+      its `ThrottlerStorage` port is bound to: the default in-process store is right for exactly one replica, and an app deployed
+      with more than one replica binds a store every replica shares (Redis in full, a Postgres table in lite), because a
+      per-process counter multiplies each limit by the replica count and a rolling update briefly runs two.
     rationale: |-
       Unbounded input and unthrottled doors are the cheapest denial of service and brute-force paths.
     cases:
@@ -175,14 +178,21 @@ rules:
         when: An input field
         write: '@IsString() @MaxLength(200) note!: string'
       - id: case-2
+        when: A list field
+        write: '@IsArray() @ArrayMaxSize(50) @IsUUID(undefined, { each: true }) productIds!: Array<string>'
+      - id: case-3
         when: A door
         write: '@RateLimit(RateTier.Strict) on the signIn operation'
+      - id: case-4
+        when: An app deployed with more than one replica
+        write: 'Bind the ThrottlerStorage port to the shared store (Redis in full, a Postgres table in lite) before the second replica starts; keep the in-process store only while the app runs one replica.'
     verification:
       automated:
         - BE_INPUT_BOUNDED
       manual:
         - Confirm the chosen bounds against the accepted contract.
         - Confirm the strict tier's limits fit the handshake (sign-in, sign-up, reset, callback) traffic.
+        - Confirm that the throttler storage is a shared store whenever the deployed replica count is above one.
     relatedExamples: []
   - id: BE-AUTH-6
     title: Pagination is by cursor
@@ -191,19 +201,26 @@ rules:
     requirement: |-
       A list operation takes `PageArgs { first: Int (1..PAGE_SIZE_MAX), after?: String }` and returns
       `<X>Connection { items, pageInfo { endCursor, hasNextPage } }`; cursors are opaque and HMAC-signed by
-      `platform/primitives`. Offset and page-number pagination (`skip`, `offset`, `OFFSET`) is not used.
+      `platform/primitives` (`pageOf`, `decodeCursor`) with a key every replica shares. `PageArgs` and the connection types are
+      GraphQL DTO classes, so they live in the owning feature's `transport/graphql/dto/`. The domain service reads `first + 1`
+      keyset rows ordered by a sort value and the id, refuses a page size outside `1..PAGE_SIZE_MAX` and a cursor it did not
+      sign, and answers a `Page`. Offset and page-number pagination (`skip`, `offset`, `OFFSET`) is not used.
     rationale: |-
       Offset pages are unstable under concurrent writes and their cost grows with the offset.
     cases:
       - id: case-1
         when: A list of purchases
         write: 'purchases(first: 20, after: $cursor) { items { id } pageInfo { endCursor hasNextPage } }'
+      - id: case-2
+        when: The service reads a page
+        write: 'const rows = await this.entityManager.query(LIST_PERSON_ORDERS, [personId, after?.sortValue ?? null, after?.id ?? null, first + 1]); return ok(pageOf(rows, { first, key, positionOf, itemOf }))'
     verification:
       automated:
         - BE_INPUT_BOUNDED
         - BE_QUERY_UNBOUNDED
-      manual: []
-    relatedExamples: []
+      manual:
+        - Confirm that the sort is total (a sort value and the id) and that a write between two pages cannot move a row into or out of a page already read.
+    relatedExamples: [pagination]
   - id: BE-AUTH-7
     title: API edge configuration states its trust boundaries
     kind: mandatory

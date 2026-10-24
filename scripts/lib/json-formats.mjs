@@ -25,6 +25,7 @@ export const JSON_FORMATS = Object.freeze([
   { id: 'keycloak-realm-import', tool: 'Keycloak realm import', match: (rel) => /(^|\/)\.starcistacks\/[^/]+\/infra\/compose\/realm-[^/]+\.json$/.test(rel) },
   { id: 'package-scripts-fragment', tool: 'npm (scripts rendered into package.json)', match: (rel) => /^packages\/hfs\/templates\/app\/package-scripts[^/]*\/[^/]+\.json$/.test(rel) },
   { id: 'async-event-contract', tool: 'starci app emit', match: (rel) => /(^|\/)be\/contracts\/[^/]+\/events(\.pin)?\.json$/.test(rel) },
+  { id: 'operation-contract', tool: 'starci app emit', match: (rel) => /(^|\/)be\/contracts\/[^/]+\/openapi\.json$/.test(rel) },
   { id: 'model-scorecard-snapshot', tool: 'scripts/agent/benchmark-snapshot.mjs', match: (rel) => /^benchmark\/snapshots\/[^/]+\.json$/.test(rel) },
 ]);
 

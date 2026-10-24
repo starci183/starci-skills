@@ -14816,12 +14816,13 @@ FE_SLOT_FILE_ROLE:
 BE_OPERATION_CONTRACT:
   title: "A versioned operation has no typed contract"
   title_vi: "Thao tác có phiên bản không có hợp đồng kiểu"
-  meaning_vi: "Mỗi thao tác `<tên>@<phiên bản>` của một app được khai báo đúng một lần trong bảng thao tác có kiểu `apps/<app>/src/operations.ts` (`OperationContract<Input, Output, RefusalCode>` đăng ký bằng `defineOperations`). Bộ kiểm tra thấy đầu vào hoặc đầu ra là `any`, `unknown`, `Record<string, unknown>`, kiểu generic chưa gán, hàm hoặc `Date`; mã từ chối không phải hợp các chuỗi literal đóng; hoặc route phục vụ bảng không nhận `OperationRequest<Table>` và trả `Promise<OperationReply<Table>>` của cùng một bảng."
+  meaning_vi: "Mỗi thao tác `<tên>@<phiên bản>` của một app được khai báo đúng một lần trong bảng thao tác có kiểu `apps/<app>/src/operations.ts` (`OperationContract<Input, Output, RefusalCode>` đăng ký bằng `defineOperations`). Bộ kiểm tra thấy đầu vào hoặc đầu ra là `any`, `unknown`, `Record<string, unknown>`, kiểu generic chưa gán, hàm hoặc `Date`; mã từ chối không phải hợp các chuỗi literal đóng; hoặc route phục vụ bảng không nhận `OperationRequest<Table>` và trả `Promise<OperationReply<Table>>` của cùng một bảng, hoặc body của route chưa gắn `OperationValidationService` nên pipe toàn cục không có lớp nào để kiểm."
   causes_vi:
     - "Đầu vào hoặc kết quả của thao tác khai báo là `unknown` nên client phải tự gõ kiểu tay"
     - "Mã từ chối khai báo là `string` thay vì hợp các literal như `\"DENIED\" | \"INVALID\"`"
     - "Route nhận `@Body() body: unknown` hoặc chỉ dùng một nửa `OperationRequest` / `OperationReply`"
-  nextStep_vi: "Khai báo kiểu có tên, đóng cho đầu vào và đầu ra của từng thao tác, liệt kê mã từ chối bằng hợp literal, và cho route nhận `OperationRequest<typeof OPERATIONS>` và trả `Promise<OperationReply<typeof OPERATIONS>>`; chạy `starci app emit` để sinh `contracts/<app>/openapi.json`. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục BE-OPERATIONS-1; không thêm ngoại lệ, không tắt luật."
+    - "Body của route chỉ gõ bằng `OperationRequest<Table>` mà không có `@Body(new OperationValidationService(RequestClass))`, nên không ai kiểm giá trị lúc chạy"
+  nextStep_vi: "Khai báo kiểu có tên, đóng cho đầu vào và đầu ra của từng thao tác, liệt kê mã từ chối bằng hợp literal, và cho route nhận `@Body(new OperationValidationService(RequestClass)) request: OperationRequest<typeof OPERATIONS>` và trả `Promise<OperationReply<typeof OPERATIONS>>`; chạy `starci app emit` để sinh `contracts/<app>/openapi.json`. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục BE-OPERATIONS-1; không thêm ngoại lệ, không tắt luật."
   owner: op-retry
   kind: check-finding
 

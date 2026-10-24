@@ -35,6 +35,8 @@ test('the stack layout JSON is admitted by its position under .starcistacks', ()
 test('emitted contracts, scorecard snapshots, claude settings and package-script fragments are formats of their tool', () => {
   assert.equal(formatId('be/contracts/order/events.json'), 'async-event-contract');
   assert.equal(formatId('be/contracts/order/events.pin.json'), 'async-event-contract');
+  assert.equal(formatId('be/contracts/order/openapi.json'), 'operation-contract');
+  assert.equal(formatId('be/contracts/order/other.json'), null);
   assert.equal(formatId('benchmark/snapshots/2026-09-25-24h.json'), 'model-scorecard-snapshot');
   assert.equal(formatId('benchmark/snapshots/nested/x.json'), null);
   assert.equal(formatId('.claude/settings.json'), 'claude-code-settings');

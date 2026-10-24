@@ -1918,7 +1918,7 @@ rules:
       - {path: packages/hfs/src/r94-r96-r97-coverage.spec.mjs, editions: [lite, full], codes: [FE_SLOT_FILE_ROLE]}
   - id: R95
     code: "BE_OPERATION_CONTRACT"
-    law: "A versioned operation is declared once in the app's typed operation table (`OperationContract<Input, Output, RefusalCode>` registered by `defineOperations`): its input and output are closed types (never `any`, `unknown` or `Record<string, unknown>`), its refusal codes a closed union of string literals, and the route that serves the table takes `OperationRequest<Table>` and answers `Promise<OperationReply<Table>>` of that one table."
+    law: "A versioned operation is declared once in the app's typed operation table (`OperationContract<Input, Output, RefusalCode>` registered by `defineOperations`): its input and output are closed types (never `any`, `unknown` or `Record<string, unknown>`), its refusal codes a closed union of string literals, and the route that serves the table takes `OperationRequest<Table>` and answers `Promise<OperationReply<Table>>` of that one table, binding its body to the `OperationValidationService` of `platform/http-security` because the alias leaves no class for the global pipe to validate."
     kinds: [lint]
     failureCodes: ["BE_OPERATION_CONTRACT"]
     enforcers:

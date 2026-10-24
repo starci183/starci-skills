@@ -16,6 +16,7 @@ for (const edition of ['lite', 'full']) {
       'apps/core/src/main.ts': "import { boot } from './boot';\nboot();\n",
       'apps/core/src/boot.ts': 'export const boot = () => 1;\n',
       'apps/core/src/stray.ts': 'export const stray = 1;\n',
+      'apps/core/src/operations.ts': 'export const OPERATIONS = 1;\n',
       'src/modules/domain/liveness/index.ts': 'export const used = 1;\nexport const unused = 2;\n',
       'src/modules/domain/live/index.ts': 'export const live = 1;\n',
     };
@@ -25,6 +26,7 @@ for (const edition of ['lite', 'full']) {
       valid: [
         sourceCase(fixture, files, 'apps/core/src/main.ts'),
         sourceCase(fixture, files, 'apps/core/src/boot.ts'),
+        sourceCase(fixture, files, 'apps/core/src/operations.ts'),
         sourceCase(fixture, files, 'src/modules/domain/live/index.ts'),
       ],
       invalid: [
