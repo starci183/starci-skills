@@ -1518,6 +1518,8 @@ slots:
     coverage: none
     composedBy: [api]
     rules: [BE_REALTIME_SHAPE, BE_REALTIME_WRITES, BE_REALTIME_TOPIC_SCOPE, BE_DEFAULT_DENY, BE_REST_DOOR_EVIDENCE]
+    exemplifiedBy:
+      - {path: packages/eslint/be/webhooks-realtime-coverage.spec.mjs, editions: [lite, full]}
   - id: be.cli
     since: 3.1.0
     profiles: [be]
