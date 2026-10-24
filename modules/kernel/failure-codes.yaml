@@ -22925,3 +22925,25 @@ UNEXPECTED_TOKEN:
   nextStep_vi: "Mở tệp tại vị trí báo lỗi, sửa cú pháp rồi chạy lại."
   owner: op-retry
   kind: input-invalid
+
+BE_SCHEMA_PLACE:
+  title: "A zod schema is outside its zone"
+  title_vi: "Schema zod đặt sai vùng"
+  meaning_vi: "Tệp `<file>` import `zod` ngoài tệp `<name>.schema.ts` của một chủ sở hữu domain, platform hoặc integrations; hoặc import `zod` trong feature, cửa transport hay thư mục `dto/`; hoặc tệp schema còn import `class-validator`, `class-transformer` hay `@nestjs/graphql`."
+  causes_vi:
+    - "Vi phạm luật R304: đầu vào của cửa transport được class-validator kiểm (R42), còn dữ liệu không đi qua DTO (phản hồi của nhà cung cấp, đầu ra có cấu trúc của mô hình, payload hàng đợi hoặc outbox đọc lại) mới đi qua schema zod của chủ sở hữu"
+    - "Schema zod viết thẳng trong service, mapper hay lớp DTO thay vì tệp `<name>.schema.ts`"
+  nextStep_vi: "Chuyển schema sang `<name>.schema.ts` cạnh bộ đọc trong chủ sở hữu domain, platform hoặc integrations, để bộ đọc import schema (và kiểu suy ra) từ đó và ánh xạ lỗi parse sang họ lỗi của chủ sở hữu; đầu vào của cửa transport dùng class-validator. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
+  owner: op-retry
+  kind: check-finding
+
+BE_SCHEMA_BOUNDED:
+  title: "A zod schema has an unbounded string, collection or open value"
+  title_vi: "Schema zod có chuỗi, tập hợp hoặc giá trị mở không giới hạn"
+  meaning_vi: "Schema ở `<file>` có `z.string()` (hoặc `z.email()`, `z.url()`) không có `.max(n)`/`.length(n)`, `z.array()`/`z.set()` không có `.max(n)`/`.length(n)`/`.size(n)`, `z.record()`/`z.map()` không giới hạn số phần tử bằng `.refine`/`.check`, hoặc dùng `z.any()`, `z.unknown()`, `z.json()`; hoặc giới hạn vô nghĩa như `Infinity`, `0`, `Number.MAX_*`."
+  causes_vi:
+    - "Vi phạm luật R305: mảng không giới hạn mà mọi phần tử đều lỗi sẽ cấp phát một issue cho từng phần tử (GHSA-mrhx-c7xc-m3w5), còn chuỗi không giới hạn là chi phí không giới hạn ở mọi phiên bản zod"
+    - "Schema mô tả dữ liệu ngoài bằng `z.any()` hoặc `z.unknown()` nên thực chất không kiểm gì"
+  nextStep_vi: "Thêm giới hạn hữu hạn dương cho từng chuỗi và tập hợp (`z.string().max(200)`, `z.array(item).max(100)`), giới hạn số phần tử của record bằng `.refine`, và mô tả hình dạng thật thay cho `z.any()`. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
+  owner: op-retry
+  kind: check-finding

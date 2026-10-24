@@ -254,3 +254,20 @@ In lite and full, R142 reports `BE_AMBIENT_ID` for ambient identifier sources
 outside `platform/ids`, including ordinary specs and the test world
 (slot `be.tests.world`). Application code asks the injected `Ids` port through `ids.next()`; ordinary
 specs supply deterministic identifiers through `fakeIds()`.
+
+<a id="r304"></a>
+### Boundary schema place
+
+In lite and full, R304 reports `BE_SCHEMA_PLACE` for a `zod` import outside a `<name>.schema.ts` file of a
+`modules/domain`, `modules/platform` or `modules/integrations` owner, for any `zod` import in a feature, a transport
+door or a `dto/` folder, and for a schema file that also imports `class-validator`, `class-transformer` or
+`@nestjs/graphql`. A transport input is validated by `class-validator` (R42); data that never reaches a DTO (a provider
+response, model output, a queue or outbox payload read back) is read through a schema, and the reader maps a failed parse to
+the error family of its owner. The schema file is a measured role (`schema` is a logic role): the spec of the reader that imports it covers it, and no schema is excluded from coverage.
+
+<a id="r305"></a>
+### Boundary schema bounds
+
+In lite and full, R305 reports `BE_SCHEMA_BOUNDED` for a string, array, set, map or record schema without an upper bound
+and for `z.any()`, `z.unknown()` and `z.json()`. A bound is a finite positive number (`Infinity`, `0` and
+`Number.MAX_*` are none); a record or map bounds its entry count with `.refine` or `.check`.

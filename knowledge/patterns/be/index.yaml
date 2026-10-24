@@ -105,8 +105,8 @@ topics:
   - id: be.typing
     title: Typing
     path: typing.yaml
-    decides: Strict flags, plain application contracts, ExecuteParams, protocol DTOs, bounded input, no type escapes anywhere
-    rules: BE-TYPING-1 … BE-TYPING-7
+    decides: Strict flags, plain application contracts, ExecuteParams, protocol DTOs, bounded input, no type escapes anywhere, bounded zod schemas for non-DTO boundary data
+    rules: BE-TYPING-1 … BE-TYPING-8
   - id: be.error
     title: Error
     path: error.yaml

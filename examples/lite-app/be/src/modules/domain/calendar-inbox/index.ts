@@ -1,3 +1,4 @@
+export { CALENDAR_INBOX_ERROR_KINDS } from "./errors/calendar-inbox.error"
 export { CalendarInboxModule } from "./calendar-inbox.module"
 export { CalendarInboxService } from "./calendar-inbox.service"
 export {

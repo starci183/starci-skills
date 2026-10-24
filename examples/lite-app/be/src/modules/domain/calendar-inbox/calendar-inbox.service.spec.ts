@@ -5,6 +5,7 @@ import { PRIMARY_ENTITY_MANAGER } from "@modules/platform/database"
 import { INBOX } from "@modules/platform/inbox"
 import { CalendarDeliveryQueue } from "@modules/queues/calendar-delivery"
 import { CalendarInboxService } from "./calendar-inbox.service"
+import { CalendarInboxErrorCode } from "./errors/calendar-inbox.error"
 import {
     COMPLETE_CALENDAR_INBOX,
     FIND_PENDING_CALENDAR_INBOX,
@@ -177,6 +178,16 @@ describe("CalendarInboxService.processCalendarDelivery", () => {
         expect(calendars.acceptCalendarDelivery).toHaveBeenCalledTimes(1)
         expect(tx.em.query).toHaveBeenCalledTimes(3)
         expect(tx.em.query).toHaveBeenLastCalledWith(FIND_PENDING_CALENDAR_INBOX, ["inbox-1"])
+    })
+
+    it("fails the job before any effect when the retained payload does not read back", async () => {
+        const { inbox, tx, calendars } = await build([], [{ id: "inbox-1", payload: { id: "x".repeat(65) } }])
+
+        await expect(inbox.processCalendarDelivery("inbox-1")).rejects.toThrow(CalendarInboxErrorCode.MalformedPayload)
+
+        expect(tx.rollbacks).toBe(1)
+        expect(tx.committedWrites).toEqual([])
+        expect(calendars.acceptCalendarDelivery).not.toHaveBeenCalled()
     })
 
     it("leaves the receipt pending when the domain work fails", async () => {

@@ -38,6 +38,7 @@ import { recommended as errorHandlingRecommended, rules as errorHandlingRules } 
 import { recommended as idempotencyRecommended, rules as idempotencyRules } from "./idempotency.mjs"
 import { recommended as infraOwnerRecommended, rules as infraOwnerRules } from "./infra-owner.mjs"
 import { recommended as injectionRecommended, rules as injectionRules } from "./injection.mjs"
+import { recommended as boundarySchemaRecommended, rules as boundarySchemaRules } from "./boundary-schema.mjs"
 import { recommended as inputBoundsRecommended, rules as inputBoundsRules } from "./input-bounds.mjs"
 import { recommended as logSafetyRecommended, rules as logSafetyRules } from "./log-safety.mjs"
 import { recommended as moduleLayeringRecommended, rules as moduleLayeringRules } from "./module-layering.mjs"
@@ -92,6 +93,7 @@ const CONTRIBUTIONS = [
     { law: "idempotency", rules: idempotencyRules, recommended: idempotencyRecommended },
     { law: "infra-owner", rules: infraOwnerRules, recommended: infraOwnerRecommended },
     { law: "injection", rules: injectionRules, recommended: injectionRecommended },
+    { law: "boundary-schema", rules: boundarySchemaRules, recommended: boundarySchemaRecommended },
     { law: "input-bounds", rules: inputBoundsRules, recommended: inputBoundsRecommended },
     { law: "log-safety", rules: logSafetyRules, recommended: logSafetyRecommended },
     { law: "module-layering", rules: moduleLayeringRules, recommended: moduleLayeringRecommended },

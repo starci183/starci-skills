@@ -281,7 +281,7 @@ ruleParams:
     # R89 BE_SOURCE_FORM: the closed role-suffix vocabulary of a source file name (<kebab-name>.<suffix>.ts; BE-CONVENTION 1.15)
     # and the suffixes that are never a role. index.ts, main.ts, app.module.ts and the migrations of be.persistence are the
     # only names outside it.
-    suffixes: [module, module-definition, decorators, options, config, connection, service, command, query, handler, templates, compensation, saga-state, saga-step, saga, contracts, port, resolver, controller, gateway, webhook, subscription, consumer, cli, event, queue, projection, projection-entity, processor, step, input, type, args, request, response, mapper, policy, entity, sql, rows, error, messages, log-events, cache-keys, guard, interceptor, filter, client, spec, integration-spec, e2e-spec, contract-spec, global-setup, builder]
+    suffixes: [module, module-definition, decorators, options, config, connection, service, schema, command, query, handler, templates, compensation, saga-state, saga-step, saga, contracts, port, resolver, controller, gateway, webhook, subscription, consumer, cli, event, queue, projection, projection-entity, processor, step, input, type, args, request, response, mapper, policy, entity, sql, rows, error, messages, log-events, cache-keys, guard, interceptor, filter, client, spec, integration-spec, e2e-spec, contract-spec, global-setup, builder]
     # R47 BE_CONTRACT_UNGUARDED: the world's shape vocabulary. `helper` names the function a contract spec imports to erase the values of a JSON
     # payload (`shapeOf`); a contract spec proves a fake's fixtures by asserting helper(real) equals helper(fixture).
     contractShape: {helper: shapeOf}
@@ -300,7 +300,7 @@ ruleParams:
     # options, config, command, query, contracts, port, event, queue, entity, sql, rows, messages, log-events, error, decorators, cache-keys,
     # projection-entity, connection, and every file with no role: index.ts, main.ts, migrations) is declaration or composition and is never measured.
     # A unit spec beside such a file (`<name>.<role>.spec.ts`) is legal but not required: the file owes 100, not a spec of its own.
-    logicRoles: [service, policy, projection, guard, mapper, client, filter, interceptor, processor, step, saga, saga-step, compensation, consumer, webhook]
+    logicRoles: [service, schema, policy, projection, guard, mapper, client, filter, interceptor, processor, step, saga, saga-step, compensation, consumer, webhook]
     # R203 BE_FEATURE_THIN. THE roles a feature-tier file is judged thin by: a file `<name>.<role>.ts` of one of these roles inside a slot of tier
     # feature maps parameters and makes ONE delegating call into modules/ (a service, the command or query bus, the event bus, a queue producer): no
     # branch, loop, ternary, try or throw, no computation; orchestration (step order, compensation, claim, fencing, retry) lives in platform/*.
@@ -1568,7 +1568,7 @@ slots:
     requires: [index.ts]
     # <name>.templates.ts holds the capability's static templates, copy and presets as TS constants (owner ruling 2026-10-13);
     # user-editable ones are seed rows, large or user media live in object storage.
-    allows: ["<capability>.module.ts", "<capability>.module-definition.ts", "<capability>.config.ts", "<capability>.options.ts", errors/, messages/, persistence/, policies/, "*.service.ts", "*.service.spec.ts", "*.contracts.ts", "*.templates.ts"]
+    allows: ["<capability>.module.ts", "<capability>.module-definition.ts", "<capability>.config.ts", "<capability>.options.ts", errors/, messages/, persistence/, policies/, "*.service.ts", "*.service.spec.ts", "*.contracts.ts", "*.templates.ts", "*.schema.ts", "*.schema.spec.ts"]
     forbids: [testing/, exceptions/, utils/, helpers/, shared/]
     tests: unit-beside            # <name>.service.spec.ts beside each <name>.service.ts, nothing else
     coverage: required
