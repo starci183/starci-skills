@@ -1,4 +1,7 @@
+import type { PageCursor } from "@modules/platform/primitives"
 import type { GetBuyerStatusResult } from "../order.contracts"
+import type { OrderSummary } from "../order-list.contracts"
+import type { OrderStatus } from "../order-status.contracts"
 
 /** The row INSERT_ORDER_IF_NEW and CANCEL_ORDER_IF_CONFIRMED answer. */
 export interface OrderIdRow {
@@ -20,3 +23,29 @@ export const toBuyerStatus = (personId: string, rows: ReadonlyArray<OrderCountRo
     personId,
     hasOrders: (rows[0]?.order_count ?? 0) > 0,
 })
+
+/** The row LIST_PERSON_ORDERS answers. */
+export interface OrderListRow {
+    /** The order id. */
+    id: string
+    /** The lifecycle state. */
+    status: OrderStatus
+    /** The order total in minor units. */
+    total_minor_units: number
+    /** The currency. */
+    currency: string
+    /** When the order was placed, as the database prints it, so the keyset position loses no digit. */
+    created_at: string
+}
+
+/** The order a list row shows. */
+export const toOrderSummary = (row: OrderListRow): OrderSummary => ({
+    orderId: row.id,
+    status: row.status,
+    totalMinorUnits: row.total_minor_units,
+    currency: row.currency,
+    placedAt: row.created_at,
+})
+
+/** The keyset position of a list row: where the next page starts after it. */
+export const toOrderPosition = (row: OrderListRow): PageCursor => ({ sortValue: row.created_at, id: row.id })

@@ -1,10 +1,10 @@
 import type { Request, Response } from "express"
-import type { OperationRequest } from "@modules/platform/http-security"
+import type { ExecutionRequest } from "@modules/platform/http-security"
 
 /** The GraphQL context every operation runs with: the request it arrived on and, over HTTP, its response. */
 export interface GraphqlContext {
     /** The request: the HTTP request, or the one built from a subscription connection. */
-    readonly req: OperationRequest
+    readonly req: ExecutionRequest
     /** The HTTP response; a subscription has none. */
     readonly res: Response | undefined
 }

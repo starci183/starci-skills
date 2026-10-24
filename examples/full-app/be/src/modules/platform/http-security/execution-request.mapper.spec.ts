@@ -1,10 +1,10 @@
 import { Test } from "@nestjs/testing"
 import type { ExecutionContext } from "@nestjs/common"
 import { mock } from "@starci/jest-preset"
-import type { OperationRequest } from "./http-security.contracts"
+import type { ExecutionRequest } from "./http-security.contracts"
 import { requestOf } from "./execution-request.mapper"
 
-const request: OperationRequest = { headers: {}, method: "GET", ip: "127.0.0.1" }
+const request: ExecutionRequest = { headers: {}, method: "GET", ip: "127.0.0.1" }
 
 const SUBJECT: unique symbol = Symbol("http-security/execution-request.mapper")
 const subjectFunctions = () => ({ requestOf })

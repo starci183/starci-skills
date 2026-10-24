@@ -3,7 +3,7 @@ import { Test } from "@nestjs/testing"
 import { Reflector } from "@nestjs/core"
 import { mock } from "@starci/jest-preset"
 import type { Role } from "@modules/platform/cqrs"
-import type { OperationRequest } from "@modules/platform/http-security"
+import type { ExecutionRequest } from "@modules/platform/http-security"
 import { AuthGuard } from "./auth.guard"
 import type { CredentialMetadata, CredentialPrincipal } from "./credential.contracts"
 import { IdentityErrorCode } from "./errors/identity.error"
@@ -30,7 +30,7 @@ const build = async (authorization?: string, metadata: DoorMetadata = {}) => {
         return undefined
     })
     const verifier = mock<SessionVerifier>()
-    const request: OperationRequest & { credentialPrincipal?: CredentialPrincipal } = {
+    const request: ExecutionRequest & { credentialPrincipal?: CredentialPrincipal } = {
         headers: authorization === undefined ? {} : { authorization },
         method: "GET",
         ip: "127.0.0.1",

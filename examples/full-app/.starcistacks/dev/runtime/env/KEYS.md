@@ -49,6 +49,7 @@ identity api holds it as `<SERVICE>_SERVICE_KEY_FILE` and the calling service as
 | `RECEIPTS_S3_BUCKET` | Private bucket of the receipts | none |
 | `RECEIPTS_S3_ACCESS_KEY_ID` | Access key id (the MinIO root user `ecommerce` in dev) | none |
 | `RECEIPTS_S3_SECRET_ACCESS_KEY` | Credential of the object-storage client; supply at runtime and share with MinIO | none |
+| `ORDER_PAGE_CURSOR_KEY` | Key the cursors of the order list are signed with (secret: the same value on every replica of the order api, so a cursor one replica made is valid on another) | none |
 | `RECEIPTS_S3_REGION` | Region the requests are signed for | `us-east-1` |
 | `RECEIPTS_LINK_TTL` | Lifetime of a receipt download link (`5m`) | `5m` |
 | `RECEIPTS_S3_TIMEOUT` | Deadline of a call to MinIO | `15s` |

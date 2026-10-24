@@ -3,7 +3,7 @@ import { Test } from "@nestjs/testing"
 import { mock } from "@starci/jest-preset"
 import { HttpSecurityErrorCode } from "./errors/http-security.error"
 import { HTTP_SECURITY_OPTIONS } from "./http-security.decorators"
-import type { OperationRequest } from "./http-security.contracts"
+import type { ExecutionRequest } from "./http-security.contracts"
 import type { HttpSecurityOptions } from "./http-security.options"
 import { OriginGuard } from "./origin.guard"
 
@@ -13,8 +13,8 @@ const options: HttpSecurityOptions = {
     webhooks: {},
 }
 
-const build = async (method: string, headers: OperationRequest["headers"]) => {
-    const request: OperationRequest = { headers, method, ip: "127.0.0.1" }
+const build = async (method: string, headers: ExecutionRequest["headers"]) => {
+    const request: ExecutionRequest = { headers, method, ip: "127.0.0.1" }
     const http = mock<ReturnType<ExecutionContext["switchToHttp"]>>()
     http.getRequest.mockReturnValue(request)
     const context = mock<ExecutionContext>()

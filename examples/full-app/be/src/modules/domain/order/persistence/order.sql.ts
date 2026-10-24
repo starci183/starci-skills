@@ -15,3 +15,14 @@ export const CANCEL_ORDER_IF_PENDING = sql`WITH cancelled AS (
 
 /** Counts the orders of one person ($1). */
 export const COUNT_PERSON_ORDERS = sql`SELECT count(*)::int AS order_count FROM orders WHERE person_id = $1`
+
+/**
+ * One page of a person's orders, newest first, after a keyset position ($1 person, $2 and $3 the created_at text and id the page
+ * before ended at, both null for the first page, $4 how many rows to read). The sort is created_at then id, so two orders placed at
+ * the same instant keep one stable order, and a write between two pages moves no row into or out of the page already read.
+ */
+export const LIST_PERSON_ORDERS = sql`SELECT id, status, total_minor_units, currency, created_at::text AS created_at
+    FROM orders
+    WHERE person_id = $1 AND ($2::timestamptz IS NULL OR (created_at, id) < ($2::timestamptz, $3::uuid))
+    ORDER BY created_at DESC, id DESC
+    LIMIT $4`

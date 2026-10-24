@@ -32,6 +32,11 @@ type Mutation {
   placeOrder(input: PlaceOrderInput!): PlaceOrderType!
 }
 
+type OrderConnection {
+  items: [OrderSummaryType!]!
+  pageInfo: PageInfoType!
+}
+
 input OrderReceiptInput {
   orderId: ID!
 }
@@ -49,6 +54,19 @@ type OrderStatusChangedType {
 
 input OrderStatusInput {
   orderId: ID!
+}
+
+type OrderSummaryType {
+  currency: String!
+  orderId: String!
+  placedAt: String!
+  status: String!
+  totalMinorUnits: Int!
+}
+
+type PageInfoType {
+  endCursor: String
+  hasNextPage: Boolean!
 }
 
 input PlaceOrderInput {
@@ -74,6 +92,7 @@ type Query {
   buyerStatus: BuyerStatusType!
   cart: CartType!
   orderReceipt(input: OrderReceiptInput!): OrderReceiptType!
+  orders(after: String, first: Int!): OrderConnection!
 }
 
 type Subscription {

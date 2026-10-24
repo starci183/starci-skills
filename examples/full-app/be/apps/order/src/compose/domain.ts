@@ -17,6 +17,6 @@ export const domainModules = (options: OrderAppOptions): Array<DynamicModule> =>
     CartModule.register({ isGlobal: true }),
     LoyaltyModule.register({ isGlobal: true }),
     OrderSummaryModule.register({ isGlobal: true }),
-    OrderModule.register({ isGlobal: true }),
+    OrderModule.register({ isGlobal: true, ...options.order }),
     IdentityModule.register({ isGlobal: true, verifier: IDENTITY_API }),
 ]

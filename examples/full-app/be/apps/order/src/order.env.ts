@@ -1,3 +1,4 @@
+import { parseOrderConfig } from "@modules/domain/order"
 import { parseIdentityApiConfig } from "@modules/integrations/identity-api"
 import { parseReceiptStorageConfig } from "@modules/integrations/receipt-storage"
 import type { EnvSource } from "@modules/platform/config"
@@ -21,6 +22,8 @@ export interface OrderEnv {
     readonly eventBus: ReturnType<typeof parseEventBusConfig>
     /** The private bucket that archives order receipts. */
     readonly receiptStorage: ReturnType<typeof parseReceiptStorageConfig>
+    /** The key the cursors of the order list are signed with. */
+    readonly order: ReturnType<typeof parseOrderConfig>
     /** The origin allowlist and rate limits. */
     readonly httpSecurity: ReturnType<typeof parseHttpSecurityConfig>
     /** How the queue relay and workers run. */
@@ -38,6 +41,7 @@ export const readOrderEnv = (env: EnvSource): OrderEnv => ({
     identityApi: parseIdentityApiConfig(env),
     eventBus: parseEventBusConfig(env),
     receiptStorage: parseReceiptStorageConfig(env),
+    order: parseOrderConfig(env),
     httpSecurity: parseHttpSecurityConfig(env),
     queue: parseQueueConfig(env),
     jobs: parseJobsConfig(env),

@@ -4,6 +4,7 @@ import { ClearCartHandler } from "./application/clear-cart.handler"
 import { GetBuyerStatusHandler } from "./application/get-buyer-status.handler"
 import { GetCartHandler } from "./application/get-cart.handler"
 import { GetOrderReceiptHandler } from "./application/get-order-receipt.handler"
+import { ListOrdersHandler } from "./application/list-orders.handler"
 import { PlaceOrderHandler } from "./application/place-order.handler"
 import { ConfigurableModuleClass } from "./checkout.module-definition"
 
@@ -15,6 +16,7 @@ import { ConfigurableModuleClass } from "./checkout.module-definition"
         GetCartHandler,
         GetBuyerStatusHandler,
         GetOrderReceiptHandler,
+        ListOrdersHandler,
     ],
 })
 /** The checkout feature: the handlers of the cart, the placement of an order, the receipt link and the buyer status. */

@@ -137,6 +137,9 @@ const SERVICE_KEYS: Readonly<Record<"order" | "billing", string>> = {
     billing: randomBytes(24).toString("hex"),
 }
 
+/** The key the order app of the run signs list cursors with: a fresh random value per run, held only in memory. */
+const ORDER_PAGE_CURSOR_KEY = randomBytes(24).toString("hex")
+
 /** The identity app of the run, as `service` calls it with its own key (the order app unless named). */
 export const identityApiOptionsOf = (
     w: EcommerceWiring,
@@ -220,6 +223,7 @@ export const orderOptions = (w: EcommerceWiring): OrderAppOptions => ({
     identityApi: identityApiOptionsOf(w),
     eventBus: eventBusOptionsOf(w, "order"),
     receiptStorage: receiptStorageOptionsOf(w),
+    order: { pageCursorKey: new Secret(ORDER_PAGE_CURSOR_KEY) },
     httpSecurity,
     queue: queueOptionsOf(w, `order${w.kafka.topicPrefix.replace(/\W/g, "")}`),
     jobs: { workerId: "order-test", leaseMs: 30_000 },

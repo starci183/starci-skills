@@ -1,3 +1,4 @@
+import type { OrderOptions } from "@modules/domain/order"
 import type { IdentityApiOptions } from "@modules/integrations/identity-api"
 import type { ReceiptStorageOptions } from "@modules/integrations/receipt-storage"
 import type { OrderExpiryOptions } from "@modules/queues/order-expiry"
@@ -19,6 +20,8 @@ export interface OrderAppOptions {
     readonly eventBus: EventBusConfig
     /** The private bucket the receipts of placed orders are archived in. */
     readonly receiptStorage: ReceiptStorageOptions
+    /** The key the cursors of the order list are signed with. */
+    readonly order: OrderOptions
     /** The origin allowlist and rate limits. */
     readonly httpSecurity: HttpSecurityOptions
     /** How often the expiry sweep runs and how long an order waits for its payment. */

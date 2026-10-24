@@ -99,6 +99,73 @@ examples:
       - be/src/modules/domain/order/checkout.service.spec.ts
       - be/src/tests/e2e/checkout/checkout-journey.e2e-spec.ts
       - be/src/tests/e2e/checkout/checkout-refusal.e2e-spec.ts
+  - id: pagination
+    path: full-app
+    lane: backend
+    title: "Cursor pagination - a signed keyset cursor, a Page, a GraphQL connection and the e2e walk"
+    summary: "The order list reads first + 1 keyset rows, signs the end cursor with an HMAC and answers a Page; the checkout door maps PageArgs to the query and the Page to an OrderConnection."
+    relatedRules:
+      - BE-AUTH-6
+      - BE-AUTH-5
+      - BE-CQRS-3
+    files:
+      - be/src/modules/platform/primitives/page.contracts.ts
+      - be/src/modules/platform/primitives/page-cursor.policy.ts
+      - be/src/modules/platform/primitives/page-cursor.policy.spec.ts
+      - be/src/modules/domain/order/order-list.contracts.ts
+      - be/src/modules/domain/order/order-list.service.ts
+      - be/src/modules/domain/order/order-list.service.spec.ts
+      - be/src/modules/domain/order/persistence/order.sql.ts
+      - be/src/modules/domain/order/persistence/order.rows.ts
+      - be/src/features/api/checkout/application/list-orders.query.ts
+      - be/src/features/api/checkout/application/list-orders.handler.ts
+      - be/src/features/api/checkout/transport/graphql/orders.resolver.ts
+      - be/src/features/api/checkout/transport/graphql/orders.mapper.ts
+      - be/src/features/api/checkout/transport/graphql/dto/page.args.ts
+      - be/src/features/api/checkout/transport/graphql/dto/page-info.type.ts
+      - be/src/features/api/checkout/transport/graphql/dto/orders.type.ts
+      - be/src/tests/e2e/checkout/order-pagination.e2e-spec.ts
+    entrypoint: be/src/modules/domain/order/order-list.service.ts
+    projects:
+      - be/tsconfig.json
+      - be/src/tests/tsconfig.json
+    tests:
+      - be/src/modules/platform/primitives/page-cursor.policy.spec.ts
+      - be/src/modules/domain/order/order-list.service.spec.ts
+      - be/src/tests/e2e/checkout/order-pagination.e2e-spec.ts
+  - id: operations
+    path: full-app
+    lane: backend
+    title: "A versioned operation table - defineOperations, the validated operation route and the emitted OpenAPI"
+    summary: "The order capability declares the operation table, the app exports it, and one POST /operations route validates the envelope against a request class and answers the table's reply type."
+    relatedRules:
+      - BE-OPERATIONS-1
+      - BE-TRANSPORT-1
+      - BE-AUTH-5
+    files:
+      - be/src/modules/platform/operations/operations.contracts.ts
+      - be/src/modules/platform/operations/operations.policy.ts
+      - be/src/modules/platform/operations/operations.policy.spec.ts
+      - be/src/modules/platform/operations/index.ts
+      - be/src/modules/platform/http-security/operation-validation.service.ts
+      - be/src/modules/platform/http-security/operation-validation.service.spec.ts
+      - be/src/modules/domain/order/order-operations.contracts.ts
+      - be/src/features/api/checkout/transport/http/operations.controller.ts
+      - be/src/features/api/checkout/transport/http/orders-operation.mapper.ts
+      - be/src/features/api/checkout/transport/http/dto/orders-list.request.ts
+      - be/src/features/api/checkout/transport/http/dto/orders-list.input.ts
+      - be/src/features/api/checkout/transport/http/checkout-http.module.ts
+      - be/apps/order/src/operations.ts
+      - be/contracts/order/openapi.json
+      - be/src/tests/e2e/checkout/order-pagination.e2e-spec.ts
+    entrypoint: be/src/modules/domain/order/order-operations.contracts.ts
+    projects:
+      - be/tsconfig.json
+      - be/src/tests/tsconfig.json
+    tests:
+      - be/src/modules/platform/operations/operations.policy.spec.ts
+      - be/src/modules/platform/http-security/operation-validation.service.spec.ts
+      - be/src/tests/e2e/checkout/order-pagination.e2e-spec.ts
   - id: domain
     path: full-app
     lane: backend

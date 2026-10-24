@@ -15,6 +15,10 @@ export enum OrderErrorCode {
     ReceiptNotFound = "ORDER_RECEIPT_NOT_FOUND",
     /** The receipt is not archived yet and the archive cannot take it now. */
     ReceiptNotReady = "ORDER_RECEIPT_NOT_READY",
+    /** The page size of a list is not a whole number from 1 to the biggest page. */
+    PageSizeInvalid = "ORDER_PAGE_SIZE_INVALID",
+    /** The cursor of a list was not made by this service, or was edited. */
+    PageCursorInvalid = "ORDER_PAGE_CURSOR_INVALID",
 }
 
 /** How each order code travels. */
@@ -25,6 +29,8 @@ export const ORDER_ERROR_KINDS: Record<OrderErrorCode, ErrorKind> = {
     [OrderErrorCode.PlacementFailed]: "internal",
     [OrderErrorCode.ReceiptNotFound]: "not-found",
     [OrderErrorCode.ReceiptNotReady]: "unavailable",
+    [OrderErrorCode.PageSizeInvalid]: "invalid",
+    [OrderErrorCode.PageCursorInvalid]: "invalid",
 }
 
 /** The one error class of the order capability. */

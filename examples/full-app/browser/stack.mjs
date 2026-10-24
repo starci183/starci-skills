@@ -139,6 +139,7 @@ const generateSecrets = () => {
         minioRootPassword: crypto.randomBytes(24).toString("hex"),
         orderServiceKey: crypto.randomBytes(32).toString("hex"),
         billingServiceKey: crypto.randomBytes(32).toString("hex"),
+        orderPageCursorKey: crypto.randomBytes(32).toString("hex"),
     }
     composeEnv = {
         ...process.env,
@@ -194,6 +195,7 @@ const serviceEnv = (secrets, mounts) => ({
         RECEIPTS_S3_BUCKET: "receipts",
         RECEIPTS_S3_ACCESS_KEY_ID: "ecommerce",
         RECEIPTS_S3_SECRET_ACCESS_KEY: secrets.minioRootPassword,
+        ORDER_PAGE_CURSOR_KEY: secrets.orderPageCursorKey,
         EVENT_BUS_BROKERS: `localhost:${ports.kafka}`,
         EVENT_BUS_GROUP_ID: "order-api",
         QUEUE_REDIS_HOST: "localhost",

@@ -4,7 +4,7 @@ import type { Reflector } from "@nestjs/core"
 import { InjectReflector } from "@modules/platform/composition"
 import type { Principal, Role } from "@modules/platform/cqrs"
 import { requestOf } from "@modules/platform/http-security"
-import type { OperationRequest } from "@modules/platform/http-security"
+import type { ExecutionRequest } from "@modules/platform/http-security"
 import { unwrapOutcome } from "@modules/platform/primitives"
 import { admit } from "./admission.policy"
 import { bearerTokenOf } from "./bearer-token.mapper"
@@ -30,7 +30,7 @@ export class AuthGuard implements CanActivate {
         const credential = this.reflector.getAllAndOverride<CredentialMetadata | undefined>(CREDENTIAL_KEY, targets)
         const metadata = this.reflector.getAllAndOverride<PublicMetadata | undefined>(PUBLIC_KEY, targets)
         if (credential !== undefined) {
-            const request: OperationRequest & { credentialPrincipal?: CredentialPrincipal } = requestOf(context)
+            const request: ExecutionRequest & { credentialPrincipal?: CredentialPrincipal } = requestOf(context)
             unwrapOutcome(
                 admit(metadata, { required: credential, principal: request.credentialPrincipal }),
                 IdentityError,

@@ -6,6 +6,7 @@ import { CartResolver } from "./cart.resolver"
 import { ConfigurableModuleClass } from "./checkout-graphql.module-definition"
 import { ClearCartResolver } from "./clear-cart.resolver"
 import { OrderReceiptResolver } from "./order-receipt.resolver"
+import { OrdersResolver } from "./orders.resolver"
 import { PlaceOrderResolver } from "./place-order.resolver"
 
 @Module({
@@ -17,6 +18,7 @@ import { PlaceOrderResolver } from "./place-order.resolver"
         CartResolver,
         BuyerStatusResolver,
         OrderReceiptResolver,
+        OrdersResolver,
     ],
 })
 /** The GraphQL transport of the checkout feature. */

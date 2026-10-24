@@ -14,9 +14,9 @@ import { useTestWorld } from "../../world/use-test-world"
 
 /**
  * The order lifecycle past the first confirmation: one buyer places several orders and the history they produce is
- * verified end to end. The api has no order list or detail door: the only order reads are the placeOrder answer and the
- * buyerStatus flag the identity service reads. So "list" and "detail" are asserted where the truth lives, out-of-band on
- * this run databases (orders and order_lines rows), cross-checked against the live cross-service reads. The
+ * verified end to end. The api has no order detail door and its paginated list (checkout/order-pagination) shows no lines: the
+ * lines and the rows are asserted where the truth lives, out-of-band on this run databases (orders and order_lines
+ * rows), cross-checked against the live cross-service reads. The
  * status transitions the schema models are covered too: a placement lands pending, a
  * refusal appends nothing, and a key replay returns the first answer without appending either.
  *

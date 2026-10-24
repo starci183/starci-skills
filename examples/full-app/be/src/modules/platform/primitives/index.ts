@@ -1,4 +1,6 @@
 export type { Outcome } from "./outcome.contracts"
 export { ok, refused, unwrapOutcome } from "./outcome.mapper"
+export { CURSOR_LENGTH_MAX, decodeCursor, pageOf } from "./page-cursor.policy"
+export type { Page, PageCursor } from "./page.contracts"
 export { isRecord } from "./record.policy"
 export { eachInOrder } from "./sequence.policy"
