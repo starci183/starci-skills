@@ -2,6 +2,7 @@ import type { DynamicModule } from "@nestjs/common"
 import { IDENTITY_ERROR_KINDS, IDENTITY_MESSAGES } from "@modules/domain/identity"
 import { INVOICE_ERROR_KINDS, INVOICE_MESSAGES } from "@modules/domain/invoice"
 import { IDENTITY_API_ERROR_KINDS, IDENTITY_API_MESSAGES } from "@modules/integrations/identity-api"
+import { SEPAY_ERROR_KINDS, SEPAY_MESSAGES } from "@modules/integrations/sepay"
 import { ClockModule } from "@modules/platform/clock"
 import { CONFIG_ERROR_KINDS } from "@modules/platform/config"
 import { CqrsModule } from "@modules/platform/cqrs"
@@ -31,6 +32,7 @@ export const platformModules = (options: BillingAppOptions): Array<DynamicModule
             HTTP_SECURITY_MESSAGES,
             PROBES_MESSAGES,
             IDENTITY_API_MESSAGES,
+            SEPAY_MESSAGES,
             IDENTITY_MESSAGES,
             EVENT_BUS_MESSAGES,
             INVOICE_MESSAGES,
@@ -45,6 +47,7 @@ export const platformModules = (options: BillingAppOptions): Array<DynamicModule
             HTTP_SECURITY_ERROR_KINDS,
             PROBES_ERROR_KINDS,
             IDENTITY_API_ERROR_KINDS,
+            SEPAY_ERROR_KINDS,
             IDENTITY_ERROR_KINDS,
             EVENT_BUS_ERROR_KINDS,
             INVOICE_ERROR_KINDS,

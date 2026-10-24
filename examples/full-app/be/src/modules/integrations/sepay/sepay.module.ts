@@ -3,6 +3,7 @@ import type { DynamicModule } from "@nestjs/common"
 import { WEBHOOK_SIGNATURE, WebhookSignatureService } from "@modules/platform/http-security"
 import { ConfigurableModuleClass, OPTIONS_TYPE } from "./sepay.module-definition"
 import { SepaySignatureService } from "./sepay-signature.service"
+import { SepayTransactionsMapper } from "./sepay-transactions.mapper"
 
 @Module({})
 /** Provides the shared webhook proof configured for the SePay notifier. */
@@ -14,10 +15,11 @@ export class SepayModule extends ConfigurableModuleClass {
             ...base,
             providers: [
                 ...(base.providers ?? []),
+                SepayTransactionsMapper,
                 { provide: WebhookSignatureService, useClass: SepaySignatureService },
                 { provide: WEBHOOK_SIGNATURE, useExisting: WebhookSignatureService },
             ],
-            exports: [WebhookSignatureService, WEBHOOK_SIGNATURE],
+            exports: [WebhookSignatureService, WEBHOOK_SIGNATURE, SepayTransactionsMapper],
         }
     }
 }
