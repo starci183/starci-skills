@@ -166,7 +166,7 @@ rules:
     requirement: |-
       Runtime GraphQL and HTTP DTO classes live under the owning feature `transport/<protocol>/dto/`. Apply the installed
       semantic validation; a GraphQL `ID` or string shape alone is insufficient. Every string field has a length or format bound
-      (`@MaxLength` or a bounded scalar). Plain application contracts stay under `application/`. Map output deliberately;
+      (`@MaxLength` or a bounded scalar) and every array field a count bound (`@ArrayMaxSize`). Plain application contracts stay under `application/`. Map output deliberately;
       nullability and error representation follow the accepted API contract, and there is no universal response wrapper.
     rationale: |-
       Protocol, application and persistence contracts evolve at different boundaries, and an unbounded string is an unbounded

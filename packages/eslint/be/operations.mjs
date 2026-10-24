@@ -328,7 +328,18 @@ export const restRouteDeclared = {
     },
 }
 
-/** An operation route takes the table's `OperationRequest` and answers its `OperationReply`, of one table. */
+/** True when a pipe argument is `new OperationValidationService(...)`, the class declared by the platform capability `http-security` (resolved by symbol). */
+const isOperationPipe = (hfs, checker, toTs, argument) => {
+    if (argument?.type !== "NewExpression") return false
+    const target = toTs(argument.callee)
+    if (!target) return false
+    return declarationsOfSymbol(checker, checker.getSymbolAtLocation(target)).some((declaration) => {
+        const file = String(declaration.getSourceFile().fileName).replace(/\\/g, "/")
+        return declaration.name?.text === "OperationValidationService" && hfs.slotOf(file) === "be.platform" && hfs.ownerOf(file)?.split("/").pop() === "http-security"
+    })
+}
+
+/** An operation route takes the table's `OperationRequest` and answers its `OperationReply`, of one table, and validates the body it takes. */
 export const operationRouteDrivenByTable = {
     meta: {
         type: "problem",
@@ -337,6 +348,8 @@ export const operationRouteDrivenByTable = {
         messages: {
             half: "This route takes or answers `{{one}}` but not `{{other}}`. An operation route is driven by the table on both sides: `@Body() request: OperationRequest<Table>` and `Promise<OperationReply<Table>>`.",
             table: "The request and the reply of this route name different operation tables. One route serves one table.",
+            unvalidated:
+                "The body of this operation route is typed by an alias, which leaves no class at run time, so the global pipe validates nothing. Bind it to the request class with `@Body(new OperationValidationService(RequestClass))` of `platform/http-security`.",
         },
     },
     create(context) {
@@ -348,14 +361,21 @@ export const operationRouteDrivenByTable = {
                 if (node.kind !== "method" || node.static) return
                 if (!(node.decorators ?? []).some((decorator) => isImportedFrom(context, decoratorCallee(decorator), "@nestjs/common", HTTP_ROUTES))) return
                 const params = node.value.params.filter((param) => (param.decorators ?? []).some((decorator) => isImportedFrom(context, decoratorCallee(decorator), "@nestjs/common", "Body")))
-                const request = params.map((param) => canonReference(hfs, checker, toTs, param.typeAnnotation ?? param.parameter?.typeAnnotation)).find(Boolean) ?? null
+                const references = params.map((param) => canonReference(hfs, checker, toTs, param.typeAnnotation ?? param.parameter?.typeAnnotation))
+                const request = references.find(Boolean) ?? null
                 const reply = canonReference(hfs, checker, toTs, unwrapPromise(node.value.returnType))
                 if (!request && !reply) return
                 if (!request || !reply) {
                     context.report({ node: node.key, messageId: "half", data: request ? { one: "OperationRequest", other: "OperationReply" } : { one: "OperationReply", other: "OperationRequest" } })
                     return
                 }
-                if (request.table !== reply.table) context.report({ node: node.key, messageId: "table" })
+                if (request.table !== reply.table) {
+                    context.report({ node: node.key, messageId: "table" })
+                    return
+                }
+                const body = params[references.indexOf(request)]
+                const pipes = (body.decorators ?? []).filter((decorator) => isImportedFrom(context, decoratorCallee(decorator), "@nestjs/common", "Body")).flatMap(decoratorArguments)
+                if (!pipes.some((pipe) => isOperationPipe(hfs, checker, toTs, pipe))) context.report({ node: body, messageId: "unvalidated" })
             },
         }
     },

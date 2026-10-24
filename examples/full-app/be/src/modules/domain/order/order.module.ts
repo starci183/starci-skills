@@ -3,6 +3,7 @@ import type { DynamicModule } from "@nestjs/common"
 import { CheckoutService } from "./checkout.service"
 import { ConfigurableModuleClass, OPTIONS_TYPE } from "./order.module-definition"
 import { ReceiptModule } from "@modules/queues/receipt"
+import { OrderListService } from "./order-list.service"
 import { OrderPaymentService } from "./order-payment.service"
 import { OrderStatusService } from "./order-status.service"
 import { OrderService } from "./order.service"
@@ -20,12 +21,20 @@ export class OrderModule extends ConfigurableModuleClass {
             providers: [
                 ...(base.providers ?? []),
                 OrderService,
+                OrderListService,
                 CheckoutService,
                 ReceiptService,
                 OrderPaymentService,
                 OrderStatusService,
             ],
-            exports: [OrderService, CheckoutService, ReceiptService, OrderPaymentService, OrderStatusService],
+            exports: [
+                OrderService,
+                OrderListService,
+                CheckoutService,
+                ReceiptService,
+                OrderPaymentService,
+                OrderStatusService,
+            ],
         }
     }
 }

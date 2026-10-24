@@ -321,7 +321,9 @@ rules:
     hfsRules: [R95, R88, R23, R278]
     requirement: |-
       A versioned operation `<name>@<version>` (for example `sales.policy@1`) that an app serves over one operation route is
-      declared once, in the app's operation table `be/apps/<app>/src/operations.ts`, which exports `OPERATIONS`. The table is made by
+      declared once, in the app's operation table, which `be/apps/<app>/src/operations.ts` exports as `OPERATIONS`. A feature cannot
+      import an app and a feature's contracts hold no call, so the table is made in a `<name>-operations.contracts.ts` of the
+      domain capability that owns the operations, and the app file re-exports it from the capability's public surface. The table is made by
       `defineOperations` of the platform capability `operations` (`be/src/modules/platform/operations/`, which declares
       `OperationContract<Input, Output, RefusalCode>`, `query`, `mutation`, `defineOperations`, `OperationRequest<Table>` and
       `OperationReply<Table>`). `Input` and `Output` are named, closed types: never `any`, `unknown`, `Record<string, unknown>`,
@@ -333,6 +335,10 @@ rules:
       table with the type checker, and the full `starci app check` fails when the committed file is stale.
       A public REST operation in either edition belongs to this nonempty table, and its route decorator supplies its own
       versioned-operation evidence; a class-level reference does not justify a route absent from the table.
+      The body of the route is typed by an alias, which leaves no class at run time, so the global pipe validates nothing there.
+      The route therefore binds the body to `OperationValidationService` of `platform/http-security`, given a request class that
+      mirrors the envelope (`@IsIn` on `operation`, a bounded `requestId`, a `@ValidateNested()` input class with the bounds of
+      BE-AUTH-5), and the owning domain service still refuses an input outside its own bounds.
     rationale: |-
       The operation set of an app is a contract the front end (`fe/`, through the root codegen) and other consumers generate a client from. A name-to-string registry with `unknown`
       bodies and results forces every client to hand-type the wire; one typed table gives the client generator, the route and the
@@ -341,14 +347,18 @@ rules:
       - id: case-1
         when: A query with two refusals and a mutation with none
         write: |-
-          // be/apps/core/src/operations.ts
+          // modules/domain/sales/sales-operations.contracts.ts
           export const OPERATIONS = defineOperations({
               "sales.policy@1": query<SalesPolicyAsk, SalesPolicyView, "DENIED" | "INVALID">(),
               "sales.close@1": mutation<SalesCloseAsk, SalesOpportunityView>(),
           })
+          // be/apps/core/src/operations.ts
+          export { OPERATIONS } from "@modules/domain/sales"
           // features/api/sales/transport/http/operations.controller.ts
           @Post("operations")
-          async invoke(@Body() request: OperationRequest<typeof OPERATIONS>): Promise<OperationReply<typeof OPERATIONS>> { ... }
+          async invoke(
+              @Body(new OperationValidationService(SalesPolicyRequest)) request: OperationRequest<typeof OPERATIONS>,
+          ): Promise<OperationReply<typeof OPERATIONS>> { ... }
     verification:
       automated:
         - BE_OPERATION_CONTRACT
@@ -358,7 +368,8 @@ rules:
         - BE_REST_ROUTE_UNDECLARED
       manual:
         - Confirm each refusal code is one the operation's owner can actually answer.
-    relatedExamples: [api]
+        - Confirm that the request class mirrors the envelope and the input bounds of the table.
+    relatedExamples: [operations]
 files:
   - path: src/features/api/<feature>/index.ts
     slot: be.feature

@@ -20,6 +20,7 @@
       "optionalSlots": [
         "repo.docs",
         "be.contract.graphql",
+        "be.contract.openapi",
         "be.contract.events",
         "be.contract.events.pin",
         "be.transport.message"

@@ -1,0 +1,225 @@
+{
+  "components": {
+    "schemas": {
+      "ListOrdersAsk": {
+        "properties": {
+          "after": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "string"
+              }
+            ]
+          },
+          "first": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "first"
+        ],
+        "type": "object"
+      },
+      "Operation.orders.list.v1.Reply": {
+        "properties": {
+          "operation": {
+            "const": "orders.list@1"
+          },
+          "outcome": {
+            "oneOf": [
+              {
+                "properties": {
+                  "kind": {
+                    "const": "ok"
+                  },
+                  "value": {
+                    "$ref": "#/components/schemas/OrderPage"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "value"
+                ],
+                "type": "object"
+              },
+              {
+                "properties": {
+                  "code": {
+                    "enum": [
+                      "ORDER_PAGE_CURSOR_INVALID",
+                      "ORDER_PAGE_SIZE_INVALID"
+                    ],
+                    "type": "string"
+                  },
+                  "kind": {
+                    "const": "refused"
+                  },
+                  "params": {
+                    "additionalProperties": {
+                      "type": [
+                        "string",
+                        "number",
+                        "boolean"
+                      ]
+                    },
+                    "type": "object"
+                  }
+                },
+                "required": [
+                  "code",
+                  "kind"
+                ],
+                "type": "object"
+              }
+            ]
+          },
+          "requestId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "operation",
+          "outcome",
+          "requestId"
+        ],
+        "type": "object",
+        "x-kind": "query",
+        "x-operation": "orders.list@1"
+      },
+      "Operation.orders.list.v1.Request": {
+        "properties": {
+          "input": {
+            "$ref": "#/components/schemas/ListOrdersAsk"
+          },
+          "operation": {
+            "const": "orders.list@1"
+          },
+          "requestId": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "input",
+          "operation",
+          "requestId"
+        ],
+        "type": "object",
+        "x-kind": "query",
+        "x-operation": "orders.list@1"
+      },
+      "OrderPage": {
+        "properties": {
+          "endCursor": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "string"
+              }
+            ]
+          },
+          "hasNextPage": {
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/OrderSummary"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "endCursor",
+          "hasNextPage",
+          "items"
+        ],
+        "type": "object"
+      },
+      "OrderSummary": {
+        "properties": {
+          "currency": {
+            "type": "string"
+          },
+          "orderId": {
+            "type": "string"
+          },
+          "placedAt": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "cancelled",
+              "expired",
+              "paid",
+              "pending"
+            ],
+            "type": "string"
+          },
+          "totalMinorUnits": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "currency",
+          "orderId",
+          "placedAt",
+          "status",
+          "totalMinorUnits"
+        ],
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "title": "order operations",
+    "version": "1"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/operations": {
+      "post": {
+        "operationId": "invokeOperation",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/Operation.orders.list.v1.Request"
+                  }
+                ]
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/Operation.orders.list.v1.Reply"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "The reply of the invoked operation: its outcome is ok or a declared refusal."
+          }
+        }
+      }
+    }
+  },
+  "x-operations": [
+    {
+      "id": "orders.list@1",
+      "kind": "query"
+    }
+  ]
+}

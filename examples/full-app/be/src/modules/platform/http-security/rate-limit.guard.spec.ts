@@ -4,7 +4,7 @@ import { Test } from "@nestjs/testing"
 import { ThrottlerStorage } from "@nestjs/throttler"
 import { mock } from "@starci/jest-preset"
 import { HttpSecurityError, HttpSecurityErrorCode } from "./errors/http-security.error"
-import type { OperationRequest } from "./http-security.contracts"
+import type { ExecutionRequest } from "./http-security.contracts"
 import { HTTP_SECURITY_OPTIONS } from "./http-security.decorators"
 import type { RateLimitOptions } from "./http-security.options"
 import { RateLimit, RateLimitGuard, RateTier, serviceTrackerOf, throttlerOptionsOf } from "./rate-limit.guard"
@@ -20,7 +20,7 @@ const serviceHandler = (): void => undefined
 RateLimit(RateTier.Service)(serviceHandler)
 
 const contextOf = (handler = defaultHandler, authorization?: string) => {
-    const request: OperationRequest = {
+    const request: ExecutionRequest = {
         headers: { "user-agent": "spec", ...(authorization === undefined ? {} : { authorization }) },
         method: "GET",
         ip: "127.0.0.1",

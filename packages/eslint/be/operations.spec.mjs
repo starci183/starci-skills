@@ -52,10 +52,12 @@ test("operation-contract-decidable: an operation names closed input, output and 
 
 const ROUTE_HEAD = `import { Body, Controller, Post } from "@nestjs/common"\nimport { defineOperations, query } from "@modules/platform/operations"\nimport type { OperationReply, OperationRequest } from "@modules/platform/operations"\nexport const OPERATIONS = defineOperations({ "plan.read@1": query<{ readonly id: string }, { readonly ok: boolean }>() })\nexport const OTHER = defineOperations({ "plan.other@1": query<{ readonly id: string }, { readonly ok: boolean }>() })\nexport type Table = typeof OPERATIONS\n`
 
+const PIPE = `import { OperationValidationService } from "@modules/platform/http-security"\nclass AskRequest { id!: string }\n`
+
 test("operation-route-driven-by-table: a route takes OperationRequest<Table> and answers Promise<OperationReply<Table>> of one table", () => {
     tester.run("operation-route-driven-by-table", operationRouteDrivenByTable, {
         valid: [
-            { filename: CONTROLLER, code: `${ROUTE_HEAD}@Controller("api/v1")\nexport class C { @Post("operations") async handle(@Body() request: OperationRequest<Table>): Promise<OperationReply<Table>> { return null as never } }` },
+            { filename: CONTROLLER, code: `${ROUTE_HEAD}${PIPE}@Controller("api/v1")\nexport class C { @Post("operations") async handle(@Body(new OperationValidationService(AskRequest)) request: OperationRequest<Table>): Promise<OperationReply<Table>> { return null as never } }` },
             // a route that touches no operation type is not an operation route
             { filename: CONTROLLER, code: `import { Body, Controller, Post } from "@nestjs/common"\nclass PayRequest { id!: string }\n@Controller("pay")\nexport class C { @Post() async pay(@Body() body: PayRequest): Promise<PayRequest> { return body } }` },
             // outside a transport slot nothing is judged
@@ -65,12 +67,22 @@ test("operation-route-driven-by-table: a route takes OperationRequest<Table> and
             { filename: CONTROLLER, code: `${ROUTE_HEAD}@Controller("api/v1")\nexport class C { @Post("operations") async handle(@Body() request: OperationRequest<Table>): Promise<{ readonly ok: boolean }> { return { ok: true } } }`, errors: [{ messageId: "half" }] },
             { filename: CONTROLLER, code: `${ROUTE_HEAD}class Ask { id!: string }\n@Controller("api/v1")\nexport class C { @Post("operations") async handle(@Body() request: Ask): Promise<OperationReply<Table>> { return null as never } }`, errors: [{ messageId: "half" }] },
             { filename: CONTROLLER, code: `${ROUTE_HEAD}@Controller("api/v1")\nexport class C { @Post("operations") async handle(@Body() request: OperationRequest<Table>): Promise<OperationReply<typeof OTHER>> { return null as never } }`, errors: [{ messageId: "table" }] },
+            // a body no pipe validates: the alias leaves no class for the global pipe
+            { filename: CONTROLLER, code: `${ROUTE_HEAD}@Controller("api/v1")\nexport class C { @Post("operations") async handle(@Body() request: OperationRequest<Table>): Promise<OperationReply<Table>> { return null as never } }`, errors: [{ messageId: "unvalidated" }] },
+            // a pipe of the right name that is not the platform's proves nothing
+            { filename: CONTROLLER, code: `${ROUTE_HEAD}class OperationValidationService { constructor(readonly envelope: unknown) {} }\nclass AskRequest { id!: string }\n@Controller("api/v1")\nexport class C { @Post("operations") async handle(@Body(new OperationValidationService(AskRequest)) request: OperationRequest<Table>): Promise<OperationReply<Table>> { return null as never } }`, errors: [{ messageId: "unvalidated" }] },
+            // a pipe that is only mentioned, not given to the body
+            { filename: CONTROLLER, code: `${ROUTE_HEAD}${PIPE}@Controller("api/v1")\nexport class C { @Post("operations") async handle(@Body(AskRequest) request: OperationRequest<Table>): Promise<OperationReply<Table>> { return null as never } }`, errors: [{ messageId: "unvalidated" }] },
         ],
     })
 })
 
 test("the message of a half-typed route names the missing side", () => {
     assert.match(operationRouteDrivenByTable.meta.messages.half, /OperationRequest<Table>/)
+})
+
+test("the message of an unvalidated body names the pipe to bind", () => {
+    assert.match(operationRouteDrivenByTable.meta.messages.unvalidated, /OperationValidationService\(RequestClass\)/)
 })
 
 for (const edition of ["lite", "full"]) {

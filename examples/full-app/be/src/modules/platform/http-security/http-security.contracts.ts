@@ -5,4 +5,4 @@ import type { Request } from "express"
  * over a GraphQL subscription connection it is built from the upgrade request and the connection params, because a
  * connection has no per-operation HTTP request.
  */
-export type OperationRequest = Pick<Request, "headers" | "method" | "ip" | "principal">
+export type ExecutionRequest = Pick<Request, "headers" | "method" | "ip" | "principal">

@@ -1,8 +1,8 @@
-import type { OperationRequest } from "@modules/platform/http-security"
+import type { ExecutionRequest } from "@modules/platform/http-security"
 import type { ConnectionExtra, ConnectionParams, GraphqlContext, GraphqlContextInput } from "./graphql.contracts"
 
 /** The request of a subscription operation: the upgrade headers with the Authorization the client sent as a connection param. */
-export const connectionRequestOf = (extra: ConnectionExtra | undefined): OperationRequest => ({
+export const connectionRequestOf = (extra: ConnectionExtra | undefined): ExecutionRequest => ({
     headers: { ...extra?.request.headers, authorization: extra?.authorization ?? extra?.request.headers.authorization },
     method: "GET",
     ip: extra?.request.socket.remoteAddress,

@@ -68,6 +68,78 @@ export interface OrderReceiptData {
     orderReceipt: OrderReceiptView
 }
 
+/** One order as the orders list shows it. */
+export interface OrderSummaryView {
+    /** The order id. */
+    orderId: string
+    /** The lifecycle state. */
+    status: string
+    /** The order total in minor units. */
+    totalMinorUnits: number
+    /** The currency. */
+    currency: string
+    /** When the order was placed. */
+    placedAt: string
+}
+
+/** Where a paginated list stands. */
+export interface PageInfoView {
+    /** The cursor to continue from; null for an empty page. */
+    endCursor: string | null
+    /** True when more items follow. */
+    hasNextPage: boolean
+}
+
+/** One page of orders as the connection answers it. */
+export interface OrderConnectionView {
+    /** The orders of the page. */
+    items: Array<OrderSummaryView>
+    /** The cursor and whether a next page exists. */
+    pageInfo: PageInfoView
+}
+
+/** The orders query data. */
+export interface OrdersData {
+    /** The `orders` field. */
+    orders: OrderConnectionView
+}
+
+/** One page as the operation route answers it. */
+export interface OrdersListPageView {
+    /** The orders of the page. */
+    items: Array<OrderSummaryView>
+    /** The cursor to continue from; null for an empty page. */
+    endCursor: string | null
+    /** True when more items follow. */
+    hasNextPage: boolean
+}
+
+/** The success half of an operation outcome. */
+export interface OrdersListOkView {
+    /** The discriminant. */
+    kind: "ok"
+    /** The page. */
+    value: OrdersListPageView
+}
+
+/** The refusal half of an operation outcome. */
+export interface OrdersListRefusedView {
+    /** The discriminant. */
+    kind: "refused"
+    /** The declared refusal code. */
+    code: string
+}
+
+/** The reply of the `orders.list@1` operation route: a page, or a declared refusal. */
+export interface OrdersListReply {
+    /** The operation answered. */
+    operation: string
+    /** The id the caller sent. */
+    requestId: string
+    /** The success value or the refusal. */
+    outcome: OrdersListOkView | OrdersListRefusedView
+}
+
 /** One push of an order's status, as the subscription delivers it. */
 export interface OrderStatusChangedView {
     /** The order. */

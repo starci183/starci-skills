@@ -3,6 +3,7 @@
  *   HFS_UNUSED_EXPORT  an export of an owner's public entry that no production file outside the owner imports is dead.
  *   HFS_UNUSED_FILE    a production source file that no root reaches is dead. Roots: the files an app slot requires
  *                      (main.ts, app.module.ts), every route file (slot tier `route`), the public entry of every package,
+ *                      and an api app operation table `operations.ts` (the contract emit reads it by path),
  *                      and a source file a framework config of the app names by a relative string literal
  *                      (next.config.ts pointing next-intl at its request config). Specs and tests are not in the graph,
  *                      so a file only a spec imports is dead, on purpose. Type-only imports reach a file.
@@ -47,6 +48,8 @@ export const DEAD_EXPORT_RULE_IDS = ['HFS_UNUSED_EXPORT', 'HFS_UNUSED_FILE'];
 const PACKAGE_ENTRIES = ['src/index.ts', 'src/index.tsx', 'index.ts', 'index.tsx'];
 const OWNER_ENTRIES = ['index.ts', 'index.tsx'];
 const CHAIN_DEPTH = 6;
+/** The file of an api app that the contract emit reads by path for the typed operation table (BE-OPERATIONS-1): no import reaches it, the emit does. */
+const OPERATION_TABLE_FILE = "operations.ts";
 /** Tiers whose files are not production source that an app serves: judged by no dead-file rule. */
 const UNJUDGED_TIERS = new Set(['none', 'e2e', 'fixtures']);
 const CONFIG_EXTENSIONS = ['', '.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '/index.ts', '/index.tsx', '/index.js'];
@@ -144,7 +147,7 @@ function rootFiles(graph, config) {
     if (!node.owner || node.tier !== 'app') continue;
     const slot = graph.resolver.slot(node.owner.slot);
     const inside = rel.slice(withoutSlash(node.owner.root).length + 1);
-    if ((slot?.requires ?? []).includes(inside)) roots.add(rel);
+    if ((slot?.requires ?? []).includes(inside) || inside === OPERATION_TABLE_FILE) roots.add(rel);
   }
   for (const [key, owner] of graph.ownerRoots) {
     if (owner.tier !== 'package') continue;

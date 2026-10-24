@@ -16,6 +16,7 @@ export const ECOMMERCE_OPERATIONS = {
     placeOrder:
         "mutation PlaceOrder($input: PlaceOrderInput!) { placeOrder(input: $input) { orderId status totalMinorUnits currency replayed } }",
     buyerStatus: ORDER_API_DOCUMENTS.buyerStatus,
+    orders: "query Orders($first: Int!, $after: String) { orders(first: $first, after: $after) { items { orderId status totalMinorUnits currency placedAt } pageInfo { endCursor hasNextPage } } }",
     orderReceipt: "query OrderReceipt($input: OrderReceiptInput!) { orderReceipt(input: $input) { url expiresAt } }",
     orderStatusChanged:
         "subscription OrderStatusChanged($input: OrderStatusInput!) { orderStatusChanged(input: $input) { orderId status changedAt } }",
