@@ -10,6 +10,7 @@ until every S* row in `docs/goal.md` holds with fresh evidence, then `1.0.0` fre
 - Candidate package pins select HFS 4.7.31, CLI 1.7.31, jest preset 2.3.5, test-world 1.2.3, tsconfig 2.0.7, prettier config 1.0.4, back-end canon 3.4.39 and front-end canon 8.4.38.
 
 ### Fixed
+- Item A, canon and lint aligned: BE-AUTH-5 and BE-TYPING-7 state that `BE_INPUT_BOUNDED` requires `ArrayMaxSize`, BE-AUTH-5 adds the shared `ThrottlerStorage` case for replicas above one, BE-AUTH-6 names where `PageArgs` and the connection types live, and BE-OPERATIONS-1 is rewritten to a buildable shape (the domain capability declares the table, the app re-exports it); the operation-route rule also refuses a body no `OperationValidationService` validates; `HFS_UNUSED_FILE` treats an api app `operations.ts` as a root and the emitted `openapi.json` is a declared JSON format. The full-app carries the pagination and operations examples.
 - R270 `HFS_DOC_ENV_UNKNOWN` treats an app-declared error code (errors catalog or message file) and a name in an error-code sentence as an error code, not an environment key; an undeclared environment key still fails (specs in `packages/hfs`).
 - `knowledge/hfs/fe-stack.yaml`: the realtime concern `why` is quoted, since the SSE sentence added in item C made the catalog invalid YAML.
 
