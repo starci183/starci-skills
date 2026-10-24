@@ -1,6 +1,22 @@
 import { Type } from "class-transformer"
-import { IsIn, IsString, MaxLength, ValidateNested } from "class-validator"
-import { OrdersListInput } from "./orders-list.input"
+import { IsInt, IsIn, IsOptional, IsString, Max, MaxLength, Min, ValidateNested } from "class-validator"
+import { PAGE_SIZE_MAX } from "@modules/platform/database"
+import { CURSOR_LENGTH_MAX } from "@modules/platform/primitives"
+
+/** The input of `orders.list@1`: how many orders to read and the cursor of the page before. */
+export class OrdersListInputRequest {
+    /** The page size, from 1 up to the biggest page. */
+    @IsInt()
+    @Min(1)
+    @Max(PAGE_SIZE_MAX)
+    first!: number
+
+    /** The `endCursor` of the page before; absent or null for the first page. */
+    @IsOptional()
+    @IsString()
+    @MaxLength(CURSOR_LENGTH_MAX)
+    after?: string | null
+}
 
 /** The body of the operation route for `orders.list@1`, as a class so the pipe can validate it at run time. */
 export class OrdersListRequest {
@@ -15,6 +31,6 @@ export class OrdersListRequest {
 
     /** The input of the operation. */
     @ValidateNested()
-    @Type(() => OrdersListInput)
-    input!: OrdersListInput
+    @Type(() => OrdersListInputRequest)
+    input!: OrdersListInputRequest
 }

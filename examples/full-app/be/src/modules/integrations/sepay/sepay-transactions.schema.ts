@@ -20,3 +20,6 @@ export const SepayTransactionsSchema = z.object({
 
 /** One validated SePay transaction. */
 export type SepayTransaction = z.infer<typeof SepayTransactionSchema>
+
+/** The transactions of one validated SePay list answer. */
+export type SepayTransactionPage = ReadonlyArray<SepayTransaction>
