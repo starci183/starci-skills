@@ -17,8 +17,8 @@ import { isTransportSlot, KIND_DOOR_SLOTS } from "./lib/transport-slots.mjs"
 import { isPackageType, typeOrigins, typed } from "./lib/types.mjs"
 import { operationRouteEvidence, restExceptionEvidence } from "./operations.mjs"
 
-/** The HTTP route decorators of `@nestjs/common`. */
-const HTTP_ROUTES = ["Get", "Post", "Put", "Patch", "Delete", "All", "Options", "Head"]
+/** The HTTP route decorators of `@nestjs/common` (`Sse` is a route too: a `text/event-stream` GET that needs its own evidence). */
+const HTTP_ROUTES = ["Get", "Post", "Put", "Patch", "Delete", "All", "Options", "Head", "Sse"]
 
 /** The GraphQL operation decorators of `@nestjs/graphql`. */
 const GRAPHQL_OPERATIONS = ["Query", "Mutation", "Subscription", "ResolveField"]
@@ -28,6 +28,9 @@ const HTTP_SLOT = "be.transport.http"
 
 /** The slot of provider webhook doors (the REST doors of the webhook kind). */
 const WEBHOOK_SLOT = "be.feature.webhooks.http"
+
+/** The slot of server-sent-events doors (the event-stream REST doors of the realtime kind). */
+const SSE_SLOT = "be.feature.realtime.sse"
 
 /** Slots whose classes are entered through a method the framework calls on a queue. */
 const PLAIN_ENTRY_SLOTS = new Set(["be.transport.message"])
@@ -356,12 +359,12 @@ export const doorLivesInFeatures = {
         docs: { description: "A `@Controller` is declared in the `transport/http` slot of a feature." },
         schema: [],
         messages: {
-            wrongSlot: "A `@Controller` belongs in `src/features/api/<feature>/transport/http/` (slot `be.transport.http`) or, for a provider webhook, in `src/features/webhooks/<provider>/transport/http/` (slot `be.feature.webhooks.http`); this file is in slot `{{slot}}`. A door parked among the capabilities it calls reads as one and gets imported like one.",
+            wrongSlot: "A `@Controller` belongs in `src/features/api/<feature>/transport/http/` (slot `be.transport.http`), for a provider webhook in `src/features/webhooks/<provider>/transport/http/` (slot `be.feature.webhooks.http`) or, for a server-sent-events stream, in `src/features/realtime/<channel>/transport/sse/` (slot `be.feature.realtime.sse`); this file is in slot `{{slot}}`. A door parked among the capabilities it calls reads as one and gets imported like one.",
         },
     },
     create(context) {
         const slot = hfsOf(context).slotOf(context.filename)
-        if (slot === HTTP_SLOT || slot === WEBHOOK_SLOT) return {}
+        if (slot === HTTP_SLOT || slot === WEBHOOK_SLOT || slot === SSE_SLOT) return {}
         return {
             Decorator(node) {
                 if (isController(context, node)) context.report({ node, messageId: "wrongSlot", data: { slot: slot ?? "none" } })
@@ -403,7 +406,7 @@ export const restDoorNeedsAReason = {
         docs: { description: "Every REST route shows its own public reason (Health, AuthHandshake, SignedWebhook), byte transfer, redirect or declared operation table." },
         schema: [],
         messages: {
-            unjustified: "[BE_REST_DOOR_EVIDENCE] This REST route shows none of the reasons a door may not be GraphQL: a route-level probe, auth handshake or signed webhook (`@Public({ reason: PublicReason.X })`), a byte transfer, an OAuth redirect or a declared public v1 operation table. A plain JSON read belongs in the GraphQL schema, where the client already is.",
+            unjustified: "[BE_REST_DOOR_EVIDENCE] This REST route shows none of the reasons a door may not be GraphQL: a route-level probe, auth handshake or signed webhook (`@Public({ reason: PublicReason.X })`), a byte transfer, an OAuth redirect, an event stream (`@Sse` in the sse slot of a realtime channel) or a declared public v1 operation table. A plain JSON read belongs in the GraphQL schema, where the client already is.",
         },
     },
     create(context) {

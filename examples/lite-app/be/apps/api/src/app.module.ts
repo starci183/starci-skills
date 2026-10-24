@@ -8,6 +8,7 @@ import { AuthGuard, CredentialGuard } from "@modules/domain/identity"
 import type { ApiOptions } from "./api.options"
 import { bookingsModules } from "./compose/bookings"
 import { platformModules } from "./compose/platform"
+import { realtimeModules } from "./compose/realtime"
 import { identityModules, identityProviders } from "./compose/identity"
 import { healthModules } from "./compose/health"
 
@@ -22,6 +23,7 @@ export class AppModule {
             imports: [
                 ...platformModules(options),
                 ...bookingsModules(),
+                ...realtimeModules(),
                 ...identityModules(verifyAccessToken),
                 ...healthModules(),
             ],

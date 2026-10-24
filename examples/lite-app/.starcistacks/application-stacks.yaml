@@ -43,7 +43,7 @@ components:
     role: service
     image: lite-app/api:1.0.0@sha256:0000000000000000000000000000000000000000000000000000000000000000
     compose: infra/swarm/stack.yaml
-    purpose: The Nest api (GraphQL, the signed calendar webhook, the pgmq relay and workers). Liveness /health/live, readiness /health/ready.
+    purpose: The Nest api (GraphQL, the signed calendar webhook, the booking-status event stream, the pgmq relay and workers; one replica, its realtime hub lives in the process). Liveness /health/live, readiness /health/ready.
     required: true
   web:
     role: service

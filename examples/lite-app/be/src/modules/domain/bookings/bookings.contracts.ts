@@ -29,3 +29,13 @@ export interface BookingResult {
     /** `pending` until the confirm-booking job ran, then `confirmed`. */
     readonly status: string
 }
+
+/** The push of one booking status change to its owner; `id` is the domain event id, the resume point of `Last-Event-ID`. */
+export interface BookingStatusFrame {
+    /** The domain event id, `<booking id>:<status>`: unique per booking and status, so a replayed job pushes the same id. */
+    readonly id: string
+    /** The booking that changed. */
+    readonly bookingId: string
+    /** The new status. */
+    readonly status: string
+}

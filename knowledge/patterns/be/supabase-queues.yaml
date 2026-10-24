@@ -142,8 +142,8 @@ rules:
       also owned by an app scheduler. A migration that removes a tick unschedules its job. The schedule and overlap policy
       are declared in `.starcistacks/application-stacks.yaml`; never use a host scheduler, `@nestjs/schedule` or a cron
       process of its own. Cache is Postgres (an unlogged table owned by the cache capability) and a lock or lease is a Postgres
-      advisory lock (`pg_try_advisory_xact_lock`) or a row claim. Realtime is the socket.io gateway of be.feature.realtime.websocket
-      inside the api process, one instance with no Redis adapter (knowledge/patterns/be/realtime.yaml liteAdapter); a push that
+      advisory lock (`pg_try_advisory_xact_lock`) or a row claim. Realtime is the SSE door of be.feature.realtime.sse (the default for one-way push) or the socket.io gateway of
+      be.feature.realtime.websocket, inside the api process, one instance with no Redis adapter (knowledge/patterns/be/realtime.yaml liteAdapter); a push that
       must follow a commit is published by a reactor of the committed event.
     rationale: |-
       Every one of these is a feature of the Supabase project or the api process the app already has, so lite runs no second

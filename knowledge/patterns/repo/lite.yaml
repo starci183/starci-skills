@@ -40,8 +40,8 @@ rules:
       shape, every pattern (queue, event bus, saga, reactors, projection, realtime, webhooks, fenced job) declared the same way,
       and the back-end unit specs exactly as full (ruleParams.be.unitRoles, logicRoles at 100 per file, @starci/jest-preset
       doubles, builders). Backing adapters run on Supabase: schema authority in app.supabase.migrations; queue and
-      event bus on Supabase Queues (pgmq); realtime on the same socket.io gateway run inside the api process (one instance, no
-      Redis adapter); cache and locks on Postgres; app-owned schedules through back-end schedulers, pgmq jobs or pg_cron ticks
+      event bus on Supabase Queues (pgmq); realtime on SSE (the default for one-way push) or the same socket.io gateway, run inside the api process (one instance, the
+      memory hub, no Redis adapter); cache and locks on Postgres; app-owned schedules through back-end schedulers, pgmq jobs or pg_cron ticks
       (+ pg_net); storage and auth on Supabase. The api, web, ingress and application sidecars run on Docker Swarm on the VPS;
       app.starcistacks declares Supabase as managed backing and the environment with `runtime: docker-swarm`. The ingress is
       any declared `role: ingress` component (Traefik or Caddy); a sidecar such as n8n keeps its state in SQLite on a declared

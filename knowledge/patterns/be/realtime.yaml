@@ -3,10 +3,15 @@ id: be.feature.realtime
 title: Realtime channels
 purpose: |-
   Given a state change a connected client must see without asking, how is it pushed? Realtime is a feature KIND:
-  `be/src/features/realtime/<channel>/` holds one door per channel, a socket gateway (`<channel>.gateway.ts`) or a GraphQL
-  subscription (`<x>.subscription.ts`), that READS and PUSHES only. It never writes. The push is fed by a reactor: an event
-  consumer in `features/reactors/` receives the domain event and publishes to a topic of the `RealtimeHub` of `platform/realtime`;
-  the door only subscribes the client to a topic of that hub, scoped to the client's principal.
+  `be/src/features/realtime/<channel>/` holds one door per channel, a server-sent-events controller
+  (`transport/sse/<channel>.controller.ts`), a socket gateway (`<channel>.gateway.ts`) or a GraphQL subscription
+  (`<x>.subscription.ts`), that READS and PUSHES only. It never writes. The push is fed by a reactor: an event consumer in
+  `features/reactors/` receives the domain event and publishes to a topic of the `RealtimeHub` of `platform/realtime` (an app
+  with no event bus lets the domain service that commits the change publish, after its commit); the door only subscribes the
+  client to a topic of that hub, scoped to the client's principal. SSE is the default door for one-way server-to-client push
+  (job progress, a status that changes, streamed tokens), in lite and in full (owner decision 2026-10-24): it is plain HTTP
+  behind the ingress, reconnects by itself and resumes from `Last-Event-ID`. The socket.io gateway stays for a channel that also
+  needs client-to-server messages, and the GraphQL subscription stays full-only.
 appliesTo:
   - backend
 family: be
@@ -19,27 +24,38 @@ provenance:
     - knowledge/patterns/be/transport.yaml
     - knowledge/patterns/be/api-auth.yaml
     - owner decision 2026-10-02 (feature kinds: webhooks, realtime, reactors, saga, jobs, cli; no kind imports another)
+    - owner decision 2026-10-24 (the lite edition may serve SSE, and SSE is the default door for one-way push; ruling:R212/case-5)
   limitations: |-
     Static checks prove the door's role, that the hub is the only thing injected and that a subscribed topic is built from the
     principal. They do not prove the topic naming is collision free across channels, that an initial snapshot is consistent with
     the stream, or the behaviour of the socket under reconnects; the three `realtime/*` scenarios prove delivery, isolation and
-    cleanup on the real stack.
+    cleanup on the real stack. Nothing proves the ingress settings of an SSE channel (no compression, no buffering, HTTP/2, an
+    idle timeout above the heartbeat): they are reviewed against the stack files and a real stream. The hub is single-replica:
+    its subscriptions and its replay buffer live in one process, so a second replica of the api does not see the pushes of the
+    first.
 rules:
   - id: BE-REALTIME-1
     title: A channel is a kind folder with one door, its module and its own spec
     kind: mandatory
-    hfsRules: [R01, R02, R47, R184]
+    hfsRules: [R01, R02, R47, R184, R278]
     requirement: |-
       A push channel lives in `be/src/features/realtime/<channel>/` (slot `be.feature.realtime`), enabled by declaring the pattern
       `realtime` in `hfs.json` `sides.be.patterns`. The folder holds `index.ts` (the module class an app composes), `transport/<protocol>/<channel>-<protocol>.module.ts`, ONE door and its spec: either
+      `transport/sse/<channel>.controller.ts` (one `@Controller` class with ONE `@Sse` method, the default for one-way push) with
+      `<channel>.controller.spec.ts`, or
       `transport/websocket/<channel>.gateway.ts` (one `@WebSocketGateway` class whose handlers are `@SubscribeMessage`) with
       `<channel>.gateway.spec.ts`, or `transport/graphql/<channel>.subscription.ts` (one `@Resolver` class whose operations are `@Subscription`) with
       `<channel>.subscription.spec.ts`, plus optional `dto/` (`<name>.{input,type,args}.ts`). A door carries no query, mutation, field
-      resolver or REST route. The kind imports only `modules/*`, never another kind, and only an api-kind app composes its module.
+      resolver or plain REST route (`@Get`, `@Post` ...; the `@Sse` stream is the event-stream evidence of BE_REST_DOOR_EVIDENCE only in the
+      sse slot). The kind imports only `modules/*`, never another kind, and only an api-kind app composes its module. SSE and the
+      socket.io gateway run in lite and in full; the GraphQL subscription is full only.
     rationale: |-
       One file per door keeps a protocol's machinery in one place, and keeping queries and mutations out guarantees that what a
       client can do through a realtime door is listen.
     cases:
+      - id: case-3
+        when: A one-way push of a status (job progress, a booking that gets confirmed), in either edition
+        write: 'features/realtime/booking-status/index.ts, transport/sse/booking-status-sse.module.ts, transport/sse/booking-status.controller.ts and transport/sse/booking-status.controller.spec.ts.'
       - id: case-1
         when: A GraphQL subscription of order status
         write: 'features/realtime/order-status/index.ts, transport/graphql/order-status-graphql.module.ts, transport/graphql/order-status.subscription.ts and transport/graphql/order-status.subscription.spec.ts.'
@@ -78,6 +94,8 @@ rules:
         - BE_CONTRACT_UNGUARDED
         - BE_UNIT_SPEC_NOT_STAGED
         - BE_REALTIME_SHAPE
+        - BE_REST_DOOR_EVIDENCE
+        - BE_REST_ROUTE_UNDECLARED
       manual:
         - Confirm no query or mutation lives in a subscription door; it lives in an api feature.
     relatedExamples: [realtime]
@@ -87,12 +105,17 @@ rules:
     hfsRules: [R185, R90, R203]
     requirement: |-
       A realtime door is thin (R203 `BE_FEATURE_THIN`): it maps the subscription or the message and makes one delegating call
-      to the hub. The only value it injects is the `RealtimeHub` of `platform/realtime` (`subscribe(topic)` returns an async
-      iterable of frames, `publish(topic, frame)` pushes one; a topic is a typed `RealtimeTopic<T>` built by the owning domain
-      contract, never a string written in a door). No `EntityManager`, `CommandBus`, `QueryBus`, event bus, queue or
+      to the hub. The only value it injects is the `RealtimeHub` of `platform/realtime` (`subscribe(topic, options?)` returns an
+      async iterable of frames, `publish(topic, frame)` pushes one; a topic is a typed `RealtimeTopic<T>` built by the owning domain
+      contract, never a string written in a door). An SSE controller hands that iterable to `eventStream` of `platform/realtime`, which
+      returns the `Observable<MessageEvent>` Nest needs: the opening frame, one event per frame with its `id`, and the comment
+      heartbeat. No `EntityManager`, `CommandBus`, `QueryBus`, event bus, queue or
       service of `modules/domain` is injected: a domain service may write, so it is not provably read-only. The data a client
-      needs is pushed by a reactor; the socket library and the pub/sub engine (`socket.io`, `graphql-subscriptions`, `graphql-ws`)
-      are imported only by `platform/realtime`.
+      needs is pushed by a reactor (or by the domain service that commits the change, in an app with no event bus); the socket
+      library and the pub/sub engine (`socket.io`, `graphql-subscriptions`, `graphql-ws`) are imported only by `platform/realtime`,
+      and so is the heartbeat timer (`setInterval` is owned by `platform/realtime`, `infraOwners`). Because the door reads only the
+      hub, a snapshot cannot be sent on connect from the door: the client reads the current state through a query operation first
+      (or again on every open), and the stream carries the changes.
     rationale: |-
       A door that can only touch the hub cannot change business state, so the biggest risk of a long-lived unauthenticated-looking
       connection, a write through it, is removed by type.
@@ -109,11 +132,15 @@ rules:
     kind: mandatory
     hfsRules: [R186, R41]
     requirement: |-
-      Every `@SubscribeMessage` and `@Subscription` handler takes `@CurrentPrincipal()` of `domain/identity` and builds the topic it
+      Every `@SubscribeMessage`, `@Subscription` and `@Sse` handler takes `@CurrentPrincipal()` of `domain/identity` and builds the topic it
       passes to `hub.subscribe` from the principal's id (plus a client-supplied id only inside that prefix) with the topic
       builder of the owning domain contract, so one client cannot
       listen to another's channel. The reactor that pushes uses the same topic builder from the owning domain contract, never a
-      hand-written string. The default-deny guards apply to the door like to any other.
+      hand-written string. The default-deny guards apply to the door like to any other; an SSE stream is never `@Public`. The
+      browser `EventSource` cannot send an `Authorization` header, so the front end reads the stream with `fetch` and the bearer
+      access token (modules/api/sse read by a use<Channel>Stream hook); a token in the URL is refused because it ends up in logs. The `Last-Event-ID` header is client
+      input like any other: it is passed as `{ after }` to `hub.subscribe` and only picks where the replay resumes inside the
+      principal's own topic, it never names a topic.
     rationale: |-
       A topic taken from client input alone is an authorization hole: knowing an order id would be enough to watch it.
     cases:
@@ -136,8 +163,9 @@ rules:
       `subscriber-receives-push` (a connected client receives the frame a reactor pushes after the domain event),
       `foreign-topic-is-isolated` (another principal subscribed to the same channel receives nothing) and
       `disconnect-releases-subscription` (after the client disconnects the hub holds no subscription for it). The client is a real
-      socket or GraphQL-over-websocket client of the test world. The unit spec of the door covers its wiring with the Nest testing
-      module and a recording hub double.
+      socket, GraphQL-over-websocket or HTTP event-stream client of the test world (an SSE channel is read with a real `fetch` of
+      `text/event-stream` against the running api, with the principal's bearer token). The unit spec of the door covers its wiring
+      with the Nest testing module and a recording hub double.
     rationale: |-
       The door has no logic, so the risk is delivery, isolation and leaks on a real connection, which only a client against the
       real app shows.
@@ -150,6 +178,42 @@ rules:
         - BE_PATTERN_SPEC_MISSING
       manual:
         - Confirm the e2e client waits with the world's waitFor and never sleeps.
+    relatedExamples: [realtime]
+  - id: BE-REALTIME-5
+    title: An SSE stream stays open, resumes and is bounded
+    kind: mandatory
+    hfsRules: [R184, R278, R90]
+    requirement: |-
+      An SSE channel returns `eventStream(hub.subscribe(topic, { after: lastEventId }))` of `platform/realtime` and nothing else:
+      the stream writes an opening frame with the reconnect delay (`retry`), one event per frame whose `id` is the domain event id
+      of the frame (unique within the topic, for example `<booking>:<status>`), and a comment heartbeat (`: heartbeat`) every 15 to 25
+      seconds while the channel is idle, below the idle timeout of the ingress. The heartbeat timer belongs to `platform/realtime`
+      alone (`infraOwners` `setInterval`). The hub retains the last frames of a topic that carry a string `id` in a bounded
+      buffer (a fixed number of frames per topic and of topics, the oldest dropped first), so a client that reconnects with
+      `Last-Event-ID` receives what it missed; an id the buffer no longer holds replays the whole buffer, and the client refetches
+      its snapshot through the query operation on every open. The hub is single-replica: the api that composes an SSE channel
+      runs one replica (STACKS_REALTIME_SCALED in lite); a shared hub across replicas is a later decision. At the ingress, the
+      stream route is never compressed or buffered (Nest sends `X-Accel-Buffering: no` and `Cache-Control: no-cache, no-transform`;
+      Traefik's compress middleware excludes `text/event-stream`, a Caddy route sets no `encode` and `flush_interval -1`), the edge
+      speaks HTTP/2 to the browser so the six-connection limit of HTTP/1.1 per origin does not starve tabs, and an Express
+      `compression()` is never put in front of the app.
+    rationale: |-
+      A quiet stream is cut by every proxy that sees no bytes, a buffered one delivers nothing until it fills, and a stream with no
+      ids loses every push made while the client reconnects. Bounding the buffer keeps one process from growing with its history.
+    cases:
+      - id: case-1
+        when: A client on a flaky network reconnects after missing two pushes
+        write: 'The browser reconnects with Last-Event-ID: b-1:confirmed, hub.subscribe(topic, { after: "b-1:confirmed" }) replays the retained frames after it, then goes live; the front end also refetches the status once on open.'
+    verification:
+      automated:
+        - BE_REALTIME_SHAPE
+        - BE_REST_DOOR_EVIDENCE
+        - BE_REST_ROUTE_UNDECLARED
+        - BE_INFRA_OWNER
+      manual:
+        - Confirm the ingress route of the api sets no compression and no response buffering for text/event-stream, and that its idle timeout is above the heartbeat.
+        - Confirm the lite stack pins the api to one replica (STACKS_REALTIME_SCALED refuses a scaled api that composes realtime).
+        - Confirm the replay bounds fit the channel (frames per topic, number of topics).
     relatedExamples: [realtime]
 files:
   - path: src/features/realtime/<channel>/index.ts
@@ -214,10 +278,42 @@ files:
     template: realtime/channel.input.ts.tpl
     role: The typed, bounded arguments of the door.
     rules: [BE_INPUT_BOUNDED]
+  - path: src/features/realtime/<channel>/transport/sse/<channel>-sse.options.ts
+    slot: be.feature.realtime.sse
+    template: realtime/channel.sse.options.ts.tpl
+    role: The options of the SSE door's module; empty, the app's default-deny guards authenticate the stream.
+    optional: true
+  - path: src/features/realtime/<channel>/transport/sse/<channel>-sse.module-definition.ts
+    slot: be.feature.realtime.sse
+    template: realtime/channel.sse.module-definition.ts.tpl
+    role: The configurable-module base of the SSE door's module, registered as register.
+    optional: true
+  - path: src/features/realtime/<channel>/transport/sse/<channel>-sse.module.ts
+    slot: be.feature.realtime.sse
+    template: realtime/channel.sse.module.ts.tpl
+    role: Nest module of the SSE door, composed only by an api-kind app.
+    optional: true
+  - path: src/features/realtime/<channel>/transport/sse/<channel>.controller.ts
+    slot: be.feature.realtime.sse
+    template: realtime/channel.controller.ts.tpl
+    role: A server-sent-events door (one Controller class with one Sse method); the default door for one-way push.
+    rules: [BE_REALTIME_SHAPE, BE_REALTIME_WRITES, BE_REALTIME_TOPIC_SCOPE, BE_REST_DOOR_EVIDENCE]
+    spec: src/features/realtime/<channel>/transport/sse/<channel>.controller.spec.ts
+    optional: true
+  - path: src/features/realtime/<channel>/transport/sse/<channel>.controller.spec.ts
+    slot: be.feature.realtime.sse
+    template: realtime/channel.controller.spec.ts.tpl
+    role: Unit spec of the SSE controller beside it.
+    optional: true
   - path: src/modules/platform/realtime/realtime.hub.ts
     slot: be.platform
-    role: RealtimeHub, the one owner of the socket and subscription engine (publish and subscribe).
+    role: RealtimeHub, the one owner of the socket and subscription engine (publish and subscribe, with the bounded replay buffer an SSE reconnect resumes from).
     spec: src/modules/platform/realtime/realtime.service.spec.ts
+    optional: true
+  - path: src/modules/platform/realtime/event-stream.mapper.ts
+    slot: be.platform
+    role: eventStream, the one place that turns hub frames into server-sent events (opening frame, ids, comment heartbeat) and owns the heartbeat timer.
+    spec: src/modules/platform/realtime/event-stream.mapper.spec.ts
     optional: true
   - path: src/features/reactors/<name>/transport/message/<event>.consumer.ts
     slot: be.transport.message
@@ -229,21 +325,24 @@ files:
     spec: realtime/subscriber-receives-push, realtime/foreign-topic-is-isolated, realtime/disconnect-releases-subscription
     rules: [BE_PATTERN_SPEC_MISSING]
     optional: true
-# Edition lite (R212, owner ruling 2026-10-14): the same ports, door and rules; one instance behind them.
+# Edition lite (R212, owner ruling 2026-10-14; the SSE door by owner decision 2026-10-24, ruling:R212/case-5): the same ports, door and rules; one instance behind them.
 liteAdapter:
   summary: >-
-    Under lite the realtime pattern is the full one: the socket.io gateway of be.feature.realtime.websocket
-    (transport/websocket/<channel>.gateway.ts) runs inside the be api process, one instance with the default in-memory adapter
-    and no Redis adapter. A reactor publishes to the RealtimeHub of platform/realtime, which emits to the principal-scoped room
-    of the namespace; the front end listens through hooks/socketio (knowledge/patterns/fe/realtime.yaml). graphql-ws
-    subscriptions are not used in lite.
+    Under lite the realtime pattern is the full one with its lite doors: the SSE controller of be.feature.realtime.sse
+    (transport/sse/<channel>.controller.ts, the default for one-way push) or the socket.io gateway of be.feature.realtime.websocket
+    (transport/websocket/<channel>.gateway.ts) runs inside the be api process, one instance (the memory hub, its bounded replay
+    buffer and the socket.io default in-memory adapter, no Redis adapter). A publisher (a reactor, or the domain service that
+    commits the change in an app with no event bus) publishes to the RealtimeHub of platform/realtime; the SSE door streams the
+    principal-scoped topic as text/event-stream and the gateway emits to the principal-scoped room of the namespace. The front end
+    listens through a use<Channel>Stream hook over modules/api/sse (a fetch reader with the bearer token) or hooks/socketio (knowledge/patterns/fe/realtime.yaml).
+    graphql-ws subscriptions are not used in lite.
   ports:
-    - {port: RealtimeHub.publish (platform/realtime), adapter: "the socket.io server of the api process emits to the namespace room of the topic (no Redis adapter: one instance)"}
-    - {port: RealtimeHub.subscribe, adapter: "the gateway's @SubscribeMessage handler joins the room built from the principal, as full"}
-    - {port: topic scope, adapter: "the room name built from @CurrentPrincipal (BE_REALTIME_TOPIC_SCOPE), as full"}
+    - {port: RealtimeHub.publish (platform/realtime), adapter: "the memory hub of the api process retains the frame (bounded) and hands it to the open SSE streams; the socket.io server emits to the namespace room of the topic (no Redis adapter: one instance)"}
+    - {port: RealtimeHub.subscribe, adapter: "the SSE controller streams hub.subscribe(topic, { after }) through eventStream; the gateway's stream joins the room built from the principal, as full"}
+    - {port: topic scope, adapter: "the topic and the room name built from @CurrentPrincipal (BE_REALTIME_TOPIC_SCOPE), as full"}
   forbids: [redis, ioredis, "@socket.io/redis-adapter", graphql-ws, graphql-subscriptions]
   proof: >-
-    The gateway's own unit spec (<channel>.gateway.spec.ts) and the hub adapter's spec, as full; declaring realtime requires
-    integration specs titled `realtime/<scenario>: ...` for every declared scenario on `starci supabase start` (R284), using a
-    real socket.io client. Lite has no e2e world.
+    The door's own unit spec (<channel>.controller.spec.ts or <channel>.gateway.spec.ts) and the hub adapter's spec, as full;
+    declaring realtime requires integration specs titled `realtime/<scenario>: ...` for every declared scenario on
+    `starci supabase start` (R284), using a real client (an HTTP event-stream read or a socket.io client). Lite has no e2e world.
   see: [knowledge/patterns/be/supabase-queues.yaml, knowledge/patterns/fe/realtime.yaml]

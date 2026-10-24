@@ -3193,11 +3193,12 @@ rules:
       - {path: packages/eslint/be/webhooks-realtime-coverage.spec.mjs, editions: [lite, full], codes: [BE_REALTIME_SHAPE]}
     exemplifiedBy:
       - {path: packages/hfs/templates/be/patterns/realtime/channel.gateway.ts.tpl, editions: [lite, full]}
+      - {path: packages/hfs/templates/be/patterns/realtime/channel.controller.ts.tpl, editions: [lite, full]}
       - {path: packages/eslint/be/webhooks-realtime-coverage.spec.mjs, editions: [lite, full], codes: [BE_REALTIME_SHAPE]}
     witness:
       - {path: packages/eslint/be/webhooks-realtime-coverage.spec.mjs, edition: lite, codes: [BE_REALTIME_SHAPE]}
       - {path: packages/eslint/be/webhooks-realtime-coverage.spec.mjs, edition: full, codes: [BE_REALTIME_SHAPE]}
-    law: "A realtime file is the one door its role names: `<channel>.gateway.ts` holds one `@WebSocketGateway` class with `@SubscribeMessage` handlers and `<x>.subscription.ts` holds one `@Resolver` class with `@Subscription` operations, and neither carries a query, a mutation, a field resolver, a REST route or the other protocol. A lite app serves the same socket.io gateway from its api process and no graphql-ws subscription (R212 case-2 (owner:lite-production-swarm), with the Work boundary amended by ruling:R212/case-4)."
+    law: "A realtime file is the one door its role names: `<channel>.gateway.ts` holds one `@WebSocketGateway` class with `@SubscribeMessage` handlers, `<x>.subscription.ts` holds one `@Resolver` class with `@Subscription` operations and `<channel>.controller.ts` of the sse slot holds one `@Controller` class whose one route is `@Sse`, and none carries a query, a mutation, a field resolver, a plain REST route or another protocol. A lite app serves SSE (the default door for one-way push) or the socket.io gateway from its api process and no graphql-ws subscription (R212 case-2 (owner:lite-production-swarm), with the Work boundary amended by ruling:R212/case-4 and the realtime adapter amended by ruling:R212/case-5)."
     kinds: [lint]
     gates: [pre-commit, settle, land, ci]
     failureCodes: ["BE_REALTIME_SHAPE"]
@@ -3211,11 +3212,12 @@ rules:
       - {path: packages/eslint/be/webhooks-realtime-coverage.spec.mjs, editions: [lite, full], codes: [BE_REALTIME_WRITES]}
     exemplifiedBy:
       - {path: packages/hfs/templates/be/patterns/realtime/channel.gateway.ts.tpl, editions: [lite, full]}
+      - {path: packages/hfs/templates/be/patterns/realtime/channel.controller.ts.tpl, editions: [lite, full]}
       - {path: packages/eslint/be/webhooks-realtime-coverage.spec.mjs, editions: [lite, full], codes: [BE_REALTIME_WRITES]}
     witness:
       - {path: packages/eslint/be/webhooks-realtime-coverage.spec.mjs, edition: lite, codes: [BE_REALTIME_WRITES]}
       - {path: packages/eslint/be/webhooks-realtime-coverage.spec.mjs, edition: full, codes: [BE_REALTIME_WRITES]}
-    law: "A realtime door reads and pushes only: the one value injected into it is the `RealtimeHub` of `platform/realtime`; no `EntityManager`, bus, queue, event bus or domain service reaches it."
+    law: "A realtime door (gateway, subscription or SSE controller) reads and pushes only: the one value injected into it is the `RealtimeHub` of `platform/realtime`; no `EntityManager`, bus, queue, event bus or domain service reaches it."
     kinds: [lint]
     gates: [pre-commit, settle, land, ci]
     failureCodes: ["BE_REALTIME_WRITES"]
@@ -3229,11 +3231,12 @@ rules:
       - {path: packages/eslint/be/webhooks-realtime-coverage.spec.mjs, editions: [lite, full], codes: [BE_REALTIME_TOPIC_SCOPE]}
     exemplifiedBy:
       - {path: packages/hfs/templates/be/patterns/realtime/channel.gateway.ts.tpl, editions: [lite, full]}
+      - {path: packages/hfs/templates/be/patterns/realtime/channel.controller.ts.tpl, editions: [lite, full]}
       - {path: packages/eslint/be/webhooks-realtime-coverage.spec.mjs, editions: [lite, full], codes: [BE_REALTIME_TOPIC_SCOPE]}
     witness:
       - {path: packages/eslint/be/webhooks-realtime-coverage.spec.mjs, edition: lite, codes: [BE_REALTIME_TOPIC_SCOPE]}
       - {path: packages/eslint/be/webhooks-realtime-coverage.spec.mjs, edition: full, codes: [BE_REALTIME_TOPIC_SCOPE]}
-    law: "The topic a realtime handler passes to `RealtimeHub.subscribe` is built from the handler's `@CurrentPrincipal()` parameter of `domain/identity`, so a client can only listen to channels its principal owns."
+    law: "The topic a realtime handler (including the `@Sse` method of an SSE controller) passes to `RealtimeHub.subscribe` is built from the handler's `@CurrentPrincipal()` parameter of `domain/identity`, so a client can only listen to channels its principal owns; a `Last-Event-ID` header only chooses where the replay inside that topic resumes."
     kinds: [lint]
     gates: [pre-commit, settle, land, ci]
     failureCodes: ["BE_REALTIME_TOPIC_SCOPE"]
@@ -3568,7 +3571,7 @@ rules:
     docs: [docs/lite-edition.md#edition-validation]
     templateNa: "The hfs.json edition declaration is generated programmatically by packages/hfs/scaffold/app.mjs; no managed declaration template exists. Forbidden paths are rejected rather than scaffolded."
     code: "HFS_EDITION_INVALID"
-    law: "hfs.json names an edition the manifest knows (full, or lite; absent means full). Lite follows the 2026-10-13 ruling: the same monorepo, code structure, slots, patterns and back-end unit specs, with only backing infrastructure swapped for managed Supabase (Postgres, Auth, Storage, Supabase Queues/pgmq for queue and event bus, Postgres locks, pg_cron); the api and sidecars run on docker-swarm on a VPS. The realtime pattern uses the same socket.io gateway inside the be api process (one instance, no Redis adapter), and both editions share knowledge/hfs/fe-stack.yaml. Lite requires application-stacks.yaml and permits environment metadata, runbooks, infra/swarm and encrypted-secret custody, while refusing infra/compose, infra/k8s, infra/terraform and components duplicating Supabase backing services (runtime/{config,env}, seeds and the sealed secrets of its environments are allowed). Contract specs and `test:contract` are allowed (owner 2026-10-14); it has no e2e spec, `test:e2e`, `test:stack` or `test:browser` script, e2e workflow, browser journey, Work catalog, shell, features, resources, UAT or br records, test container, toxiproxy, browser-runner, BullMQ, Kafka, Redis or graphql-ws dependency, or supabase/functions. Its .starciwork is optional and admits only .gitignore, workspace.yaml and brand/**; workspace.yaml is optional and carries project identity and repo roles for the Work tools."
+    law: "hfs.json names an edition the manifest knows (full, or lite; absent means full). Lite follows the 2026-10-13 ruling: the same monorepo, code structure, slots, patterns and back-end unit specs, with only backing infrastructure swapped for managed Supabase (Postgres, Auth, Storage, Supabase Queues/pgmq for queue and event bus, Postgres locks, pg_cron); the api and sidecars run on docker-swarm on a VPS. The realtime pattern serves SSE (the default for one-way push) or the same socket.io gateway inside the be api process (one instance, no Redis adapter; R212 case-5), and both editions share knowledge/hfs/fe-stack.yaml. Lite requires application-stacks.yaml and permits environment metadata, runbooks, infra/swarm and encrypted-secret custody, while refusing infra/compose, infra/k8s, infra/terraform and components duplicating Supabase backing services (runtime/{config,env}, seeds and the sealed secrets of its environments are allowed). Contract specs and `test:contract` are allowed (owner 2026-10-14); it has no e2e spec, `test:e2e`, `test:stack` or `test:browser` script, e2e workflow, browser journey, Work catalog, shell, features, resources, UAT or br records, test container, toxiproxy, browser-runner, BullMQ, Kafka, Redis or graphql-ws dependency, or supabase/functions. Its .starciwork is optional and admits only .gitignore, workspace.yaml and brand/**; workspace.yaml is optional and carries project identity and repo roles for the Work tools."
     kinds: [check]
     gates: [settle, land, ci]
     failureCodes: ["HFS_EDITION_INVALID", "HFS_EDITION_FORBIDDEN_PRESENT", "HFS_STARCIWORK_LITE_FORBIDDEN"]
@@ -3598,6 +3601,11 @@ rules:
         source: owner
         quote: "In a lite app, .starciwork keeps only the brand records."
         ruling: "Amended by the owner on 2026-10-14: under lite, .starciwork is optional when the app has no brand records and admits only .gitignore, workspace.yaml and brand/** in the existing brand tooling layout, including drawing records, references and assets. workspace.yaml is optional and keeps the project id and repo roles so Work root detection and render-proof role mapping can tie brand records to the front end. index.yaml, shell/, features/, _resources/, uat and br remain forbidden. Lite readers read workspace.yaml normally and skip the full-edition catalog, shell and feature metadata; lite scaffolding creates .gitignore and workspace.yaml, with brand/ only when present. Full edition is unchanged."
+      - id: case-5
+        date: "2026-10-24"
+        source: owner
+        quote: "Lite may serve SSE, and SSE is the default for one-way push. (alpha.30 BE patterns research, owner decisions 2026-10-24, relayed by the alpha.30 lead)"
+        ruling: "Server-sent events are the third door of the realtime pattern (be.feature.realtime.sse), legal in lite and in full, and the default door for one-way server-to-client push; this amends the lite realtime adapter clause of case-2, which named the socket.io gateway as lite's only push. The socket.io gateway stays for a bidirectional channel, graphql-ws and the GraphQL subscription door stay full-only, and the hub is single-replica (the lite api pins replicas: 1, STACKS_REALTIME_SCALED)."
     proves: [packages/hfs/src/hfs-edition-invalid.spec.mjs, packages/hfs/src/hfs-edition-forbidden-present.spec.mjs, packages/hfs/src/hfs-starciwork-lite-forbidden.spec.mjs]
     exemplifiedBy:
       - {path: packages/hfs/src/hfs-edition-invalid.spec.mjs, editions: [lite, full]}
@@ -4750,8 +4758,8 @@ rules:
       - {path: packages/hfs/src/hfs-secret-custody.spec.mjs, editions: [full], codes: [HFS_SECRET_OUTSIDE_ENC]}
   - id: R278
     code: "BE_REST_DOOR_EVIDENCE"
-    amendedBy: [owner:credential-guarded-rest-door]
-    law: "GraphQL is the default door in lite and full. Each REST route carries its own evidence: a probe, auth handshake, signed webhook, actual byte stream, a public versioned operation served from the app's nonempty defineOperations table, or a credential-guarded route (owner:credential-guarded-rest-door): the route or its controller carries @Credential({ kind: \"<literal>\" }) imported from the domain identity capability, which also declares the CredentialGuard class implementing CanActivate (resolved by TypeScript symbol, never by name); a local decorator of the same name, a @UseGuards of any other guard and a computed kind prove nothing. A class-level reference or an unused StreamableFile import proves no route, and a public REST route absent from the operation table is refused."
+    amendedBy: [owner:credential-guarded-rest-door, owner:lite-sse-door]
+    law: "GraphQL is the default door in lite and full. Each REST route carries its own evidence: a probe, auth handshake, signed webhook, actual byte stream, an event stream (a text/event-stream route: an `@Sse` method of `@nestjs/common` inside the be.feature.realtime.sse slot, owner:lite-sse-door; an `@Sse` anywhere else proves nothing), a public versioned operation served from the app's nonempty defineOperations table, or a credential-guarded route (owner:credential-guarded-rest-door): the route or its controller carries @Credential({ kind: \"<literal>\" }) imported from the domain identity capability, which also declares the CredentialGuard class implementing CanActivate (resolved by TypeScript symbol, never by name); a local decorator of the same name, a @UseGuards of any other guard and a computed kind prove nothing. A class-level reference or an unused StreamableFile import proves no route, and a public REST route absent from the operation table is refused."
     kinds: [lint]
     gates: [pre-commit, settle, land, ci]
     failureCodes: ["BE_REST_DOOR_EVIDENCE", "BE_REST_ROUTE_UNDECLARED"]

@@ -124,4 +124,15 @@ class PlainGuard { canActivate() { return true } }
             ],
         })
     })
+
+    test(`BE_REST_ROUTE_UNDECLARED: ${edition} lets the @Sse stream of the sse slot stand without an operation table`, () => {
+        const hfs = hfsFromDeclaration({ ...appDeclaration("be", { ...BE_DECLARATION, patterns: ["realtime"] }), edition }, TYPED_ROOT)
+        const editionTester = ruleTester({ root: TYPED_ROOT, hfs })
+        const code = `import { Controller, Sse } from "@nestjs/common"
+@Controller("orders") class C { @Sse("stream") stream() { return [] as never } }`
+        editionTester.run("rest-route-declared", restRouteDeclared, {
+            valid: [{ filename: at("src/features/realtime/orders/transport/sse/orders.controller.ts"), code }],
+            invalid: [{ filename: CONTROLLER, code, errors: [{ messageId: "undeclared" }] }],
+        })
+    })
 }

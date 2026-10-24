@@ -14,8 +14,9 @@ Lite supplies its backing services through Supabase and keeps the same platform 
   visibility timeout and `read_ct`, archive on dead letter); no BullMQ or Redis;
 - event bus: pgmq-backed topics, or in-process delivery for a single api, behind the same `EventPublisher`/`EventConsumer`
   ports; no Kafka;
-- realtime: the same socket.io gateway as full (`be.feature.realtime.websocket`), run inside the api process as one instance
-  with no Redis adapter;
+- realtime: server-sent events (`be.feature.realtime.sse`, the default door for one-way push, owner decision 2026-10-24) or the
+  same socket.io gateway as full (`be.feature.realtime.websocket`), run inside the api process as one instance with the memory
+  hub, its bounded replay buffer and no Redis adapter;
 - cache and locks: Postgres (advisory locks or an unlogged table); no Redis;
 - scheduling: an application-owned back-end scheduler, pgmq jobs or `pg_cron` ticks (with `pg_net`); a scheduled CLI batch may use a declared Swarm scheduler and replicated job;
 - storage and auth: Supabase Storage and Supabase Auth (the back end verifies the access token against the project JWKS).
@@ -137,8 +138,8 @@ explicit public name. Supabase Edge Functions are not part of lite.
   adds the requested group with the unit spec of each command beside it.
 - `starci app add queue|job|reactor|saga|projection|realtime ...` refuses in lite with `LiteAdapterRefusal` before writing:
   the package carries only the full adapters. Write these patterns on the topic's `liteAdapter` in
-  `knowledge/patterns/be/<topic>.yaml`; `knowledge/patterns/be/supabase-queues.yaml` owns pgmq, and realtime uses the
-  in-process socket.io gateway.
+  `knowledge/patterns/be/<topic>.yaml`; `knowledge/patterns/be/supabase-queues.yaml` owns pgmq, and realtime uses an SSE door
+  (templates `realtime/channel.controller*.tpl`, `channel.sse.*.tpl`) or the in-process socket.io gateway.
 - `starci app add webhook ...` writes the lite inbox intake. The intake transaction records the receipt and a typed outbox
   event; a reactor or job processes the delivery after commit (R263). Processing never runs inside the intake transaction.
 - `starci app add app <name>` adds another front-end app from the lite skeleton and registers its workspace.

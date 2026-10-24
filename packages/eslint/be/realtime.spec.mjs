@@ -13,6 +13,7 @@ import { realtimeReadOnly, realtimeShape, realtimeTopicScope, rules } from "./re
 const tester = typedTester({ declaration: { ...BE_DECLARATION, patterns: ["webhooks", "realtime"] } })
 const GATEWAY = at("src/features/realtime/order-status/transport/websocket/order-status.gateway.ts")
 const SUBSCRIPTION = at("src/features/realtime/order-status/transport/graphql/order-status.subscription.ts")
+const SSE = at("src/features/realtime/order-status/transport/sse/order-status.controller.ts")
 const OTHER_SLOT = at("src/features/plan/transport/graphql/order-status.subscription.ts")
 
 const SOCKET_HEAD = `import { SubscribeMessage, WebSocketGateway } from "@nestjs/websockets"
@@ -28,6 +29,11 @@ import type { Principal } from "@modules/platform/cqrs"
 import { RealtimeHub } from "@modules/platform/realtime"
 `
 
+const SSE_HEAD = `import { Controller, Headers, Sse } from "@nestjs/common"
+import { CurrentPrincipal } from "@modules/domain/identity"
+import { RealtimeHub } from "@modules/platform/realtime"
+`
+
 /** A gateway whose one handler body and constructor are given. */
 const gateway = ({ head = SOCKET_HEAD, ctor = "private readonly hub: RealtimeHub", params = "@CurrentPrincipal() principal: { id: string }", body = "return this.hub.subscribe(`orders:${principal.id}`)", extra = "" } = {}) => `${head}
 @WebSocketGateway()
@@ -36,6 +42,19 @@ export class OrderStatusGateway {
 
     @SubscribeMessage("orders")
     watch(${params}): AsyncIterable<object> {
+        ${body}
+    }
+    ${extra}
+}`
+
+/** An SSE controller whose one `@Sse` method body and constructor are given. */
+const controller = ({ head = SSE_HEAD, ctor = "private readonly hub: RealtimeHub", params = "@CurrentPrincipal() principal: { id: string }, @Headers(\"last-event-id\") lastEventId?: string", body = "return this.hub.subscribe(`orders:${principal.id}`, { after: lastEventId })", extra = "" } = {}) => `${head}
+@Controller("orders")
+export class OrderStatusController {
+    constructor(${ctor}) {}
+
+    @Sse("stream")
+    stream(${params}): AsyncIterable<object> {
         ${body}
     }
     ${extra}
@@ -81,6 +100,7 @@ test("realtime-shape: a file is the one door its role names, with no route, quer
         valid: [
             { filename: GATEWAY, code: gateway() },
             { filename: SUBSCRIPTION, code: subscription() },
+            { filename: SSE, code: controller() },
             // the module and the dto of the kind are not doors
             { filename: at("src/features/realtime/order-status/transport/graphql/order-status-graphql.module.ts"), code: "export class M {}" },
             // outside the realtime slot nothing is judged
@@ -99,6 +119,13 @@ test("realtime-shape: a file is the one door its role names, with no route, quer
             { filename: SUBSCRIPTION, code: subscription({ head: `${GRAPHQL_HEAD}import { Controller } from "@nestjs/common"\n`, extra: "" }).replace("@Resolver()", "@Controller()\n@Resolver()"), errors: [{ messageId: "foreign" }] },
             // a socket handler inside a subscription file is the other protocol
             { filename: SUBSCRIPTION, code: subscription({ head: `${GRAPHQL_HEAD}import { SubscribeMessage } from "@nestjs/websockets"\n`, extra: "@SubscribeMessage('x')\n    other(): void {}" }), errors: [{ messageId: "foreign" }] },
+            // an SSE controller is one controller with exactly one @Sse stream and no plain route
+            { filename: SSE, code: `${SSE_HEAD}export class Plain {}`, errors: [{ messageId: "door" }] },
+            { filename: SSE, code: `${SSE_HEAD}@Controller("orders") export class Empty {}`, errors: [{ messageId: "operations" }] },
+            { filename: SSE, code: controller({ extra: '@Sse("other") other(): AsyncIterable<object> { return [] as never }' }), errors: [{ messageId: "single" }] },
+            { filename: SSE, code: controller({ head: `${SSE_HEAD}import { Get, Post } from "@nestjs/common"\n`, extra: '@Get("read") read(): string { return "x" } @Post("write") write(): string { return "x" }' }), errors: [{ messageId: "foreign" }, { messageId: "foreign" }] },
+            { filename: SSE, code: controller({ head: `${SSE_HEAD}import { Query } from "@nestjs/graphql"\n`, extra: "@Query(() => String) read(): string { return 'x' }" }), errors: [{ messageId: "foreign" }] },
+            { filename: SSE, code: controller({ head: `${SSE_HEAD}import { SubscribeMessage } from "@nestjs/websockets"\n`, extra: "@SubscribeMessage('x') other(): void {}" }), errors: [{ messageId: "foreign" }] },
             // a subscription inside a gateway file is the other protocol
             { filename: GATEWAY, code: gateway({ head: `${SOCKET_HEAD}import { Subscription } from "@nestjs/graphql"\n`, extra: "@Subscription(() => Object)\n    other(): void {}" }), errors: [{ messageId: "foreign" }] },
         ],
@@ -110,6 +137,7 @@ test("realtime-read-only: the hub is the only injected value", () => {
         valid: [
             { filename: GATEWAY, code: gateway() },
             { filename: SUBSCRIPTION, code: subscription() },
+            { filename: SSE, code: controller() },
             // a class with no constructor injects nothing
             { filename: SUBSCRIPTION, code: subscription({ ctor: "" }) },
             // outside the realtime slot nothing is judged
@@ -119,6 +147,8 @@ test("realtime-read-only: the hub is the only injected value", () => {
             { filename: GATEWAY, code: gateway({ head: `${SOCKET_HEAD}import { OrderService } from "@modules/domain/order"\n`, ctor: "private readonly hub: RealtimeHub, private readonly orders: OrderService" }), errors: [{ messageId: "injects" }] },
             { filename: SUBSCRIPTION, code: subscription({ head: `${GRAPHQL_HEAD}import { EntityManager } from "typeorm"\n`, ctor: "private readonly hub: RealtimeHub, private readonly entityManager: EntityManager" }), errors: [{ messageId: "injects" }] },
             { filename: SUBSCRIPTION, code: subscription({ head: `${GRAPHQL_HEAD}import { CommandBus } from "@nestjs/cqrs"\n`, ctor: "private readonly bus: CommandBus" }), errors: [{ messageId: "injects" }] },
+            { filename: SSE, code: controller({ head: `${SSE_HEAD}import { OrderService } from "@modules/domain/order"
+`, ctor: "private readonly hub: RealtimeHub, private readonly orders: OrderService" }), errors: [{ messageId: "injects" }] },
             // an untyped parameter cannot be proven to be the hub
             { filename: SUBSCRIPTION, code: subscription({ ctor: "private readonly hub" }), errors: [{ messageId: "injects" }] },
             // a lookalike hub of another owner is not the platform hub
@@ -132,6 +162,9 @@ test("realtime-topic-scope: the topic is built from the principal parameter", ()
         valid: [
             { filename: GATEWAY, code: gateway() },
             { filename: SUBSCRIPTION, code: subscription() },
+            { filename: SSE, code: controller() },
+            // the Last-Event-ID only picks the replay point inside a topic built from the principal
+            { filename: SSE, code: controller({ body: "return this.hub.subscribe(['orders', principal.id].join(':'), { after: lastEventId })" }) },
             // the principal id may be passed through a call
             { filename: SUBSCRIPTION, code: subscription({ body: "return this.hub.subscribe(['orders', principal.id].join(':'))" }) },
             // a handler that never subscribes is not judged
@@ -143,6 +176,9 @@ test("realtime-topic-scope: the topic is built from the principal parameter", ()
             // a topic from client input only
             { filename: SUBSCRIPTION, code: subscription({ body: "return this.hub.subscribe(`orders:${orderId}`)" }), errors: [{ messageId: "scope" }] },
             { filename: SUBSCRIPTION, code: subscription({ body: "return this.hub.subscribe('orders')" }), errors: [{ messageId: "scope" }] },
+            // a topic from the Last-Event-ID header or the client alone is a leak
+            { filename: SSE, code: controller({ body: "return this.hub.subscribe(`orders:${lastEventId}`)" }), errors: [{ messageId: "scope" }] },
+            { filename: SSE, code: controller({ params: "@Headers(\"last-event-id\") lastEventId?: string", body: "return this.hub.subscribe('orders')" }), errors: [{ messageId: "scope" }] },
             // no principal parameter at all
             { filename: GATEWAY, code: gateway({ params: "", body: "return this.hub.subscribe('orders')" }), errors: [{ messageId: "scope" }] },
             // a principal parameter that is a lookalike decorator of another owner proves nothing

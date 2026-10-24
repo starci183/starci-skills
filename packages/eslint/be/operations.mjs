@@ -17,8 +17,11 @@ import { decoratorArguments, decoratorCallee, isImportedFrom } from "./lib/impor
 import { isTransportSlot } from "./lib/transport-slots.mjs"
 import { typed } from "./lib/types.mjs"
 
-/** The HTTP route decorators of `@nestjs/common`. */
-const HTTP_ROUTES = ["Get", "Post", "Put", "Patch", "Delete", "All", "Options", "Head"]
+/** The HTTP route decorators of `@nestjs/common` (`Sse` is a route too: a `text/event-stream` GET that needs its own evidence). */
+const HTTP_ROUTES = ["Get", "Post", "Put", "Patch", "Delete", "All", "Options", "Head", "Sse"]
+
+/** The slot of server-sent-events doors: the one place an `@Sse` route is evidence of itself. */
+const SSE_SLOT = "be.feature.realtime.sse"
 
 /** True when a declaration file is owned by the capability `operations` of a platform slot. */
 const declaredByOperations = (hfs, file) => hfs.slotOf(file) === "be.platform" && hfs.ownerOf(file)?.split("/").pop() === "operations"
@@ -275,9 +278,17 @@ const credentialGuardEvidence = (context, method) => {
     return false
 }
 
-/** Route-level evidence for probes, auth handshakes, signed webhooks, redirects, byte transfers and credential-guarded routes. */
+/**
+ * Event-stream evidence (BE_REST_DOOR_EVIDENCE, owner:lite-sse-door): the route is an `@Sse` method of `@nestjs/common` inside the sse slot of a
+ * realtime channel. It is structural, not a name list: the same `@Sse` anywhere else, or any other route inside the sse slot, proves nothing.
+ */
+const eventStreamEvidence = (context, method) =>
+    hfsOf(context).slotOf(context.filename) === SSE_SLOT
+    && (method.decorators ?? []).some((decorator) => isImportedFrom(context, decoratorCallee(decorator), "@nestjs/common", "Sse"))
+
+/** Route-level evidence for probes, auth handshakes, signed webhooks, redirects, byte transfers, event streams and credential-guarded routes. */
 export const restExceptionEvidence = (context, method) => {
-    if (credentialGuardEvidence(context, method)) return true
+    if (credentialGuardEvidence(context, method) || eventStreamEvidence(context, method)) return true
     for (const decorator of method.decorators ?? []) {
         const callee = decoratorCallee(decorator)
         if (isImportedFrom(context, callee, "@nestjs/common", "Redirect")) return true

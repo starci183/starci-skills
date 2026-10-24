@@ -7,7 +7,7 @@
 # catalog READ this file through scripts/hfs/slots.mjs; none of them hardcodes a path.
 # Shape: modules/schemas/hfs-slots.schema.yaml. The repository side is hfs.json: modules/schemas/hfs-repo.schema.yaml.
 schema: starci/hfs-slots@3
-version: 3.5.0
+version: 3.6.0
 
 versioning:
   # MAJOR.MINOR.PATCH of this manifest. A repository pins only the MAJOR in hfs.json ("hfs": 3).
@@ -41,6 +41,8 @@ versioning:
 # 3.4.0 is a minor (alpha.25): it ADDS the opt-in be.contract.mcp-tools slot, the committed MCP tool-catalog snapshot of an app.
 # 3.5.0 is a minor (alpha.27): it ADDS the opt-in app.browser-config slot, the managed browser/tsconfig.json that type-checks the browser
 # journey (enabled with app.browser by `browser: true`).
+# 3.6.0 is a minor (alpha.30): it ADDS the opt-in be.feature.realtime.sse slot, the server-sent-events door of the realtime kind (owner decision
+# 2026-10-24: lite may serve SSE, and SSE is the default door for one-way push), and lets fe.modules.api hold the SSE stream readers (sse/).
 
 # Field meaning, per slot.
 #   id          stable name, never changes meaning inside a major.
@@ -217,7 +219,7 @@ ruleParams:
       kafkajs: [platform/event-bus]          # pattern event-bus: Kafka is the only event transport
       "@nestjs/schedule": []                 # no @Cron / @Interval / @Timeout anywhere: a schedule is a BullMQ job scheduler of a queue
       eventemitter2: []
-      setInterval: [platform/retry, platform/event-bus, platform/queue, platform/http]
+      setInterval: [platform/retry, platform/event-bus, platform/queue, platform/http, platform/realtime]
       setTimeout: [platform/retry, platform/event-bus, platform/queue, platform/http]
       "node:timers": [platform/retry, platform/event-bus, platform/queue, platform/http]
       "node:timers/promises": [platform/retry, platform/event-bus, platform/queue, platform/http]
@@ -1434,9 +1436,9 @@ slots:
     since: 1.0.0
   - id: be.feature.realtime
     profiles: [be]
-    editionWhy: "ruling:R212/case-2 (owner:lite-production-swarm) (with the Work boundary amended by ruling:R212/case-4): lite runs socket.io in the api process, one instance without Redis; full may scale its gateway."
+    editionWhy: "ruling:R212/case-2 (owner:lite-production-swarm) (with the Work boundary amended by ruling:R212/case-4) and ruling:R212/case-5 (owner decision 2026-10-24): lite serves server-sent events (the default door for one-way push) or runs socket.io in the api process, one instance without Redis; full may scale its gateway."
     path: "src/features/realtime/<channel>/"
-    presence: opt-in              # a push channel: reads and pushes only (a socket gateway or a GraphQL subscription), no domain write
+    presence: opt-in              # a push channel: reads and pushes only (an SSE controller, a socket gateway or a GraphQL subscription), no domain write
     pattern: realtime             # declaring the pattern (hfs.json sides.be.patterns) enables the kind (knowledge/patterns/be/realtime.yaml)
     trigger: realtime
     tracked: tracked
@@ -1447,9 +1449,9 @@ slots:
     tests: none
     lite:
       why: >-
-        a push channel on the same socket.io gateway as full (owner ruling 2026-10-13): lite runs the gateway inside the be api
-        process, one instance and no Redis adapter; the front end listens through hooks/socketio
-        (knowledge/patterns/be/realtime.yaml, liteAdapter)
+        a push channel: the server-sent-events door (be.feature.realtime.sse, the default for one-way push, owner decision 2026-10-24)
+        or the same socket.io gateway as full (owner ruling 2026-10-13), both run inside the be api process, one instance and no
+        Redis adapter; the front end listens through a use<Channel>Stream hook over modules/api/sse, or hooks/socketio (knowledge/patterns/be/realtime.yaml, liteAdapter)
     coverage: none
     rules: [BE_KIND_ISOLATION, BE_FEATURE_IMPORTS_FEATURE, BE_FEATURE_NOT_COMPOSED]
     since: 1.0.0
@@ -1457,14 +1459,14 @@ slots:
       - {path: packages/hfs/src/hfs-stacks-swarm.spec.mjs, edition: lite}
   - id: be.feature.realtime.graphql
     profiles: [be]
-    editionWhy: "ruling:R212/case-2 (owner:lite-production-swarm) (with the Work boundary amended by ruling:R212/case-4): lite uses only the in-process socket.io gateway; the GraphQL subscription door remains full-only."
+    editionWhy: "ruling:R212/case-2 (owner:lite-production-swarm) (with the Work boundary amended by ruling:R212/case-4): lite pushes through the SSE door or the in-process socket.io gateway; the GraphQL subscription door remains full-only."
     path: "src/features/realtime/<channel>/transport/graphql/"
     presence: opt-in              # a GraphQL subscription over graphql-ws
-    litePresence: forbidden       # ruling:R212/case-2 (owner:lite-production-swarm) (with the Work boundary amended by ruling:R212/case-4): lite pushes through the api's in-process socket.io gateway
+    litePresence: forbidden       # ruling:R212/case-2 (owner:lite-production-swarm) (with the Work boundary amended by ruling:R212/case-4): lite pushes through the api's SSE door or its in-process socket.io gateway
     pattern: realtime
     tracked: tracked
     tier: feature
-    goesTo: "src/features/realtime/<channel>/transport/websocket/ (be.feature.realtime.websocket): both editions push through the socket.io gateway; lite runs it in the api process"
+    goesTo: "src/features/realtime/<channel>/transport/sse/ (be.feature.realtime.sse, the default for one-way push) or transport/websocket/ (be.feature.realtime.websocket): lite runs either door in the api process"
     requires: ["<channel>-graphql.module.ts", "<channel>.subscription.ts", "<channel>.subscription.spec.ts"]
     allows: ["<channel>-graphql.module.ts", "<channel>-graphql.module-definition.ts", "<channel>-graphql.options.ts", "<channel>.subscription.ts", "<channel>.subscription.spec.ts", dto/]
     tests: unit-beside            # the door's own spec beside the door (a subscription has no service of its own)
@@ -1474,14 +1476,14 @@ slots:
     since: 1.0.0
   - id: be.feature.realtime.dto
     profiles: [be]
-    editionWhy: "ruling:R212/case-2 (owner:lite-production-swarm) (with the Work boundary amended by ruling:R212/case-4): GraphQL subscription DTOs exist only with the full subscription door; lite uses socket.io contracts."
+    editionWhy: "ruling:R212/case-2 (owner:lite-production-swarm) (with the Work boundary amended by ruling:R212/case-4): GraphQL subscription DTOs exist only with the full subscription door; lite uses SSE or socket.io contracts."
     path: "src/features/realtime/<channel>/transport/graphql/dto/"
     presence: opt-in
     litePresence: forbidden       # the dto of the graphql door, which lite does not serve
     pattern: realtime
     tracked: tracked
     tier: feature
-    goesTo: "src/features/realtime/<channel>/transport/websocket/ (be.feature.realtime.websocket): both editions push through the socket.io gateway; lite runs it in the api process"
+    goesTo: "src/features/realtime/<channel>/transport/sse/ (be.feature.realtime.sse, the default for one-way push) or transport/websocket/ (be.feature.realtime.websocket): lite runs either door in the api process"
     allows: ["<name>.{input,type,args}.ts"]
     tests: none
     coverage: none
@@ -1502,6 +1504,20 @@ slots:
     composedBy: [api]
     rules: [BE_REALTIME_SHAPE, BE_REALTIME_WRITES, BE_REALTIME_TOPIC_SCOPE, BE_DEFAULT_DENY]
     since: 1.0.0
+  - id: be.feature.realtime.sse
+    since: 3.6.0
+    profiles: [be]
+    path: "src/features/realtime/<channel>/transport/sse/"
+    presence: opt-in              # a server-sent-events door: one @Sse method, the default door for one-way push (owner decision 2026-10-24), served in both editions
+    pattern: realtime
+    tracked: tracked
+    tier: feature
+    requires: ["<channel>-sse.module.ts", "<channel>.controller.ts", "<channel>.controller.spec.ts"]
+    allows: ["<channel>-sse.module.ts", "<channel>-sse.module-definition.ts", "<channel>-sse.options.ts", "<channel>.controller.ts", "<channel>.controller.spec.ts"]
+    tests: unit-beside            # the door's own spec beside the door (an SSE controller has no service of its own)
+    coverage: none
+    composedBy: [api]
+    rules: [BE_REALTIME_SHAPE, BE_REALTIME_WRITES, BE_REALTIME_TOPIC_SCOPE, BE_DEFAULT_DENY, BE_REST_DOOR_EVIDENCE]
   - id: be.cli
     since: 3.1.0
     profiles: [be]
@@ -2254,15 +2270,17 @@ slots:
     # The browser's calls to the back end (owner ruling 2026-10-13, fe-stack graphql/rest/codegen, FE-API-GRAPHQL): the auth and
     # no-auth Apollo clients with their link chain (graphql/clients), one file per operation (graphql/queries/query-<x>.ts,
     # graphql/mutations/mutation-<x>.ts with its gql document map and typed request/response in types/), the generated wire types
-    # (graphql/__generated__) and the axios calls (rest/<area>/*.ts) for uploads, presigned URLs and auth endpoints. A repository has
+    # (graphql/__generated__), the axios calls (rest/<area>/*.ts) for uploads, presigned URLs and auth endpoints and the fetch readers of
+    # server-sent-events streams (sse/<area>/*.ts, one file per stream, the bearer token from modules/auth). A repository has
     # exactly ONE client folder and ONE GraphQLResponse union: the app's (fe.transport.client/outcome) when one app calls the back end,
     # or the api package's (fe.package.api.client/outcome) when several do (FE_TRANSPORT_OWNER, machine).
     requires: [index.ts]
     allows: [index.ts, graphql/index.ts, graphql/types.ts, "graphql/clients/**", "graphql/queries/query-*.ts", "graphql/queries/types/*.ts",
-             "graphql/mutations/mutation-*.ts", "graphql/mutations/types/*.ts", "graphql/__generated__/**", "rest/index.ts", "rest/<area>/*.ts"]
+             "graphql/mutations/mutation-*.ts", "graphql/mutations/types/*.ts", "graphql/__generated__/**", "rest/index.ts", "rest/<area>/*.ts",
+             "sse/index.ts", "sse/<area>/*.ts"]
     roles: {entry: index.ts, query: "query-*.ts", mutation: "mutation-*.ts"}
     # A hook imports its one operation file directly (one file per operation, FE-API-GRAPHQL), never through a barrel of every operation.
-    entries: ["graphql/queries/query-*.ts", "graphql/queries/types/*.ts", "graphql/mutations/mutation-*.ts", "graphql/mutations/types/*.ts"]
+    entries: ["graphql/queries/query-*.ts", "graphql/queries/types/*.ts", "graphql/mutations/mutation-*.ts", "graphql/mutations/types/*.ts", "sse/<area>/*.ts"]
     tests: none
     rules: [FE_TRANSPORT_OWNER, FE_HTTP_STATUS_COLLAPSE, FE_WIRE_GENERATED]
   - id: fe.transport.generated

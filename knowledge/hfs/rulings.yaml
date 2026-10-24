@@ -277,8 +277,8 @@ rulings:
       Auth only. Later decisions amend the hosting and lite Work clauses while retaining those boundaries.
     supersedes:
       - {rule: R212, case: case-1}
-    amendedBy: [R212/case-4, lite-production-swarm]
-    amendmentScope: The lite Work and production hosting clauses only.
+    amendedBy: [R212/case-4, R212/case-5, lite-production-swarm]
+    amendmentScope: The lite Work and production hosting clauses, and the lite realtime adapter clause (R212/case-5).
     enforcedBy: [R212, R217]
 
   - id: R212/case-3 # Historical hosting clause amended by owner:lite-production-swarm.
@@ -295,6 +295,20 @@ rulings:
     amendedBy: [lite-production-swarm]
     amendmentScope: The lite production hosting clause; adapter, baseline and asset policies remain.
     enforcedBy: [R212, R213, R257, R282]
+
+  - id: R212/case-5
+    date: '2026-10-24'
+    topic: edition.lite-sse-door
+    status: live
+    source: owner:lite-sse-door (owner decision 2026-10-24); knowledge/hfs/rules.yaml R212 cases.case-5
+    statement: >-
+      Lite may serve server-sent events from the api process beside the in-process socket.io gateway. SSE is the
+      third door of the realtime pattern (be.feature.realtime.sse) in both editions and the default door for one-way
+      push; the hub is single-replica, and the GraphQL subscription door stays full-only.
+    supersedes:
+      - {rule: R212, case: case-2}
+    amendmentScope: The lite realtime adapter clause of case-2 only; the Supabase Auth boundary and the socket.io gateway stay.
+    enforcedBy: [R184, R185, R186, R212, R278]
 
   - id: R245
     date: '2026-10-14'

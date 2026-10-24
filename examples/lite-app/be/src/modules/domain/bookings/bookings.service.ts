@@ -2,9 +2,12 @@ import { Injectable } from "@nestjs/common"
 import type { EntityManager } from "typeorm"
 import { ResourcesService } from "@modules/domain/resources"
 import { InjectPrimaryEntityManager, requireOwnedRow } from "@modules/platform/database"
+import { InjectRealtimeHub } from "@modules/platform/realtime"
+import type { RealtimeHub } from "@modules/platform/realtime"
 import { BookingConfirmationQueue, isConfirmBookingPayload } from "@modules/queues/booking-confirmation"
 import { BookingReminderQueue, isBookingReminderPayload, isBookingReminderTick } from "@modules/queues/booking-reminder"
 import type { BookingResult, BookingStatusResult, CreateBookingParams } from "./bookings.contracts"
+import { bookingStatusFrame, bookingStatusTopic } from "./bookings.policy"
 import { BookingsError, BookingsErrorCode } from "./errors/bookings.error"
 import type { BookingsRow } from "./persistence/bookings.rows"
 import {
@@ -20,6 +23,8 @@ const EXCLUSION_VIOLATION = "23P01"
 
 type InsertedBooking = Pick<BookingsRow, "id" | "resource_id" | "starts_at" | "ends_at" | "status">
 
+type ConfirmedBooking = Pick<BookingsRow, "id" | "owner_id">
+
 const isIntervalTaken = (cause: unknown): boolean =>
     typeof cause === "object" && cause !== null && "code" in cause && cause.code === EXCLUSION_VIOLATION
 
@@ -31,6 +36,7 @@ export class BookingsService {
         private readonly resources: ResourcesService,
         private readonly confirmations: BookingConfirmationQueue,
         private readonly reminders: BookingReminderQueue,
+        @InjectRealtimeHub() private readonly hub: RealtimeHub,
     ) {}
 
     /**
@@ -78,10 +84,17 @@ export class BookingsService {
         })
     }
 
-    /** The effect of one confirm-booking job: the pending booking becomes confirmed. Any other payload changes nothing. */
+    /**
+     * The effect of one confirm-booking job: the pending booking becomes confirmed, and once that write is committed its owner is
+     * pushed the new status on the booking-status channel. A confirmed booking answers no row, so a repeated job pushes nothing.
+     * Any other payload changes nothing.
+     */
     async confirmBooking(payload: object): Promise<void> {
         if (!isConfirmBookingPayload(payload)) return
-        await this.entityManager.query(CONFIRM_BOOKING, [payload.bookingId])
+        const confirmed = await this.entityManager.query<Array<ConfirmedBooking>>(CONFIRM_BOOKING, [payload.bookingId])
+        for (const booking of confirmed) {
+            this.hub.publish(bookingStatusTopic(booking.owner_id), bookingStatusFrame(booking.id, "confirmed"))
+        }
     }
 
     /**
