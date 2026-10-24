@@ -75,7 +75,7 @@ concerns:
     home: [fe.hooks.socketio]
     pattern: FE-REALTIME
     forbids: [graphql-ws, subscriptions-transport-ws, '@supabase/realtime-js', pusher-js, ably]
-    why: 'one socket.io-client singleton per namespace and one side-effect component that dispatches to redux and SWR; lite runs the gateway in the be api process. A one-way channel served as server-sent events needs no package: a fetch reader in modules/api/sse and a use<Channel>Stream hook (FE-REALTIME).'
+    why: one socket.io-client singleton per namespace and one side-effect component that dispatches to redux and SWR; lite runs the gateway in the be api process. A one-way channel served as server-sent events needs no package, only a fetch reader in modules/api/sse and a use<Channel>Stream hook (FE-REALTIME).
   - id: auth
     tier: core
     packages: []

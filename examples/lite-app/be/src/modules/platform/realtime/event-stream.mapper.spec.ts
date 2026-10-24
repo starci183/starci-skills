@@ -30,7 +30,7 @@ const controlled = (withReturn: boolean) => {
                     wake = resolve
                 })
             }
-            if (failure !== undefined) throw failure
+            if (failure !== undefined) return Promise.reject(failure)
             return queue.shift() ?? { done: true, value: undefined }
         },
         ...(withReturn ? { return: returned } : {}),
@@ -53,10 +53,16 @@ const controlled = (withReturn: boolean) => {
     }
 }
 
+/** How the response ended: completed, or failed with an error. */
+interface StreamState {
+    completed: boolean
+    error: unknown
+}
+
 /** Subscribes like Nest does and records what the response would write. */
 const listen = (stream: ReturnType<typeof eventStream>) => {
     const events: Array<MessageEvent> = []
-    const state: { completed: boolean; error: unknown } = { completed: false, error: undefined }
+    const state: StreamState = { completed: false, error: undefined }
     const subscription = stream.subscribe({
         next: (event) => events.push(event),
         error: (error: unknown) => {
@@ -116,6 +122,12 @@ describe("eventStream", () => {
         expect(events.slice(1)).toEqual([{ comment: "heartbeat" }, { comment: "heartbeat" }])
         subscription.unsubscribe()
     })
+
+})
+
+describe("eventStream disconnects and failures", () => {
+    beforeEach(() => jest.useFakeTimers())
+    afterEach(() => jest.useRealTimers())
 
     it("stops the heartbeat and returns the hub iterator when the client disconnects", async () => {
         const subject = await buildSubject()

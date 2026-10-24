@@ -104,8 +104,8 @@ const drain = async (reader: ReadableStreamDefaultReader<string>, parse: (chunk:
  */
 export const followEventStream = async ({ url, signal, onOpen, onEvent, report }: FollowEventStreamParams): Promise<void> => {
     let lastEventId: string | undefined
-    let retryMs = RECONNECT_POLICY.initialDelayMs
-    let delayMs = retryMs
+    let retryMs: number = RECONNECT_POLICY.initialDelayMs
+    let delayMs: number = retryMs
     const parse = createEventParser(
         (event) => {
             lastEventId = event.id ?? lastEventId

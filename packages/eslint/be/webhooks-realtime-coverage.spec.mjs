@@ -64,7 +64,7 @@ import { RealtimeHub } from "@modules/platform/realtime"
 `
 
 /** Both editions serve the same event-stream door: one `@Sse` method, the hub as the only value injected, the topic from the principal. */
-const sseController = ({ body = 'return this.hub.subscribe(["orders", principal.id].join(":"), { after: lastEventId })', injections = "", imports = "" } = {}) => SSE_HEAD + imports + `
+const sseController = ({ body = 'return this.hub.stream(["orders", principal.id].join(":"), { after: lastEventId })', injections = "", imports = "" } = {}) => SSE_HEAD + imports + `
 @Controller("orders")
 export class OrderStatusController {
     constructor(private readonly hub: RealtimeHub${injections}) {}
@@ -156,7 +156,7 @@ for (const edition of ["lite", "full"]) {
         assert.equal(hfs.edition, edition)
         ruleTester({ root: TYPED_ROOT, hfs }).run("realtime-topic-scope", realtimeTopicScope, {
             valid: [{ filename: SSE, code: sseController() }],
-            invalid: [{ filename: SSE, code: sseController({ body: "return this.hub.subscribe(`orders:${lastEventId}`)" }), errors: [{ messageId: "scope" }] }],
+            invalid: [{ filename: SSE, code: sseController({ body: "return this.hub.stream(`orders:${lastEventId}`)" }), errors: [{ messageId: "scope" }] }],
         })
     })
 }

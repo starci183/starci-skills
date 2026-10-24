@@ -2,10 +2,9 @@ import { APP_GUARD } from "@nestjs/core"
 import { Test } from "@nestjs/testing"
 import { BookingStatusSseModule } from "@features/realtime/booking-status"
 import { ACCESS_TOKEN_VERIFIER, AuthGuard } from "@modules/domain/identity"
-import { SupabaseErrorCode } from "@modules/integrations/supabase"
-import type { VerifySupabaseAccessToken } from "@modules/integrations/supabase"
 import type { Principal } from "@modules/platform/cqrs"
 import { ok, refused } from "@modules/platform/primitives"
+import { TestWorldError, TestWorldErrorCode } from "./test-world.error"
 import { REALTIME_HUB, RealtimeModule } from "@modules/platform/realtime"
 import type { RealtimeHub } from "@modules/platform/realtime"
 
@@ -13,12 +12,13 @@ import type { RealtimeHub } from "@modules/platform/realtime"
 const PRINCIPALS: Readonly<Record<string, Principal>> = {
     "token-person-1": { id: "person-1", role: "authenticated" },
     "token-person-2": { id: "person-2", role: "authenticated" },
+    "token-person-3": { id: "person-3", role: "authenticated" },
 }
 
 /** The verifier of the proof: a known token is its principal, anything else is an invalid access token. */
-const verifyAccessToken: VerifySupabaseAccessToken = (token) => {
+const verifyAccessToken = (token: string) => {
     const principal = PRINCIPALS[token]
-    return Promise.resolve(principal === undefined ? refused(SupabaseErrorCode.AccessTokenInvalid) : ok(principal))
+    return Promise.resolve(principal === undefined ? refused("SUPABASE_ACCESS_TOKEN_INVALID") : ok(principal))
 }
 
 /** One open stream of the proof: the response head and the text read so far. */
@@ -42,11 +42,11 @@ export const createRealtimeProof = async () => {
     const moduleRef = await Test.createTestingModule({
         imports: [RealtimeModule.register({ isGlobal: true }), BookingStatusSseModule.register({})],
         providers: [
-            { provide: ACCESS_TOKEN_VERIFIER, useValue: verifyAccessToken },
+            { provide: ACCESS_TOKEN_VERIFIER, useFactory: () => verifyAccessToken },
             { provide: APP_GUARD, useClass: AuthGuard },
         ],
     }).compile()
-    const app = moduleRef.createNestApplication()
+    const app = moduleRef.createNestApplication({ logger: false })
     await app.listen(0, "127.0.0.1")
     const origin = await app.getUrl()
     const hub = app.get<RealtimeHub>(REALTIME_HUB)
@@ -70,7 +70,7 @@ export const createRealtimeProof = async () => {
             readUntil: async function readUntil(marker: string): Promise<string> {
                 if (received.includes(marker)) return received
                 const chunk = await reader?.read()
-                if (chunk === undefined || chunk.done) throw new Error(`the stream ended before ${marker}`)
+                if (chunk === undefined || chunk.done) throw new TestWorldError({ code: TestWorldErrorCode.StreamEnded, params: { marker } })
                 received += chunk.value
                 return readUntil(marker)
             },
@@ -80,7 +80,7 @@ export const createRealtimeProof = async () => {
     /** Polls a condition on the event loop (no sleep) until it holds, and fails the test when it never does. */
     const waitFor = async (condition: () => boolean, attempts = 200): Promise<void> => {
         if (condition()) return
-        if (attempts === 0) throw new Error("the condition never held")
+        if (attempts === 0) throw new TestWorldError({ code: TestWorldErrorCode.ConditionNeverHeld })
         await new Promise<void>((resolve) => setTimeout(resolve, 5))
         return waitFor(condition, attempts - 1)
     }

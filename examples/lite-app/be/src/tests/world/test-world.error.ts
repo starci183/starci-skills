@@ -10,6 +10,10 @@ export enum TestWorldErrorCode {
     SchedulerRollback = "TEST_WORLD_SCHEDULER_ROLLBACK",
     /** Fails the first run so redispatch must resume persisted progress. */
     ProviderDown = "TEST_WORLD_PROVIDER_DOWN",
+    /** The event stream ended before the awaited text arrived. */
+    StreamEnded = "TEST_WORLD_STREAM_ENDED",
+    /** A polled condition never held within its attempts. */
+    ConditionNeverHeld = "TEST_WORLD_CONDITION_NEVER_HELD",
 }
 
 /** A coded infrastructure failure or an injected rollback and retry failure. */

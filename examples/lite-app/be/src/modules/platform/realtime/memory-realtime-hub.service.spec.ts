@@ -1,3 +1,4 @@
+import type { MessageEvent } from "@nestjs/common"
 import { Test } from "@nestjs/testing"
 import { MemoryRealtimeHubService, REPLAY_FRAMES, REPLAY_TOPICS } from "./memory-realtime-hub.service"
 import type { RealtimeTopic } from "./realtime.port"
@@ -58,14 +59,17 @@ describe("MemoryRealtimeHubService live delivery", () => {
         await reader.return?.()
     })
 
-    it("never delivers a frame of another topic or a value the topic does not accept", async () => {
+    it("never delivers a frame of another topic or a value the subscriber's topic does not accept", async () => {
         const hub = await build()
-        const topic = topicOf("t:mine")
-        const reader = hub.subscribe(topic)[Symbol.asyncIterator]()
+        const strict: RealtimeTopic<Frame> = {
+            name: "t:mine",
+            accepts: (value: unknown): value is Frame => isFrame(value) && value.value > 0,
+        }
+        const reader = hub.subscribe(strict)[Symbol.asyncIterator]()
 
         hub.publish(topicOf("t:other"), frameOf(1))
-        hub.publish({ name: "t:mine", accepts: (value: unknown): value is Frame => value === "never" }, frameOf(2))
-        hub.publish(topic, frameOf(3))
+        hub.publish(topicOf("t:mine"), frameOf(0))
+        hub.publish(topicOf("t:mine"), frameOf(3))
 
         await expect(reader.next()).resolves.toEqual({ done: false, value: frameOf(3) })
         await reader.return?.()
@@ -146,12 +150,21 @@ describe("MemoryRealtimeHubService replay", () => {
 
     it("retains only a frame the topic accepts and that carries a string id", async () => {
         const hub = await build()
-        const topic: RealtimeTopic<Frame> = { name: "t:ids", accepts: (value: unknown): value is Frame => isFrame(value) && value.value > 0 }
-        hub.publish(topic, frameOf(0))
-        hub.publish(topic, { id: 7, value: 1 } as unknown as Frame)
-        hub.publish(topic, frameOf(1))
+        const strict: RealtimeTopic<Frame> = {
+            name: "t:ids",
+            accepts: (value: unknown): value is Frame => isFrame(value) && value.value > 0,
+        }
+        const withoutId: RealtimeTopic<{ readonly value: number }> = { name: "t:ids", accepts: (value: unknown): value is { readonly value: number } => value !== undefined }
+        const numericId: RealtimeTopic<{ readonly id: number; readonly value: number }> = {
+            name: "t:ids",
+            accepts: (value: unknown): value is { readonly id: number; readonly value: number } => value !== undefined,
+        }
+        hub.publish(strict, frameOf(0))
+        hub.publish(withoutId, { value: 1 })
+        hub.publish(numericId, { id: 7, value: 1 })
+        hub.publish(strict, frameOf(1))
 
-        await expect(replayed(hub, topic, "e-none")).resolves.toEqual([frameOf(1)])
+        await expect(replayed(hub, strict, "e-none")).resolves.toEqual([frameOf(1)])
     })
 
     it("keeps at most REPLAY_FRAMES frames of one topic, dropping the oldest", async () => {
@@ -173,5 +186,36 @@ describe("MemoryRealtimeHubService replay", () => {
 
         await expect(replayed(hub, topicOf("t:first"), "e-none")).resolves.toEqual([])
         await expect(replayed(hub, topicOf(`t:filler-${REPLAY_TOPICS - 1}`), "e-none")).resolves.toEqual([frameOf(REPLAY_TOPICS - 1)])
+    })
+})
+
+describe("MemoryRealtimeHubService stream", () => {
+    it("writes the frames of the topic as events and releases the subscription when the client unsubscribes", async () => {
+        const hub = await build()
+        const topic = topicOf("t:stream")
+        const events: Array<MessageEvent> = []
+
+        const subscription = hub.stream(topic).subscribe((event) => events.push(event))
+        expect(hub.subscriberCount(topic)).toBe(1)
+        hub.publish(topic, frameOf(1))
+        await new Promise<void>((resolve) => setImmediate(resolve))
+        subscription.unsubscribe()
+
+        expect(events).toEqual([{ retry: 3_000, comment: "open" }, { id: "e-1", data: frameOf(1) }])
+        expect(hub.subscriberCount(topic)).toBe(0)
+    })
+
+    it("resumes the event stream after the id the client names", async () => {
+        const hub = await build()
+        const topic = topicOf("t:stream-resume")
+        hub.publish(topic, frameOf(1))
+        hub.publish(topic, frameOf(2))
+        const events: Array<MessageEvent> = []
+
+        const subscription = hub.stream(topic, { after: "e-1" }).subscribe((event) => events.push(event))
+        await new Promise<void>((resolve) => setImmediate(resolve))
+        subscription.unsubscribe()
+
+        expect(events.map((event) => event.id)).toEqual([undefined, "e-2"])
     })
 })

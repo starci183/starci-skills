@@ -26,16 +26,14 @@ export const eventStream = <T extends EventFrame>(
         subscriber.next({ retry: RECONNECT_MS, comment: "open" })
         const beat = setInterval(() => subscriber.next({ comment: "heartbeat" }), heartbeatMs)
         const pump = async (): Promise<void> => {
-            try {
-                for await (const frame of { [Symbol.asyncIterator]: () => iterator }) {
-                    subscriber.next({ id: frame.id, data: frame })
-                }
-                subscriber.complete()
-            } catch (cause) {
-                subscriber.error(cause)
+            for await (const frame of { [Symbol.asyncIterator]: () => iterator }) {
+                subscriber.next({ id: frame.id, data: frame })
             }
         }
-        void pump()
+        void pump().then(
+            () => subscriber.complete(),
+            (cause: unknown) => subscriber.error(cause),
+        )
         return () => {
             clearInterval(beat)
             void iterator.return?.()
