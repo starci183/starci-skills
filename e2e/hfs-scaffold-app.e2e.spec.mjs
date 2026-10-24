@@ -148,7 +148,9 @@ test('starci app scaffold end to end: npm ci, codegen + typecheck, starci app li
     services: [{ service: 'postgresql', image: POSTGRES_IMAGE }],
     postgresql: { connections: [{ name: 'primary', schema: 'primary' }] },
   }));
-  t.after(async () => { await stack.detach({ namespace, runId, infra }).catch(() => undefined); });
+  let detached = false;
+  const detach = async () => { if (!detached) { detached = true; await stack.detach({ namespace, runId, infra }); } };
+  t.after(async () => { await detach().catch(() => undefined); });
   const postgres = infra.postgresql;
   const login = postgres.schemas.primary ?? postgres;
   const url = `postgres://${encodeURIComponent(login.user)}:${encodeURIComponent(login.password)}@${postgres.host}:${postgres.port}/${postgres.databases.primary}`;
@@ -171,6 +173,9 @@ test('starci app scaffold end to end: npm ci, codegen + typecheck, starci app li
   } finally {
     await client.end().catch(() => undefined);
   }
+
+  // The migrate proof holds the namespace of data slot 1, which the world provisions itself: release it first.
+  await detach();
 
   // The test world the scaffold ships (scaffold/test-world.mjs): the managed integration, e2e and contract scripts the release
   // gate runs, each over the real warm stack its own globalSetup attaches; every test of every layer passes, none skipped.
